@@ -89,24 +89,36 @@ func createFile(folder string, file string) {
 }
 
 func GetByKey(key string) ([]byte, error) {
-	if val, ok := mainStore.get(key); ok {
+	rootMu.RLock()
+	ms := mainStore
+	rootMu.RUnlock()
+	if val, ok := ms.get(key); ok {
 		return val, nil
 	}
+
 	return nil, fmt.Errorf("key not found: %s", key)
 }
 
-func GetByWildcardKey(pattern string) map[string][]byte {
+func GetByWildcardKeyWithLimit(pattern string, limit int) map[string][]byte {
 	out := make(map[string][]byte)
 	keys := make([]string, 0)
 
 	if isBareStar(pattern) {
 		mainStore.Iterate(func(k string, v []byte) {
 			keys = append(keys, k)
+			limit--
+			if limit == 0 {
+				return
+			}
 		})
 	} else {
 		mainStore.Iterate(func(k string, v []byte) {
 			if matchGlob(pattern, k) {
 				keys = append(keys, k)
+				limit--
+				if limit == 0 {
+					return
+				}
 			}
 		})
 	}
@@ -126,6 +138,10 @@ func GetByWildcardKey(pattern string) map[string][]byte {
 	}
 
 	return out
+}
+
+func GetByWildcardKey(pattern string) map[string][]byte {
+	return GetByWildcardKeyWithLimit(pattern, -1)
 }
 
 func DeleteByWildcardKey(pattern string) int {

@@ -36,6 +36,8 @@ func GetKeyController(ctx *fasthttp.RequestCtx) {
 	} else {
 		handleSingleKey(key, ctx)
 	}
+
+	ctx.Response.Header.Set("Content-Type", "application/json")
 }
 
 func handleSingleKey(key string, ctx *fasthttp.RequestCtx) {
