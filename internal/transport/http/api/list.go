@@ -11,9 +11,10 @@ import (
 func ListController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 	limit := ctx.QueryArgs().GetUintOrZero("limit")
+	offset := ctx.QueryArgs().GetUintOrZero("offset")
 	sortField, sortAscending := ParseSortParam(ctx.QueryArgs())
 
-	data := api_storage.ListEntities(entity, limit, sortField, sortAscending)
+	data := api_storage.ListEntities(entity, limit, offset, sortField, sortAscending)
 
 	response, err := json.Marshal(data)
 	if err != nil {

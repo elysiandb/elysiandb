@@ -16,7 +16,7 @@ func WriteEntity(entity string, data map[string]interface{}) {
 	UpdateIndexesForEntity(entity)
 }
 
-func ListEntities(entity string, limit int, sortField string, sortAscending bool) []map[string]interface{} {
+func ListEntities(entity string, limit int, offset int, sortField string, sortAscending bool) []map[string]interface{} {
 	idList, err := GetListOfIds(entity, sortField, sortAscending)
 	if err != nil {
 		return []map[string]interface{}{}
@@ -29,6 +29,12 @@ func ListEntities(entity string, limit int, sortField string, sortAscending bool
 		if err := json.Unmarshal(idList, &ids); err != nil {
 			return []map[string]interface{}{}
 		}
+	}
+
+	if offset > 0 && offset < len(ids) {
+		ids = ids[offset:]
+	} else if offset >= len(ids) {
+		return []map[string]interface{}{}
 	}
 
 	if limit > 0 && limit < len(ids) {
