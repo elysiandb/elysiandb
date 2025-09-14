@@ -7,11 +7,32 @@
 [![Coverage](https://codecov.io/gh/taymour/elysiandb/branch/main/graph/badge.svg)](https://codecov.io/gh/taymour/elysiandb)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**ElysianDB** is a lightweight and fast key–value store written in Go.  
-It supports both **TCP** and **HTTP** protocols, combining a minimal Redis-style text protocol with a simple REST interface.  
-Designed to be **easy to configure, resource-efficient, and responsive even under high load**, ElysianDB includes persistence, TTL support, optional runtime statistics, and straightforward deployment via Docker.
+# ElysianDB — Lightweight KV Store with **Zero‑Config Auto‑Generated REST API**
+
+**ElysianDB** is a lightweight, fast key–value store written in Go. It speaks both **HTTP** and **TCP**:
+
+* a minimal Redis‑style **text protocol** over TCP for max performance,
+* a simple **KV HTTP API**, and now
+* a **zero‑configuration, auto‑generated REST API** that lets you treat ElysianDB like an **instant backend** for your frontend.
+
+> **One‑liner:** You get an **auto‑generated REST API** (CRUD, pagination, sort) **with no configuration**; **entities are inferred from the URL**, and **indexes** are created automatically on first sort or managed manually.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) if you’d like to help.
+
+---
+
+## Highlights
+
+* **Fast in‑memory store** with shard routing (xxhash), optional TTL.
+* **Persistence** via on‑disk JSON snapshots (periodic + graceful shutdown + manual save).
+* **Three interfaces**: TCP text protocol, KV HTTP endpoints, and **Zero‑Config REST Entities**.
+* **Schema‑less JSON**: store any JSON per entity; IDs generated automatically.
+* **Indexing**:
+  * **automatic, on‑demand** (first sort builds the index),
+  * or **manual** add/remove per field.
+* **Listing features**: `limit`, `offset`, and `sort[field]=asc|desc`.
+* **CI + tests** (unit + e2e) and coverage reports.
+* **Docker‑first**—one small image, sane defaults.
 
 ---
 
@@ -83,9 +104,6 @@ Prebuilt images are available on Docker Hub:
 ```bash
 # pull the latest
 docker pull taymour/elysiandb:latest
-
-# or a specific version
-docker pull taymour/elysiandb:0.1.2
 ```
 
 ## Persistence & Shutdown Behavior
@@ -159,6 +177,69 @@ docker run -d --name elysiandb \
 ---
 
 ## Protocols
+
+### Instant REST API (zero config)
+
+**Create** an article, **list** with pagination, **fetch** by id, **update**, **delete**:
+
+```bash
+# Create (entity is inferred from /api/<entity>)
+curl -s -X POST http://localhost:8089/api/articles \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Hello","tags":["go","kv"],"published":true}'
+
+# List with offset/limit and sort by title ascending
+curl -s "http://localhost:8089/api/articles?limit=20&offset=0&sort[title]=asc"
+
+# Read one (replace <id> with the value returned by POST)
+curl -s http://localhost:8089/api/articles/<id>
+
+# Update
+curl -s -X PUT http://localhost:8089/api/articles/<id> \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Hello v2","published":true}'
+
+# Delete one
+curl -s -X DELETE http://localhost:8089/api/articles/<id> -i
+
+# Destroy all records for an entity (dangerous)
+curl -s -X DELETE http://localhost:8089/api/articles -i
+```
+
+**Index management (optional):**
+
+```bash
+# Manually create an index for field "created_at"
+curl -X POST http://localhost:8089/api/articles/created_at/index -i
+
+# Remove that index
+curl -X DELETE http://localhost:8089/api/articles/created_at/index -i
+```
+
+> You usually **don’t need** to create indexes yourself: the first time you request `sort[field]`, ElysianDB will **build the index automatically** and reuse it next time.
+
+---
+
+## Zero‑Config REST Entities — How It Works
+
+* **Entity inference** from the URL: `/api/<entity>` → entity name is `<entity>` (e.g., `articles`, `users`, `orders`, `weird-entity_name42`).
+* **Schema‑less JSON** per entity. ElysianDB stores documents “as is”.
+* **IDs** are generated as UUIDs on `POST /api/<entity>` and returned in the response.
+* **CRUD endpoints**:
+
+  * `POST   /api/<entity>` → create JSON document (auto‑ID)
+  * `GET    /api/<entity>` → list with `limit`, `offset`, `sort[field]=asc|desc`
+  * `GET    /api/<entity>/<id>` → fetch by id
+  * `PUT    /api/<entity>/<id>` → merge/update fields
+  * `DELETE /api/<entity>/<id>` → delete by id
+  * `DELETE /api/<entity>` → delete **all** documents of that entity
+* **Sorting & Indexing**:
+
+  * Query like `?sort[score]=desc` builds **(or refreshes)** the index for `score` if missing.
+  * Indexes can also be **managed explicitly** per field (see endpoints above).
+* **Pagination**: `limit` and `offset` are integers; defaults are `0` (no limit) and `0`.
+
+This makes ElysianDB a drop‑in **instant backend API** for POCs, internal tools, and simple frontends.
 
 ### TCP text protocol ("Redis style")
 
