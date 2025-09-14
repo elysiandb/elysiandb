@@ -7,6 +7,7 @@ toolchain go1.24.7
 require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/fasthttp/router v1.5.4
+	github.com/google/uuid v1.6.0
 	github.com/valyala/fasthttp v1.65.0
 	gopkg.in/yaml.v2 v2.4.0
 )

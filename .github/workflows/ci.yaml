@@ -31,16 +31,15 @@ jobs:
       - name: Run tests (race)
         run: make test
 
-      - name: Coverage (only internal + main)
+      - name: Coverage (all packages)
         run: |
-          INTERNAL_PKGS=$(go list ./internal/... | tr '\n' ',')
-          MAIN_PKG=$(go list -f '{{.ImportPath}}' .)
-          COVERPKG="${INTERNAL_PKGS}${MAIN_PKG}"
+          COVERPKG=$(go list ./... | tr '\n' ',' | sed 's/,$//')
+          TEST_PKGS=$(go list -f '{{if or (len .TestGoFiles) (len .XTestGoFiles)}}{{.ImportPath}}{{end}}' ./... | grep -v '^$')
+          if [ -z "$TEST_PKGS" ]; then echo "no test packages"; exit 0; fi
 
-          PKGS=$(go list -f '{{if or (len .TestGoFiles) (len .XTestGoFiles)}}{{.ImportPath}}{{end}}' ./... | grep -v '^$')
-          if [ -z "$PKGS" ]; then echo "no test packages"; exit 0; fi
+          go test $TEST_PKGS -race -covermode=atomic -coverpkg="$COVERPKG" \
+            -coverprofile=coverage.out -count=1
 
-          go test $PKGS -race -covermode=atomic -coverpkg="$COVERPKG" -coverprofile=coverage.out -count=1
           go tool cover -func=coverage.out | tail
 
       - name: Upload to Codecov
