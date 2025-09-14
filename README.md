@@ -21,6 +21,25 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) if you’d like to help.
 
 ---
 
+**Frontend example, just start ElysianDB and you can execute this code out of the box without any configuration or schema upload :**
+
+```
+// Create an article
+await fetch("http://localhost:8089/api/articles", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ title: "Hello", tags: ["go", "kv"], published: true }),
+});
+
+
+// Fetch articles
+const res = await fetch("http://localhost:8089/api/articles?limit=20&offset=0&sort[title]=asc");
+const articles = await res.json();
+```
+> More features to see below. This is a basic version but more features are coming.
+
+---
+
 ## Highlights
 
 * **Fast in‑memory store** with shard routing (xxhash), optional TTL.
