@@ -62,7 +62,7 @@ func TestReadAllEntities(t *testing.T) {
 	api_storage.WriteEntity(entity, u1)
 	api_storage.WriteEntity(entity, u2)
 
-	all := api_storage.ListEntities(entity, 0, "", true)
+	all := api_storage.ListEntities(entity, 0, 0, "", true)
 	if len(all) != 2 {
 		t.Fatalf("ListEntities len=%d, want 2, all=%v", len(all), all)
 	}
@@ -132,7 +132,7 @@ func TestDeleteAllEntities_RemovesAllForThatEntityOnly(t *testing.T) {
 
 	api_storage.DeleteAllEntities("posts")
 
-	if list := api_storage.ListEntities("posts", 0, "", true); len(list) != 0 {
+	if list := api_storage.ListEntities("posts", 0, 0, "", true); len(list) != 0 {
 		t.Fatalf("posts should be empty, got %v", list)
 	}
 	if v := api_storage.ReadEntityById("profiles", "me"); v == nil {

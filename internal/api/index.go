@@ -57,7 +57,6 @@ func RemoveEntityIndexes(entity string) {
 	storage.DeleteByWildcardKey(
 		globals.ApiEntityIndexPatternKey(entity),
 	)
-	UpdateIndexesForEntity(entity)
 }
 
 func CreateIndexesForField(entity string, field string) {
