@@ -240,3 +240,58 @@ func TestAutoREST_WorksForArbitraryEntityNames(t *testing.T) {
 		}
 	}
 }
+
+func TestAutoREST_Filters(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/books", map[string]any{"title": "Go in Action", "author": "Alice"})
+	mustPOSTJSON(t, client, "http://test/api/books", map[string]any{"title": "Learning Python", "author": "Bob"})
+	mustPOSTJSON(t, client, "http://test/api/books", map[string]any{"title": "Advanced Go", "author": "Alice"})
+
+	gr := mustGET(t, client, "http://test/api/books?filter[author]=Alice")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET /api/books?filter[author]=Alice expected 200, got %d", sc)
+	}
+	var byAuthor []map[string]any
+	if err := json.Unmarshal(gr.Body(), &byAuthor); err != nil {
+		t.Fatalf("invalid JSON filter response: %v (%q)", err, gr.Body())
+	}
+	if len(byAuthor) != 2 {
+		t.Fatalf("expected 2 books by Alice, got %d (%v)", len(byAuthor), byAuthor)
+	}
+
+	gr2 := mustGET(t, client, "http://test/api/books?filter[title]=Learning+Python")
+	if sc := gr2.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET /api/books?filter[title]=Learning Python expected 200, got %d", sc)
+	}
+	var byTitle []map[string]any
+	if err := json.Unmarshal(gr2.Body(), &byTitle); err != nil {
+		t.Fatalf("invalid JSON filter response: %v (%q)", err, gr2.Body())
+	}
+	if len(byTitle) != 1 || byTitle[0]["title"] != "Learning Python" {
+		t.Fatalf("expected only Learning Python, got %v", byTitle)
+	}
+}
+
+func TestAutoREST_CombinedFilters(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/movies", map[string]any{"title": "Inception", "director": "Nolan", "year": 2010})
+	mustPOSTJSON(t, client, "http://test/api/movies", map[string]any{"title": "Interstellar", "director": "Nolan", "year": 2014})
+	mustPOSTJSON(t, client, "http://test/api/movies", map[string]any{"title": "Dunkirk", "director": "Nolan", "year": 2017})
+	mustPOSTJSON(t, client, "http://test/api/movies", map[string]any{"title": "The Matrix", "director": "Wachowski", "year": 1999})
+
+	gr := mustGET(t, client, "http://test/api/movies?filter[director]=Nolan&filter[year]=2014")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET /api/movies?filter[director]=Nolan&filter[year]=2014 expected 200, got %d", sc)
+	}
+	var filtered []map[string]any
+	if err := json.Unmarshal(gr.Body(), &filtered); err != nil {
+		t.Fatalf("invalid JSON filter response: %v (%q)", err, gr.Body())
+	}
+	if len(filtered) != 1 || filtered[0]["title"] != "Interstellar" {
+		t.Fatalf("expected only Interstellar, got %v", filtered)
+	}
+}
