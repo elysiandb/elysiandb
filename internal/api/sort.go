@@ -5,7 +5,7 @@ import (
 )
 
 func GetSortedEntityIdsByField(entity string, field string, ascending bool) []string {
-	data := ListEntities(entity, 0, 0, "", true)
+	data := ListEntities(entity, 0, 0, "", true, map[string]string{})
 	sort.Slice(data, func(i, j int) bool {
 		a, b := data[i][field], data[j][field]
 		switch va := a.(type) {
