@@ -13,8 +13,9 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	limit := ctx.QueryArgs().GetUintOrZero("limit")
 	offset := ctx.QueryArgs().GetUintOrZero("offset")
 	sortField, sortAscending := ParseSortParam(ctx.QueryArgs())
+	filters := ParseFilterParam(ctx.QueryArgs())
 
-	data := api_storage.ListEntities(entity, limit, offset, sortField, sortAscending)
+	data := api_storage.ListEntities(entity, limit, offset, sortField, sortAscending, filters)
 
 	response, err := json.Marshal(data)
 	if err != nil {
@@ -50,4 +51,17 @@ func ParseSortParam(params *fasthttp.Args) (field string, ascending bool) {
 	}
 
 	return field, ascending
+}
+
+func ParseFilterParam(params *fasthttp.Args) map[string]string {
+	filters := make(map[string]string)
+	for k, v := range params.All() {
+		key := string(k)
+		if strings.HasPrefix(key, "filter[") && strings.HasSuffix(key, "]") {
+			field := key[len("filter[") : len(key)-1]
+			value := strings.TrimSpace(string(v))
+			filters[field] = value
+		}
+	}
+	return filters
 }
