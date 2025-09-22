@@ -7,7 +7,7 @@ func isBareStar(p string) bool {
 	return p[0] == '*'
 }
 
-func matchGlob(pattern string, s string) bool {
+func MatchGlob(pattern string, s string) bool {
 	p := pattern
 	i, j := 0, 0
 	star := -1

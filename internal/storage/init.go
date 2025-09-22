@@ -113,7 +113,7 @@ func GetByWildcardKeyWithLimit(pattern string, limit int) map[string][]byte {
 		})
 	} else {
 		mainStore.Iterate(func(k string, v []byte) {
-			if matchGlob(pattern, k) {
+			if MatchGlob(pattern, k) {
 				keys = append(keys, k)
 				limit--
 				if limit == 0 {
@@ -153,7 +153,7 @@ func DeleteByWildcardKey(pattern string) int {
 		})
 	} else {
 		mainStore.Iterate(func(k string, v []byte) {
-			if matchGlob(pattern, k) {
+			if MatchGlob(pattern, k) {
 				keys = append(keys, k)
 			}
 		})

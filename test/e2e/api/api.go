@@ -294,4 +294,16 @@ func TestAutoREST_CombinedFilters(t *testing.T) {
 	if len(filtered) != 1 || filtered[0]["title"] != "Interstellar" {
 		t.Fatalf("expected only Interstellar, got %v", filtered)
 	}
+
+	gr2 := mustGET(t, client, "http://test/api/movies?filter[director]=No*&filter[title]=Incep*")
+	if sc := gr2.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET /api/movies?filter[director]=No*&filter[title]=Incep* expected 200, got %d", sc)
+	}
+	var filtered2 []map[string]any
+	if err := json.Unmarshal(gr2.Body(), &filtered2); err != nil {
+		t.Fatalf("invalid JSON filter response: %v (%q)", err, gr2.Body())
+	}
+	if len(filtered2) != 1 || filtered2[0]["title"] != "Inception" {
+		t.Fatalf("expected only Inception, got %v", filtered2)
+	}
 }

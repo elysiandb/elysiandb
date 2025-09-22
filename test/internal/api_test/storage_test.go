@@ -167,7 +167,6 @@ func TestListEntities_WithFilters(t *testing.T) {
 
 	filters := map[string]string{"author": "Alice"}
 	results := api_storage.ListEntities(entity, 0, 0, "", true, filters)
-
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results for author=Alice, got %d (%v)", len(results), results)
 	}
@@ -181,8 +180,33 @@ func TestListEntities_WithFilters(t *testing.T) {
 
 	filters = map[string]string{"title": "Learning Python"}
 	results = api_storage.ListEntities(entity, 0, 0, "", true, filters)
-
 	if len(results) != 1 || results[0]["id"] != "b2" {
 		t.Fatalf("expected only b2, got %v", results)
+	}
+
+	filters = map[string]string{"author": "Al*"}
+	results = api_storage.ListEntities(entity, 0, 0, "", true, filters)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results for author wildcard, got %d (%v)", len(results), results)
+	}
+	ids = []string{results[0]["id"].(string), results[1]["id"].(string)}
+	expected = map[string]bool{"b1": true, "b3": true}
+	for _, id := range ids {
+		if !expected[id] {
+			t.Fatalf("unexpected id in wildcard results: %s", id)
+		}
+	}
+
+	filters = map[string]string{"title": "*Go*"}
+	results = api_storage.ListEntities(entity, 0, 0, "", true, filters)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results for title contains Go, got %d (%v)", len(results), results)
+	}
+	ids = []string{results[0]["id"].(string), results[1]["id"].(string)}
+	expected = map[string]bool{"b1": true, "b3": true}
+	for _, id := range ids {
+		if !expected[id] {
+			t.Fatalf("unexpected id in wildcard results: %s", id)
+		}
 	}
 }
