@@ -16,7 +16,14 @@ func WriteEntity(entity string, data map[string]interface{}) {
 	UpdateIndexesForEntity(entity)
 }
 
-func ListEntities(entity string, limit int, offset int, sortField string, sortAscending bool) []map[string]interface{} {
+func ListEntities(
+	entity string,
+	limit int,
+	offset int,
+	sortField string,
+	sortAscending bool,
+	filters map[string]string,
+) []map[string]interface{} {
 	idList, err := GetListOfIds(entity, sortField, sortAscending)
 	if err != nil {
 		return []map[string]interface{}{}
@@ -31,25 +38,28 @@ func ListEntities(entity string, limit int, offset int, sortField string, sortAs
 		}
 	}
 
-	if offset > 0 && offset < len(ids) {
-		ids = ids[offset:]
-	} else if offset >= len(ids) {
-		return []map[string]interface{}{}
-	}
-
-	if limit > 0 && limit < len(ids) {
-		ids = ids[:limit]
-	}
-
-	results := []map[string]interface{}{}
+	filtered := []map[string]interface{}{}
 	for _, id := range ids {
 		entityData := ReadEntityById(entity, id)
 		if entityData != nil {
-			results = append(results, entityData)
+			if !FiltersMatchEntity(entityData, filters) {
+				continue
+			}
+			filtered = append(filtered, entityData)
 		}
 	}
 
-	return results
+	start := offset
+	if start > len(filtered) {
+		start = len(filtered)
+	}
+	
+	end := len(filtered)
+	if limit > 0 && start+limit < end {
+		end = start + limit
+	}
+
+	return filtered[start:end]
 }
 
 func GetListOfIds(entity string, sortField string, sortAscending bool) ([]byte, error) {

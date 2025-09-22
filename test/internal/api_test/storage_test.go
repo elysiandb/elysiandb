@@ -62,7 +62,7 @@ func TestReadAllEntities(t *testing.T) {
 	api_storage.WriteEntity(entity, u1)
 	api_storage.WriteEntity(entity, u2)
 
-	all := api_storage.ListEntities(entity, 0, 0, "", true)
+	all := api_storage.ListEntities(entity, 0, 0, "", true, nil)
 	if len(all) != 2 {
 		t.Fatalf("ListEntities len=%d, want 2, all=%v", len(all), all)
 	}
@@ -132,7 +132,7 @@ func TestDeleteAllEntities_RemovesAllForThatEntityOnly(t *testing.T) {
 
 	api_storage.DeleteAllEntities("posts")
 
-	if list := api_storage.ListEntities("posts", 0, 0, "", true); len(list) != 0 {
+	if list := api_storage.ListEntities("posts", 0, 0, "", true, nil); len(list) != 0 {
 		t.Fatalf("posts should be empty, got %v", list)
 	}
 	if v := api_storage.ReadEntityById("profiles", "me"); v == nil {
@@ -155,4 +155,34 @@ func normalizeMap(m map[string]interface{}) map[string]interface{} {
 		}
 	}
 	return out
+}
+
+func TestListEntities_WithFilters(t *testing.T) {
+	initTestStore(t)
+
+	entity := "books"
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "b1", "title": "Go in Action", "author": "Alice"})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "b2", "title": "Learning Python", "author": "Bob"})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "b3", "title": "Advanced Go", "author": "Alice"})
+
+	filters := map[string]string{"author": "Alice"}
+	results := api_storage.ListEntities(entity, 0, 0, "", true, filters)
+
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results for author=Alice, got %d (%v)", len(results), results)
+	}
+	ids := []string{results[0]["id"].(string), results[1]["id"].(string)}
+	expected := map[string]bool{"b1": true, "b3": true}
+	for _, id := range ids {
+		if !expected[id] {
+			t.Fatalf("unexpected id in results: %s", id)
+		}
+	}
+
+	filters = map[string]string{"title": "Learning Python"}
+	results = api_storage.ListEntities(entity, 0, 0, "", true, filters)
+
+	if len(results) != 1 || results[0]["id"] != "b2" {
+		t.Fatalf("expected only b2, got %v", results)
+	}
 }
