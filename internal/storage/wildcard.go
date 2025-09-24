@@ -1,5 +1,7 @@
 package storage
 
+import "strings"
+
 func isBareStar(p string) bool {
 	if len(p) != 1 {
 		return false
@@ -8,6 +10,8 @@ func isBareStar(p string) bool {
 }
 
 func MatchGlob(pattern string, s string) bool {
+	pattern = strings.ToLower(pattern)
+	s = strings.ToLower(s)
 	p := pattern
 	i, j := 0, 0
 	star := -1

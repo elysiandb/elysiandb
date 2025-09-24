@@ -165,7 +165,7 @@ func TestListEntities_WithFilters(t *testing.T) {
 	api_storage.WriteEntity(entity, map[string]interface{}{"id": "b2", "title": "Learning Python", "author": "Bob"})
 	api_storage.WriteEntity(entity, map[string]interface{}{"id": "b3", "title": "Advanced Go", "author": "Alice"})
 
-	filters := map[string]string{"author": "Alice"}
+	filters := map[string]map[string]string{"author": {"eq": "Alice"}}
 	results := api_storage.ListEntities(entity, 0, 0, "", true, filters)
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results for author=Alice, got %d (%v)", len(results), results)
@@ -178,13 +178,13 @@ func TestListEntities_WithFilters(t *testing.T) {
 		}
 	}
 
-	filters = map[string]string{"title": "Learning Python"}
+	filters = map[string]map[string]string{"title": {"eq": "Learning Python"}}
 	results = api_storage.ListEntities(entity, 0, 0, "", true, filters)
 	if len(results) != 1 || results[0]["id"] != "b2" {
 		t.Fatalf("expected only b2, got %v", results)
 	}
 
-	filters = map[string]string{"author": "Al*"}
+	filters = map[string]map[string]string{"author": {"eq": "Al*"}}
 	results = api_storage.ListEntities(entity, 0, 0, "", true, filters)
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results for author wildcard, got %d (%v)", len(results), results)
@@ -197,7 +197,7 @@ func TestListEntities_WithFilters(t *testing.T) {
 		}
 	}
 
-	filters = map[string]string{"title": "*Go*"}
+	filters = map[string]map[string]string{"title": {"eq": "*Go*"}}
 	results = api_storage.ListEntities(entity, 0, 0, "", true, filters)
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results for title contains Go, got %d (%v)", len(results), results)
@@ -208,5 +208,81 @@ func TestListEntities_WithFilters(t *testing.T) {
 		if !expected[id] {
 			t.Fatalf("unexpected id in wildcard results: %s", id)
 		}
+	}
+
+	filters = map[string]map[string]string{"author": {"neq": "Alice"}}
+	results = api_storage.ListEntities(entity, 0, 0, "", true, filters)
+	if len(results) != 1 || results[0]["id"] != "b2" {
+		t.Fatalf("expected only b2 with neq filter, got %v", results)
+	}
+}
+
+func TestListEntities_WithNestedFilters(t *testing.T) {
+	initTestStore(t)
+
+	entity := "articles"
+	api_storage.WriteEntity(entity, map[string]interface{}{
+		"id":    "a1",
+		"title": "Go & Dist",
+		"author": map[string]interface{}{
+			"name": "Mister Good",
+			"id":   "u1",
+			"category": map[string]interface{}{
+				"title": "yep",
+			},
+		},
+	})
+	api_storage.WriteEntity(entity, map[string]interface{}{
+		"id":    "a2",
+		"title": "Python Tips",
+		"author": map[string]interface{}{
+			"name": "Alice",
+			"id":   "u2",
+			"category": map[string]interface{}{
+				"title": "news",
+			},
+		},
+	})
+	api_storage.WriteEntity(entity, map[string]interface{}{
+		"id":    "a3",
+		"title": "Go Advanced",
+		"author": map[string]interface{}{
+			"name": "Bob",
+			"id":   "u3",
+			"category": map[string]interface{}{
+				"title": "yep",
+			},
+		},
+	})
+
+	f1 := map[string]map[string]string{"author.name": {"eq": "Alice"}}
+	r1 := api_storage.ListEntities(entity, 0, 0, "", true, f1)
+	if len(r1) != 1 || r1[0]["id"] != "a2" {
+		t.Fatalf("expected only a2, got %v", r1)
+	}
+
+	f2 := map[string]map[string]string{"author.name": {"eq": "mister*"}}
+	r2 := api_storage.ListEntities(entity, 0, 0, "", true, f2)
+	if len(r2) != 1 || r2[0]["id"] != "a1" {
+		t.Fatalf("expected only a1 (case-insensitive, wildcard), got %v", r2)
+	}
+
+	f3 := map[string]map[string]string{"author.category.title": {"eq": "yep"}}
+	r3 := api_storage.ListEntities(entity, 0, 0, "", true, f3)
+	if len(r3) != 2 {
+		t.Fatalf("expected a1 and a3 for category=yep, got %v", r3)
+	}
+	seen := map[string]bool{r3[0]["id"].(string): true, r3[1]["id"].(string): true}
+	if !seen["a1"] || !seen["a3"] {
+		t.Fatalf("expected a1 and a3, got %v", r3)
+	}
+
+	f4 := map[string]map[string]string{
+		"author.category.title": {"eq": "yep"},
+		"author.name":           {"neq": "bob"},
+	}
+	r4 := api_storage.ListEntities(entity, 0, 0, "", true, f4)
+	if len(r4) != 1 || r4[0]["id"] != "a1" {
+		t.Fatalf("expected only a1 for combined eq/neq, got %v", r4)
 	}
 }
