@@ -1,5 +1,7 @@
 package api_storage
 
+import "github.com/taymour/elysiandb/internal/storage"
+
 func FiltersMatchEntity(
 	entityData map[string]interface{},
 	filters map[string]string,
@@ -9,7 +11,12 @@ func FiltersMatchEntity(
 	}
 
 	for field, value := range filters {
-		if entityData[field] != value {
+		entityVal, ok := entityData[field]
+		strVal, isString := entityVal.(string)
+		if !ok || !isString {
+			return false
+		}
+		if !storage.MatchGlob(value, strVal) {
 			return false
 		}
 	}
