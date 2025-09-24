@@ -22,7 +22,7 @@ func ListEntities(
 	offset int,
 	sortField string,
 	sortAscending bool,
-	filters map[string]string,
+	filters map[string]map[string]string,
 ) []map[string]interface{} {
 	idList, err := GetListOfIds(entity, sortField, sortAscending)
 	if err != nil {

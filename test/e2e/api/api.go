@@ -307,3 +307,43 @@ func TestAutoREST_CombinedFilters(t *testing.T) {
 		t.Fatalf("expected only Inception, got %v", filtered2)
 	}
 }
+
+func TestAutoREST_FilterEqAndNeq(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/authors", map[string]any{"name": "Alice"})
+	mustPOSTJSON(t, client, "http://test/api/authors", map[string]any{"name": "Bob"})
+	mustPOSTJSON(t, client, "http://test/api/authors", map[string]any{"name": "Charlie"})
+
+	gr := mustGET(t, client, "http://test/api/authors?filter[name][eq]=Alice")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET /api/authors?filter[name][eq]=Alice expected 200, got %d", sc)
+	}
+	var eqResult []map[string]any
+	if err := json.Unmarshal(gr.Body(), &eqResult); err != nil {
+		t.Fatalf("invalid JSON filter eq response: %v (%q)", err, gr.Body())
+	}
+	if len(eqResult) != 1 || eqResult[0]["name"] != "Alice" {
+		t.Fatalf("expected only Alice, got %v", eqResult)
+	}
+
+	gr2 := mustGET(t, client, "http://test/api/authors?filter[name][neq]=Alice")
+	if sc := gr2.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET /api/authors?filter[name][neq]=Alice expected 200, got %d", sc)
+	}
+	var neqResult []map[string]any
+	if err := json.Unmarshal(gr2.Body(), &neqResult); err != nil {
+		t.Fatalf("invalid JSON filter neq response: %v (%q)", err, gr2.Body())
+	}
+	if len(neqResult) != 2 {
+		t.Fatalf("expected 2 results without Alice, got %d (%v)", len(neqResult), neqResult)
+	}
+	names := map[string]bool{}
+	for _, r := range neqResult {
+		names[r["name"].(string)] = true
+	}
+	if names["Alice"] {
+		t.Fatalf("Alice should not be in neq results: %v", neqResult)
+	}
+}

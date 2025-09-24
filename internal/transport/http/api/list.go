@@ -53,15 +53,29 @@ func ParseSortParam(params *fasthttp.Args) (field string, ascending bool) {
 	return field, ascending
 }
 
-func ParseFilterParam(params *fasthttp.Args) map[string]string {
-	filters := make(map[string]string)
+func ParseFilterParam(params *fasthttp.Args) map[string]map[string]string {
+	filters := make(map[string]map[string]string)
 	for k, v := range params.All() {
 		key := string(k)
 		if strings.HasPrefix(key, "filter[") && strings.HasSuffix(key, "]") {
-			field := key[len("filter[") : len(key)-1]
-			value := strings.TrimSpace(string(v))
-			filters[field] = value
+			inner := key[len("filter[") : len(key)-1]
+			val := strings.TrimSpace(string(v))
+
+			field, op := "", "eq"
+			if strings.Contains(inner, "][") {
+				parts := strings.SplitN(inner, "][", 2)
+				field, op = parts[0], parts[1]
+			} else {
+				field = inner
+			}
+
+			if _, ok := filters[field]; !ok {
+				filters[field] = make(map[string]string)
+			}
+			
+			filters[field][op] = val
 		}
 	}
+
 	return filters
 }
