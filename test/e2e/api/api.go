@@ -347,3 +347,36 @@ func TestAutoREST_FilterEqAndNeq(t *testing.T) {
 		t.Fatalf("Alice should not be in neq results: %v", neqResult)
 	}
 }
+
+func TestAutoREST_SortAscendingDescending(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/products", map[string]any{"name": "Banana", "price": 2})
+	mustPOSTJSON(t, client, "http://test/api/products", map[string]any{"name": "Apple", "price": 1})
+	mustPOSTJSON(t, client, "http://test/api/products", map[string]any{"name": "Cherry", "price": 3})
+
+	grAsc := mustGET(t, client, "http://test/api/products?sort[price]=asc")
+	if sc := grAsc.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET /api/products?sort[price]=asc expected 200, got %d", sc)
+	}
+	var ascResult []map[string]any
+	if err := json.Unmarshal(grAsc.Body(), &ascResult); err != nil {
+		t.Fatalf("invalid JSON asc response: %v (%q)", err, grAsc.Body())
+	}
+	if len(ascResult) != 3 || ascResult[0]["name"] != "Apple" || ascResult[1]["name"] != "Banana" || ascResult[2]["name"] != "Cherry" {
+		t.Fatalf("unexpected asc order: %v", ascResult)
+	}
+
+	grDesc := mustGET(t, client, "http://test/api/products?sort[price]=desc")
+	if sc := grDesc.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET /api/products?sort[price]=desc expected 200, got %d", sc)
+	}
+	var descResult []map[string]any
+	if err := json.Unmarshal(grDesc.Body(), &descResult); err != nil {
+		t.Fatalf("invalid JSON desc response: %v (%q)", err, grDesc.Body())
+	}
+	if len(descResult) != 3 || descResult[0]["name"] != "Cherry" || descResult[1]["name"] != "Banana" || descResult[2]["name"] != "Apple" {
+		t.Fatalf("unexpected desc order: %v", descResult)
+	}
+}
