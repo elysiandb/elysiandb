@@ -286,3 +286,48 @@ func TestListEntities_WithNestedFilters(t *testing.T) {
 		t.Fatalf("expected only a1 for combined eq/neq, got %v", r4)
 	}
 }
+
+func TestListEntities_WithNumericFilters(t *testing.T) {
+	initTestStore(t)
+
+	entity := "products"
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "p1", "price": 10})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "p2", "price": 20})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "p3", "price": 30})
+
+	f1 := map[string]map[string]string{"price": {"eq": "20"}}
+	r1 := api_storage.ListEntities(entity, 0, 0, "", true, f1)
+	if len(r1) != 1 || r1[0]["id"] != "p2" {
+		t.Fatalf("expected only p2 for eq=20, got %v", r1)
+	}
+
+	f2 := map[string]map[string]string{"price": {"neq": "20"}}
+	r2 := api_storage.ListEntities(entity, 0, 0, "", true, f2)
+	if len(r2) != 2 {
+		t.Fatalf("expected 2 results for neq=20, got %v", r2)
+	}
+
+	f3 := map[string]map[string]string{"price": {"lt": "20"}}
+	r3 := api_storage.ListEntities(entity, 0, 0, "", true, f3)
+	if len(r3) != 1 || r3[0]["id"] != "p1" {
+		t.Fatalf("expected only p1 for lt=20, got %v", r3)
+	}
+
+	f4 := map[string]map[string]string{"price": {"lte": "20"}}
+	r4 := api_storage.ListEntities(entity, 0, 0, "", true, f4)
+	if len(r4) != 2 {
+		t.Fatalf("expected p1 and p2 for lte=20, got %v", r4)
+	}
+
+	f5 := map[string]map[string]string{"price": {"gt": "20"}}
+	r5 := api_storage.ListEntities(entity, 0, 0, "", true, f5)
+	if len(r5) != 1 || r5[0]["id"] != "p3" {
+		t.Fatalf("expected only p3 for gt=20, got %v", r5)
+	}
+
+	f6 := map[string]map[string]string{"price": {"gte": "20"}}
+	r6 := api_storage.ListEntities(entity, 0, 0, "", true, f6)
+	if len(r6) != 2 {
+		t.Fatalf("expected p2 and p3 for gte=20, got %v", r6)
+	}
+}
