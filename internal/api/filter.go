@@ -7,7 +7,7 @@ import (
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
-func getNestedValue(data map[string]interface{}, path string) (interface{}, bool) {
+func GetNestedValue(data map[string]interface{}, path string) (interface{}, bool) {
 	parts := strings.Split(path, ".")
 	var current interface{} = data
 	for _, part := range parts {
@@ -21,7 +21,7 @@ func getNestedValue(data map[string]interface{}, path string) (interface{}, bool
 			return nil, false
 		}
 	}
-	
+
 	return current, true
 }
 
@@ -34,7 +34,7 @@ func FiltersMatchEntity(
 	}
 
 	for field, ops := range filters {
-		val, ok := getNestedValue(entityData, field)
+		val, ok := GetNestedValue(entityData, field)
 		if !ok {
 			return false
 		}

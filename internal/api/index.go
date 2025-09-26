@@ -1,7 +1,8 @@
 package api_storage
 
 import (
-	"encoding/json"
+	"bytes"
+	"reflect"
 
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/storage"
@@ -9,48 +10,56 @@ import (
 
 func RemoveIdFromIndexes(entity string, id string) {
 	idIndexKey := globals.ApiEntityIndexIdKey(entity)
-	idList, _ := storage.GetByKey(idIndexKey)
+	raw, _ := storage.GetByKey(idIndexKey)
+	ids := decodeIDs(raw)
 
-	var ids []string
-	if idList == nil {
-		ids = []string{}
-	} else {
-		if err := json.Unmarshal(idList, &ids); err != nil {
-			ids = []string{}
-		}
+	changed := false
+	newIds := newIdsWithout(ids, id, &changed)
+	if !changed {
+		return
 	}
 
-	newIds := []string{}
-	for _, existingId := range ids {
-		if existingId != id {
-			newIds = append(newIds, existingId)
+	storage.PutKeyValue(idIndexKey, encodeIDs(newIds))
+}
+
+func decodeIDs(b []byte) []string {
+	if len(b) == 0 {
+		return nil
+	}
+	parts := bytes.Split(b, []byte{'\n'})
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if len(p) > 0 {
+			out = append(out, string(p))
 		}
 	}
-	ids = newIds
-	idsBytes, _ := json.Marshal(ids)
-	storage.PutKeyValue(idIndexKey, idsBytes)
+	return out
+}
 
-	UpdateIndexesForEntity(entity)
+func encodeIDs(ids []string) []byte {
+	if len(ids) == 0 {
+		return nil
+	}
+	parts := make([][]byte, 0, len(ids))
+	for _, id := range ids {
+		parts = append(parts, []byte(id))
+	}
+	return bytes.Join(parts, []byte{'\n'})
 }
 
 func AddIdToindexes(entity string, id string) {
-	idIndexKey := globals.ApiEntityIndexIdKey(entity)
-	idList, _ := storage.GetByKey(idIndexKey)
+	k := globals.ApiEntityIndexIdKey(entity)
+	raw, _ := storage.GetByKey(k)
 
-	var ids []string
-	if idList == nil {
-		ids = []string{}
-	} else {
-		if err := json.Unmarshal(idList, &ids); err != nil {
-			ids = []string{}
+	ids := decodeIDs(raw)
+	for _, v := range ids {
+		if v == id {
+			return
 		}
 	}
-
 	ids = append(ids, id)
-	idsBytes, _ := json.Marshal(ids)
-	storage.PutKeyValue(idIndexKey, idsBytes)
 
-	UpdateIndexesForEntity(entity)
+	_ = storage.PutKeyValue(k, encodeIDs(ids))
 }
 
 func RemoveEntityIndexes(entity string) {
@@ -60,13 +69,13 @@ func RemoveEntityIndexes(entity string) {
 }
 
 func CreateIndexesForField(entity string, field string) {
-	ascSorted, _ := json.Marshal(GetSortedEntityIdsByField(entity, field, true))
+	ascSorted := encodeIDs(GetSortedEntityIdsByField(entity, field, true))
 	storage.PutKeyValue(
 		globals.ApiEntityIndexFieldSortAscKey(entity, field),
 		ascSorted,
 	)
 
-	descSorted, _ := json.Marshal(GetSortedEntityIdsByField(entity, field, false))
+	descSorted := encodeIDs(GetSortedEntityIdsByField(entity, field, false))
 	storage.PutKeyValue(
 		globals.ApiEntityIndexFieldSortDescKey(entity, field),
 		descSorted,
@@ -86,23 +95,8 @@ func IndexExistsForField(entity string, field string) bool {
 }
 
 func GetListForIndexedFields(entity string) []string {
-	fields, err := storage.GetByKey(
-		globals.ApiEntityIndexAllFieldsKey(entity),
-	)
-	if err != nil {
-		return nil
-	}
-
-	var listOfFields []string
-	if fields == nil {
-		listOfFields = []string{}
-	} else {
-		if err := json.Unmarshal(fields, &listOfFields); err != nil {
-			return nil
-		}
-	}
-
-	return listOfFields
+	raw, _ := storage.GetByKey(globals.ApiEntityIndexAllFieldsKey(entity))
+	return decodeIDs(raw)
 }
 
 func AddFieldToIndexedFields(entity string, field string) {
@@ -110,15 +104,7 @@ func AddFieldToIndexedFields(entity string, field string) {
 		globals.ApiEntityIndexAllFieldsKey(entity),
 	)
 
-	var listOfFields []string
-	if fields == nil {
-		listOfFields = []string{}
-	} else {
-		if err := json.Unmarshal(fields, &listOfFields); err != nil {
-			listOfFields = []string{}
-		}
-	}
-
+	listOfFields := decodeIDs(fields)
 	for _, existingField := range listOfFields {
 		if existingField == field {
 			return
@@ -126,17 +112,36 @@ func AddFieldToIndexedFields(entity string, field string) {
 	}
 
 	listOfFields = append(listOfFields, field)
-	fieldsBytes, _ := json.Marshal(listOfFields)
 	storage.PutKeyValue(
 		globals.ApiEntityIndexAllFieldsKey(entity),
-		fieldsBytes,
+		encodeIDs(listOfFields),
 	)
 }
 
-func UpdateIndexesForEntity(entity string) {
-	fields := GetListForIndexedFields(entity)
-	for _, field := range fields {
-		CreateIndexesForField(entity, field)
+func UpdateIndexesForEntity(entity string, id string, oldData, newData map[string]interface{}) {
+	changedFields := make(map[string]struct{})
+
+	for k, newVal := range newData {
+		if k == "id" {
+			continue
+		}
+		oldVal, exists := oldData[k]
+		if !exists || !reflect.DeepEqual(oldVal, newVal) {
+			changedFields[k] = struct{}{}
+		}
+	}
+
+	for k := range oldData {
+		if k == "id" {
+			continue
+		}
+		if _, exists := newData[k]; !exists {
+			changedFields[k] = struct{}{}
+		}
+	}
+
+	for f := range changedFields {
+		CreateIndexesForField(entity, f)
 	}
 }
 
@@ -144,4 +149,19 @@ func DeleteIndexesForField(entity string, field string) {
 	storage.DeleteByWildcardKey(
 		globals.ApiEntityIndexFieldAllKey(entity, field),
 	)
+}
+
+func newIdsWithout(ids []string, id string, changed *bool) []string {
+	if len(ids) == 0 {
+		return ids
+	}
+	out := ids[:0]
+	for _, existing := range ids {
+		if existing == id {
+			*changed = true
+			continue
+		}
+		out = append(out, existing)
+	}
+	return out
 }

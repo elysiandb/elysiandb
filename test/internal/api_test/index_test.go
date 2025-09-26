@@ -1,7 +1,7 @@
 package api_test
 
 import (
-	"encoding/json"
+	"bytes"
 	"reflect"
 	"testing"
 	"time"
@@ -27,13 +27,18 @@ func initIdxTestStore(t *testing.T) {
 	storage.LoadDB()
 }
 
-func mustUnmarshal[T any](t *testing.T, b []byte) T {
-	t.Helper()
-	var v T
-	if err := json.Unmarshal(b, &v); err != nil {
-		t.Fatalf("unmarshal: %v", err)
+func decodeIDs(b []byte) []string {
+	if len(b) == 0 {
+		return nil
 	}
-	return v
+	parts := bytes.Split(b, []byte{'\n'})
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if len(p) > 0 {
+			out = append(out, string(p))
+		}
+	}
+	return out
 }
 
 func TestAddIdToindexes_And_RemoveIdFromIndexes(t *testing.T) {
@@ -49,7 +54,7 @@ func TestAddIdToindexes_And_RemoveIdFromIndexes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByKey: %v", err)
 	}
-	got := mustUnmarshal[[]string](t, raw)
+	got := decodeIDs(raw)
 	if !reflect.DeepEqual(got, []string{"u1", "u2"}) {
 		t.Fatalf("ids=%v, want [u1 u2]", got)
 	}
@@ -61,7 +66,7 @@ func TestAddIdToindexes_And_RemoveIdFromIndexes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByKey after remove: %v", err)
 	}
-	got2 := mustUnmarshal[[]string](t, raw2)
+	got2 := decodeIDs(raw2)
 	if !reflect.DeepEqual(got2, []string{"u2"}) {
 		t.Fatalf("ids=%v, want [u2]", got2)
 	}
@@ -107,8 +112,8 @@ func TestCreateIndexesForField_And_IndexExists(t *testing.T) {
 		t.Fatalf("desc GetByKey: %v", err)
 	}
 
-	asc := mustUnmarshal[[]string](t, ascRaw)
-	desc := mustUnmarshal[[]string](t, descRaw)
+	asc := decodeIDs(ascRaw)
+	desc := decodeIDs(descRaw)
 
 	if !reflect.DeepEqual(asc, []string{"b", "a", "c"}) {
 		t.Fatalf("asc=%v", asc)
@@ -156,7 +161,7 @@ func TestUpdateIndexesForEntity_RebuildsFromFieldsList(t *testing.T) {
 	api_storage.WriteEntity(entity, map[string]any{"id": "p2", "rank": 5})
 
 	api_storage.AddFieldToIndexedFields(entity, "rank")
-	api_storage.UpdateIndexesForEntity(entity)
+	api_storage.CreateIndexesForField(entity, "rank")
 	time.Sleep(10 * time.Millisecond)
 
 	if !api_storage.IndexExistsForField(entity, "rank") {
@@ -168,7 +173,7 @@ func TestUpdateIndexesForEntity_RebuildsFromFieldsList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("asc GetByKey: %v", err)
 	}
-	asc := mustUnmarshal[[]string](t, ascRaw)
+	asc := decodeIDs(ascRaw)
 	if !reflect.DeepEqual(asc, []string{"p2", "p1"}) {
 		t.Fatalf("asc=%v", asc)
 	}

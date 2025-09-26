@@ -10,10 +10,20 @@ import (
 func WriteEntity(entity string, data map[string]interface{}) {
 	key := globals.ApiSingleEntityKey(entity, data["id"].(string))
 
+	old := ReadEntityById(entity, data["id"].(string))
+
 	jsonData, _ := json.Marshal(data)
 	storage.PutKeyValue(key, jsonData)
 	AddIdToindexes(entity, data["id"].(string))
-	UpdateIndexesForEntity(entity)
+	if old != nil {
+		UpdateIndexesForEntity(entity, data["id"].(string), old, data)
+	} else {
+		for k := range data {
+			if k != "id" {
+				CreateIndexesForField(entity, k)
+			}
+		}
+	}
 }
 
 func ListEntities(
@@ -29,13 +39,9 @@ func ListEntities(
 		return []map[string]interface{}{}
 	}
 
-	var ids []string
-	if idList == nil {
+	ids := decodeIDs(idList)
+	if len(ids) == 0 {
 		return []map[string]interface{}{}
-	} else {
-		if err := json.Unmarshal(idList, &ids); err != nil {
-			return []map[string]interface{}{}
-		}
 	}
 
 	filtered := []map[string]interface{}{}
@@ -53,7 +59,7 @@ func ListEntities(
 	if start > len(filtered) {
 		start = len(filtered)
 	}
-	
+
 	end := len(filtered)
 	if limit > 0 && start+limit < end {
 		end = start + limit
@@ -114,13 +120,17 @@ func UpdateEntityById(entity string, id string, updated map[string]interface{}) 
 		return nil
 	}
 
+	old := make(map[string]interface{})
+	for k, v := range existing {
+		old[k] = v
+	}
+
 	for k, v := range updated {
 		existing[k] = v
 	}
 
 	WriteEntity(entity, existing)
-
-	UpdateIndexesForEntity(entity)
+	UpdateIndexesForEntity(entity, id, old, existing)
 
 	return existing
 }

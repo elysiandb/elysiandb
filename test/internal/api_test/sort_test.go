@@ -118,29 +118,61 @@ func TestGetSortedEntityIdsByField_MixedTypesAndMissing(t *testing.T) {
 	}
 }
 
+func TestGetSortedEntityIdsByField_NestedFields(t *testing.T) {
+	initSortTestStore(t)
+
+	entity := "books"
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "b1", "author": map[string]interface{}{"name": "Charles"}})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "b2", "author": map[string]interface{}{"name": "Alice"}})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "b3", "author": map[string]interface{}{"name": "Bob"}})
+
+	asc := api_storage.GetSortedEntityIdsByField(entity, "author.name", true)
+	desc := api_storage.GetSortedEntityIdsByField(entity, "author.name", false)
+
+	wantAsc := []string{"b2", "b3", "b1"}
+	wantDesc := []string{"b1", "b3", "b2"}
+
+	if !equalSlices(asc, wantAsc) {
+		t.Fatalf("nested author.name asc = %v, want %v", asc, wantAsc)
+	}
+	if !equalSlices(desc, wantDesc) {
+		t.Fatalf("nested author.name desc = %v, want %v", desc, wantDesc)
+	}
+}
+
 func equalSlices(a, b []string) bool {
-	if len(a) != len(b) { return false }
+	if len(a) != len(b) {
+		return false
+	}
 	for i := range a {
-		if a[i] != b[i] { return false }
+		if a[i] != b[i] {
+			return false
+		}
 	}
 	return true
 }
 
 func containsExactly(got []string, want map[string]bool) bool {
-	if len(got) != len(want) { return false }
+	if len(got) != len(want) {
+		return false
+	}
 	seen := make(map[string]bool, len(got))
 	for _, id := range got {
 		seen[id] = true
 	}
 	for k := range want {
-		if !seen[k] { return false }
+		if !seen[k] {
+			return false
+		}
 	}
 	return true
 }
 
 func idx(arr []string, v string) int {
 	for i, x := range arr {
-		if x == v { return i }
+		if x == v {
+			return i
+		}
 	}
 	return -1
 }
