@@ -23,9 +23,6 @@ func RegisterRoutes(r *router.Router) {
 		r.GET("/stats", controller.StatsController)
 	}
 
-	r.POST("/api/{entity}/{field}/index", api.CreateIndexController)
-	r.DELETE("/api/{entity}/{field}/index", api.DeleteIndexController)
-
 	r.GET("/api/{entity}", api.ListController)
 	r.POST("/api/{entity}", api.CreateController)
 	r.GET("/api/{entity}/{id}", api.GetByIdController)

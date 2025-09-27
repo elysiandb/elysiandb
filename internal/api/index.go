@@ -2,7 +2,7 @@ package api_storage
 
 import (
 	"bytes"
-	"reflect"
+	"sort"
 
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/storage"
@@ -12,13 +12,11 @@ func RemoveIdFromIndexes(entity string, id string) {
 	idIndexKey := globals.ApiEntityIndexIdKey(entity)
 	raw, _ := storage.GetByKey(idIndexKey)
 	ids := decodeIDs(raw)
-
 	changed := false
 	newIds := newIdsWithout(ids, id, &changed)
 	if !changed {
 		return
 	}
-
 	storage.PutKeyValue(idIndexKey, encodeIDs(newIds))
 }
 
@@ -50,7 +48,6 @@ func encodeIDs(ids []string) []byte {
 func AddIdToindexes(entity string, id string) {
 	k := globals.ApiEntityIndexIdKey(entity)
 	raw, _ := storage.GetByKey(k)
-
 	ids := decodeIDs(raw)
 	for _, v := range ids {
 		if v == id {
@@ -58,7 +55,6 @@ func AddIdToindexes(entity string, id string) {
 		}
 	}
 	ids = append(ids, id)
-
 	_ = storage.PutKeyValue(k, encodeIDs(ids))
 }
 
@@ -68,29 +64,45 @@ func RemoveEntityIndexes(entity string) {
 	)
 }
 
-func CreateIndexesForField(entity string, field string) {
-	ascSorted := encodeIDs(GetSortedEntityIdsByField(entity, field, true))
-	storage.PutKeyValue(
-		globals.ApiEntityIndexFieldSortAscKey(entity, field),
-		ascSorted,
-	)
-
-	descSorted := encodeIDs(GetSortedEntityIdsByField(entity, field, false))
-	storage.PutKeyValue(
-		globals.ApiEntityIndexFieldSortDescKey(entity, field),
-		descSorted,
-	)
-
+func EnsureFieldIndex(entity, field, id string, value interface{}) {
+	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, field)
+	descKey := globals.ApiEntityIndexFieldSortDescKey(entity, field)
+	rawAsc, _ := storage.GetByKey(ascKey)
+	rawDesc, _ := storage.GetByKey(descKey)
+	asc := decodeIDs(rawAsc)
+	desc := decodeIDs(rawDesc)
+	insertAsc(&asc, id)
+	insertDesc(&desc, id)
+	storage.PutKeyValue(ascKey, encodeIDs(asc))
+	storage.PutKeyValue(descKey, encodeIDs(desc))
 	AddFieldToIndexedFields(entity, field)
+}
+
+func insertAsc(ids *[]string, id string) {
+	for _, v := range *ids {
+		if v == id {
+			return
+		}
+	}
+	*ids = append(*ids, id)
+	sort.Strings(*ids)
+}
+
+func insertDesc(ids *[]string, id string) {
+	for _, v := range *ids {
+		if v == id {
+			return
+		}
+	}
+	*ids = append(*ids, id)
+	sort.Sort(sort.Reverse(sort.StringSlice(*ids)))
 }
 
 func IndexExistsForField(entity string, field string) bool {
 	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, field)
 	descKey := globals.ApiEntityIndexFieldSortDescKey(entity, field)
-
 	ascData, _ := storage.GetByKey(ascKey)
 	descData, _ := storage.GetByKey(descKey)
-
 	return ascData != nil && descData != nil
 }
 
@@ -103,14 +115,12 @@ func AddFieldToIndexedFields(entity string, field string) {
 	fields, _ := storage.GetByKey(
 		globals.ApiEntityIndexAllFieldsKey(entity),
 	)
-
 	listOfFields := decodeIDs(fields)
 	for _, existingField := range listOfFields {
 		if existingField == field {
 			return
 		}
 	}
-
 	listOfFields = append(listOfFields, field)
 	storage.PutKeyValue(
 		globals.ApiEntityIndexAllFieldsKey(entity),
@@ -119,29 +129,22 @@ func AddFieldToIndexedFields(entity string, field string) {
 }
 
 func UpdateIndexesForEntity(entity string, id string, oldData, newData map[string]interface{}) {
-	changedFields := make(map[string]struct{})
-
 	for k, newVal := range newData {
 		if k == "id" {
 			continue
 		}
 		oldVal, exists := oldData[k]
-		if !exists || !reflect.DeepEqual(oldVal, newVal) {
-			changedFields[k] = struct{}{}
+		if !exists || oldVal != newVal {
+			EnsureFieldIndex(entity, k, id, newVal)
 		}
 	}
-
 	for k := range oldData {
 		if k == "id" {
 			continue
 		}
 		if _, exists := newData[k]; !exists {
-			changedFields[k] = struct{}{}
+			EnsureFieldIndex(entity, k, id, nil)
 		}
-	}
-
-	for f := range changedFields {
-		CreateIndexesForField(entity, f)
 	}
 }
 

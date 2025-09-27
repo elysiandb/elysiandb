@@ -14,11 +14,16 @@ func WriteToDB() {
 
 	rootMu.RLock()
 	ms := mainStore
+	js := mainJsonStore
 	ec := expirationContainer
 	rootMu.RUnlock()
 
 	if err := writeStoreToFile(cfg, DataFile, ms); err != nil {
 		log.Error("Error writing main store to database:", err)
+	}
+
+	if err := writeJsonStoreToFile(cfg, JsonDataFile, js); err != nil {
+		log.Error("Error writing json store to database:", err)
 	}
 
 	if err := writeExpirationsToFile(cfg, ExpirationDataFile, ec); err != nil {

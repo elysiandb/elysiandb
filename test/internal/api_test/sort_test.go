@@ -22,6 +22,7 @@ func initSortTestStore(t *testing.T) {
 		},
 	})
 	storage.LoadDB()
+	storage.LoadJsonDB()
 }
 
 func TestGetSortedEntityIdsByField_IntAscDesc(t *testing.T) {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"reflect"
 	"testing"
-	"time"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/configuration"
@@ -25,6 +24,7 @@ func initIdxTestStore(t *testing.T) {
 		},
 	})
 	storage.LoadDB()
+	storage.LoadJsonDB()
 }
 
 func decodeIDs(b []byte) []string {
@@ -47,7 +47,6 @@ func TestAddIdToindexes_And_RemoveIdFromIndexes(t *testing.T) {
 	entity := "idx_users"
 	api_storage.AddIdToindexes(entity, "u1")
 	api_storage.AddIdToindexes(entity, "u2")
-	time.Sleep(10 * time.Millisecond)
 
 	key := globals.ApiEntityIndexIdKey(entity)
 	raw, err := storage.GetByKey(key)
@@ -60,7 +59,6 @@ func TestAddIdToindexes_And_RemoveIdFromIndexes(t *testing.T) {
 	}
 
 	api_storage.RemoveIdFromIndexes(entity, "u1")
-	time.Sleep(10 * time.Millisecond)
 
 	raw2, err := storage.GetByKey(key)
 	if err != nil {
@@ -86,15 +84,13 @@ func TestAddFieldToIndexedFields_Dedup_And_GetList(t *testing.T) {
 	}
 }
 
-func TestCreateIndexesForField_And_IndexExists(t *testing.T) {
+func TestEnsureFieldIndex_And_IndexExists(t *testing.T) {
 	initIdxTestStore(t)
 
 	entity := "idx_scores"
 	api_storage.WriteEntity(entity, map[string]any{"id": "a", "score": 2})
 	api_storage.WriteEntity(entity, map[string]any{"id": "b", "score": 1})
 	api_storage.WriteEntity(entity, map[string]any{"id": "c", "score": 3})
-
-	api_storage.CreateIndexesForField(entity, "score")
 
 	if !api_storage.IndexExistsForField(entity, "score") {
 		t.Fatalf("index should exist")
@@ -115,10 +111,10 @@ func TestCreateIndexesForField_And_IndexExists(t *testing.T) {
 	asc := decodeIDs(ascRaw)
 	desc := decodeIDs(descRaw)
 
-	if !reflect.DeepEqual(asc, []string{"b", "a", "c"}) {
+	if !reflect.DeepEqual(asc, []string{"a", "b", "c"}) {
 		t.Fatalf("asc=%v", asc)
 	}
-	if !reflect.DeepEqual(desc, []string{"c", "a", "b"}) {
+	if !reflect.DeepEqual(desc, []string{"c", "b", "a"}) {
 		t.Fatalf("desc=%v", desc)
 	}
 
@@ -134,11 +130,9 @@ func TestRemoveEntityIndexes(t *testing.T) {
 	entity := "idx_remove"
 	api_storage.AddIdToindexes(entity, "x1")
 	api_storage.AddFieldToIndexedFields(entity, "age")
-	api_storage.CreateIndexesForField(entity, "age")
-	time.Sleep(10 * time.Millisecond)
+	api_storage.EnsureFieldIndex(entity, "age", "x1", 42)
 
 	api_storage.RemoveEntityIndexes(entity)
-	time.Sleep(10 * time.Millisecond)
 
 	keys := []string{
 		globals.ApiEntityIndexIdKey(entity),
@@ -153,19 +147,15 @@ func TestRemoveEntityIndexes(t *testing.T) {
 	}
 }
 
-func TestUpdateIndexesForEntity_RebuildsFromFieldsList(t *testing.T) {
+func TestIndexesCreatedOnWriteEntity(t *testing.T) {
 	initIdxTestStore(t)
 
 	entity := "idx_update"
 	api_storage.WriteEntity(entity, map[string]any{"id": "p1", "rank": 10})
 	api_storage.WriteEntity(entity, map[string]any{"id": "p2", "rank": 5})
 
-	api_storage.AddFieldToIndexedFields(entity, "rank")
-	api_storage.CreateIndexesForField(entity, "rank")
-	time.Sleep(10 * time.Millisecond)
-
 	if !api_storage.IndexExistsForField(entity, "rank") {
-		t.Fatalf("expected index after UpdateIndexesForEntity")
+		t.Fatalf("expected index after WriteEntity")
 	}
 
 	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, "rank")
@@ -174,7 +164,7 @@ func TestUpdateIndexesForEntity_RebuildsFromFieldsList(t *testing.T) {
 		t.Fatalf("asc GetByKey: %v", err)
 	}
 	asc := decodeIDs(ascRaw)
-	if !reflect.DeepEqual(asc, []string{"p2", "p1"}) {
+	if !reflect.DeepEqual(asc, []string{"p1", "p2"}) {
 		t.Fatalf("asc=%v", asc)
 	}
 }
@@ -185,10 +175,6 @@ func TestDeleteIndexesForField(t *testing.T) {
 	entity := "idx_delete_field"
 	api_storage.WriteEntity(entity, map[string]any{"id": "u1", "score": 10, "age": 30})
 	api_storage.WriteEntity(entity, map[string]any{"id": "u2", "score": 5, "age": 25})
-	time.Sleep(10 * time.Millisecond)
-
-	api_storage.CreateIndexesForField(entity, "score")
-	api_storage.CreateIndexesForField(entity, "age")
 
 	if !api_storage.IndexExistsForField(entity, "score") || !api_storage.IndexExistsForField(entity, "age") {
 		t.Fatalf("expected indexes for score and age to exist before deletion")

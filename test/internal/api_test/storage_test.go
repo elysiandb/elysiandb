@@ -23,6 +23,7 @@ func initTestStore(t *testing.T) {
 		},
 	})
 	storage.LoadDB()
+	storage.LoadJsonDB()
 }
 
 func TestWriteAndReadEntityById(t *testing.T) {
@@ -291,9 +292,9 @@ func TestListEntities_WithNumericFilters(t *testing.T) {
 	initTestStore(t)
 
 	entity := "products"
-	api_storage.WriteEntity(entity, map[string]interface{}{"id": "p1", "price": 10})
-	api_storage.WriteEntity(entity, map[string]interface{}{"id": "p2", "price": 20})
-	api_storage.WriteEntity(entity, map[string]interface{}{"id": "p3", "price": 30})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "p1", "price": float64(10)})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "p2", "price": float64(20)})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "p3", "price": float64(30)})
 
 	f1 := map[string]map[string]string{"price": {"eq": "20"}}
 	r1 := api_storage.ListEntities(entity, 0, 0, "", true, f1)
