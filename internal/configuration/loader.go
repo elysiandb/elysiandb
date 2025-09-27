@@ -9,10 +9,11 @@ import (
 )
 
 type Config struct {
-	Store  StoreConfig   `yaml:"store"`
-	Server ServersConfig `yaml:"server"`
-	Log    LogConfig     `yaml:"log"`
-	Stats  StatsConfig   `yaml:"stats"`
+	Store    StoreConfig    `yaml:"store"`
+	Server   ServersConfig  `yaml:"server"`
+	Log      LogConfig      `yaml:"log"`
+	Stats    StatsConfig    `yaml:"stats"`
+	ApiCache ApiCacheConfig `yaml:"apiCache"`
 }
 
 type ServersConfig struct {
@@ -38,6 +39,11 @@ type StoreConfig struct {
 
 type StatsConfig struct {
 	Enabled bool `yaml:"enabled"`
+}
+
+type ApiCacheConfig struct {
+	Enabled                bool `yaml:"enabled"`
+	CleanupIntervalSeconds int  `yaml:"cleanupIntervalSeconds"`
 }
 
 func LoadConfig(path string) (*Config, error) {

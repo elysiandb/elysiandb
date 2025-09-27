@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/cache"
+	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/valyala/fasthttp"
 )
 
@@ -14,6 +16,18 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	offset := ctx.QueryArgs().GetUintOrZero("offset")
 	sortField, sortAscending := ParseSortParam(ctx.QueryArgs())
 	filters := ParseFilterParam(ctx.QueryArgs())
+
+	var hash []byte
+	if globals.GetConfig().ApiCache.Enabled {
+		hash = cache.HashQuery(entity, limit, offset, sortField, sortAscending, filters)
+		cached := cache.CacheStore.Get(entity, hash)
+		if cached != nil {
+			ctx.Response.Header.Set("Content-Type", "application/json")
+			ctx.SetStatusCode(fasthttp.StatusOK)
+			ctx.SetBody(cached)
+			return
+		}
+	}
 
 	data := api_storage.ListEntities(entity, limit, offset, sortField, sortAscending, filters)
 
@@ -27,6 +41,10 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
+
+	if globals.GetConfig().ApiCache.Enabled {
+		cache.CacheStore.Set(entity, hash, response)
+	}
 }
 
 func ParseSortParam(params *fasthttp.Args) (field string, ascending bool) {
@@ -72,7 +90,7 @@ func ParseFilterParam(params *fasthttp.Args) map[string]map[string]string {
 			if _, ok := filters[field]; !ok {
 				filters[field] = make(map[string]string)
 			}
-			
+
 			filters[field][op] = val
 		}
 	}

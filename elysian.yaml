@@ -9,3 +9,6 @@ log:
   flushIntervalSeconds: 5
 stats:
   enabled: false
+apiCache:
+  enabled: true
+  cleanupIntervalSeconds: 10
