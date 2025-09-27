@@ -2,6 +2,7 @@ package boot
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/fasthttp/router"
 
@@ -22,13 +23,20 @@ func StartHTTP() {
 	srv := &fasthttp.Server{
 		Handler:               r.Handler,
 		Name:                  "ElysianDB",
-		DisableKeepalive:      false,
-		TCPKeepalive:          true,
-		ReadBufferSize:        4096,
-		WriteBufferSize:       4096,
-		ReduceMemoryUsage:     true,
-		LogAllErrors:          false,
 		NoDefaultServerHeader: true,
+		ReduceMemoryUsage:     true,
+
+		// Haute concurrence
+		Concurrency: 100_000,
+
+		// Buffers
+		ReadBufferSize:  64 << 10,
+		WriteBufferSize: 64 << 10,
+
+		// Timeouts
+		ReadTimeout:  3 * time.Second,
+		WriteTimeout: 3 * time.Second,
+		IdleTimeout:  30 * time.Second,
 	}
 
 	log.DirectInfo("ElysianDB HTTP listening on http://", addr)

@@ -10,6 +10,7 @@ import (
 
 const (
 	DataFile           = "elysiandb.json"
+	JsonDataFile       = "elysiandbjson.json"
 	ExpirationDataFile = "elysiandb.expiration.json"
 )
 

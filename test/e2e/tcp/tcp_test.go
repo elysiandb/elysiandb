@@ -39,6 +39,7 @@ func TestTCP_PING_SET_MGET_GET__WILDCARD__SAVE__RESET(t *testing.T) {
 		},
 	})
 	storage.LoadDB()
+	storage.LoadJsonDB()
 	boot.BootSaver()
 	boot.BootExpirationHandler()
 	boot.BootLogger()
