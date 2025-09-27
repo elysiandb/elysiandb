@@ -13,6 +13,19 @@ export const options = {
   thresholds: {
     http_req_failed:   ['rate<0.01'],
     http_req_duration: ['p(95)<100'],
+    'http_req_duration{ name:api_create }': ['p(95)<100'],
+    'http_req_duration{ name:api_get_by_id }': ['p(95)<100'],
+    'http_req_duration{ name:api_update }': ['p(95)<100'],
+    'http_req_duration{ name:api_list }': ['p(95)<100'],
+    'http_req_duration{ name:api_filter_eq }': ['p(95)<100'],
+    'http_req_duration{ name:api_filter_neq }': ['p(95)<100'],
+    'http_req_duration{ name:api_filter_wildcard }': ['p(95)<100'],
+    'http_req_duration{ name:api_nested_create }': ['p(95)<100'],
+    'http_req_duration{ name:api_filter_nested }': ['p(95)<100'],
+    'http_req_duration{ name:api_filter_combined }': ['p(95)<100'],
+    'http_req_duration{ name:api_sort_asc }': ['p(95)<100'],
+    'http_req_duration{ name:api_sort_desc }': ['p(95)<100'],
+    'http_req_duration{ name:api_delete }': ['p(95)<100'],
   },
 }
 

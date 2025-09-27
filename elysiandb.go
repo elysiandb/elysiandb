@@ -7,6 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	"github.com/taymour/elysiandb/internal/boot"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
@@ -15,6 +18,11 @@ import (
 )
 
 func main() {
+	go func() {
+		fmt.Println("pprof running on :6060")
+		http.ListenAndServe(":6060", nil)
+	}()
+
 	fmt.Println(`
    ╔══════════════════════════════════════╗
    ║                                      ║

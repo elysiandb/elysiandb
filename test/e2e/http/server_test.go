@@ -28,6 +28,7 @@ func startTestServer(t *testing.T) (*fasthttp.Client, func()) {
 	}
 	globals.SetConfig(cfg)
 	storage.LoadDB()
+	storage.LoadJsonDB()
 
 	r := router.New()
 	routing.RegisterRoutes(r)

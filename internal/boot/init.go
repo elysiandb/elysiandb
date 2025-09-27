@@ -6,6 +6,7 @@ import (
 
 func InitDB() {
 	storage.LoadDB()
+	storage.LoadJsonDB()
 	BootSaver()
 	BootExpirationHandler()
 	BootLogger()

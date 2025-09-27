@@ -70,3 +70,28 @@ func ReadExpirationsFromDB(fileName string) (map[int64][]string, error) {
 
 	return out, nil
 }
+
+func ReadJsonFromDB(fileName string) (map[string]map[string]interface{}, error) {
+	cfg := globals.GetConfig()
+
+	file, err := os.Open(cfg.Store.Folder + "/" + fileName)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	data := make(map[string]map[string]interface{})
+	bytes, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+	if len(bytes) == 0 {
+		return data, nil
+	}
+
+	if err := json.Unmarshal(bytes, &data); err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
