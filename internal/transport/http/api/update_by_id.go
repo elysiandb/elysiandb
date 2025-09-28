@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/cache"
+	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/valyala/fasthttp"
 )
 
@@ -31,4 +33,8 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
+
+	if globals.GetConfig().ApiCache.Enabled {
+		cache.CacheStore.Purge(entity)
+	}
 }

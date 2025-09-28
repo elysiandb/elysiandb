@@ -51,8 +51,10 @@ export default function () {
   const id = created && created.id
 
   if (id) {
-    const getById = http.get(`${BASE}/api/${entity}/${id}`, { tags: { name: 'api_get_by_id' } })
-    check(getById, { 'GET by ID 200': r => r.status === 200 })
+    for (let i = 0; i < 20; i++) {
+      const getById = http.get(`${BASE}/api/${entity}/${id}`, { tags: { name: 'api_get_by_id' } })
+      check(getById, { 'GET by ID 200': r => r.status === 200 })
+    }
 
     const update = http.put(`${BASE}/api/${entity}/${id}`, JSON.stringify({ title: `updated-${id}`, extra: 123 }), {
       headers: { 'Content-Type': 'application/json' },
@@ -61,17 +63,25 @@ export default function () {
     check(update, { 'UPDATE 200': r => r.status === 200 })
   }
 
-  const list = http.get(`${BASE}/api/${entity}`, { tags: { name: 'api_list' } })
-  check(list, { 'LIST 200': r => r.status === 200 })
+  for (let i = 0; i < 20; i++) {
+    const list = http.get(`${BASE}/api/${entity}`, { tags: { name: 'api_list' } })
+    check(list, { 'LIST 200': r => r.status === 200 })
+  }
 
-  const filterEq = http.get(`${BASE}/api/${entity}?filter[title][eq]=title-${__VU}-${__ITER}`, { tags: { name: 'api_filter_eq' } })
-  check(filterEq, { 'FILTER eq 200': r => r.status === 200 })
+  for (let i = 0; i < 20; i++) {
+    const filterEq = http.get(`${BASE}/api/${entity}?filter[title][eq]=title-${__VU}-${__ITER}`, { tags: { name: 'api_filter_eq' } })
+    check(filterEq, { 'FILTER eq 200': r => r.status === 200 })
+  }
 
-  const filterNeq = http.get(`${BASE}/api/${entity}?filter[title][neq]=title-${__VU}-${__ITER}`, { tags: { name: 'api_filter_neq' } })
-  check(filterNeq, { 'FILTER neq 200': r => r.status === 200 })
+  for (let i = 0; i < 20; i++) {
+    const filterNeq = http.get(`${BASE}/api/${entity}?filter[title][neq]=title-${__VU}-${__ITER}`, { tags: { name: 'api_filter_neq' } })
+    check(filterNeq, { 'FILTER neq 200': r => r.status === 200 })
+  }
 
-  const filterWildcard = http.get(`${BASE}/api/${entity}?filter[title][eq]=title-*`, { tags: { name: 'api_filter_wildcard' } })
-  check(filterWildcard, { 'FILTER wildcard 200': r => r.status === 200 })
+  for (let i = 0; i < 20; i++) {
+    const filterWildcard = http.get(`${BASE}/api/${entity}?filter[title][eq]=title-*`, { tags: { name: 'api_filter_wildcard' } })
+    check(filterWildcard, { 'FILTER wildcard 200': r => r.status === 200 })
+  }
 
   const nested = http.post(`${BASE}/api/nested`, JSON.stringify({ author: { name: "Alice", category: { title: "yep" } } }), {
     headers: { 'Content-Type': 'application/json' },
@@ -79,17 +89,25 @@ export default function () {
   })
   check(nested, { 'NESTED CREATE 200': r => r.status === 200 })
 
-  const filterNested = http.get(`${BASE}/api/nested?filter[author.name][eq]=Alice`, { tags: { name: 'api_filter_nested' } })
-  check(filterNested, { 'FILTER nested 200': r => r.status === 200 })
+  for (let i = 0; i < 20; i++) {
+    const filterNested = http.get(`${BASE}/api/nested?filter[author.name][eq]=Alice`, { tags: { name: 'api_filter_nested' } })
+    check(filterNested, { 'FILTER nested 200': r => r.status === 200 })
+  }
 
-  const combined = http.get(`${BASE}/api/${entity}?filter[title][eq]=title-${__VU}-${__ITER}&filter[value][eq]=${__ITER}`, { tags: { name: 'api_filter_combined' } })
-  check(combined, { 'FILTER combined 200': r => r.status === 200 })
+  for (let i = 0; i < 20; i++) {
+    const combined = http.get(`${BASE}/api/${entity}?filter[title][eq]=title-${__VU}-${__ITER}&filter[value][eq]=${__ITER}`, { tags: { name: 'api_filter_combined' } })
+    check(combined, { 'FILTER combined 200': r => r.status === 200 })
+  }
 
-  const sortAsc = http.get(`${BASE}/api/${entity}?sort[value]=asc`, { tags: { name: 'api_sort_asc' } })
-  check(sortAsc, { 'SORT asc 200': r => r.status === 200 })
+  for (let i = 0; i < 20; i++) {
+    const sortAsc = http.get(`${BASE}/api/${entity}?sort[value]=asc`, { tags: { name: 'api_sort_asc' } })
+    check(sortAsc, { 'SORT asc 200': r => r.status === 200 })
+  }
 
-  const sortDesc = http.get(`${BASE}/api/${entity}?sort[value]=desc`, { tags: { name: 'api_sort_desc' } })
-  check(sortDesc, { 'SORT desc 200': r => r.status === 200 })
+  for (let i = 0; i < 20; i++) {
+    const sortDesc = http.get(`${BASE}/api/${entity}?sort[value]=desc`, { tags: { name: 'api_sort_desc' } })
+    check(sortDesc, { 'SORT desc 200': r => r.status === 200 })
+  }
 
   if (id) {
     const del = http.del(`${BASE}/api/${entity}/${id}`, null, { tags: { name: 'api_delete' } })

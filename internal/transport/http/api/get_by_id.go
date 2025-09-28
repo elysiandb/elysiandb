@@ -4,14 +4,25 @@ import (
 	"encoding/json"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/cache"
+	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/valyala/fasthttp"
 )
 
 func GetByIdController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 	id := ctx.UserValue("id").(string)
-	data := api_storage.ReadEntityById(entity, id)
 
+	if globals.GetConfig().ApiCache.Enabled {
+		if v := cache.CacheStore.GetById(entity, id); v != nil {
+			ctx.Response.Header.Set("Content-Type", "application/json")
+			ctx.SetStatusCode(fasthttp.StatusOK)
+			ctx.SetBody(v)
+			return
+		}
+	}
+
+	data := api_storage.ReadEntityById(entity, id)
 	response, err := json.Marshal(data)
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
@@ -19,8 +30,11 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	ctx.Response.Header.Set("Content-Type", "application/json")
+	if globals.GetConfig().ApiCache.Enabled {
+		cache.CacheStore.SetById(entity, id, response)
+	}
 
+	ctx.Response.Header.Set("Content-Type", "application/json")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
 }
