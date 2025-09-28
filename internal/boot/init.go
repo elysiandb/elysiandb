@@ -5,6 +5,7 @@ import (
 
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/recovery"
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
@@ -17,6 +18,15 @@ func InitDB() {
 
 	storage.LoadDB()
 	storage.LoadJsonDB()
+
+	if cfg.Store.CrashRecovery.Enabled {
+		recovery.ReplayJsonRecoveryLog(storage.PutJsonValue, storage.DeleteJsonByKey)
+		recovery.ActivateJsonRecoveryLog(storage.WriteJsonDB)
+
+		recovery.ReplayStoreRecoveryLog(storage.PutKeyValue, storage.DeleteByKey)
+		recovery.ActivateStoreRecoveryLog(storage.WriteStoreDB)
+	}
+
 	BootSaver()
 	BootExpirationHandler()
 	BootLogger()

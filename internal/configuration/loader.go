@@ -31,10 +31,16 @@ type ServerConfig struct {
 	Port    int    `yaml:"port"`
 }
 
+type CrashRecoveryConfig struct {
+	Enabled  bool  `yaml:"enabled"`
+	MaxLogMB int64 `yaml:"maxLogMB"`
+}
+
 type StoreConfig struct {
-	Folder               string `yaml:"folder"`
-	Shards               int    `yaml:"shards"`
-	FlushIntervalSeconds int    `yaml:"flushIntervalSeconds"`
+	Folder               string              `yaml:"folder"`
+	Shards               int                 `yaml:"shards"`
+	FlushIntervalSeconds int                 `yaml:"flushIntervalSeconds"`
+	CrashRecovery        CrashRecoveryConfig `yaml:"crashRecovery"`
 }
 
 type StatsConfig struct {

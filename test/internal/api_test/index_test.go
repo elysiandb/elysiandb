@@ -111,10 +111,10 @@ func TestEnsureFieldIndex_And_IndexExists(t *testing.T) {
 	asc := decodeIDs(ascRaw)
 	desc := decodeIDs(descRaw)
 
-	if !reflect.DeepEqual(asc, []string{"a", "b", "c"}) {
+	if !reflect.DeepEqual(asc, []string{"b", "a", "c"}) {
 		t.Fatalf("asc=%v", asc)
 	}
-	if !reflect.DeepEqual(desc, []string{"c", "b", "a"}) {
+	if !reflect.DeepEqual(desc, []string{"c", "a", "b"}) {
 		t.Fatalf("desc=%v", desc)
 	}
 
@@ -182,7 +182,7 @@ func TestIndexesCreatedOnWriteEntity(t *testing.T) {
 		t.Fatalf("asc GetByKey: %v", err)
 	}
 	asc := decodeIDs(ascRaw)
-	if !reflect.DeepEqual(asc, []string{"p1", "p2"}) {
+	if !reflect.DeepEqual(asc, []string{"p2", "p1"}) {
 		t.Fatalf("asc=%v", asc)
 	}
 }

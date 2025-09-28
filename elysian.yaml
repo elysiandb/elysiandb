@@ -1,7 +1,8 @@
 store:
   folder: /tmp/elysiandb
   shards: 512
-  flushIntervalSeconds: 5
+  flushIntervalSeconds: 3600
+  crashRecovery: { enabled: true, maxLogMB: 100 }
 server:
   http: { enabled: true,  host: 0.0.0.0, port: 8089 }
   tcp:  { enabled: true,  host: 0.0.0.0, port: 8088 }
