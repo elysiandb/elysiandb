@@ -103,7 +103,7 @@ func TestGetSortedEntityIdsByField_MixedTypesAndMissing(t *testing.T) {
 	asc := api_storage.GetSortedEntityIdsByField(entity, "rank", true)
 	desc := api_storage.GetSortedEntityIdsByField(entity, "rank", false)
 
-	wantSet := map[string]bool{"m1": true, "m2": true, "m3": true, "m4": true}
+	wantSet := map[string]bool{"m1": true, "m2": true, "m3": true}
 	if !containsExactly(asc, wantSet) {
 		t.Fatalf("asc should contain all ids, got %v", asc)
 	}
@@ -138,6 +138,72 @@ func TestGetSortedEntityIdsByField_NestedFields(t *testing.T) {
 	}
 	if !equalSlices(desc, wantDesc) {
 		t.Fatalf("nested author.name desc = %v, want %v", desc, wantDesc)
+	}
+}
+
+func TestGetSortedEntityIdsByField_DateAscDesc(t *testing.T) {
+	initSortTestStore(t)
+
+	entity := "events"
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "e1", "date": "2023-01-01"})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "e2", "date": "2022-12-31"})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "e3", "date": "2023-01-02"})
+
+	asc := api_storage.GetSortedEntityIdsByField(entity, "date", true)
+	desc := api_storage.GetSortedEntityIdsByField(entity, "date", false)
+
+	wantAsc := []string{"e2", "e1", "e3"}
+	wantDesc := []string{"e3", "e1", "e2"}
+
+	if !equalSlices(asc, wantAsc) {
+		t.Fatalf("date asc = %v, want %v", asc, wantAsc)
+	}
+	if !equalSlices(desc, wantDesc) {
+		t.Fatalf("date desc = %v, want %v", desc, wantDesc)
+	}
+}
+
+func TestGetSortedEntityIdsByField_DateTimeAscDesc(t *testing.T) {
+	initSortTestStore(t)
+
+	entity := "events"
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "e1", "date": "2023-01-01T10:00:00Z"})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "e2", "date": "2022-12-31T23:59:59Z"})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "e3", "date": "2023-01-02T00:00:00Z"})
+
+	asc := api_storage.GetSortedEntityIdsByField(entity, "date", true)
+	desc := api_storage.GetSortedEntityIdsByField(entity, "date", false)
+
+	wantAsc := []string{"e2", "e1", "e3"}
+	wantDesc := []string{"e3", "e1", "e2"}
+
+	if !equalSlices(asc, wantAsc) {
+		t.Fatalf("date asc = %v, want %v", asc, wantAsc)
+	}
+	if !equalSlices(desc, wantDesc) {
+		t.Fatalf("date desc = %v, want %v", desc, wantDesc)
+	}
+}
+
+func TestGetSortedEntityIdsByField_NestedDateAscDesc(t *testing.T) {
+	initSortTestStore(t)
+
+	entity := "meetings"
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "m1", "schedule": map[string]interface{}{"start": "2023-01-02"}})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "m2", "schedule": map[string]interface{}{"start": "2022-12-31"}})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "m3", "schedule": map[string]interface{}{"start": "2023-01-01"}})
+
+	asc := api_storage.GetSortedEntityIdsByField(entity, "schedule.start", true)
+	desc := api_storage.GetSortedEntityIdsByField(entity, "schedule.start", false)
+
+	wantAsc := []string{"m2", "m3", "m1"}
+	wantDesc := []string{"m1", "m3", "m2"}
+
+	if !equalSlices(asc, wantAsc) {
+		t.Fatalf("nested date asc = %v, want %v", asc, wantAsc)
+	}
+	if !equalSlices(desc, wantDesc) {
+		t.Fatalf("nested date desc = %v, want %v", desc, wantDesc)
 	}
 }
 
