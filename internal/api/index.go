@@ -76,6 +76,13 @@ func EnsureFieldIndex(entity, field, id string, value interface{}) {
 	storage.PutKeyValue(ascKey, encodeIDs(asc))
 	storage.PutKeyValue(descKey, encodeIDs(desc))
 	AddFieldToIndexedFields(entity, field)
+
+	if m, ok := value.(map[string]interface{}); ok {
+		for k, v := range m {
+			nestedField := field + "." + k
+			EnsureFieldIndex(entity, nestedField, id, v)
+		}
+	}
 }
 
 func insertAsc(ids *[]string, id string) {

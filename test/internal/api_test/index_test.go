@@ -124,6 +124,24 @@ func TestEnsureFieldIndex_And_IndexExists(t *testing.T) {
 	}
 }
 
+func TestEnsureFieldIndex_Nested(t *testing.T) {
+	initIdxTestStore(t)
+
+	entity := "idx_nested"
+	api_storage.WriteEntity(entity, map[string]any{
+		"id": "n1",
+		"obj": map[string]any{
+			"sub": map[string]any{
+				"val": 42,
+			},
+		},
+	})
+
+	if !api_storage.IndexExistsForField(entity, "obj.sub.val") {
+		t.Fatalf("expected nested index obj.sub.val to exist")
+	}
+}
+
 func TestRemoveEntityIndexes(t *testing.T) {
 	initIdxTestStore(t)
 

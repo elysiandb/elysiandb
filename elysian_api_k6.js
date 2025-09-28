@@ -25,6 +25,9 @@ export const options = {
     'http_req_duration{ name:api_filter_combined }': ['p(95)<100'],
     'http_req_duration{ name:api_sort_asc }': ['p(95)<100'],
     'http_req_duration{ name:api_sort_desc }': ['p(95)<100'],
+    'http_req_duration{ name:api_filter_date }': ['p(95)<100'],
+    'http_req_duration{ name:api_sort_date_asc }': ['p(95)<100'],
+    'http_req_duration{ name:api_sort_date_desc }': ['p(95)<100'],
     'http_req_duration{ name:api_delete }': ['p(95)<100'],
   },
 }
@@ -38,7 +41,7 @@ function uuid() {
 
 export default function () {
   const entity = 'benchmarks'
-  const payload = { title: `title-${__VU}-${__ITER}`, value: __ITER }
+  const payload = { title: `title-${__VU}-${__ITER}`, value: __ITER, date: "2023-01-01T10:00:00Z" }
 
   const create = http.post(`${BASE}/api/${entity}`, JSON.stringify(payload), {
     headers: { 'Content-Type': 'application/json' },
@@ -56,7 +59,7 @@ export default function () {
       check(getById, { 'GET by ID 200': r => r.status === 200 })
     }
 
-    const update = http.put(`${BASE}/api/${entity}/${id}`, JSON.stringify({ title: `updated-${id}`, extra: 123 }), {
+    const update = http.put(`${BASE}/api/${entity}/${id}`, JSON.stringify({ title: `updated-${id}`, extra: 123, date: "2023-01-02T12:00:00Z" }), {
       headers: { 'Content-Type': 'application/json' },
       tags: { name: 'api_update' }
     })
@@ -107,6 +110,21 @@ export default function () {
   for (let i = 0; i < 20; i++) {
     const sortDesc = http.get(`${BASE}/api/${entity}?sort[value]=desc`, { tags: { name: 'api_sort_desc' } })
     check(sortDesc, { 'SORT desc 200': r => r.status === 200 })
+  }
+
+  for (let i = 0; i < 20; i++) {
+    const filterDate = http.get(`${BASE}/api/${entity}?filter[date][gte]=2023-01-01T00:00:00Z`, { tags: { name: 'api_filter_date' } })
+    check(filterDate, { 'FILTER date 200': r => r.status === 200 })
+  }
+
+  for (let i = 0; i < 20; i++) {
+    const sortDateAsc = http.get(`${BASE}/api/${entity}?sort[date]=asc`, { tags: { name: 'api_sort_date_asc' } })
+    check(sortDateAsc, { 'SORT date asc 200': r => r.status === 200 })
+  }
+
+  for (let i = 0; i < 20; i++) {
+    const sortDateDesc = http.get(`${BASE}/api/${entity}?sort[date]=desc`, { tags: { name: 'api_sort_date_desc' } })
+    check(sortDateDesc, { 'SORT date desc 200': r => r.status === 200 })
   }
 
   if (id) {
