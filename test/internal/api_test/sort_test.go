@@ -103,7 +103,7 @@ func TestGetSortedEntityIdsByField_MixedTypesAndMissing(t *testing.T) {
 	asc := api_storage.GetSortedEntityIdsByField(entity, "rank", true)
 	desc := api_storage.GetSortedEntityIdsByField(entity, "rank", false)
 
-	wantSet := map[string]bool{"m1": true, "m2": true, "m3": true}
+	wantSet := map[string]bool{"m1": true, "m2": true, "m3": true, "m4": true}
 	if !containsExactly(asc, wantSet) {
 		t.Fatalf("asc should contain all ids, got %v", asc)
 	}

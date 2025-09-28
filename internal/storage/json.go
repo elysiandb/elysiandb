@@ -12,6 +12,7 @@ import (
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/recovery"
 	"github.com/taymour/elysiandb/internal/stat"
 )
 
@@ -153,6 +154,10 @@ func (s *JsonStore) reset() {
 		sh.mu.Unlock()
 	}
 	s.saved.Store(false)
+
+	if globals.GetConfig().Store.CrashRecovery.Enabled {
+		recovery.ClearJsonRecoveryLog()
+	}
 }
 
 func (s *JsonStore) shardIndex(key string) int {
@@ -177,6 +182,10 @@ func (s *JsonStore) put(key string, value map[string]interface{}) {
 	sh.m[key] = value
 	sh.mu.Unlock()
 	s.saved.Store(false)
+
+	if globals.GetConfig().Store.CrashRecovery.Enabled {
+		recovery.LogJsonPut(key, value)
+	}
 }
 
 func (s *JsonStore) del(key string) {
@@ -185,6 +194,10 @@ func (s *JsonStore) del(key string) {
 	delete(sh.m, key)
 	sh.mu.Unlock()
 	s.saved.Store(false)
+
+	if globals.GetConfig().Store.CrashRecovery.Enabled {
+		recovery.LogJsonDelete(key)
+	}
 }
 
 func (s *JsonStore) Iterate(fn func(k string, v map[string]interface{})) {

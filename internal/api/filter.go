@@ -68,7 +68,7 @@ func matchDate(value string, ops map[string]string) (bool, bool) {
 		if !ok2 {
 			return false, false
 		}
-		
+
 		tv, tc := tVal, tCmp
 		if dateOnly1 || dateOnly2 {
 			tv = tv.Truncate(24 * time.Hour)

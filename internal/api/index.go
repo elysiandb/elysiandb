@@ -2,7 +2,6 @@ package api_storage
 
 import (
 	"bytes"
-	"sort"
 
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/storage"
@@ -67,12 +66,8 @@ func RemoveEntityIndexes(entity string) {
 func EnsureFieldIndex(entity, field, id string, value interface{}) {
 	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, field)
 	descKey := globals.ApiEntityIndexFieldSortDescKey(entity, field)
-	rawAsc, _ := storage.GetByKey(ascKey)
-	rawDesc, _ := storage.GetByKey(descKey)
-	asc := decodeIDs(rawAsc)
-	desc := decodeIDs(rawDesc)
-	insertAsc(&asc, id)
-	insertDesc(&desc, id)
+	asc := GetSortedEntityIdsByField(entity, field, true)
+	desc := GetSortedEntityIdsByField(entity, field, false)
 	storage.PutKeyValue(ascKey, encodeIDs(asc))
 	storage.PutKeyValue(descKey, encodeIDs(desc))
 	AddFieldToIndexedFields(entity, field)
@@ -83,26 +78,6 @@ func EnsureFieldIndex(entity, field, id string, value interface{}) {
 			EnsureFieldIndex(entity, nestedField, id, v)
 		}
 	}
-}
-
-func insertAsc(ids *[]string, id string) {
-	for _, v := range *ids {
-		if v == id {
-			return
-		}
-	}
-	*ids = append(*ids, id)
-	sort.Strings(*ids)
-}
-
-func insertDesc(ids *[]string, id string) {
-	for _, v := range *ids {
-		if v == id {
-			return
-		}
-	}
-	*ids = append(*ids, id)
-	sort.Sort(sort.Reverse(sort.StringSlice(*ids)))
 }
 
 func IndexExistsForField(entity string, field string) bool {

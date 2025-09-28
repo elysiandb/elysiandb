@@ -67,10 +67,12 @@ func applyOffsetLimit[T any](in []T, offset, limit int) []T {
 	if start > len(in) {
 		start = len(in)
 	}
+
 	end := len(in)
 	if limit > 0 && start+limit < end {
 		end = start + limit
 	}
+
 	return in[start:end]
 }
 

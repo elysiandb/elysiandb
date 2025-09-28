@@ -6,6 +6,7 @@ import (
 
 	xxhash "github.com/cespare/xxhash/v2"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/recovery"
 )
 
 const (
@@ -192,6 +193,10 @@ func (s *Store) reset() {
 		sh.mu.Unlock()
 	}
 	s.saved.Store(false)
+
+	if globals.GetConfig().Store.CrashRecovery.Enabled {
+		recovery.ClearStoreRecoveryLog()
+	}
 }
 
 func (s *Store) shardIndex(key string) int {
@@ -220,6 +225,10 @@ func (s *Store) put(key string, value []byte) {
 	sh.m[key] = buf
 	sh.mu.Unlock()
 	s.saved.Store(false)
+
+	if globals.GetConfig().Store.CrashRecovery.Enabled {
+		recovery.LogStorePut(key, buf)
+	}
 }
 
 func (s *Store) del(key string) {
@@ -228,6 +237,10 @@ func (s *Store) del(key string) {
 	delete(sh.m, key)
 	sh.mu.Unlock()
 	s.saved.Store(false)
+
+	if globals.GetConfig().Store.CrashRecovery.Enabled {
+		recovery.LogStoreDelete(key)
+	}
 }
 
 func (s *Store) Iterate(fn func(k string, v []byte)) {
