@@ -29,6 +29,16 @@ func TestCacheGetNotExist(t *testing.T) {
 	}
 }
 
+func TestCacheInvalidHashLength(t *testing.T) {
+	cache.InitCache(10 * time.Second)
+	entity := "users"
+	got := cache.CacheStore.Get(entity, []byte("short"))
+	if got != nil {
+		t.Fatalf("expected nil for invalid hash length")
+	}
+	cache.CacheStore.Set(entity, []byte("short"), []byte("x"))
+}
+
 func TestCachePurge(t *testing.T) {
 	cache.InitCache(10 * time.Second)
 	entity := "users"
@@ -160,6 +170,7 @@ func TestCacheExpiration(t *testing.T) {
 	value := []byte(`{"id":"1","name":"Alice"}`)
 	cache.CacheStore.Set(entity, hash, value)
 	time.Sleep(200 * time.Millisecond)
+	cache.CacheStore.CleanExpired()
 	got := cache.CacheStore.Get(entity, hash)
 	if got != nil {
 		t.Fatalf("expected nil after expiration, got %s", got)
@@ -195,8 +206,25 @@ func TestCacheExpirationById(t *testing.T) {
 	value := []byte(`{"id":"456","name":"Charlie"}`)
 	cache.CacheStore.SetById(entity, id, value)
 	time.Sleep(200 * time.Millisecond)
+	cache.CacheStore.CleanExpired()
 	got := cache.CacheStore.GetById(entity, id)
 	if got != nil {
 		t.Fatalf("expected nil after expiration, got %s", got)
+	}
+}
+
+func TestCacheCleanExpiredRemovesBothDataAndIds(t *testing.T) {
+	cache.InitCache(10 * time.Millisecond)
+	entity := "users"
+	hash := cache.HashQuery("users", 10, 0, "name", true, nil)
+	cache.CacheStore.Set(entity, hash, []byte("val"))
+	cache.CacheStore.SetById(entity, "id1", []byte("val"))
+	time.Sleep(20 * time.Millisecond)
+	cache.CacheStore.CleanExpired()
+	if v := cache.CacheStore.Get(entity, hash); v != nil {
+		t.Fatalf("expected nil after CleanExpired, got %s", v)
+	}
+	if v := cache.CacheStore.GetById(entity, "id1"); v != nil {
+		t.Fatalf("expected nil after CleanExpired, got %s", v)
 	}
 }
