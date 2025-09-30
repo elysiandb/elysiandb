@@ -9,6 +9,7 @@ import (
 
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/recovery"
 	"github.com/taymour/elysiandb/internal/stat"
 )
 
@@ -182,6 +183,14 @@ func PutKeyValueWithTTL(key string, value []byte, ttl int) error {
 		expirationContainer.put(expiration, []string{key})
 		if cfg.Stats.Enabled && !hadTTL {
 			stat.Stats.IncrementExpirationKeysCount()
+		}
+
+		if globals.GetConfig().Store.CrashRecovery.Enabled {
+			recovery.LogStorePutWithTTL(key, value, ttl)
+		}
+	} else {
+		if globals.GetConfig().Store.CrashRecovery.Enabled {
+			recovery.LogStorePut(key, value)
 		}
 	}
 

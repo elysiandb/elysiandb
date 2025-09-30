@@ -23,7 +23,7 @@ func InitDB() {
 		recovery.ReplayJsonRecoveryLog(storage.PutJsonValue, storage.DeleteJsonByKey)
 		recovery.ActivateJsonRecoveryLog(storage.WriteJsonDB)
 
-		recovery.ReplayStoreRecoveryLog(storage.PutKeyValue, storage.DeleteByKey)
+		recovery.ReplayStoreRecoveryLog(storage.PutKeyValueWithTTL, storage.DeleteByKey)
 		recovery.ActivateStoreRecoveryLog(storage.WriteStoreDB)
 	}
 

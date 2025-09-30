@@ -225,10 +225,6 @@ func (s *Store) put(key string, value []byte) {
 	sh.m[key] = buf
 	sh.mu.Unlock()
 	s.saved.Store(false)
-
-	if globals.GetConfig().Store.CrashRecovery.Enabled {
-		recovery.LogStorePut(key, buf)
-	}
 }
 
 func (s *Store) del(key string) {
