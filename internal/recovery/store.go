@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
@@ -22,6 +23,7 @@ type storeRecoveryOp struct {
 	Op    string `json:"op"`
 	Key   string `json:"key"`
 	Value []byte `json:"value,omitempty"`
+	TTL   int    `json:"ttl,omitempty"`
 }
 
 func ActivateStoreRecoveryLog(saveDBFunc func()) {
@@ -57,6 +59,17 @@ func LogStorePut(key string, value []byte) {
 	appendStoreRecoveryOp(storeRecoveryOp{Op: "put", Key: key, Value: value})
 }
 
+func LogStorePutWithTTL(key string, value []byte, ttl int) {
+	if !storeRecoveryActive {
+		return
+	}
+	var exp int
+	if ttl > 0 {
+		exp = int(time.Now().Unix()) + ttl
+	}
+	appendStoreRecoveryOp(storeRecoveryOp{Op: "put", Key: key, Value: value, TTL: exp})
+}
+
 func LogStoreDelete(key string) {
 	if !storeRecoveryActive {
 		return
@@ -65,7 +78,7 @@ func LogStoreDelete(key string) {
 }
 
 func ReplayStoreRecoveryLog(
-	putFunc func(key string, value []byte) error,
+	putFunc func(key string, value []byte, ttl int) error,
 	deleteFunc func(key string),
 ) {
 	cfg := globals.GetConfig()
@@ -80,6 +93,7 @@ func ReplayStoreRecoveryLog(
 	}
 	defer f.Close()
 
+	now := int(time.Now().Unix())
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -93,7 +107,10 @@ func ReplayStoreRecoveryLog(
 		}
 		switch op.Op {
 		case "put":
-			_ = putFunc(op.Key, op.Value)
+			if op.TTL > 0 && now >= op.TTL {
+				continue
+			}
+			_ = putFunc(op.Key, op.Value, op.TTL)
 		case "del":
 			deleteFunc(op.Key)
 		}
