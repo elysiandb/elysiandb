@@ -56,12 +56,6 @@ func (s *cacheStore) Get(entity string, hash []byte) []byte {
 	if !ok {
 		return nil
 	}
-	if time.Now().UnixNano() > it.exp {
-		e.mu.Lock()
-		delete(e.data, key)
-		e.mu.Unlock()
-		return nil
-	}
 	return it.v
 }
 
@@ -95,12 +89,6 @@ func (s *cacheStore) GetById(entity, id string) []byte {
 	it, ok := e.ids[id]
 	e.mu.RUnlock()
 	if !ok {
-		return nil
-	}
-	if time.Now().UnixNano() > it.exp {
-		e.mu.Lock()
-		delete(e.ids, id)
-		e.mu.Unlock()
 		return nil
 	}
 	return it.v
@@ -164,4 +152,28 @@ func HashQuery(entity string, limit, offset int, sortField string, sortAscending
 	}
 	sum := sha256.Sum256(b)
 	return sum[:]
+}
+
+func (s *cacheStore) CleanExpired() {
+	s.mu.RLock()
+	entities := make(map[string]*cacheEntity, len(s.entities))
+	for k, v := range s.entities {
+		entities[k] = v
+	}
+	s.mu.RUnlock()
+	now := time.Now().UnixNano()
+	for _, e := range entities {
+		e.mu.Lock()
+		for k, it := range e.data {
+			if now > it.exp {
+				delete(e.data, k)
+			}
+		}
+		for id, it := range e.ids {
+			if now > it.exp {
+				delete(e.ids, id)
+			}
+		}
+		e.mu.Unlock()
+	}
 }
