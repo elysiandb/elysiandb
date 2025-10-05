@@ -2,29 +2,10 @@ package api_storage
 
 import (
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/storage"
 )
-
-func GetNestedValue(data map[string]interface{}, path string) (interface{}, bool) {
-	parts := strings.Split(path, ".")
-	var current interface{} = data
-	for _, part := range parts {
-		m, ok := current.(map[string]interface{})
-		if !ok {
-			return nil, false
-		}
-
-		current, ok = m[part]
-		if !ok {
-			return nil, false
-		}
-	}
-
-	return current, true
-}
 
 func FiltersMatchEntity(
 	entityData map[string]interface{},
