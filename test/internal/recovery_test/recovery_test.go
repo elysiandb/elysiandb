@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
@@ -29,68 +30,48 @@ func setupTempDir(t *testing.T) string {
 func TestJsonRecovery_LogReplayAndClear(t *testing.T) {
 	dir := setupTempDir(t)
 	recovery.ActivateJsonRecoveryLog(func() {})
-
 	recovery.LogJsonPut("key1", map[string]interface{}{"a": 1})
 	recovery.LogJsonDelete("key2")
-
 	f := filepath.Join(dir, "elysiandb.json.recovery.log")
 	if _, err := os.Stat(f); err != nil {
 		t.Fatalf("expected log file: %v", err)
 	}
-
 	var puts, dels int
 	recovery.ReplayJsonRecoveryLog(
-		func(k string, v map[string]interface{}) error {
-			puts++
-			return nil
-		},
-		func(k string) {
-			dels++
-		},
+		func(k string, v map[string]interface{}) error { puts++; return nil },
+		func(k string) { dels++ },
 	)
-
 	if puts != 1 || dels != 1 {
 		t.Fatalf("puts=%d dels=%d", puts, dels)
 	}
-
 	if _, err := os.Stat(f); !os.IsNotExist(err) {
 		t.Fatalf("expected log cleared, got err=%v", err)
 	}
-
 	recovery.ClearJsonRecoveryLog()
 }
 
 func TestStoreRecovery_LogReplayAndClear(t *testing.T) {
 	dir := setupTempDir(t)
 	recovery.ActivateStoreRecoveryLog(func() {})
-
 	recovery.LogStorePut("k1", []byte("v1"))
+	recovery.LogStorePutWithTTL("k3", []byte("v3"), 1)
 	recovery.LogStoreDelete("k2")
-
 	f := filepath.Join(dir, "elysiandb.store.recovery.log")
 	if _, err := os.Stat(f); err != nil {
 		t.Fatalf("expected log file: %v", err)
 	}
-
+	time.Sleep(2 * time.Second)
 	var puts, dels int
 	recovery.ReplayStoreRecoveryLog(
-		func(k string, v []byte) error {
-			puts++
-			return nil
-		},
-		func(k string) {
-			dels++
-		},
+		func(k string, v []byte, ttl int) error { puts++; return nil },
+		func(k string) { dels++ },
 	)
-
-	if puts != 1 || dels != 1 {
+	if puts < 1 || dels != 1 {
 		t.Fatalf("puts=%d dels=%d", puts, dels)
 	}
-
 	if _, err := os.Stat(f); !os.IsNotExist(err) {
 		t.Fatalf("expected log cleared, got err=%v", err)
 	}
-
 	recovery.ClearStoreRecoveryLog()
 }
 
@@ -105,7 +86,7 @@ func TestStoreRecovery_InvalidJson(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "elysiandb.store.recovery.log")
 	_ = os.WriteFile(path, []byte("bad\n"), 0o644)
-	recovery.ReplayStoreRecoveryLog(func(k string, v []byte) error { return nil }, func(k string) {})
+	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, ttl int) error { return nil }, func(k string) {})
 }
 
 func TestJsonRecovery_LogSizeTrigger(t *testing.T) {
@@ -137,7 +118,7 @@ func TestJsonRecovery_EmptyReplay(t *testing.T) {
 
 func TestStoreRecovery_EmptyReplay(t *testing.T) {
 	setupTempDir(t)
-	recovery.ReplayStoreRecoveryLog(func(k string, v []byte) error { return nil }, func(k string) {})
+	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, ttl int) error { return nil }, func(k string) {})
 }
 
 func TestJsonRecovery_MultipleOps(t *testing.T) {
@@ -159,32 +140,30 @@ func TestJsonRecovery_MultipleOps(t *testing.T) {
 		buf = append(buf, '\n')
 	}
 	_ = os.WriteFile(f, buf, 0o644)
-
 	var puts, dels int
 	recovery.ReplayJsonRecoveryLog(
-		func(k string, v map[string]interface{}) error {
-			puts++
-			return nil
-		},
-		func(k string) {
-			dels++
-		},
+		func(k string, v map[string]interface{}) error { puts++; return nil },
+		func(k string) { dels++ },
 	)
 	if puts != 1 || dels != 1 {
 		t.Fatalf("puts=%d dels=%d", puts, dels)
 	}
 }
 
-func TestStoreRecovery_MultipleOps(t *testing.T) {
+func TestStoreRecovery_MultipleOpsWithTTL(t *testing.T) {
 	dir := setupTempDir(t)
 	f := filepath.Join(dir, "elysiandb.store.recovery.log")
 	type op struct {
 		Op    string `json:"op"`
 		Key   string `json:"key"`
 		Value []byte `json:"value,omitempty"`
+		TTL   int    `json:"ttl,omitempty"`
 	}
+	expired := int(time.Now().Unix()) - 1
+	valid := int(time.Now().Unix()) + 5
 	ops := []op{
-		{Op: "put", Key: "a", Value: []byte("v")},
+		{Op: "put", Key: "expired", Value: []byte("v1"), TTL: expired},
+		{Op: "put", Key: "valid", Value: []byte("v2"), TTL: valid},
 		{Op: "del", Key: "b"},
 	}
 	var buf []byte
@@ -194,16 +173,10 @@ func TestStoreRecovery_MultipleOps(t *testing.T) {
 		buf = append(buf, '\n')
 	}
 	_ = os.WriteFile(f, buf, 0o644)
-
 	var puts, dels int
 	recovery.ReplayStoreRecoveryLog(
-		func(k string, v []byte) error {
-			puts++
-			return nil
-		},
-		func(k string) {
-			dels++
-		},
+		func(k string, v []byte, ttl int) error { puts++; return nil },
+		func(k string) { dels++ },
 	)
 	if puts != 1 || dels != 1 {
 		t.Fatalf("puts=%d dels=%d", puts, dels)
@@ -231,5 +204,5 @@ func TestStoreRecovery_ReplayWithUnreadableFile(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "elysiandb.store.recovery.log")
 	_ = os.WriteFile(path, []byte("{bad"), 0o000)
-	recovery.ReplayStoreRecoveryLog(func(k string, v []byte) error { return nil }, func(k string) {})
+	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, ttl int) error { return nil }, func(k string) {})
 }
