@@ -16,10 +16,11 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	offset := ctx.QueryArgs().GetUintOrZero("offset")
 	sortField, sortAscending := ParseSortParam(ctx.QueryArgs())
 	filters := ParseFilterParam(ctx.QueryArgs())
+	fieldsParam := string(ctx.QueryArgs().Peek("fields"))
 
 	var hash []byte
 	if globals.GetConfig().ApiCache.Enabled {
-		hash = cache.HashQuery(entity, limit, offset, sortField, sortAscending, filters)
+		hash = cache.HashQuery(entity, limit, offset, sortField, sortAscending, filters, fieldsParam)
 		cached := cache.CacheStore.Get(entity, hash)
 		if cached != nil {
 			ctx.Response.Header.Set("Content-Type", "application/json")
@@ -30,6 +31,16 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	}
 
 	data := api_storage.ListEntities(entity, limit, offset, sortField, sortAscending, filters)
+
+	fields := api_storage.ParseFieldsParam(fieldsParam)
+	if len(fields) > 0 {
+		filteredData := make([]map[string]interface{}, len(data))
+		for i, item := range data {
+			filteredData[i] = api_storage.FilterFields(item, fields)
+		}
+
+		data = filteredData
+	}
 
 	response, err := json.Marshal(data)
 	if err != nil {

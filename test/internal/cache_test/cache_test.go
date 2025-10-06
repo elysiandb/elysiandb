@@ -10,7 +10,7 @@ import (
 func TestCacheSetGet(t *testing.T) {
 	cache.InitCache(10 * time.Second)
 	entity := "users"
-	hash := cache.HashQuery("users", 10, 0, "name", true, nil)
+	hash := cache.HashQuery("users", 10, 0, "name", true, nil, "")
 	value := []byte(`{"id":"1","name":"Alice"}`)
 	cache.CacheStore.Set(entity, hash, value)
 	got := cache.CacheStore.Get(entity, hash)
@@ -22,7 +22,7 @@ func TestCacheSetGet(t *testing.T) {
 func TestCacheGetNotExist(t *testing.T) {
 	cache.InitCache(10 * time.Second)
 	entity := "users"
-	hash := cache.HashQuery("users", 10, 0, "name", true, nil)
+	hash := cache.HashQuery("users", 10, 0, "name", true, nil, "")
 	got := cache.CacheStore.Get(entity, hash)
 	if got != nil {
 		t.Fatalf("expected nil, got %s", got)
@@ -42,7 +42,7 @@ func TestCacheInvalidHashLength(t *testing.T) {
 func TestCachePurge(t *testing.T) {
 	cache.InitCache(10 * time.Second)
 	entity := "users"
-	hash := cache.HashQuery("users", 10, 0, "name", true, nil)
+	hash := cache.HashQuery("users", 10, 0, "name", true, nil, "")
 	value := []byte(`{"id":"1"}`)
 	cache.CacheStore.Set(entity, hash, value)
 	cache.CacheStore.Purge(entity)
@@ -53,20 +53,20 @@ func TestCachePurge(t *testing.T) {
 }
 
 func TestHashQueryDifferentInputs(t *testing.T) {
-	h1 := cache.HashQuery("users", 10, 0, "name", true, nil)
-	h2 := cache.HashQuery("users", 20, 0, "name", true, nil)
+	h1 := cache.HashQuery("users", 10, 0, "name", true, nil, "")
+	h2 := cache.HashQuery("users", 20, 0, "name", true, nil, "")
 	if string(h1) == string(h2) {
 		t.Fatalf("expected different hashes for different limits")
 	}
-	h3 := cache.HashQuery("users", 10, 5, "name", true, nil)
+	h3 := cache.HashQuery("users", 10, 5, "name", true, nil, "")
 	if string(h1) == string(h3) {
 		t.Fatalf("expected different hashes for different offsets")
 	}
-	h4 := cache.HashQuery("users", 10, 0, "name", false, nil)
+	h4 := cache.HashQuery("users", 10, 0, "name", false, nil, "")
 	if string(h1) == string(h4) {
 		t.Fatalf("expected different hashes for ascending vs descending")
 	}
-	h5 := cache.HashQuery("users", 10, 0, "age", true, nil)
+	h5 := cache.HashQuery("users", 10, 0, "age", true, nil, "")
 	if string(h1) == string(h5) {
 		t.Fatalf("expected different hashes for different sort fields")
 	}
@@ -82,9 +82,9 @@ func TestHashQueryWithFiltersStringOps(t *testing.T) {
 	f3 := map[string]map[string]string{
 		"name": {"eq": "Bob"},
 	}
-	h1 := cache.HashQuery("users", 10, 0, "name", true, f1)
-	h2 := cache.HashQuery("users", 10, 0, "name", true, f2)
-	h3 := cache.HashQuery("users", 10, 0, "name", true, f3)
+	h1 := cache.HashQuery("users", 10, 0, "name", true, f1, "")
+	h2 := cache.HashQuery("users", 10, 0, "name", true, f2, "")
+	h3 := cache.HashQuery("users", 10, 0, "name", true, f3, "")
 	if string(h1) == string(h2) {
 		t.Fatalf("expected different hashes for eq vs neq")
 	}
@@ -106,10 +106,10 @@ func TestHashQueryWithFiltersNumericOps(t *testing.T) {
 	f4 := map[string]map[string]string{
 		"age": {"gte": "30"},
 	}
-	h1 := cache.HashQuery("users", 10, 0, "age", true, f1)
-	h2 := cache.HashQuery("users", 10, 0, "age", true, f2)
-	h3 := cache.HashQuery("users", 10, 0, "age", true, f3)
-	h4 := cache.HashQuery("users", 10, 0, "age", true, f4)
+	h1 := cache.HashQuery("users", 10, 0, "age", true, f1, "")
+	h2 := cache.HashQuery("users", 10, 0, "age", true, f2, "")
+	h3 := cache.HashQuery("users", 10, 0, "age", true, f3, "")
+	h4 := cache.HashQuery("users", 10, 0, "age", true, f4, "")
 	if string(h1) == string(h2) {
 		t.Fatalf("expected different hashes for lt vs lte")
 	}
@@ -130,8 +130,8 @@ func TestHashQueryWithMultipleFilters(t *testing.T) {
 		"name": {"eq": "Alice"},
 		"age":  {"gte": "30"},
 	}
-	h1 := cache.HashQuery("users", 10, 0, "name", true, f1)
-	h2 := cache.HashQuery("users", 10, 0, "name", true, f2)
+	h1 := cache.HashQuery("users", 10, 0, "name", true, f1, "")
+	h2 := cache.HashQuery("users", 10, 0, "name", true, f2, "")
 	if string(h1) == string(h2) {
 		t.Fatalf("expected different hashes for different filter values on age")
 	}
@@ -144,17 +144,17 @@ func TestHashQueryWithNestedFilters(t *testing.T) {
 	f2 := map[string]map[string]string{
 		"profile.age": {"lt": "40"},
 	}
-	h1 := cache.HashQuery("users", 10, 0, "profile.name", true, f1)
-	h2 := cache.HashQuery("users", 10, 0, "profile.age", true, f2)
+	h1 := cache.HashQuery("users", 10, 0, "profile.name", true, f1, "")
+	h2 := cache.HashQuery("users", 10, 0, "profile.age", true, f2, "")
 	if string(h1) == string(h2) {
 		t.Fatalf("expected different hashes for nested filters with different fields")
 	}
 }
 
 func TestHashQueryWithNestedSort(t *testing.T) {
-	h1 := cache.HashQuery("users", 10, 0, "profile.name", true, nil)
-	h2 := cache.HashQuery("users", 10, 0, "profile.name", false, nil)
-	h3 := cache.HashQuery("users", 10, 0, "profile.age", true, nil)
+	h1 := cache.HashQuery("users", 10, 0, "profile.name", true, nil, "")
+	h2 := cache.HashQuery("users", 10, 0, "profile.name", false, nil, "")
+	h3 := cache.HashQuery("users", 10, 0, "profile.age", true, nil, "")
 	if string(h1) == string(h2) {
 		t.Fatalf("expected different hashes for asc vs desc on nested field")
 	}
@@ -166,7 +166,7 @@ func TestHashQueryWithNestedSort(t *testing.T) {
 func TestCacheExpiration(t *testing.T) {
 	cache.InitCache(100 * time.Millisecond)
 	entity := "users"
-	hash := cache.HashQuery("users", 10, 0, "name", true, nil)
+	hash := cache.HashQuery("users", 10, 0, "name", true, nil, "")
 	value := []byte(`{"id":"1","name":"Alice"}`)
 	cache.CacheStore.Set(entity, hash, value)
 	time.Sleep(200 * time.Millisecond)
@@ -216,7 +216,7 @@ func TestCacheExpirationById(t *testing.T) {
 func TestCacheCleanExpiredRemovesBothDataAndIds(t *testing.T) {
 	cache.InitCache(10 * time.Millisecond)
 	entity := "users"
-	hash := cache.HashQuery("users", 10, 0, "name", true, nil)
+	hash := cache.HashQuery("users", 10, 0, "name", true, nil, "")
 	cache.CacheStore.Set(entity, hash, []byte("val"))
 	cache.CacheStore.SetById(entity, "id1", []byte("val"))
 	time.Sleep(20 * time.Millisecond)
