@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -24,7 +25,10 @@ func main() {
    ╚══════════════════════════════════════╝
 	`)
 
-	cfg, err := configuration.LoadConfig("elysian.yaml")
+	configFilename := flag.String("config", "elysian.yaml", "Path to configuration file")
+	flag.Parse()
+
+	cfg, err := configuration.LoadConfig(*configFilename)
 	if err != nil {
 		log.Error("Error loading config:", err)
 		return

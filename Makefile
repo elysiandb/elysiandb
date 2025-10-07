@@ -27,3 +27,7 @@ test-cover:
 	if [ -z "$$pkgs" ]; then echo "no test packages"; exit 0; fi; \
 	go test $$pkgs -race -coverprofile=coverage.out -coverpkg=$(COVERPKG) -count=1 && \
 	go tool cover -func=coverage.out
+
+install:
+	rm -f /usr/local/bin/elysiandb
+	go build -o /usr/local/bin/elysiandb .
