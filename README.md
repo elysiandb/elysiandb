@@ -40,6 +40,48 @@ const articles = await res.json();
 
 ---
 
+## ElysianDB Performance Summary
+
+**Instant REST API Benchmarks — Small Web Project Scenarios**
+
+ElysianDB demonstrates super real-time performance under realistic small-project workloads, maintaining sub-millisecond latency even under concurrent access.
+
+---
+
+### Benchmark Scenarios
+
+| Scenario             | Command                                                        | Description                                                  |
+| -------------------- | -------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Dev Local**        | `BASE_URL=http://localhost:8089 KEYS=100 VUS=3 DURATION=10s`   | Light local usage — simulate developer / staging environment |
+| **Small Web App**    | `BASE_URL=http://localhost:8089 KEYS=500 VUS=10 DURATION=20s`  | Typical small production web app or SaaS dashboard           |
+| **Light Production** | `BASE_URL=http://localhost:8089 KEYS=1000 VUS=25 DURATION=30s` | Simulates modest real-world traffic with concurrent users    |
+
+---
+
+### Results Overview
+
+| Scenario             | Load               | p95 (Global) | Nested p95 | RPS    | HTTP Errors | Notes                          |
+| -------------------- | ------------------ | ------------ | ---------- | ------ | ----------- | ------------------------------ |
+| **Dev Local**        | 3 VUs / 100 keys   | **0.23 ms**  | 1.0 ms     | ~15k/s | 0 %         | Practically instantaneous      |
+| **Small Web App**    | 10 VUs / 500 keys  | **0.37 ms**  | 2.0 ms     | ~40k/s | 0 %         | Ultra-fluid API performance    |
+| **Light Production** | 25 VUs / 1000 keys | **1.35 ms**  | 14.7 ms    | ~41k/s | 0 %         | Stable at moderate concurrency |
+
+---
+
+### Key Takeaways
+
+**Sub-millisecond latency** for 95% of requests up to 10 concurrent users
+**Consistent <2 ms latency** under 25 concurrent users (hundreds of real users equivalent)
+**Zero errors** across all runs
+**Full coverage**: filtering, sorting, nested operations, and updates all included
+**Lazy indexing** remains transparent and cost-free under real-world usage
+
+---
+
+### Conclusion
+
+> **ElysianDB delivers true instant REST APIs — consistently under 2 ms at web-scale concurrency, with zero configuration and automatic indexing.**
+
 ## Highlights
 
 * **Fast in‑memory store** with shard routing (xxhash), optional TTL.

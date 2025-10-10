@@ -66,7 +66,5 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
-	fmt.Printf("Loaded config: %+v\n", cfg)
-
 	return &cfg, nil
 }
