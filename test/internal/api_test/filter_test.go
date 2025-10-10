@@ -252,3 +252,100 @@ func TestFiltersMatchEntityInvalidCases(t *testing.T) {
 		t.Fatalf("expected false for unparsable date")
 	}
 }
+
+func TestFiltersMatchEntityArrayContains(t *testing.T) {
+	entity := map[string]interface{}{"tags": []interface{}{"toto", "tata", "titi"}}
+	f := map[string]map[string]string{"tags": {"contains": "toto"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected contains match")
+	}
+	f = map[string]map[string]string{"tags": {"contains": "tutu"}}
+	if api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected contains fail")
+	}
+}
+
+func TestFiltersMatchEntityArrayNotContains(t *testing.T) {
+	entity := map[string]interface{}{"tags": []interface{}{"toto", "tata", "titi"}}
+	f := map[string]map[string]string{"tags": {"not_contains": "tutu"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected not_contains match")
+	}
+	f = map[string]map[string]string{"tags": {"not_contains": "toto"}}
+	if api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected not_contains fail")
+	}
+}
+
+func TestFiltersMatchEntityArrayAll(t *testing.T) {
+	entity := map[string]interface{}{"tags": []interface{}{"toto", "tata", "titi"}}
+	f := map[string]map[string]string{"tags": {"all": "toto,tata"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected all match")
+	}
+	f = map[string]map[string]string{"tags": {"all": "toto,tutu"}}
+	if api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected all fail")
+	}
+}
+
+func TestFiltersMatchEntityArrayAny(t *testing.T) {
+	entity := map[string]interface{}{"tags": []interface{}{"toto", "tata", "titi"}}
+	f := map[string]map[string]string{"tags": {"any": "tutu,tata"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected any match")
+	}
+	f = map[string]map[string]string{"tags": {"any": "tutu,tete"}}
+	if api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected any fail")
+	}
+}
+
+func TestFiltersMatchEntityArrayEq(t *testing.T) {
+	entity := map[string]interface{}{"tags": []interface{}{"toto", "tata", "titi"}}
+	f := map[string]map[string]string{"tags": {"eq": "toto,tata,titi"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected eq match")
+	}
+	f = map[string]map[string]string{"tags": {"eq": "toto,tata"}}
+	if api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected eq fail length mismatch")
+	}
+	f = map[string]map[string]string{"tags": {"eq": "toto,titi,tata"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected eq match ignoring order")
+	}
+}
+
+func TestFiltersMatchEntityArrayNone(t *testing.T) {
+	entity := map[string]interface{}{"tags": []interface{}{"toto", "tata", "titi"}}
+	f := map[string]map[string]string{"tags": {"none": "tutu,tete"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected none match")
+	}
+	f = map[string]map[string]string{"tags": {"none": "tata,tete"}}
+	if api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected none fail")
+	}
+}
+
+func TestFiltersMatchEntityArrayMixedTypes(t *testing.T) {
+	entity := map[string]interface{}{"values": []interface{}{"1", 2.0, "three"}}
+	f := map[string]map[string]string{"values": {"contains": "1"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected contains match for stringified int")
+	}
+	f = map[string]map[string]string{"values": {"contains": "2"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected contains match for float")
+	}
+	f = map[string]map[string]string{"values": {"any": "two,three"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected any match for string value")
+	}
+	f = map[string]map[string]string{"values": {"none": "four,five"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected none match for absent values")
+	}
+}
+

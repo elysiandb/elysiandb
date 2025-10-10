@@ -1,7 +1,9 @@
 package api_storage
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/storage"
@@ -30,11 +32,96 @@ func FiltersMatchEntity(
 			if !matchNumber(v, ops) {
 				return false
 			}
+		case []interface{}:
+			if !matchArray(v, ops) {
+				return false
+			}
 		default:
 			return false
 		}
 	}
 
+	return true
+}
+
+func matchArray(arr []interface{}, ops map[string]string) bool {
+	toStrings := func(a []interface{}) []string {
+		out := make([]string, 0, len(a))
+		for _, v := range a {
+			switch s := v.(type) {
+			case string:
+				out = append(out, s)
+			case float64:
+				out = append(out, strconv.FormatFloat(s, 'f', -1, 64))
+			case int:
+				out = append(out, strconv.Itoa(s))
+			default:
+				out = append(out, fmt.Sprintf("%v", s))
+			}
+		}
+		return out
+	}
+	inArray := func(arr []string, val string) bool {
+		for _, a := range arr {
+			if a == val {
+				return true
+			}
+		}
+		return false
+	}
+	arrStr := toStrings(arr)
+	for op, cmp := range ops {
+		values := []string{cmp}
+		if strings.Contains(cmp, ",") {
+			values = strings.Split(cmp, ",")
+		}
+		switch op {
+		case "contains":
+			if !inArray(arrStr, values[0]) {
+				return false
+			}
+		case "not_contains":
+			if inArray(arrStr, values[0]) {
+				return false
+			}
+		case "all":
+			for _, v := range values {
+				if !inArray(arrStr, v) {
+					return false
+				}
+			}
+		case "any":
+			found := false
+			for _, v := range values {
+				if inArray(arrStr, v) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+		case "eq":
+			if len(arrStr) != len(values) {
+				return false
+			}
+			matched := make(map[string]bool)
+			for _, v := range arrStr {
+				matched[v] = true
+			}
+			for _, v := range values {
+				if !matched[v] {
+					return false
+				}
+			}
+		case "none":
+			for _, v := range values {
+				if inArray(arrStr, v) {
+					return false
+				}
+			}
+		}
+	}
 	return true
 }
 

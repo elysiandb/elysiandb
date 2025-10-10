@@ -13,22 +13,28 @@ export const options = {
   thresholds: {
     http_req_failed:   ['rate<0.01'],
     http_req_duration: ['p(95)<100'],
-    'http_req_duration{ name:api_create }': ['p(95)<100'],
-    'http_req_duration{ name:api_get_by_id }': ['p(95)<100'],
-    'http_req_duration{ name:api_update }': ['p(95)<100'],
-    'http_req_duration{ name:api_list }': ['p(95)<100'],
-    'http_req_duration{ name:api_filter_eq }': ['p(95)<100'],
-    'http_req_duration{ name:api_filter_neq }': ['p(95)<100'],
-    'http_req_duration{ name:api_filter_wildcard }': ['p(95)<100'],
-    'http_req_duration{ name:api_nested_create }': ['p(95)<100'],
-    'http_req_duration{ name:api_filter_nested }': ['p(95)<100'],
-    'http_req_duration{ name:api_filter_combined }': ['p(95)<100'],
-    'http_req_duration{ name:api_sort_asc }': ['p(95)<100'],
-    'http_req_duration{ name:api_sort_desc }': ['p(95)<100'],
-    'http_req_duration{ name:api_filter_date }': ['p(95)<100'],
-    'http_req_duration{ name:api_sort_date_asc }': ['p(95)<100'],
-    'http_req_duration{ name:api_sort_date_desc }': ['p(95)<100'],
-    'http_req_duration{ name:api_delete }': ['p(95)<100'],
+    'http_req_duration{name:api_create}': ['p(95)<100'],
+    'http_req_duration{name:api_get_by_id}': ['p(95)<100'],
+    'http_req_duration{name:api_update}': ['p(95)<100'],
+    'http_req_duration{name:api_list}': ['p(95)<100'],
+    'http_req_duration{name:api_filter_eq}': ['p(95)<100'],
+    'http_req_duration{name:api_filter_neq}': ['p(95)<100'],
+    'http_req_duration{name:api_filter_wildcard}': ['p(95)<100'],
+    'http_req_duration{name:api_nested_create}': ['p(95)<100'],
+    'http_req_duration{name:api_filter_nested}': ['p(95)<100'],
+    'http_req_duration{name:api_filter_combined}': ['p(95)<100'],
+    'http_req_duration{name:api_sort_asc}': ['p(95)<100'],
+    'http_req_duration{name:api_sort_desc}': ['p(95)<100'],
+    'http_req_duration{name:api_filter_date}': ['p(95)<100'],
+    'http_req_duration{name:api_sort_date_asc}': ['p(95)<100'],
+    'http_req_duration{name:api_sort_date_desc}': ['p(95)<100'],
+    'http_req_duration{name:api_delete}': ['p(95)<100'],
+    'http_req_duration{name:api_filter_array_contains}': ['p(95)<100'],
+    'http_req_duration{name:api_filter_array_not_contains}': ['p(95)<100'],
+    'http_req_duration{name:api_filter_array_all}': ['p(95)<100'],
+    'http_req_duration{name:api_filter_array_any}': ['p(95)<100'],
+    'http_req_duration{name:api_filter_array_none}': ['p(95)<100'],
+    'http_req_duration{name:api_filter_array_eq}': ['p(95)<100'],
   },
 }
 
@@ -41,7 +47,7 @@ function uuid() {
 
 export default function () {
   const entity = 'benchmarks'
-  const payload = { title: `title-${__VU}-${__ITER}`, value: __ITER, date: "2023-01-01T10:00:00Z" }
+  const payload = { title: `title-${__VU}-${__ITER}`, value: __ITER, date: "2023-01-01T10:00:00Z", tags: ["go", "db", "fast"] }
 
   const create = http.post(`${BASE}/api/${entity}`, JSON.stringify(payload), {
     headers: { 'Content-Type': 'application/json' },
@@ -59,7 +65,7 @@ export default function () {
       check(getById, { 'GET by ID 200': r => r.status === 200 })
     }
 
-    const update = http.put(`${BASE}/api/${entity}/${id}`, JSON.stringify({ title: `updated-${id}`, extra: 123, date: "2023-01-02T12:00:00Z" }), {
+    const update = http.put(`${BASE}/api/${entity}/${id}`, JSON.stringify({ title: `updated-${id}`, extra: 123, date: "2023-01-02T12:00:00Z", tags: ["api", "cli", "tool"] }), {
       headers: { 'Content-Type': 'application/json' },
       tags: { name: 'api_update' }
     })
@@ -125,6 +131,26 @@ export default function () {
   for (let i = 0; i < 20; i++) {
     const sortDateDesc = http.get(`${BASE}/api/${entity}?sort[date]=desc`, { tags: { name: 'api_sort_date_desc' } })
     check(sortDateDesc, { 'SORT date desc 200': r => r.status === 200 })
+  }
+
+  for (let i = 0; i < 20; i++) {
+    const contains = http.get(`${BASE}/api/${entity}?filter[tags][contains]=go`, { tags: { name: 'api_filter_array_contains' } })
+    check(contains, { 'FILTER array contains 200': r => r.status === 200 })
+
+    const notContains = http.get(`${BASE}/api/${entity}?filter[tags][not_contains]=api`, { tags: { name: 'api_filter_array_not_contains' } })
+    check(notContains, { 'FILTER array not_contains 200': r => r.status === 200 })
+
+    const all = http.get(`${BASE}/api/${entity}?filter[tags][all]=go,db`, { tags: { name: 'api_filter_array_all' } })
+    check(all, { 'FILTER array all 200': r => r.status === 200 })
+
+    const any = http.get(`${BASE}/api/${entity}?filter[tags][any]=db,tool`, { tags: { name: 'api_filter_array_any' } })
+    check(any, { 'FILTER array any 200': r => r.status === 200 })
+
+    const none = http.get(`${BASE}/api/${entity}?filter[tags][none]=cli,tool`, { tags: { name: 'api_filter_array_none' } })
+    check(none, { 'FILTER array none 200': r => r.status === 200 })
+
+    const eq = http.get(`${BASE}/api/${entity}?filter[tags][eq]=go,db,fast`, { tags: { name: 'api_filter_array_eq' } })
+    check(eq, { 'FILTER array eq 200': r => r.status === 200 })
   }
 
   if (id) {

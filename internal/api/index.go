@@ -2,7 +2,11 @@ package api_storage
 
 import (
 	"bytes"
+	"fmt"
+	"runtime"
+	"sync"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/storage"
 )
@@ -13,10 +17,32 @@ func RemoveIdFromIndexes(entity string, id string) {
 	ids := decodeIDs(raw)
 	changed := false
 	newIds := newIdsWithout(ids, id, &changed)
-	if !changed {
-		return
+	if changed {
+		storage.PutKeyValue(idIndexKey, encodeIDs(newIds))
 	}
-	storage.PutKeyValue(idIndexKey, encodeIDs(newIds))
+
+	go RemoveIdFromNonMasterIndexes(entity, id)
+}
+
+func RemoveIdFromNonMasterIndexes(entity string, id string) {
+	fields := GetListForIndexedFields(entity)
+	for _, field := range fields {
+		for _, sortKey := range []string{
+			globals.ApiEntityIndexFieldSortAscKey(entity, field),
+			globals.ApiEntityIndexFieldSortDescKey(entity, field),
+		} {
+			raw, _ := storage.GetByKey(sortKey)
+			if len(raw) == 0 {
+				continue
+			}
+			ids := decodeIDs(raw)
+			changed := false
+			newIds := newIdsWithout(ids, id, &changed)
+			if changed {
+				storage.PutKeyValue(sortKey, encodeIDs(newIds))
+			}
+		}
+	}
 }
 
 func decodeIDs(b []byte) []string {
@@ -66,17 +92,47 @@ func RemoveEntityIndexes(entity string) {
 func EnsureFieldIndex(entity, field, id string, value interface{}) {
 	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, field)
 	descKey := globals.ApiEntityIndexFieldSortDescKey(entity, field)
-	asc := GetSortedEntityIdsByField(entity, field, true)
-	desc := GetSortedEntityIdsByField(entity, field, false)
-	storage.PutKeyValue(ascKey, encodeIDs(asc))
-	storage.PutKeyValue(descKey, encodeIDs(desc))
+
+	type indexJob struct {
+		key string
+		asc bool
+	}
+
+	jobs := []indexJob{
+		{key: ascKey, asc: true},
+		{key: descKey, asc: false},
+	}
+
+	sem := make(chan struct{}, runtime.NumCPU()*2)
+	wg := sync.WaitGroup{}
+
+	for _, job := range jobs {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(j indexJob) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			ids := GetSortedEntityIdsByField(entity, field, j.asc)
+			storage.PutKeyValue(j.key, encodeIDs(ids))
+		}(job)
+	}
+	wg.Wait()
+
 	AddFieldToIndexedFields(entity, field)
 
 	if m, ok := value.(map[string]interface{}); ok {
+		wg := sync.WaitGroup{}
 		for k, v := range m {
-			nestedField := field + "." + k
-			EnsureFieldIndex(entity, nestedField, id, v)
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(subField string, subVal interface{}) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				nestedField := field + "." + subField
+				EnsureFieldIndex(entity, nestedField, id, subVal)
+			}(k, v)
 		}
+		wg.Wait()
 	}
 }
 
@@ -111,23 +167,70 @@ func AddFieldToIndexedFields(entity string, field string) {
 }
 
 func UpdateIndexesForEntity(entity string, id string, oldData, newData map[string]interface{}) {
+	safeKey := func(v interface{}) string {
+		switch val := v.(type) {
+		case []interface{}:
+			h := xxhash.Sum64String(fmt.Sprint(val))
+			return fmt.Sprintf("%x", h)
+		case map[string]interface{}:
+			h := xxhash.Sum64String(fmt.Sprint(val))
+			return fmt.Sprintf("%x", h)
+		default:
+			return fmt.Sprintf("%v", val)
+		}
+	}
+
+	sem := make(chan struct{}, runtime.NumCPU()*2)
+	wg := sync.WaitGroup{}
+
+	for k, v := range newData {
+		if k == "id" {
+			continue
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(field string, val interface{}) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			EnsureFieldIndex(entity, field, id, val)
+		}(k, v)
+	}
+	wg.Wait()
+
+	wg = sync.WaitGroup{}
 	for k, newVal := range newData {
 		if k == "id" {
 			continue
 		}
 		oldVal, exists := oldData[k]
-		if !exists || oldVal != newVal {
-			EnsureFieldIndex(entity, k, id, newVal)
+		if !exists || safeKey(oldVal) != safeKey(newVal) {
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(field string, val interface{}) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				EnsureFieldIndex(entity, field, id, val)
+			}(k, newVal)
 		}
 	}
+	wg.Wait()
+
+	wg = sync.WaitGroup{}
 	for k := range oldData {
 		if k == "id" {
 			continue
 		}
 		if _, exists := newData[k]; !exists {
-			EnsureFieldIndex(entity, k, id, nil)
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(field string) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				DeleteIndexesForField(entity, field)
+			}(k)
 		}
 	}
+	wg.Wait()
 }
 
 func DeleteIndexesForField(entity string, field string) {

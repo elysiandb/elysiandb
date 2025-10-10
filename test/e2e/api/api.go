@@ -380,3 +380,147 @@ func TestAutoREST_SortAscendingDescending(t *testing.T) {
 		t.Fatalf("unexpected desc order: %v", descResult)
 	}
 }
+
+func TestAutoREST_ArrayFilters_AllOps(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/articles", map[string]any{"title": "Post1", "tags": []string{"go", "db", "fast"}})
+	mustPOSTJSON(t, client, "http://test/api/articles", map[string]any{"title": "Post2", "tags": []string{"go", "api"}})
+	mustPOSTJSON(t, client, "http://test/api/articles", map[string]any{"title": "Post3", "tags": []string{"cli", "tool"}})
+
+	gr := mustGET(t, client, "http://test/api/articles?filter[tags][contains]=go")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET /api/articles?filter[tags][contains]=go expected 200, got %d", sc)
+	}
+	var contains []map[string]interface{}
+	_ = json.Unmarshal(gr.Body(), &contains)
+	if len(contains) != 2 {
+		t.Fatalf("expected 2 contains results, got %v", contains)
+	}
+
+	gr2 := mustGET(t, client, "http://test/api/articles?filter[tags][not_contains]=go")
+	var notContains []map[string]interface{}
+	_ = json.Unmarshal(gr2.Body(), &notContains)
+	if len(notContains) != 1 || notContains[0]["title"] != "Post3" {
+		t.Fatalf("expected not_contains Post3, got %v", notContains)
+	}
+
+	gr3 := mustGET(t, client, "http://test/api/articles?filter[tags][all]=go,db")
+	var all []map[string]interface{}
+	_ = json.Unmarshal(gr3.Body(), &all)
+	if len(all) != 1 || all[0]["title"] != "Post1" {
+		t.Fatalf("expected all Post1, got %v", all)
+	}
+
+	gr4 := mustGET(t, client, "http://test/api/articles?filter[tags][any]=db,tool")
+	var any []map[string]interface{}
+	_ = json.Unmarshal(gr4.Body(), &any)
+	if len(any) != 2 {
+		t.Fatalf("expected 2 any results, got %v", any)
+	}
+
+	gr5 := mustGET(t, client, "http://test/api/articles?filter[tags][none]=go,api")
+	var none []map[string]interface{}
+	_ = json.Unmarshal(gr5.Body(), &none)
+	if len(none) != 1 || none[0]["title"] != "Post3" {
+		t.Fatalf("expected none Post3, got %v", none)
+	}
+
+	gr6 := mustGET(t, client, "http://test/api/articles?filter[tags][eq]=go,db,fast")
+	var eq []map[string]interface{}
+	_ = json.Unmarshal(gr6.Body(), &eq)
+	if len(eq) != 1 || eq[0]["title"] != "Post1" {
+		t.Fatalf("expected eq Post1, got %v", eq)
+	}
+}
+
+func TestAutoREST_ArrayFilters_Combined(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/projects", map[string]any{
+		"name":  "Proj1",
+		"tags":  []string{"go", "db"},
+		"owner": "Alice",
+	})
+	mustPOSTJSON(t, client, "http://test/api/projects", map[string]any{
+		"name":  "Proj2",
+		"tags":  []string{"api", "db"},
+		"owner": "Bob",
+	})
+	mustPOSTJSON(t, client, "http://test/api/projects", map[string]any{
+		"name":  "Proj3",
+		"tags":  []string{"cli", "tool"},
+		"owner": "Alice",
+	})
+
+	gr := mustGET(t, client, "http://test/api/projects?filter[tags][contains]=db&filter[owner][eq]=Alice")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET /api/projects combined filter expected 200, got %d", sc)
+	}
+	var res []map[string]any
+	_ = json.Unmarshal(gr.Body(), &res)
+	if len(res) != 1 || res[0]["name"] != "Proj1" {
+		t.Fatalf("expected Proj1, got %v", res)
+	}
+
+	gr2 := mustGET(t, client, "http://test/api/projects?filter[tags][any]=cli,db&filter[owner][neq]=Bob")
+	var res2 []map[string]any
+	_ = json.Unmarshal(gr2.Body(), &res2)
+	if len(res2) != 2 {
+		t.Fatalf("expected 2 projects for combined any+neq, got %v", res2)
+	}
+}
+
+func TestAutoREST_ArrayFilters_MixedTypes(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/items", map[string]interface{}{
+		"name":  "Item1",
+		"tags":  []interface{}{"1", 2, "three"},
+		"price": 10,
+	})
+	mustPOSTJSON(t, client, "http://test/api/items", map[string]interface{}{
+		"name":  "Item2",
+		"tags":  []interface{}{"4", "five"},
+		"price": 20,
+	})
+
+	gr := mustGET(t, client, "http://test/api/items?filter[tags][contains]=2")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET /api/items?filter[tags][contains]=2 expected 200, got %d", sc)
+	}
+	var res []map[string]any
+	_ = json.Unmarshal(gr.Body(), &res)
+	if len(res) != 1 || res[0]["name"] != "Item1" {
+		t.Fatalf("expected Item1, got %v", res)
+	}
+
+	gr2 := mustGET(t, client, "http://test/api/items?filter[tags][none]=2,three")
+	var res2 []map[string]any
+	_ = json.Unmarshal(gr2.Body(), &res2)
+	if len(res2) != 1 || res2[0]["name"] != "Item2" {
+		t.Fatalf("expected Item2 for none filter, got %v", res2)
+	}
+}
+
+func TestAutoREST_ArrayFilters_Chained(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/posts", map[string]any{"title": "P1", "tags": []string{"go", "fast"}})
+	mustPOSTJSON(t, client, "http://test/api/posts", map[string]any{"title": "P2", "tags": []string{"go"}})
+	mustPOSTJSON(t, client, "http://test/api/posts", map[string]any{"title": "P3", "tags": []string{"fast", "cli"}})
+
+	gr := mustGET(t, client, "http://test/api/posts?filter[tags][contains]=go&filter[tags][not_contains]=cli")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET chained filters expected 200, got %d", sc)
+	}
+	var res []map[string]any
+	_ = json.Unmarshal(gr.Body(), &res)
+	if len(res) != 2 {
+		t.Fatalf("expected 2 posts for chained filters, got %v", res)
+	}
+}
