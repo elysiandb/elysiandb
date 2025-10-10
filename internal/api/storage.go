@@ -15,7 +15,7 @@ func WriteEntity(entity string, data map[string]interface{}) {
 	} else {
 		for k := range data {
 			if k != "id" {
-				EnsureFieldIndex(entity, k, data["id"].(string), data[k])
+				markFieldAndNestedDirty(entity, k, data[k])
 			}
 		}
 	}
@@ -81,6 +81,7 @@ func GetListOfIds(entity string, sortField string, sortAscending bool) ([]byte, 
 		idIndexKey := globals.ApiEntityIndexIdKey(entity)
 		return storage.GetByKey(idIndexKey)
 	}
+	ensureFieldIndexFresh(entity, sortField)
 	if !IndexExistsForField(entity, sortField) {
 		return []byte{}, nil
 	}

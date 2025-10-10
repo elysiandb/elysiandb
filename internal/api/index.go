@@ -4,12 +4,117 @@ import (
 	"bytes"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/storage"
 )
+
+var (
+	DirtyFields sync.Map // key: entity+"|"+field -> struct{}
+	fieldLocks  sync.Map // key: entity+"|"+field -> *sync.Mutex
+)
+
+func ProcessNextDirtyField() {
+	var key string
+	var _ interface{}
+	DirtyFields.Range(func(k, v interface{}) bool {
+		key = k.(string)
+		_ = v
+		return false
+	})
+	if key == "" {
+		return
+	}
+	parts := strings.SplitN(key, "|", 2)
+	if len(parts) != 2 {
+		DirtyFields.Delete(key)
+		return
+	}
+	entity, field := parts[0], parts[1]
+	ensureFieldIndexFresh(entity, field)
+}
+
+func fieldKey(entity, field string) string {
+	return entity + "|" + field
+}
+
+func getFieldLock(entity, field string) *sync.Mutex {
+	key := fieldKey(entity, field)
+	if v, ok := fieldLocks.Load(key); ok {
+		return v.(*sync.Mutex)
+	}
+	m := &sync.Mutex{}
+	if actual, loaded := fieldLocks.LoadOrStore(key, m); loaded {
+		return actual.(*sync.Mutex)
+	}
+	return m
+}
+
+func MarkFieldDirty(entity, field string) {
+	DirtyFields.Store(fieldKey(entity, field), struct{}{})
+}
+
+func markFieldAndNestedDirty(entity, field string, value interface{}) {
+	MarkFieldDirty(entity, field)
+	if m, ok := value.(map[string]interface{}); ok {
+		for k, v := range m {
+			markFieldAndNestedDirty(entity, field+"."+k, v)
+		}
+	}
+}
+
+func ensureFieldIndexFresh(entity, field string) {
+	key := fieldKey(entity, field)
+	_, isDirty := DirtyFields.Load(key)
+	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, field)
+	descKey := globals.ApiEntityIndexFieldSortDescKey(entity, field)
+	ascData, _ := storage.GetByKey(ascKey)
+	descData, _ := storage.GetByKey(descKey)
+	if !isDirty && ascData != nil && descData != nil {
+		return
+	}
+	mtx := getFieldLock(entity, field)
+	mtx.Lock()
+	defer mtx.Unlock()
+	_, isDirty = DirtyFields.Load(key)
+	ascData, _ = storage.GetByKey(ascKey)
+	descData, _ = storage.GetByKey(descKey)
+	if !isDirty && ascData != nil && descData != nil {
+		return
+	}
+	rebuildIndexForField(entity, field)
+	DirtyFields.Delete(key)
+}
+
+func rebuildIndexForField(entity, field string) {
+	type indexJob struct {
+		key string
+		asc bool
+	}
+	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, field)
+	descKey := globals.ApiEntityIndexFieldSortDescKey(entity, field)
+	jobs := []indexJob{
+		{key: ascKey, asc: true},
+		{key: descKey, asc: false},
+	}
+	sem := make(chan struct{}, runtime.NumCPU()*2)
+	wg := sync.WaitGroup{}
+	for _, job := range jobs {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(j indexJob) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			ids := GetSortedEntityIdsByField(entity, field, j.asc)
+			storage.PutKeyValue(j.key, encodeIDs(ids))
+		}(job)
+	}
+	wg.Wait()
+	AddFieldToIndexedFields(entity, field)
+}
 
 func RemoveIdFromIndexes(entity string, id string) {
 	idIndexKey := globals.ApiEntityIndexIdKey(entity)
@@ -20,8 +125,10 @@ func RemoveIdFromIndexes(entity string, id string) {
 	if changed {
 		storage.PutKeyValue(idIndexKey, encodeIDs(newIds))
 	}
-
-	go RemoveIdFromNonMasterIndexes(entity, id)
+	fields := GetListForIndexedFields(entity)
+	for _, f := range fields {
+		MarkFieldDirty(entity, f)
+	}
 }
 
 func RemoveIdFromNonMasterIndexes(entity string, id string) {
@@ -90,38 +197,10 @@ func RemoveEntityIndexes(entity string) {
 }
 
 func EnsureFieldIndex(entity, field, id string, value interface{}) {
-	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, field)
-	descKey := globals.ApiEntityIndexFieldSortDescKey(entity, field)
-
-	type indexJob struct {
-		key string
-		asc bool
-	}
-
-	jobs := []indexJob{
-		{key: ascKey, asc: true},
-		{key: descKey, asc: false},
-	}
-
-	sem := make(chan struct{}, runtime.NumCPU()*2)
-	wg := sync.WaitGroup{}
-
-	for _, job := range jobs {
-		wg.Add(1)
-		sem <- struct{}{}
-		go func(j indexJob) {
-			defer wg.Done()
-			defer func() { <-sem }()
-			ids := GetSortedEntityIdsByField(entity, field, j.asc)
-			storage.PutKeyValue(j.key, encodeIDs(ids))
-		}(job)
-	}
-	wg.Wait()
-
-	AddFieldToIndexedFields(entity, field)
-
+	rebuildIndexForField(entity, field)
 	if m, ok := value.(map[string]interface{}); ok {
 		wg := sync.WaitGroup{}
+		sem := make(chan struct{}, runtime.NumCPU()*2)
 		for k, v := range m {
 			wg.Add(1)
 			sem <- struct{}{}
@@ -129,7 +208,12 @@ func EnsureFieldIndex(entity, field, id string, value interface{}) {
 				defer wg.Done()
 				defer func() { <-sem }()
 				nestedField := field + "." + subField
-				EnsureFieldIndex(entity, nestedField, id, subVal)
+				rebuildIndexForField(entity, nestedField)
+				if mm, ok := subVal.(map[string]interface{}); ok {
+					for kk, vv := range mm {
+						markFieldAndNestedDirty(entity, nestedField+"."+kk, vv)
+					}
+				}
 			}(k, v)
 		}
 		wg.Wait()
@@ -137,6 +221,7 @@ func EnsureFieldIndex(entity, field, id string, value interface{}) {
 }
 
 func IndexExistsForField(entity string, field string) bool {
+	ensureFieldIndexFresh(entity, field)
 	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, field)
 	descKey := globals.ApiEntityIndexFieldSortDescKey(entity, field)
 	ascData, _ := storage.GetByKey(ascKey)
@@ -180,63 +265,38 @@ func UpdateIndexesForEntity(entity string, id string, oldData, newData map[strin
 		}
 	}
 
-	sem := make(chan struct{}, runtime.NumCPU()*2)
-	wg := sync.WaitGroup{}
-
 	for k, v := range newData {
 		if k == "id" {
 			continue
 		}
-		wg.Add(1)
-		sem <- struct{}{}
-		go func(field string, val interface{}) {
-			defer wg.Done()
-			defer func() { <-sem }()
-			EnsureFieldIndex(entity, field, id, val)
-		}(k, v)
+		markFieldAndNestedDirty(entity, k, v)
 	}
-	wg.Wait()
 
-	wg = sync.WaitGroup{}
 	for k, newVal := range newData {
 		if k == "id" {
 			continue
 		}
 		oldVal, exists := oldData[k]
 		if !exists || safeKey(oldVal) != safeKey(newVal) {
-			wg.Add(1)
-			sem <- struct{}{}
-			go func(field string, val interface{}) {
-				defer wg.Done()
-				defer func() { <-sem }()
-				EnsureFieldIndex(entity, field, id, val)
-			}(k, newVal)
+			markFieldAndNestedDirty(entity, k, newVal)
 		}
 	}
-	wg.Wait()
 
-	wg = sync.WaitGroup{}
 	for k := range oldData {
 		if k == "id" {
 			continue
 		}
 		if _, exists := newData[k]; !exists {
-			wg.Add(1)
-			sem <- struct{}{}
-			go func(field string) {
-				defer wg.Done()
-				defer func() { <-sem }()
-				DeleteIndexesForField(entity, field)
-			}(k)
+			MarkFieldDirty(entity, k)
 		}
 	}
-	wg.Wait()
 }
 
 func DeleteIndexesForField(entity string, field string) {
 	storage.DeleteByWildcardKey(
 		globals.ApiEntityIndexFieldAllKey(entity, field),
 	)
+	MarkFieldDirty(entity, field)
 }
 
 func newIdsWithout(ids []string, id string, changed *bool) []string {

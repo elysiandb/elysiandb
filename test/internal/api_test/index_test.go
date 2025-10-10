@@ -200,17 +200,11 @@ func TestDeleteIndexesForField(t *testing.T) {
 
 	api_storage.DeleteIndexesForField(entity, "score")
 
-	if api_storage.IndexExistsForField(entity, "score") {
-		t.Fatalf("index for 'score' should not exist after DeleteIndexesForField")
+	if _, dirty := api_storage.DirtyFields.Load(entity + "|score"); !dirty {
+		t.Fatalf("expected 'score' index to be marked dirty or removed")
 	}
 	if !api_storage.IndexExistsForField(entity, "age") {
 		t.Fatalf("index for 'age' should still exist")
-	}
-
-	fields := api_storage.GetListForIndexedFields(entity)
-	wantSet := asSet([]string{"score", "age"})
-	if !reflect.DeepEqual(asSet(fields), wantSet) {
-		t.Fatalf("indexed fields list changed unexpectedly, got=%v", fields)
 	}
 }
 
@@ -250,8 +244,9 @@ func TestUpdateIndexesForEntity_RemoveField(t *testing.T) {
 	oldData := map[string]interface{}{"id": "1", "country": "FR", "age": 40}
 	newData := map[string]interface{}{"id": "1", "age": 40}
 	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
-	if api_storage.IndexExistsForField(entity, "country") {
-		t.Fatalf("expected index for 'country' to be removed or updated")
+
+	if _, dirty := api_storage.DirtyFields.Load(entity + "|country"); !dirty {
+		t.Fatalf("expected index for 'country' to be marked dirty or removed")
 	}
 }
 
@@ -324,5 +319,41 @@ func TestUpdateIndexesForEntity_MultipleChanges(t *testing.T) {
 		if !api_storage.IndexExistsForField(entity, f) {
 			t.Fatalf("expected index for '%s'", f)
 		}
+	}
+}
+
+func TestMarkFieldDirtyAndEnsureFresh(t *testing.T) {
+	initIdxTestStore(t)
+	entity := "idx_lazy_refresh"
+	field := "price"
+	api_storage.MarkFieldDirty(entity, field)
+
+	if _, dirty := api_storage.DirtyFields.Load(entity + "|" + field); !dirty {
+		t.Fatalf("expected field to be marked dirty")
+	}
+
+	api_storage.EnsureFieldIndex(entity, field, "1", 100)
+	_ = api_storage.IndexExistsForField(entity, field)
+	if _, dirty := api_storage.DirtyFields.Load(entity + "|" + field); dirty {
+		t.Fatalf("expected dirty flag cleared after ensureFieldIndex")
+	}
+}
+
+func TestProcessNextDirtyField(t *testing.T) {
+	initIdxTestStore(t)
+	entity := "idx_process_dirty"
+	api_storage.WriteEntity(entity, map[string]any{"id": "x1", "qty": 10})
+	api_storage.MarkFieldDirty(entity, "qty")
+
+	api_storage.ProcessNextDirtyField()
+
+	api_storage.ProcessNextDirtyField()
+	_ = api_storage.IndexExistsForField(entity, "qty")
+	if _, dirty := api_storage.DirtyFields.Load(entity + "|" + "qty"); dirty {
+		t.Fatalf("expected dirty flag cleared after processing")
+	}
+	
+	if !api_storage.IndexExistsForField(entity, "qty") {
+		t.Fatalf("expected index rebuilt for qty")
 	}
 }
