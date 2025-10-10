@@ -221,3 +221,108 @@ func asSet(xs []string) map[string]struct{} {
 	}
 	return m
 }
+
+func TestUpdateIndexesForEntity_SimpleChange(t *testing.T) {
+	initIdxTestStore(t)
+	entity := "idx_update_simple"
+	oldData := map[string]interface{}{"id": "1", "name": "Alice", "age": 30}
+	newData := map[string]interface{}{"id": "1", "name": "Bob", "age": 30}
+	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
+	if !api_storage.IndexExistsForField(entity, "name") {
+		t.Fatalf("expected index for 'name'")
+	}
+}
+
+func TestUpdateIndexesForEntity_AddField(t *testing.T) {
+	initIdxTestStore(t)
+	entity := "idx_update_add"
+	oldData := map[string]interface{}{"id": "1", "name": "Alice"}
+	newData := map[string]interface{}{"id": "1", "name": "Alice", "city": "Paris"}
+	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
+	if !api_storage.IndexExistsForField(entity, "city") {
+		t.Fatalf("expected index for 'city'")
+	}
+}
+
+func TestUpdateIndexesForEntity_RemoveField(t *testing.T) {
+	initIdxTestStore(t)
+	entity := "idx_update_remove"
+	oldData := map[string]interface{}{"id": "1", "country": "FR", "age": 40}
+	newData := map[string]interface{}{"id": "1", "age": 40}
+	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
+	if api_storage.IndexExistsForField(entity, "country") {
+		t.Fatalf("expected index for 'country' to be removed or updated")
+	}
+}
+
+func TestUpdateIndexesForEntity_ArrayChange(t *testing.T) {
+	initIdxTestStore(t)
+	entity := "idx_update_array"
+	oldData := map[string]interface{}{"id": "1", "tags": []interface{}{"a", "b"}}
+	newData := map[string]interface{}{"id": "1", "tags": []interface{}{"a", "b", "c"}}
+	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
+	if !api_storage.IndexExistsForField(entity, "tags") {
+		t.Fatalf("expected index for 'tags'")
+	}
+}
+
+func TestUpdateIndexesForEntity_MapChange(t *testing.T) {
+	initIdxTestStore(t)
+	entity := "idx_update_map"
+	oldData := map[string]interface{}{"id": "1", "info": map[string]interface{}{"a": 1, "b": 2}}
+	newData := map[string]interface{}{"id": "1", "info": map[string]interface{}{"a": 1, "b": 3}}
+	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
+	if !api_storage.IndexExistsForField(entity, "info") {
+		t.Fatalf("expected index for 'info'")
+	}
+}
+
+func TestUpdateIndexesForEntity_NoChange(t *testing.T) {
+	initIdxTestStore(t)
+	entity := "idx_update_nochange"
+	oldData := map[string]interface{}{"id": "1", "x": 10}
+	newData := map[string]interface{}{"id": "1", "x": 10}
+	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
+	if !api_storage.IndexExistsForField(entity, "x") {
+		t.Fatalf("expected index for 'x'")
+	}
+}
+
+func TestUpdateIndexesForEntity_ComplexNestedChange(t *testing.T) {
+	initIdxTestStore(t)
+	entity := "idx_update_nested"
+	oldData := map[string]interface{}{
+		"id": "1",
+		"obj": map[string]interface{}{
+			"a": []interface{}{"x", "y"},
+			"b": 10,
+		},
+	}
+	newData := map[string]interface{}{
+		"id": "1",
+		"obj": map[string]interface{}{
+			"a": []interface{}{"x", "z"},
+			"b": 11,
+		},
+	}
+	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
+	if !api_storage.IndexExistsForField(entity, "obj.a") {
+		t.Fatalf("expected index for 'obj.a'")
+	}
+	if !api_storage.IndexExistsForField(entity, "obj.b") {
+		t.Fatalf("expected index for 'obj.b'")
+	}
+}
+
+func TestUpdateIndexesForEntity_MultipleChanges(t *testing.T) {
+	initIdxTestStore(t)
+	entity := "idx_update_multi"
+	oldData := map[string]interface{}{"id": "1", "name": "A", "age": 20, "tags": []interface{}{"t1"}}
+	newData := map[string]interface{}{"id": "1", "name": "B", "age": 25, "tags": []interface{}{"t2", "t3"}}
+	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
+	for _, f := range []string{"name", "age", "tags"} {
+		if !api_storage.IndexExistsForField(entity, f) {
+			t.Fatalf("expected index for '%s'", f)
+		}
+	}
+}
