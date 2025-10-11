@@ -18,6 +18,7 @@
 > **One‑liner:** You get an **auto‑generated REST API** (CRUD, pagination, sort) **with no configuration**; **entities are inferred from the URL**, and **indexes** are created automatically.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) if you’d like to help.
+Here is the [documentation](https://github.com/elysiandb/elysiandb/blob/main/docs/index.md)
 
 ---
 
