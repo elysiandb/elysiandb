@@ -3,6 +3,7 @@ package globals
 import "fmt"
 
 const (
+	ApiEntityTypesListPattern          = "api:entity:types:list"
 	ApiEntityPattern                   = "api:entity:%s"
 	ApiEntitiesPattern                 = "api:entity:%s:*"
 	ApiSingleEntityPattern             = "api:entity:%s:id:%s"
@@ -14,6 +15,10 @@ const (
 	ApiEntityIndexFieldSortAscPattern  = "api:entity:%s:internal:index:field:%s:sort:asc"
 	ApiEntityIndexFieldSortDescPattern = "api:entity:%s:internal:index:field:%s:sort:desc"
 )
+
+func ApiAllEntityTypesListKey() string {
+	return ApiEntityTypesListPattern
+}
 
 func ApiEntityKey(entity string) string {
 	return fmt.Sprintf(ApiEntityPattern, entity)

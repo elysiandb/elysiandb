@@ -89,6 +89,17 @@ func ensureFieldIndexFresh(entity, field string) {
 	DirtyFields.Delete(key)
 }
 
+func RebuildAllIndexes() {
+	entities := ListEntityTypes()
+	for _, entity := range entities {
+		fields := GetListForIndexedFields(entity)
+		for _, field := range fields {
+			rebuildIndexForField(entity, field)
+			DirtyFields.Delete(fieldKey(entity, field))
+		}
+	}
+}
+
 func rebuildIndexForField(entity, field string) {
 	type indexJob struct {
 		key string

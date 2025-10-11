@@ -10,6 +10,7 @@ func WriteEntity(entity string, data map[string]interface{}) {
 	old := ReadEntityById(entity, data["id"].(string))
 	storage.PutJsonValue(key, data)
 	AddIdToindexes(entity, data["id"].(string))
+	AddEntityType(entity)
 	if old != nil {
 		UpdateIndexesForEntity(entity, data["id"].(string), old, data)
 	} else {
@@ -19,6 +20,28 @@ func WriteEntity(entity string, data map[string]interface{}) {
 			}
 		}
 	}
+}
+
+func AddEntityType(entity string) {
+	key := globals.ApiAllEntityTypesListKey()
+	data, _ := storage.GetByKey(key)
+	types := decodeIDs(data)
+	found := false
+	for _, t := range types {
+		if t == entity {
+			found = true
+			break
+		}
+	}
+	if !found {
+		types = append(types, entity)
+		storage.PutKeyValue(key, encodeIDs(types))
+	}
+}
+
+func ListEntityTypes() []string {
+	data, _ := storage.GetByKey(globals.ApiAllEntityTypesListKey())
+	return decodeIDs(data)
 }
 
 func ReadEntityById(entity string, id string) map[string]interface{} {
