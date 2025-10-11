@@ -76,7 +76,7 @@ Default config:
 store:
   folder: /data
   shards: 512
-  flushIntervalSeconds: 100
+  flushIntervalSeconds: 5
   crashRecovery: { enabled: true, maxLogMB: 100 }
 server:
   http: { enabled: true,  host: 0.0.0.0, port: 8089 }
