@@ -85,9 +85,12 @@ log:
   flushIntervalSeconds: 5
 stats:
   enabled: false
-apiCache:
-  enabled: true
-  cleanupIntervalSeconds: 10
+api:
+  index:
+    workers: 4
+  cache:
+    enabled: true
+    cleanupIntervalSeconds: 10
 
 ```
 

@@ -15,7 +15,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	fieldsParam := string(ctx.QueryArgs().Peek("fields"))
 	fields := api_storage.ParseFieldsParam(fieldsParam)
 
-	if len(fields) == 0 && globals.GetConfig().ApiCache.Enabled {
+	if len(fields) == 0 && globals.GetConfig().Api.Cache.Enabled {
 		if v := cache.CacheStore.GetById(entity, id); v != nil {
 			ctx.Response.Header.Set("Content-Type", "application/json")
 			ctx.SetStatusCode(fasthttp.StatusOK)
@@ -37,7 +37,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if globals.GetConfig().ApiCache.Enabled {
+	if globals.GetConfig().Api.Cache.Enabled {
 		cache.CacheStore.SetById(entity, id, response)
 	}
 

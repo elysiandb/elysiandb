@@ -34,7 +34,7 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
 
-	if globals.GetConfig().ApiCache.Enabled {
+	if globals.GetConfig().Api.Cache.Enabled {
 		cache.CacheStore.Purge(entity)
 	}
 }

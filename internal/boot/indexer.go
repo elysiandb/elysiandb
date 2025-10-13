@@ -11,7 +11,7 @@ func BootLazyIndexRebuilder() {
 	api_storage.RebuildAllIndexes()
 
 	if globals.GetConfig().Server.HTTP.Enabled {
-		for i := 0; i < 8; i++ {
+		for i := 0; i < globals.GetConfig().Api.Index.Workers; i++ {
 			go rebuildDirtyIndexesWorker()
 		}
 	}
