@@ -34,7 +34,21 @@ func ProcessNextDirtyField() {
 		return
 	}
 	entity, field := parts[0], parts[1]
-	ensureFieldIndexFresh(entity, field)
+	if fieldUsed(entity, field) {
+		ensureFieldIndexFresh(entity, field)
+	} else {
+		DirtyFields.Delete(key)
+	}
+}
+
+func fieldUsed(entity, field string) bool {
+	fields := GetListForIndexedFields(entity)
+	for _, f := range fields {
+		if f == field {
+			return true
+		}
+	}
+	return false
 }
 
 func fieldKey(entity, field string) string {
@@ -208,6 +222,7 @@ func RemoveEntityIndexes(entity string) {
 }
 
 func EnsureFieldIndex(entity, field, id string, value interface{}) {
+	AddFieldToIndexedFields(entity, field)
 	rebuildIndexForField(entity, field)
 	if m, ok := value.(map[string]interface{}); ok {
 		wg := sync.WaitGroup{}
@@ -219,6 +234,7 @@ func EnsureFieldIndex(entity, field, id string, value interface{}) {
 				defer wg.Done()
 				defer func() { <-sem }()
 				nestedField := field + "." + subField
+				AddFieldToIndexedFields(entity, nestedField)
 				rebuildIndexForField(entity, nestedField)
 				if mm, ok := subVal.(map[string]interface{}); ok {
 					for kk, vv := range mm {
