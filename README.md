@@ -1,9 +1,5 @@
 # ElysianDB — Lightweight KV Store with **Zero‑Config Auto‑Generated REST API**
 
-<p align="left">
-  <img src="docs/logo.png" alt="ElysianDB Logo" width="200"/>
-</p>
-
 [![Docker Pulls](https://img.shields.io/docker/pulls/taymour/elysiandb.svg)](https://hub.docker.com/r/taymour/elysiandb)
 [![Tests](https://img.shields.io/github/actions/workflow/status/taymour/elysiandb/ci.yaml?branch=main&label=tests)](https://github.com/taymour/elysiandb/actions/workflows/ci.yaml)
 [![Coverage](https://codecov.io/gh/elysiandb/elysiandb/branch/main/graph/badge.svg)](https://codecov.io/gh/taymour/elysiandb)
@@ -17,8 +13,9 @@
 
 > **One‑liner:** You get an **auto‑generated REST API** (CRUD, pagination, sort) **with no configuration**; **entities are inferred from the URL**, and **indexes** are created automatically.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) if you’d like to help.
-Here is the [documentation](https://github.com/elysiandb/elysiandb/blob/main/docs/index.md)
+* See [CONTRIBUTING.md](CONTRIBUTING.md) if you’d like to help.
+* Here is the [documentation](https://github.com/elysiandb/elysiandb/blob/main/docs/index.md).
+* Full documentation, benchmarks, and examples are available at [elysiandb.com](https://elysiandb.com).
 
 ---
 
