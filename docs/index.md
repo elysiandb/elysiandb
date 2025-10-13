@@ -39,26 +39,30 @@ log:
   flushIntervalSeconds: 5
 stats:
   enabled: true
-apiCache:
-  enabled: true
-  cleanupIntervalSeconds: 10
+api:
+  index:
+    workers: 4
+  cache:
+    enabled: true
+    cleanupIntervalSeconds: 10
 ```
 
 ### Configuration Fields
 
-| Key                                 | Description                                            |
-| ----------------------------------- | ------------------------------------------------------ |
-| **store.folder**                    | Path where data is persisted to disk                   |
-| **store.shards**                    | Number of memory shards (must be a power of two)       |
-| **store.flushIntervalSeconds**      | Interval for automatic persistence to disk             |
-| **store.crashRecovery.enabled**     | Enables crash recovery logs for durability             |
-| **store.crashRecovery.maxLogMB**    | Maximum size of recovery logs before flush             |
-| **server.http**                     | Enables and configures the HTTP REST/KV interface      |
-| **server.tcp**                      | Enables and configures the TCP text protocol interface |
-| **log.flushIntervalSeconds**        | Interval for flushing in‑memory logs                   |
-| **stats.enabled**                   | Enables runtime metrics and `/stats` endpoint          |
-| **apiCache.enabled**                | Enables REST API caching for repeated queries          |
-| **apiCache.cleanupIntervalSeconds** | Interval for cache expiration cleanup                  |
+| Key                                  | Description                                            |
+| ------------------------------------ | ------------------------------------------------------ |
+| **store.folder**                     | Path where data is persisted to disk                   |
+| **store.shards**                     | Number of memory shards (must be a power of two)       |
+| **store.flushIntervalSeconds**       | Interval for automatic persistence to disk             |
+| **store.crashRecovery.enabled**      | Enables crash recovery logs for durability             |
+| **store.crashRecovery.maxLogMB**     | Maximum size of recovery logs before flush             |
+| **server.http**                      | Enables and configures the HTTP REST/KV interface      |
+| **server.tcp**                       | Enables and configures the TCP text protocol interface |
+| **log.flushIntervalSeconds**         | Interval for flushing in‑memory logs                   |
+| **stats.enabled**                    | Enables runtime metrics and `/stats` endpoint          |
+| **api.index.workers**                | Number of workers that rebuild dirty indexes           |
+| **api.cache.enabled**                | Enables REST API caching for repeated queries          |
+| **api.cache.cleanupIntervalSeconds** | Interval for cache expiration cleanup                  |
 
 ---
 

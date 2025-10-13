@@ -9,11 +9,11 @@ import (
 )
 
 type Config struct {
-	Store    StoreConfig    `yaml:"store"`
-	Server   ServersConfig  `yaml:"server"`
-	Log      LogConfig      `yaml:"log"`
-	Stats    StatsConfig    `yaml:"stats"`
-	ApiCache ApiCacheConfig `yaml:"apiCache"`
+	Store  StoreConfig   `yaml:"store"`
+	Server ServersConfig `yaml:"server"`
+	Log    LogConfig     `yaml:"log"`
+	Stats  StatsConfig   `yaml:"stats"`
+	Api    ApiConfig     `yaml:"api"`
 }
 
 type ServersConfig struct {
@@ -45,6 +45,15 @@ type StoreConfig struct {
 
 type StatsConfig struct {
 	Enabled bool `yaml:"enabled"`
+}
+
+type ApiConfig struct {
+	Index ApiIndexConfig `yaml:"index"`
+	Cache ApiCacheConfig `yaml:"cache"`
+}
+
+type ApiIndexConfig struct {
+	Workers int `yaml:"workers"`
 }
 
 type ApiCacheConfig struct {

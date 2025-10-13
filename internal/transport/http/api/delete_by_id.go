@@ -14,7 +14,7 @@ func DeleteByIdController(ctx *fasthttp.RequestCtx) {
 
 	ctx.SetStatusCode(fasthttp.StatusNoContent)
 
-	if globals.GetConfig().ApiCache.Enabled {
+	if globals.GetConfig().Api.Cache.Enabled {
 		cache.CacheStore.Purge(entity)
 	}
 }

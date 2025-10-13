@@ -8,7 +8,7 @@ import (
 )
 
 func BootApiCacheCleaner() {
-	if globals.GetConfig().ApiCache.Enabled {
+	if globals.GetConfig().Api.Cache.Enabled {
 		go checkApiCachePeriodically()
 	}
 }

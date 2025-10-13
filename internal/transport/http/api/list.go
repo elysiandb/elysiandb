@@ -19,7 +19,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	fieldsParam := string(ctx.QueryArgs().Peek("fields"))
 
 	var hash []byte
-	if globals.GetConfig().ApiCache.Enabled {
+	if globals.GetConfig().Api.Cache.Enabled {
 		hash = cache.HashQuery(entity, limit, offset, sortField, sortAscending, filters, fieldsParam)
 		cached := cache.CacheStore.Get(entity, hash)
 		if cached != nil {
@@ -53,7 +53,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
 
-	if globals.GetConfig().ApiCache.Enabled {
+	if globals.GetConfig().Api.Cache.Enabled {
 		cache.CacheStore.Set(entity, hash, response)
 	}
 }

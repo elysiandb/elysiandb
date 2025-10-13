@@ -12,8 +12,8 @@ import (
 func InitDB() {
 	cfg := globals.GetConfig()
 
-	if cfg.ApiCache.Enabled {
-		cache.InitCache(time.Duration(cfg.ApiCache.CleanupIntervalSeconds) * time.Second)
+	if cfg.Api.Cache.Enabled {
+		cache.InitCache(time.Duration(cfg.Api.Cache.CleanupIntervalSeconds) * time.Second)
 	}
 
 	storage.LoadDB()
