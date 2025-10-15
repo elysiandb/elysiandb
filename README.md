@@ -16,6 +16,7 @@
 * See [CONTRIBUTING.md](CONTRIBUTING.md) if you’d like to help.
 * Here is the [documentation](https://github.com/elysiandb/elysiandb/blob/main/docs/index.md).
 * Full documentation, benchmarks, and examples are available at [elysiandb.com](https://elysiandb.com).
+* For a distributed system, please look at [ElysianGate](https://github.com/elysiandb/elysian-gate)
 
 ---
 
