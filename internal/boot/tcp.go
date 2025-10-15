@@ -2,18 +2,27 @@ package boot
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"net"
 	"time"
 
+	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	tcprouting "github.com/taymour/elysiandb/internal/transport/tcp/tcp_routing"
 )
 
 func InitTCP() {
-	addr := ":8088"
+	cfg := globals.GetConfig()
+	addr := fmt.Sprintf("%s:%d", cfg.Server.TCP.Host, cfg.Server.TCP.Port)
 
-	ln, err := net.ListenTCP("tcp4", &net.TCPAddr{Port: 8088})
+	tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
+	if err != nil {
+		log.Fatal("Error resolving TCP address:", err)
+		return
+	}
+
+	ln, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
 		log.Fatal("Error starting TCP server:", err)
 		return
