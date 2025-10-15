@@ -12,7 +12,6 @@ import (
 
 func CreateController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
-	uuid := uuid.New().String()
 
 	var data map[string]interface{}
 	if err := json.Unmarshal(ctx.PostBody(), &data); err != nil {
@@ -21,7 +20,10 @@ func CreateController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	data["id"] = uuid
+	id, hasId := data["id"].(string)
+	if !hasId || id == "" {
+		data["id"] = uuid.New().String()
+	}
 
 	api_storage.WriteEntity(entity, data)
 
