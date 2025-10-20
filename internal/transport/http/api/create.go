@@ -12,33 +12,59 @@ import (
 
 func CreateController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
+	body := ctx.PostBody()
 
-	var data map[string]interface{}
-	if err := json.Unmarshal(ctx.PostBody(), &data); err != nil {
-		ctx.SetStatusCode(fasthttp.StatusBadRequest)
-		ctx.SetBodyString("Invalid JSON")
+	if handleSingleEntity(ctx, entity, body) {
+		finalizeCreate(ctx, entity)
 		return
 	}
 
+	if handleEntityList(ctx, entity, body) {
+		finalizeCreate(ctx, entity)
+		return
+	}
+
+	ctx.SetStatusCode(fasthttp.StatusBadRequest)
+	ctx.SetBodyString("Invalid JSON")
+}
+
+func handleSingleEntity(ctx *fasthttp.RequestCtx, entity string, body []byte) bool {
+	var data map[string]interface{}
+	if err := json.Unmarshal(body, &data); err != nil || len(data) == 0 {
+		return false
+	}
 	id, hasId := data["id"].(string)
 	if !hasId || id == "" {
 		data["id"] = uuid.New().String()
 	}
-
 	api_storage.WriteEntity(entity, data)
-
-	response, err := json.Marshal(data)
-	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-		ctx.SetBodyString("Error processing request")
-		return
-	}
-
+	response, _ := json.Marshal(data)
 	ctx.Response.Header.Set("Content-Type", "application/json")
-
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
+	return true
+}
 
+func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool {
+	var list []map[string]interface{}
+	if err := json.Unmarshal(body, &list); err != nil || len(list) == 0 {
+		return false
+	}
+	for i := range list {
+		id, hasId := list[i]["id"].(string)
+		if !hasId || id == "" {
+			list[i]["id"] = uuid.New().String()
+		}
+	}
+	api_storage.WriteListOfEntities(entity, list)
+	response, _ := json.Marshal(list)
+	ctx.Response.Header.Set("Content-Type", "application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(response)
+	return true
+}
+
+func finalizeCreate(ctx *fasthttp.RequestCtx, entity string) {
 	if globals.GetConfig().Api.Cache.Enabled {
 		cache.CacheStore.Purge(entity)
 	}

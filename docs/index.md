@@ -74,10 +74,11 @@ ElysianDB automatically exposes REST endpoints per entity. Entities are inferred
 
 | Method   | Endpoint             | Description                                                 |
 | -------- | -------------------- | ----------------------------------------------------------- |
-| `POST`   | `/api/<entity>`      | Create a new JSON document (auto‑ID)                        |
+| `POST`   | `/api/<entity>`      | Create one or multiple JSON documents (auto‑ID if missing)  |
 | `GET`    | `/api/<entity>`      | List all documents, supports pagination, sorting, filtering |
 | `GET`    | `/api/<entity>/<id>` | Retrieve document by ID                                     |
-| `PUT`    | `/api/<entity>/<id>` | Update document fields                                      |
+| `PUT`    | `/api/<entity>/<id>` | Update a single document by ID                              |
+| `PUT`    | `/api/<entity>`      | Update multiple documents (batch update)                    |
 | `DELETE` | `/api/<entity>/<id>` | Delete document by ID                                       |
 | `DELETE` | `/api/<entity>`      | Delete all documents for an entity                          |
 
@@ -102,16 +103,26 @@ ElysianDB automatically exposes REST endpoints per entity. Entities are inferred
 | `any`          | Array includes any listed value        |
 | `none`         | Array excludes all listed values       |
 
-### Example
+### Examples
 
 ```bash
-# Create an entity
-curl -X POST http://localhost:8089/api/articles \
+# Create a single entity
+curl -X POST http://localhost:8089/api/users \
   -H 'Content-Type: application/json' \
-  -d '{"title": "Hello World", "tags": ["go", "db"], "published": true}'
+  -d '{"name": "Alice", "age": 30}'
+
+# Create multiple entities
+curl -X POST http://localhost:8089/api/users \
+  -H 'Content-Type: application/json' \
+  -d '[{"name": "Bob"}, {"name": "Charlie"}]'
+
+# Batch update entities
+curl -X PUT http://localhost:8089/api/users \
+  -H 'Content-Type: application/json' \
+  -d '[{"id": "u1", "age": 35}, {"id": "u2", "name": "Bobby"}]'
 
 # Query with filters and sorting
-curl "http://localhost:8089/api/articles?limit=10&offset=0&sort[title]=asc&filter[published][eq]=true"
+curl "http://localhost:8089/api/users?limit=10&offset=0&sort[name]=asc&filter[age][gt]=25"
 ```
 
 ---
@@ -238,8 +249,8 @@ Run performance benchmarks:
 
 ```bash
 make tcp_benchmark
-make http_benchmark # requires isntalling k6
-make api_benchmark # requires isntalling k6
+make http_benchmark # requires installing k6
+make api_benchmark # requires installing k6
 ```
 
 ---
