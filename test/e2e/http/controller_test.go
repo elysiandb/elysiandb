@@ -624,3 +624,103 @@ func TestDELETESingle_HTTP(t *testing.T) {
 		t.Fatalf("unexpected 404 body: %+v", e)
 	}
 }
+
+func TestCreateListOfEntities(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	entities := []map[string]interface{}{
+		{"name": "Alice", "age": 30},
+		{"name": "Bob", "age": 25},
+	}
+
+	body, _ := json.Marshal(entities)
+	req.Header.SetMethod(fasthttp.MethodPost)
+	req.SetRequestURI("http://test/api/users")
+	req.SetBody(body)
+
+	if err := client.Do(req, resp); err != nil {
+		t.Fatalf("POST list failed: %v", err)
+	}
+	if sc := resp.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", sc)
+	}
+
+	var created []map[string]interface{}
+	mustBodyJSON(t, resp.Body(), &created)
+	if len(created) != 2 {
+		t.Fatalf("expected 2 entities, got %d", len(created))
+	}
+	for _, e := range created {
+		if _, ok := e["id"].(string); !ok {
+			t.Fatalf("expected id field in %+v", e)
+		}
+	}
+}
+
+func TestUpdateListOfEntities(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	createReq := fasthttp.AcquireRequest()
+	createResp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(createReq)
+	defer fasthttp.ReleaseResponse(createResp)
+
+	entities := []map[string]interface{}{
+		{"id": "u1", "name": "Alice", "age": 30},
+		{"id": "u2", "name": "Bob", "age": 25},
+	}
+	createBody, _ := json.Marshal(entities)
+	createReq.Header.SetMethod(fasthttp.MethodPost)
+	createReq.SetRequestURI("http://test/api/users")
+	createReq.SetBody(createBody)
+
+	if err := client.Do(createReq, createResp); err != nil {
+		t.Fatalf("POST create list failed: %v", err)
+	}
+	if createResp.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", createResp.StatusCode())
+	}
+
+	updates := []map[string]interface{}{
+		{"id": "u1", "age": 35},
+		{"id": "u2", "name": "Bobby"},
+	}
+	updateBody, _ := json.Marshal(updates)
+	updateReq := fasthttp.AcquireRequest()
+	updateResp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(updateReq)
+	defer fasthttp.ReleaseResponse(updateResp)
+
+	updateReq.Header.SetMethod(fasthttp.MethodPut)
+	updateReq.SetRequestURI("http://test/api/users")
+	updateReq.SetBody(updateBody)
+
+	if err := client.Do(updateReq, updateResp); err != nil {
+		t.Fatalf("PUT update list failed: %v", err)
+	}
+	if updateResp.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", updateResp.StatusCode())
+	}
+
+	var updated []map[string]interface{}
+	mustBodyJSON(t, updateResp.Body(), &updated)
+	if len(updated) != 2 {
+		t.Fatalf("expected 2 updated entities, got %d", len(updated))
+	}
+
+	for _, e := range updated {
+		if e["id"] == "u1" && e["age"].(float64) != 35 {
+			t.Fatalf("expected age=35 for u1, got %+v", e)
+		}
+		if e["id"] == "u2" && e["name"].(string) != "Bobby" {
+			t.Fatalf("expected name=Bobby for u2, got %+v", e)
+		}
+	}
+}

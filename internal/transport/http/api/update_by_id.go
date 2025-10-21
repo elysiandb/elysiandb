@@ -12,28 +12,62 @@ import (
 func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 	id := ctx.UserValue("id").(string)
+	body := ctx.PostBody()
 
-	var updated map[string]interface{}
-	if err := json.Unmarshal(ctx.PostBody(), &updated); err != nil {
-		ctx.SetStatusCode(fasthttp.StatusBadRequest)
-		ctx.SetBodyString("Invalid JSON")
+	if handleSingleUpdate(ctx, entity, id, body) {
+		finalizeUpdate(ctx, entity)
 		return
 	}
 
-	data := api_storage.UpdateEntityById(entity, id, updated)
+	sendBadRequest(ctx)
+}
 
-	response, err := json.Marshal(data)
-	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-		ctx.SetBodyString("Error processing request")
+func UpdateListController(ctx *fasthttp.RequestCtx) {
+	entity := ctx.UserValue("entity").(string)
+	body := ctx.PostBody()
+
+	if handleBatchUpdate(ctx, entity, body) {
+		finalizeUpdate(ctx, entity)
 		return
 	}
 
+	sendBadRequest(ctx)
+}
+
+func handleSingleUpdate(ctx *fasthttp.RequestCtx, entity, id string, body []byte) bool {
+	var single map[string]interface{}
+	if err := json.Unmarshal(body, &single); err != nil || len(single) == 0 {
+		return false
+	}
+	data := api_storage.UpdateEntityById(entity, id, single)
+	response, _ := json.Marshal(data)
+	sendJSONResponse(ctx, response)
+	return true
+}
+
+func handleBatchUpdate(ctx *fasthttp.RequestCtx, entity string, body []byte) bool {
+	var list []map[string]interface{}
+	if err := json.Unmarshal(body, &list); err != nil || len(list) == 0 {
+		return false
+	}
+	data := api_storage.UpdateListOfEntities(entity, list)
+	response, _ := json.Marshal(data)
+	sendJSONResponse(ctx, response)
+	return true
+}
+
+func sendJSONResponse(ctx *fasthttp.RequestCtx, response []byte) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
-
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
+}
 
+func sendBadRequest(ctx *fasthttp.RequestCtx) {
+	ctx.SetStatusCode(fasthttp.StatusBadRequest)
+	ctx.SetBodyString("Invalid JSON")
+}
+
+func finalizeUpdate(ctx *fasthttp.RequestCtx, entity string) {
 	if globals.GetConfig().Api.Cache.Enabled {
 		cache.CacheStore.Purge(entity)
 	}

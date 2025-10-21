@@ -22,6 +22,12 @@ func WriteEntity(entity string, data map[string]interface{}) {
 	}
 }
 
+func WriteListOfEntities(entity string, list []map[string]interface{}) {
+	for _, data := range list {
+		WriteEntity(entity, data)
+	}
+}
+
 func AddEntityType(entity string) {
 	key := globals.ApiAllEntityTypesListKey()
 	data, _ := storage.GetByKey(key)
@@ -145,4 +151,19 @@ func UpdateEntityById(entity string, id string, updated map[string]interface{}) 
 	WriteEntity(entity, existing)
 	UpdateIndexesForEntity(entity, id, old, existing)
 	return existing
+}
+
+func UpdateListOfEntities(entity string, updates []map[string]interface{}) []map[string]interface{} {
+	results := make([]map[string]interface{}, 0, len(updates))
+	for _, upd := range updates {
+		id, ok := upd["id"].(string)
+		if !ok || id == "" {
+			continue
+		}
+		res := UpdateEntityById(entity, id, upd)
+		if res != nil {
+			results = append(results, res)
+		}
+	}
+	return results
 }
