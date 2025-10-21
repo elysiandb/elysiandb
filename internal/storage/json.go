@@ -16,17 +16,14 @@ import (
 	"github.com/taymour/elysiandb/internal/stat"
 )
 
-var mainJsonStore *JsonStore
-var mainJsonStoreMu sync.RWMutex
+var mainJsonStore atomic.Pointer[JsonStore]
 
 func LoadJsonDB() {
 	cfg := globals.GetConfig()
 	createFolder(cfg.Store.Folder)
 	createFile(cfg.Store.Folder, JsonDataFile)
 	js := createJsonStore(JsonDataFile)
-	rootMu.Lock()
-	mainJsonStore = js
-	rootMu.Unlock()
+	mainJsonStore.Store(js)
 }
 
 func createJsonStore(file string) *JsonStore {
@@ -41,10 +38,11 @@ func createJsonStore(file string) *JsonStore {
 }
 
 func GetJsonByKeyNoCopy(key string) (map[string]interface{}, error) {
-	mainJsonStoreMu.RLock()
-	js := mainJsonStore
+	js := mainJsonStore.Load()
+	if js == nil {
+		return nil, fmt.Errorf("json store not initialized")
+	}
 	val, ok := js.get(key)
-	mainJsonStoreMu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("key not found: %s", key)
 	}
@@ -64,11 +62,13 @@ func GetJsonByKey(key string) (map[string]interface{}, error) {
 }
 
 func PutJsonValue(key string, value map[string]interface{}) error {
-	mainJsonStoreMu.Lock()
-	defer mainJsonStoreMu.Unlock()
 	cfg := globals.GetConfig()
-	_, existed := mainJsonStore.get(key)
-	mainJsonStore.put(key, value)
+	js := mainJsonStore.Load()
+	if js == nil {
+		return fmt.Errorf("json store not initialized")
+	}
+	_, existed := js.get(key)
+	js.put(key, value)
 	if cfg.Stats.Enabled && !existed {
 		stat.Stats.IncrementKeysCount()
 	}
@@ -77,10 +77,12 @@ func PutJsonValue(key string, value map[string]interface{}) error {
 
 func DeleteJsonByKey(key string) {
 	cfg := globals.GetConfig()
-	mainJsonStoreMu.Lock()
-	defer mainJsonStoreMu.Unlock()
-	_, existed := mainJsonStore.get(key)
-	mainJsonStore.del(key)
+	js := mainJsonStore.Load()
+	if js == nil {
+		return
+	}
+	_, existed := js.get(key)
+	js.del(key)
 	if cfg.Stats.Enabled && existed {
 		stat.Stats.DecrementKeysCount()
 	}
@@ -88,10 +90,13 @@ func DeleteJsonByKey(key string) {
 
 func DeleteJsonByPrefix(prefix string) int {
 	cfg := globals.GetConfig()
+	js := mainJsonStore.Load()
+	if js == nil {
+		return 0
+	}
 	pre := strings.TrimSuffix(prefix, "*")
-	mainJsonStoreMu.Lock()
 	deleted := 0
-	for _, sh := range mainJsonStore.shards {
+	for _, sh := range js.shards {
 		for k := range sh.m {
 			if strings.HasPrefix(k, pre) {
 				delete(sh.m, k)
@@ -99,8 +104,7 @@ func DeleteJsonByPrefix(prefix string) int {
 			}
 		}
 	}
-	mainJsonStore.saved.Store(false)
-	mainJsonStoreMu.Unlock()
+	js.saved.Store(false)
 	if cfg.Stats.Enabled {
 		for i := 0; i < deleted; i++ {
 			stat.Stats.DecrementKeysCount()
@@ -154,7 +158,6 @@ func (s *JsonStore) reset() {
 		sh.mu.Unlock()
 	}
 	s.saved.Store(false)
-
 	if globals.GetConfig().Store.CrashRecovery.Enabled {
 		recovery.ClearJsonRecoveryLog()
 	}
@@ -182,7 +185,6 @@ func (s *JsonStore) put(key string, value map[string]interface{}) {
 	sh.m[key] = value
 	sh.mu.Unlock()
 	s.saved.Store(false)
-
 	if globals.GetConfig().Store.CrashRecovery.Enabled {
 		recovery.LogJsonPut(key, value)
 	}
@@ -194,7 +196,6 @@ func (s *JsonStore) del(key string) {
 	delete(sh.m, key)
 	sh.mu.Unlock()
 	s.saved.Store(false)
-
 	if globals.GetConfig().Store.CrashRecovery.Enabled {
 		recovery.LogJsonDelete(key)
 	}
