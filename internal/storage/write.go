@@ -44,8 +44,12 @@ func WriteJsonDB() {
 	cfg := globals.GetConfig()
 
 	rootMu.RLock()
-	js := mainJsonStore
+	js := mainJsonStore.Load()
 	rootMu.RUnlock()
+
+	if js == nil {
+		return
+	}
 
 	if err := writeJsonStoreToFile(cfg, JsonDataFile, js); err != nil {
 		log.Error("Error writing json store to database:", err)
