@@ -53,11 +53,12 @@ No setup, no schema — just start and query.
 
 ## Performance
 
-| Scenario   | Load               | p95 Latency | RPS    | Errors |
-| ---------- | ------------------ | ----------- | ------ | ------ |
-| Dev Local  | 3 VUs / 100 keys   | **0.23 ms** | ~15k/s | 0%     |
-| Small App  | 10 VUs / 500 keys  | **0.37 ms** | ~40k/s | 0%     |
-| Light Prod | 25 VUs / 1000 keys | **1.35 ms** | ~41k/s | 0%     |
+| Scenario   | Load               | p95 Latency | RPS      | Errors |
+| ---------- | ------------------ | ----------- | -------- | ------ |
+| Dev Local  | 3 VUs / 100 keys   | **0.20 ms** | ~18.4k/s | 0%     |
+| Small App  | 10 VUs / 500 keys  | **0.48 ms** | ~34.7k/s | 0%     |
+| Light Prod | 25 VUs / 1000 keys | **1.54 ms** | ~38.0k/s | 0%     |
+
 
 > Sub‑millisecond latency under realistic workloads — true instant REST APIs.
 
