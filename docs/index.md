@@ -40,6 +40,8 @@ log:
 stats:
   enabled: true
 api:
+  schema:
+    enabled: true
   index:
     workers: 4
   cache:
@@ -62,6 +64,7 @@ api:
 | **stats.enabled**                    | Enables runtime metrics and `/stats` endpoint          |
 | **api.index.workers**                | Number of workers that rebuild dirty indexes           |
 | **api.cache.enabled**                | Enables REST API caching for repeated queries          |
+| **api.schema.enabled**               | Enables automatic schema inference and validation      |
 | **api.cache.cleanupIntervalSeconds** | Interval for cache expiration cleanup                  |
 
 ---
@@ -123,6 +126,43 @@ curl -X PUT http://localhost:8089/api/users \
 
 # Query with filters and sorting
 curl "http://localhost:8089/api/users?limit=10&offset=0&sort[name]=asc&filter[age][gt]=25"
+```
+
+### Schema Inference and Validation
+
+When schema validation is enabled (`api.schema.enabled: true`):
+
+1. The first entity written defines the schema automatically.
+2. Future writes for the same entity are validated against the inferred schema.
+3. Validation applies to nested objects as well.
+4. Type mismatches or invalid structures return a **400 Bad Request** with detailed validation errors.
+
+#### Example
+
+#### First insert defines the schema
+
+```bash
+curl -X POST http://localhost:8089/api/users \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "Alice", "age": 30, "info": {"city": "Paris"}}'
+```
+
+#### This will fail due to type mismatch
+
+```bash
+curl -X POST http://localhost:8089/api/users \
+  -H 'Content-Type: application/json' \
+  -d '{"name": 123, "age": "thirty"}'
+```
+
+#### Sample error response
+
+```json
+[
+  { "field": "name", "message": "expected type string but got int" },
+  { "field": "age", "message": "expected type int but got string" }
+]
+
 ```
 
 ---

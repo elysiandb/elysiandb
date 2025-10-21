@@ -47,9 +47,14 @@ type StatsConfig struct {
 	Enabled bool `yaml:"enabled"`
 }
 
+type ApiSchemaConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
 type ApiConfig struct {
-	Index ApiIndexConfig `yaml:"index"`
-	Cache ApiCacheConfig `yaml:"cache"`
+	Index  ApiIndexConfig  `yaml:"index"`
+	Cache  ApiCacheConfig  `yaml:"cache"`
+	Schema ApiSchemaConfig `yaml:"schema"`
 }
 
 type ApiIndexConfig struct {

@@ -37,11 +37,20 @@ func handleSingleEntity(ctx *fasthttp.RequestCtx, entity string, body []byte) bo
 	if !hasId || id == "" {
 		data["id"] = uuid.New().String()
 	}
-	api_storage.WriteEntity(entity, data)
+	errors := api_storage.WriteEntity(entity, data)
+	if len(errors) > 0 {
+		response, _ := json.Marshal(errors)
+		ctx.Response.Header.Set("Content-Type", "application/json")
+		ctx.SetStatusCode(fasthttp.StatusBadRequest)
+		ctx.SetBody(response)
+		return true
+	}
+
 	response, _ := json.Marshal(data)
 	ctx.Response.Header.Set("Content-Type", "application/json")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
+
 	return true
 }
 
@@ -56,7 +65,25 @@ func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool
 			list[i]["id"] = uuid.New().String()
 		}
 	}
-	api_storage.WriteListOfEntities(entity, list)
+
+	validationErrors := api_storage.WriteListOfEntities(entity, list)
+	hasErrors := false
+	for _, errs := range validationErrors {
+		if len(errs) > 0 {
+			hasErrors = true
+			break
+		}
+	}
+
+	if hasErrors {
+		response, _ := json.Marshal(validationErrors)
+		ctx.Response.Header.Set("Content-Type", "application/json")
+		ctx.SetStatusCode(fasthttp.StatusBadRequest)
+		ctx.SetBody(response)
+
+		return true
+	}
+
 	response, _ := json.Marshal(list)
 	ctx.Response.Header.Set("Content-Type", "application/json")
 	ctx.SetStatusCode(fasthttp.StatusOK)

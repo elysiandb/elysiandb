@@ -27,6 +27,7 @@
 * **Multi‑Protocol** — HTTP, TCP (Redis-style text protocol), and Instant REST
 * **Automatic Indexing** — lazy-built indexes on first sort request
 * **Schema‑less JSON** — store any structure; IDs generated automatically
+* **Schema validation if enabled** — Inferred schema from POST and validate future POST
 * **Persistence** — automatic periodic flush and graceful shutdown
 
 ---
