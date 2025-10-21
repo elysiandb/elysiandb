@@ -97,12 +97,13 @@ func DeleteJsonByPrefix(prefix string) int {
 	pre := strings.TrimSuffix(prefix, "*")
 	deleted := 0
 	for _, sh := range js.shards {
-		for k := range sh.m {
-			if strings.HasPrefix(k, pre) {
-				delete(sh.m, k)
+		sh.m.Range(func(k, _ any) bool {
+			if strings.HasPrefix(k.(string), pre) {
+				sh.m.Delete(k)
 				deleted++
 			}
-		}
+			return true
+		})
 	}
 	js.saved.Store(false)
 	if cfg.Stats.Enabled {
@@ -114,8 +115,7 @@ func DeleteJsonByPrefix(prefix string) int {
 }
 
 type jsonShard struct {
-	mu sync.RWMutex
-	m  map[string]map[string]interface{}
+	m sync.Map
 }
 
 type JsonStore struct {
@@ -133,7 +133,7 @@ func NewJsonStore() *JsonStore {
 		shardCount: n,
 	}
 	for i := 0; i < n; i++ {
-		s.shards[i] = &jsonShard{m: make(map[string]map[string]interface{})}
+		s.shards[i] = &jsonShard{}
 	}
 	s.saved.Store(true)
 	return s
@@ -142,20 +142,19 @@ func NewJsonStore() *JsonStore {
 func (s *JsonStore) CountTotalKeys() uint64 {
 	total := uint64(0)
 	for i := 0; i < s.shardCount; i++ {
-		sh := s.shards[i]
-		sh.mu.RLock()
-		total += uint64(len(sh.m))
-		sh.mu.RUnlock()
+		c := uint64(0)
+		s.shards[i].m.Range(func(_, _ any) bool {
+			c++
+			return true
+		})
+		total += c
 	}
 	return total
 }
 
 func (s *JsonStore) reset() {
 	for i := 0; i < s.shardCount; i++ {
-		sh := s.shards[i]
-		sh.mu.Lock()
-		sh.m = make(map[string]map[string]interface{})
-		sh.mu.Unlock()
+		s.shards[i].m = sync.Map{}
 	}
 	s.saved.Store(false)
 	if globals.GetConfig().Store.CrashRecovery.Enabled {
@@ -170,20 +169,16 @@ func (s *JsonStore) shardIndex(key string) int {
 
 func (s *JsonStore) get(key string) (map[string]interface{}, bool) {
 	sh := s.shards[s.shardIndex(key)]
-	sh.mu.RLock()
-	v, ok := sh.m[key]
-	sh.mu.RUnlock()
+	v, ok := sh.m.Load(key)
 	if !ok {
 		return nil, false
 	}
-	return v, true
+	return v.(map[string]interface{}), true
 }
 
 func (s *JsonStore) put(key string, value map[string]interface{}) {
 	sh := s.shards[s.shardIndex(key)]
-	sh.mu.Lock()
-	sh.m[key] = value
-	sh.mu.Unlock()
+	sh.m.Store(key, value)
 	s.saved.Store(false)
 	if globals.GetConfig().Store.CrashRecovery.Enabled {
 		recovery.LogJsonPut(key, value)
@@ -192,9 +187,7 @@ func (s *JsonStore) put(key string, value map[string]interface{}) {
 
 func (s *JsonStore) del(key string) {
 	sh := s.shards[s.shardIndex(key)]
-	sh.mu.Lock()
-	delete(sh.m, key)
-	sh.mu.Unlock()
+	sh.m.Delete(key)
 	s.saved.Store(false)
 	if globals.GetConfig().Store.CrashRecovery.Enabled {
 		recovery.LogJsonDelete(key)
@@ -203,21 +196,17 @@ func (s *JsonStore) del(key string) {
 
 func (s *JsonStore) Iterate(fn func(k string, v map[string]interface{})) {
 	for i := 0; i < s.shardCount; i++ {
-		sh := s.shards[i]
-		sh.mu.RLock()
-		for k, v := range sh.m {
-			fn(k, v)
-		}
-		sh.mu.RUnlock()
+		s.shards[i].m.Range(func(k, v any) bool {
+			fn(k.(string), v.(map[string]interface{}))
+			return true
+		})
 	}
 }
 
 func (s *JsonStore) FromMap(src map[string]map[string]interface{}) {
 	for k, v := range src {
 		sh := s.shards[s.shardIndex(k)]
-		sh.mu.Lock()
-		sh.m[k] = v
-		sh.mu.Unlock()
+		sh.m.Store(k, v)
 	}
 	s.saved.Store(true)
 }
