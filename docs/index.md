@@ -85,6 +85,59 @@ ElysianDB automatically exposes REST endpoints per entity. Entities are inferred
 | `DELETE` | `/api/<entity>/<id>` | Delete document by ID                                       |
 | `DELETE` | `/api/<entity>`      | Delete all documents for an entity                          |
 
+### Nested Entity Creation (works the same way with update)
+
+ElysianDB supports creating entities that contain **sub-entities** within the same request. When a JSON object includes fields containing other objects with an `@entity` key, those sub-entities are automatically created, linked, and assigned unique IDs if missing.
+
+#### Example
+
+```bash
+curl -X POST http://localhost:8089/api/articles \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "title": "Nested Example",
+    "authors": [
+      {
+        "@entity": "author",
+        "fullname": "Mister T",
+        "status": "writer",
+        "job": {
+          "@entity": "job",
+          "id": "1234567890",
+          "designation": "Worker"
+        }
+      },
+      {
+        "@entity": "author",
+        "fullname": "Alberto",
+        "status": "coco",
+        "job": {
+          "@entity": "job",
+          "id": "1234567890"
+        }
+      }
+    ]
+  }'
+```
+
+This will create:
+
+* an `article` linked to two `author` entities
+* the `author` entities themselves, each linked to the same `job`
+* the `job` entity if it does not already exist
+
+ElysianDB automatically assigns IDs when missing and replaces nested objects with lightweight references of the form:
+
+```json
+{
+  "@entity": "author",
+  "id": "<uuid>"
+}
+```
+
+This mechanism also works recursively and supports **arrays of sub-entities**, allowing a document to include multiple nested or shared linked entities.
+
+
 ### Query Parameters
 
 * `limit` — Max number of items to return

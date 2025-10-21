@@ -29,6 +29,7 @@
 * **Schema‑less JSON** — store any structure; IDs generated automatically
 * **Schema validation if enabled** — Inferred schema from POST and validate future POST
 * **Persistence** — automatic periodic flush and graceful shutdown
+* **Nested Entity Creation** — automatic creation and linking of sub-entities detected by @entity fields in JSON
 
 ---
 

@@ -630,3 +630,170 @@ func TestAutoREST_SchemaValidation_DeepNested(t *testing.T) {
 		t.Fatalf("expected validation error for deep nested type mismatch, got 200")
 	}
 }
+
+func TestAutoREST_CreateAndUpdate_WithSubEntities(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	resp := mustPOSTJSON(t, client, "http://test/api/articles", map[string]any{
+		"title": "Nested Example",
+		"author": map[string]any{
+			"@entity":  "author",
+			"fullname": "Taymour Negib",
+			"job": map[string]any{
+				"@entity":     "job",
+				"designation": "Writer",
+			},
+		},
+	})
+	if sc := resp.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", sc)
+	}
+
+	var article map[string]any
+	if err := json.Unmarshal(resp.Body(), &article); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	aAuthor, ok := article["author"].(map[string]any)
+	if !ok || aAuthor["@entity"] != "author" {
+		t.Fatalf("expected author sub-entity link, got %+v", article)
+	}
+	authorID, _ := aAuthor["id"].(string)
+	if authorID == "" || !uuidRe.MatchString(authorID) {
+		t.Fatalf("invalid author id: %v", authorID)
+	}
+
+	grAuthor := mustGET(t, client, "http://test/api/author/"+authorID)
+	var author map[string]any
+	_ = json.Unmarshal(grAuthor.Body(), &author)
+	if author["fullname"] != "Taymour Negib" {
+		t.Fatalf("expected fullname Taymour Negib, got %+v", author)
+	}
+	job, ok := author["job"].(map[string]any)
+	if !ok || job["@entity"] != "job" {
+		t.Fatalf("expected job reference in author, got %+v", author)
+	}
+	jobID := job["id"].(string)
+	grJob := mustGET(t, client, "http://test/api/job/"+jobID)
+	var jobObj map[string]any
+	_ = json.Unmarshal(grJob.Body(), &jobObj)
+	if jobObj["designation"] != "Writer" {
+		t.Fatalf("expected Writer, got %+v", jobObj)
+	}
+
+	up := mustPUTJSON(t, client, "http://test/api/articles/"+article["id"].(string), map[string]any{
+		"title": "Nested Updated",
+		"author": map[string]any{
+			"@entity":  "author",
+			"id":       authorID,
+			"fullname": "Updated Author",
+			"job": map[string]any{
+				"@entity":     "job",
+				"id":          jobID,
+				"designation": "Editor",
+			},
+		},
+	})
+	if sc := up.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("expected 200 on update, got %d", sc)
+	}
+
+	grAuthor2 := mustGET(t, client, "http://test/api/author/"+authorID)
+	var author2 map[string]any
+	_ = json.Unmarshal(grAuthor2.Body(), &author2)
+	if author2["fullname"] != "Updated Author" {
+		t.Fatalf("expected Updated Author, got %+v", author2)
+	}
+	job2 := author2["job"].(map[string]any)
+	grJob2 := mustGET(t, client, "http://test/api/job/"+job2["id"].(string))
+	var jobObj2 map[string]any
+	_ = json.Unmarshal(grJob2.Body(), &jobObj2)
+	if jobObj2["designation"] != "Editor" {
+		t.Fatalf("expected job designation Editor, got %+v", jobObj2)
+	}
+}
+
+func TestAutoREST_Create_WithArraySubEntities(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	resp := mustPOSTJSON(t, client, "http://test/api/articles", map[string]any{
+		"title": "Multi Author Article",
+		"authors": []map[string]any{
+			{
+				"@entity":  "author",
+				"fullname": "Alice",
+				"job": map[string]any{
+					"@entity":     "job",
+					"designation": "Writer",
+				},
+			},
+			{
+				"@entity":  "author",
+				"fullname": "Bob",
+			},
+		},
+	})
+	if sc := resp.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", sc)
+	}
+	var article map[string]any
+	_ = json.Unmarshal(resp.Body(), &article)
+	authors, ok := article["authors"].([]interface{})
+	if !ok || len(authors) != 2 {
+		t.Fatalf("expected 2 authors, got %+v", article)
+	}
+	for _, a := range authors {
+		am := a.(map[string]any)
+		if am["@entity"] != "author" {
+			t.Fatalf("expected @entity=author, got %+v", am)
+		}
+		id, _ := am["id"].(string)
+		if id == "" || !uuidRe.MatchString(id) {
+			t.Fatalf("invalid author id %+v", am)
+		}
+		gr := mustGET(t, client, "http://test/api/author/"+id)
+		if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+			t.Fatalf("GET /api/author/%s expected 200, got %d", id, sc)
+		}
+	}
+}
+
+func TestAutoREST_Update_WithArraySubEntities(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	create := mustPOSTJSON(t, client, "http://test/api/albums", map[string]any{
+		"title": "Album 1",
+		"tracks": []map[string]any{
+			{"@entity": "track", "title": "Track 1"},
+			{"@entity": "track", "title": "Track 2"},
+		},
+	})
+	var album map[string]any
+	_ = json.Unmarshal(create.Body(), &album)
+	tracks := album["tracks"].([]interface{})
+	first := tracks[0].(map[string]any)
+	second := tracks[1].(map[string]any)
+	firstID := first["id"].(string)
+	secondID := second["id"].(string)
+
+	update := mustPUTJSON(t, client, "http://test/api/albums/"+album["id"].(string), map[string]any{
+		"title": "Album Updated",
+		"tracks": []map[string]any{
+			{"@entity": "track", "id": firstID, "title": "Track 1 Updated"},
+			{"@entity": "track", "id": secondID, "title": "Track 2 Updated"},
+			{"@entity": "track", "title": "Track 3 New"},
+		},
+	})
+	if sc := update.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", sc)
+	}
+	var updated map[string]any
+	_ = json.Unmarshal(update.Body(), &updated)
+	newTracks := updated["tracks"].([]interface{})
+	if len(newTracks) != 3 {
+		t.Fatalf("expected 3 tracks after update, got %+v", updated)
+	}
+}
