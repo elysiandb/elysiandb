@@ -11,6 +11,8 @@ log:
 stats:
   enabled: false
 api:
+  schema:
+    enabled: true
   index:
     workers: 4
   cache:

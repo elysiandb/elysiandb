@@ -2,10 +2,18 @@ package api_storage
 
 import (
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
-func WriteEntity(entity string, data map[string]interface{}) {
+func WriteEntity(entity string, data map[string]interface{}) []schema.ValidationError {
+	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
+		errors := schema.ValidateEntity(entity, data)
+		if len(errors) > 0 {
+			return errors
+		}
+	}
+
 	key := globals.ApiSingleEntityKey(entity, data["id"].(string))
 	old := ReadEntityById(entity, data["id"].(string))
 	storage.PutJsonValue(key, data)
@@ -20,12 +28,22 @@ func WriteEntity(entity string, data map[string]interface{}) {
 			}
 		}
 	}
+
+	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
+		analyzed := schema.AnalyzeEntitySchema(entity, data)
+		WriteEntity(schema.SchemaEntity, analyzed)
+	}
+
+	return []schema.ValidationError{}
 }
 
-func WriteListOfEntities(entity string, list []map[string]interface{}) {
+func WriteListOfEntities(entity string, list []map[string]interface{}) [][]schema.ValidationError {
+	errors := [][]schema.ValidationError{}
 	for _, data := range list {
-		WriteEntity(entity, data)
+		errors = append(errors, WriteEntity(entity, data))
 	}
+
+	return errors
 }
 
 func AddEntityType(entity string) {

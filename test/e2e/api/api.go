@@ -524,3 +524,109 @@ func TestAutoREST_ArrayFilters_Chained(t *testing.T) {
 		t.Fatalf("expected 2 posts for chained filters, got %v", res)
 	}
 }
+
+func TestAutoREST_SchemaValidation_BasicAndNested(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Enabled = true
+	globals.SetConfig(cfg)
+
+	resp1 := mustPOSTJSON(t, client, "http://test/api/users", map[string]any{
+		"name": "Alice",
+		"age":  30,
+		"info": map[string]any{"city": "Paris", "zip": 75000},
+	})
+	if sc := resp1.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("POST /api/users expected 200, got %d", sc)
+	}
+	var created1 map[string]any
+	_ = json.Unmarshal(resp1.Body(), &created1)
+	if created1["id"] == "" {
+		t.Fatalf("expected id in first creation, got %+v", created1)
+	}
+
+	resp2 := mustPOSTJSON(t, client, "http://test/api/users", map[string]any{
+		"name": 123,
+		"age":  40,
+		"info": map[string]any{"city": "Paris", "zip": "not_a_number"},
+	})
+	if sc := resp2.StatusCode(); sc == fasthttp.StatusOK {
+		t.Fatalf("expected validation error for type mismatch, got 200")
+	}
+
+	resp3 := mustPOSTJSON(t, client, "http://test/api/users", map[string]any{
+		"name": "Bob",
+		"age":  22,
+		"info": map[string]any{"city": "Lyon", "zip": 69000},
+	})
+	if sc := resp3.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("expected 200 for valid schema, got %d", sc)
+	}
+	var created3 map[string]any
+	_ = json.Unmarshal(resp3.Body(), &created3)
+	if created3["name"] != "Bob" {
+		t.Fatalf("unexpected created3 %+v", created3)
+	}
+}
+
+func TestAutoREST_SchemaValidation_NewEntity_AcceptsDifferentSchemas(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Enabled = true
+	globals.SetConfig(cfg)
+
+	r1 := mustPOSTJSON(t, client, "http://test/api/orders", map[string]any{
+		"ref":   "ORD001",
+		"total": 123.45,
+	})
+	if sc := r1.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("POST /api/orders expected 200, got %d", sc)
+	}
+
+	r2 := mustPOSTJSON(t, client, "http://test/api/customers", map[string]any{
+		"name": "Alice",
+		"vip":  true,
+	})
+	if sc := r2.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("POST /api/customers expected 200, got %d", sc)
+	}
+}
+
+func TestAutoREST_SchemaValidation_DeepNested(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Enabled = true
+	globals.SetConfig(cfg)
+
+	r1 := mustPOSTJSON(t, client, "http://test/api/projects", map[string]any{
+		"title": "Test",
+		"meta": map[string]any{
+			"author": map[string]any{
+				"name": "Alice",
+				"age":  30,
+			},
+		},
+	})
+	if sc := r1.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", sc)
+	}
+
+	r2 := mustPOSTJSON(t, client, "http://test/api/projects", map[string]any{
+		"title": "WrongType",
+		"meta": map[string]any{
+			"author": map[string]any{
+				"name": 999,
+				"age":  "old",
+			},
+		},
+	})
+	if sc := r2.StatusCode(); sc == fasthttp.StatusOK {
+		t.Fatalf("expected validation error for deep nested type mismatch, got 200")
+	}
+}
