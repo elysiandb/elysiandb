@@ -137,13 +137,14 @@ ElysianDB automatically assigns IDs when missing and replaces nested objects wit
 
 This mechanism also works recursively and supports **arrays of sub-entities**, allowing a document to include multiple nested or shared linked entities.
 
-
 ### Query Parameters
 
 * `limit` — Max number of items to return
 * `offset` — Number of items to skip
-* `sort[field]=asc|desc` — Sort results (builds index automatically)
+* `sort[field]=asc|desc` — Sort results (builds index automatically) and works with nested fields or entities
 * `filter[field][op]=value` — Filter results by field
+* `fields=title,slug` — Return only selected fields
+* `includes=author,author.category` — Includes sub-entities
 
 ### Filtering Operators
 
@@ -159,64 +160,57 @@ This mechanism also works recursively and supports **arrays of sub-entities**, a
 | `any`          | Array includes any listed value        |
 | `none`         | Array excludes all listed values       |
 
-### Examples
+### Includes and Nested Filters
 
-```bash
-# Create a single entity
-curl -X POST http://localhost:8089/api/users \
-  -H 'Content-Type: application/json' \
-  -d '{"name": "Alice", "age": 30}'
-
-# Create multiple entities
-curl -X POST http://localhost:8089/api/users \
-  -H 'Content-Type: application/json' \
-  -d '[{"name": "Bob"}, {"name": "Charlie"}]'
-
-# Batch update entities
-curl -X PUT http://localhost:8089/api/users \
-  -H 'Content-Type: application/json' \
-  -d '[{"id": "u1", "age": 35}, {"id": "u2", "name": "Bobby"}]'
-
-# Query with filters and sorting
-curl "http://localhost:8089/api/users?limit=10&offset=0&sort[name]=asc&filter[age][gt]=25"
-```
-
-### Schema Inference and Validation
-
-When schema validation is enabled (`api.schema.enabled: true`):
-
-1. The first entity written defines the schema automatically.
-2. Future writes for the same entity are validated against the inferred schema.
-3. Validation applies to nested objects as well.
-4. Type mismatches or invalid structures return a **400 Bad Request** with detailed validation errors.
+ElysianDB supports **relationship expansion** via the `includes` query parameter. It allows loading linked entities directly within query results.
 
 #### Example
 
-#### First insert defines the schema
 
 ```bash
-curl -X POST http://localhost:8089/api/users \
-  -H 'Content-Type: application/json' \
-  -d '{"name": "Alice", "age": 30, "info": {"city": "Paris"}}'
+curl "http://localhost:8089/api/articles/123?includes=author,author.job"
 ```
 
-#### This will fail due to type mismatch
+Or
 
 ```bash
-curl -X POST http://localhost:8089/api/users \
-  -H 'Content-Type: application/json' \
-  -d '{"name": 123, "age": "thirty"}'
+curl "http://localhost:8089/api/articles?includes=author,author.job"
 ```
 
-#### Sample error response
+This expands nested linked entities recursively:
 
 ```json
 [
-  { "field": "name", "message": "expected type string but got int" },
-  { "field": "age", "message": "expected type int but got string" }
+  {
+    "id": "a1",
+    "title": "Example",
+    "author": {
+      "id": "u1",
+      "fullname": "Alice",
+      "job": {
+        "id": "j1",
+        "designation": "Writer"
+      }
+    }
+  }
 ]
-
 ```
+
+#### Filtering on Included Entities
+
+Filters can reference sub-entity fields when `includes` are provided.
+
+```bash
+curl "http://localhost:8089/api/articles?includes=author&filter[author.fullname][eq]=Alice"
+```
+
+Nested filters are supported to any depth:
+
+```bash
+curl "http://localhost:8089/api/posts?includes=author,author.job&filter[author.job.designation][eq]=Writer"
+```
+
+Using `includes=all` expands all linked entities recursively.
 
 ---
 

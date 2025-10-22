@@ -797,3 +797,342 @@ func TestAutoREST_Update_WithArraySubEntities(t *testing.T) {
 		t.Fatalf("expected 3 tracks after update, got %+v", updated)
 	}
 }
+
+func TestAutoREST_Includes_SimpleAndNested(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	jobResp := mustPOSTJSON(t, client, "http://test/api/job", map[string]any{
+		"designation": "Writer",
+	})
+	var job map[string]any
+	_ = json.Unmarshal(jobResp.Body(), &job)
+	jobID := job["id"].(string)
+
+	authorResp := mustPOSTJSON(t, client, "http://test/api/author", map[string]any{
+		"fullname": "Alice",
+		"job": map[string]any{
+			"@entity": "job",
+			"id":      jobID,
+		},
+	})
+	var author map[string]any
+	_ = json.Unmarshal(authorResp.Body(), &author)
+	authorID := author["id"].(string)
+
+	categoryResp := mustPOSTJSON(t, client, "http://test/api/category", map[string]any{
+		"type": "tech",
+	})
+	var category map[string]any
+	_ = json.Unmarshal(categoryResp.Body(), &category)
+	categoryID := category["id"].(string)
+
+	mustPOSTJSON(t, client, "http://test/api/articles", map[string]any{
+		"title": "Article A",
+		"category": map[string]any{
+			"@entity": "category",
+			"id":      categoryID,
+		},
+		"author": map[string]any{
+			"@entity": "author",
+			"id":      authorID,
+		},
+	})
+
+	gr := mustGET(t, client, "http://test/api/articles?includes=category,author,author.job")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET /api/articles?includes expected 200, got %d", sc)
+	}
+	var list []map[string]any
+	_ = json.Unmarshal(gr.Body(), &list)
+	if len(list) != 1 {
+		t.Fatalf("expected 1 article, got %v", list)
+	}
+	cat := list[0]["category"].(map[string]any)
+	if cat["type"] != "tech" {
+		t.Fatalf("expected category type tech, got %v", cat)
+	}
+	auth := list[0]["author"].(map[string]any)
+	if auth["fullname"] != "Alice" {
+		t.Fatalf("expected author Alice, got %v", auth)
+	}
+	jobIn := auth["job"].(map[string]any)
+	if jobIn["designation"] != "Writer" {
+		t.Fatalf("expected job Writer, got %v", jobIn)
+	}
+}
+
+func TestAutoREST_Includes_AllMode(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	jobResp := mustPOSTJSON(t, client, "http://test/api/job", map[string]any{
+		"designation": "Engineer",
+	})
+	var job map[string]any
+	_ = json.Unmarshal(jobResp.Body(), &job)
+	jobID := job["id"].(string)
+
+	authorResp := mustPOSTJSON(t, client, "http://test/api/author", map[string]any{
+		"fullname": "Bob",
+		"job": map[string]any{
+			"@entity": "job",
+			"id":      jobID,
+		},
+	})
+	var author map[string]any
+	_ = json.Unmarshal(authorResp.Body(), &author)
+	authorID := author["id"].(string)
+
+	categoryResp := mustPOSTJSON(t, client, "http://test/api/category", map[string]any{
+		"type": "science",
+	})
+	var category map[string]any
+	_ = json.Unmarshal(categoryResp.Body(), &category)
+	categoryID := category["id"].(string)
+
+	mustPOSTJSON(t, client, "http://test/api/articles", map[string]any{
+		"title": "Full Mode Article",
+		"category": map[string]any{
+			"@entity": "category",
+			"id":      categoryID,
+		},
+		"author": map[string]any{
+			"@entity": "author",
+			"id":      authorID,
+		},
+	})
+
+	gr := mustGET(t, client, "http://test/api/articles?includes=all")
+	var list []map[string]any
+	_ = json.Unmarshal(gr.Body(), &list)
+	if len(list) != 1 {
+		t.Fatalf("expected 1 article, got %v", list)
+	}
+	cat := list[0]["category"].(map[string]any)
+	if cat["type"] != "science" {
+		t.Fatalf("expected category science, got %v", cat)
+	}
+	auth := list[0]["author"].(map[string]any)
+	if auth["fullname"] != "Bob" {
+		t.Fatalf("expected author Bob, got %v", auth)
+	}
+	jobIn := auth["job"].(map[string]any)
+	if jobIn["designation"] != "Engineer" {
+		t.Fatalf("expected job Engineer, got %v", jobIn)
+	}
+}
+
+func TestAutoREST_FiltersOnIncludedEntities(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	jobResp := mustPOSTJSON(t, client, "http://test/api/job", map[string]any{"designation": "Dev"})
+	var job map[string]any
+	_ = json.Unmarshal(jobResp.Body(), &job)
+	jobID := job["id"].(string)
+
+	auth1 := mustPOSTJSON(t, client, "http://test/api/author", map[string]any{
+		"fullname": "Alice",
+		"job": map[string]any{
+			"@entity": "job",
+			"id":      jobID,
+		},
+	})
+	var a1 map[string]any
+	_ = json.Unmarshal(auth1.Body(), &a1)
+	a1id := a1["id"].(string)
+
+	auth2 := mustPOSTJSON(t, client, "http://test/api/author", map[string]any{
+		"fullname": "Bob",
+	})
+	var a2 map[string]any
+	_ = json.Unmarshal(auth2.Body(), &a2)
+	a2id := a2["id"].(string)
+
+	mustPOSTJSON(t, client, "http://test/api/posts", map[string]any{
+		"title": "P1",
+		"author": map[string]any{
+			"@entity": "author",
+			"id":      a1id,
+		},
+	})
+	mustPOSTJSON(t, client, "http://test/api/posts", map[string]any{
+		"title": "P2",
+		"author": map[string]any{
+			"@entity": "author",
+			"id":      a2id,
+		},
+	})
+
+	gr := mustGET(t, client, "http://test/api/posts?includes=author,author.job&filter[author.fullname][eq]=Alice")
+	var list []map[string]any
+	_ = json.Unmarshal(gr.Body(), &list)
+	if len(list) != 1 || list[0]["title"] != "P1" {
+		t.Fatalf("expected P1 filtered by author Alice, got %v", list)
+	}
+	auth := list[0]["author"].(map[string]any)
+	jobIn := auth["job"].(map[string]any)
+	if jobIn["designation"] != "Dev" {
+		t.Fatalf("expected included job Dev, got %v", jobIn)
+	}
+}
+
+func TestAutoREST_FiltersOnIncludedNested(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	jobResp := mustPOSTJSON(t, client, "http://test/api/job", map[string]any{"designation": "Designer"})
+	var job map[string]any
+	_ = json.Unmarshal(jobResp.Body(), &job)
+	jobID := job["id"].(string)
+
+	auth := mustPOSTJSON(t, client, "http://test/api/author", map[string]any{
+		"fullname": "Claire",
+		"job": map[string]any{
+			"@entity": "job",
+			"id":      jobID,
+		},
+	})
+	var a map[string]any
+	_ = json.Unmarshal(auth.Body(), &a)
+	aID := a["id"].(string)
+
+	mustPOSTJSON(t, client, "http://test/api/posts", map[string]any{
+		"title": "With Designer",
+		"author": map[string]any{
+			"@entity": "author",
+			"id":      aID,
+		},
+	})
+	mustPOSTJSON(t, client, "http://test/api/posts", map[string]any{
+		"title": "Without Designer",
+	})
+
+	gr := mustGET(t, client, "http://test/api/posts?includes=author,author.job&filter[author.job.designation][eq]=Designer")
+	var list []map[string]any
+	_ = json.Unmarshal(gr.Body(), &list)
+	if len(list) != 1 || list[0]["title"] != "With Designer" {
+		t.Fatalf("expected With Designer, got %v", list)
+	}
+}
+
+func TestAutoREST_GetByID_WithIncludes(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	jobResp := mustPOSTJSON(t, client, "http://test/api/job", map[string]any{"designation": "Writer"})
+	var job map[string]any
+	_ = json.Unmarshal(jobResp.Body(), &job)
+	jobID := job["id"].(string)
+
+	authorResp := mustPOSTJSON(t, client, "http://test/api/author", map[string]any{
+		"fullname": "Alice",
+		"job": map[string]any{
+			"@entity": "job",
+			"id":      jobID,
+		},
+	})
+	var author map[string]any
+	_ = json.Unmarshal(authorResp.Body(), &author)
+	authorID := author["id"].(string)
+
+	categoryResp := mustPOSTJSON(t, client, "http://test/api/category", map[string]any{"type": "tech"})
+	var category map[string]any
+	_ = json.Unmarshal(categoryResp.Body(), &category)
+	categoryID := category["id"].(string)
+
+	articleResp := mustPOSTJSON(t, client, "http://test/api/articles", map[string]any{
+		"title": "Nested Article",
+		"category": map[string]any{
+			"@entity": "category",
+			"id":      categoryID,
+		},
+		"author": map[string]any{
+			"@entity": "author",
+			"id":      authorID,
+		},
+	})
+	var article map[string]any
+	_ = json.Unmarshal(articleResp.Body(), &article)
+	articleID := article["id"].(string)
+
+	gr := mustGET(t, client, "http://test/api/articles/"+articleID+"?includes=category,author,author.job")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET /api/articles/{id}?includes expected 200, got %d", sc)
+	}
+	var got map[string]any
+	_ = json.Unmarshal(gr.Body(), &got)
+	cat := got["category"].(map[string]any)
+	if cat["type"] != "tech" {
+		t.Fatalf("expected category tech, got %v", cat)
+	}
+	auth := got["author"].(map[string]any)
+	if auth["fullname"] != "Alice" {
+		t.Fatalf("expected author Alice, got %v", auth)
+	}
+	jobIn := auth["job"].(map[string]any)
+	if jobIn["designation"] != "Writer" {
+		t.Fatalf("expected job Writer, got %v", jobIn)
+	}
+}
+
+func TestAutoREST_GetByID_WithIncludesAll(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	jobResp := mustPOSTJSON(t, client, "http://test/api/job", map[string]any{"designation": "Engineer"})
+	var job map[string]any
+	_ = json.Unmarshal(jobResp.Body(), &job)
+	jobID := job["id"].(string)
+
+	authorResp := mustPOSTJSON(t, client, "http://test/api/author", map[string]any{
+		"fullname": "Bob",
+		"job": map[string]any{
+			"@entity": "job",
+			"id":      jobID,
+		},
+	})
+	var author map[string]any
+	_ = json.Unmarshal(authorResp.Body(), &author)
+	authorID := author["id"].(string)
+
+	categoryResp := mustPOSTJSON(t, client, "http://test/api/category", map[string]any{"type": "science"})
+	var category map[string]any
+	_ = json.Unmarshal(categoryResp.Body(), &category)
+	categoryID := category["id"].(string)
+
+	articleResp := mustPOSTJSON(t, client, "http://test/api/articles", map[string]any{
+		"title": "All Mode Article",
+		"category": map[string]any{
+			"@entity": "category",
+			"id":      categoryID,
+		},
+		"author": map[string]any{
+			"@entity": "author",
+			"id":      authorID,
+		},
+	})
+	var article map[string]any
+	_ = json.Unmarshal(articleResp.Body(), &article)
+	articleID := article["id"].(string)
+
+	gr := mustGET(t, client, "http://test/api/articles/"+articleID+"?includes=all")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("GET /api/articles/{id}?includes=all expected 200, got %d", sc)
+	}
+	var got map[string]any
+	_ = json.Unmarshal(gr.Body(), &got)
+	cat := got["category"].(map[string]any)
+	if cat["type"] != "science" {
+		t.Fatalf("expected category science, got %v", cat)
+	}
+	auth := got["author"].(map[string]any)
+	if auth["fullname"] != "Bob" {
+		t.Fatalf("expected author Bob, got %v", auth)
+	}
+	jobIn := auth["job"].(map[string]any)
+	if jobIn["designation"] != "Engineer" {
+		t.Fatalf("expected job Engineer, got %v", jobIn)
+	}
+}

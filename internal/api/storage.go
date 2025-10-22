@@ -100,6 +100,7 @@ func ListEntities(
 	sortField string,
 	sortAscending bool,
 	filters map[string]map[string]string,
+	includesParam string,
 ) []map[string]interface{} {
 	idList, err := GetListOfIds(entity, sortField, sortAscending)
 	if err != nil {
@@ -112,14 +113,20 @@ func ListEntities(
 	if len(filters) == 0 {
 		ids = applyOffsetLimit(ids, offset, limit)
 	}
-	filtered := make([]map[string]interface{}, 0, len(ids))
+	all := make([]map[string]interface{}, 0, len(ids))
 	for _, id := range ids {
 		entityData := ReadEntityById(entity, id)
 		if entityData != nil {
-			if !FiltersMatchEntity(entityData, filters) {
-				continue
-			}
-			filtered = append(filtered, entityData)
+			all = append(all, entityData)
+		}
+	}
+	if includesParam != "" {
+		all = ApplyIncludes(all, includesParam)
+	}
+	filtered := make([]map[string]interface{}, 0, len(all))
+	for _, e := range all {
+		if FiltersMatchEntity(e, filters) {
+			filtered = append(filtered, e)
 		}
 	}
 	if len(filters) > 0 {
