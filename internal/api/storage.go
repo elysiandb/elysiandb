@@ -1,6 +1,7 @@
 package api_storage
 
 import (
+	"github.com/google/uuid"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/storage"
@@ -14,13 +15,31 @@ func WriteEntity(entity string, data map[string]interface{}) []schema.Validation
 		}
 	}
 
-	key := globals.ApiSingleEntityKey(entity, data["id"].(string))
-	old := ReadEntityById(entity, data["id"].(string))
+	if _, ok := data["id"].(string); !ok || data["id"] == "" {
+		data["id"] = uuid.New().String()
+	}
+
+	subs := ExtractSubEntities(entity, data)
+	for _, sub := range subs {
+		subEntity := sub["@entity"].(string)
+		delete(sub, "@entity")
+		WriteEntity(subEntity, sub)
+	}
+
+	persistEntity(entity, data)
+	updateSchemaIfNeeded(entity, data)
+	return []schema.ValidationError{}
+}
+
+func persistEntity(entity string, data map[string]interface{}) {
+	id, _ := data["id"].(string)
+	key := globals.ApiSingleEntityKey(entity, id)
+	old := ReadEntityById(entity, id)
 	storage.PutJsonValue(key, data)
-	AddIdToindexes(entity, data["id"].(string))
+	AddIdToindexes(entity, id)
 	AddEntityType(entity)
 	if old != nil {
-		UpdateIndexesForEntity(entity, data["id"].(string), old, data)
+		UpdateIndexesForEntity(entity, id, old, data)
 	} else {
 		for k := range data {
 			if k != "id" {
@@ -28,13 +47,13 @@ func WriteEntity(entity string, data map[string]interface{}) []schema.Validation
 			}
 		}
 	}
+}
 
+func updateSchemaIfNeeded(entity string, data map[string]interface{}) {
 	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
 		analyzed := schema.AnalyzeEntitySchema(entity, data)
 		WriteEntity(schema.SchemaEntity, analyzed)
 	}
-
-	return []schema.ValidationError{}
 }
 
 func WriteListOfEntities(entity string, list []map[string]interface{}) [][]schema.ValidationError {
@@ -166,8 +185,21 @@ func UpdateEntityById(entity string, id string, updated map[string]interface{}) 
 	for k, v := range updated {
 		existing[k] = v
 	}
-	WriteEntity(entity, existing)
+
+	if _, ok := existing["id"].(string); !ok || existing["id"] == "" {
+		existing["id"] = id
+	}
+
+	subs := ExtractSubEntities(entity, existing)
+	for _, sub := range subs {
+		subEntity := sub["@entity"].(string)
+		delete(sub, "@entity")
+		WriteEntity(subEntity, sub)
+	}
+
+	persistEntity(entity, existing)
 	UpdateIndexesForEntity(entity, id, old, existing)
+	updateSchemaIfNeeded(entity, existing)
 	return existing
 }
 
