@@ -114,13 +114,24 @@ func (s *cacheStore) Purge(entity string) {
 	s.mu.Unlock()
 }
 
-func HashQuery(entity string, limit, offset int, sortField string, sortAscending bool, filters map[string]map[string]string, fieldsParam string) []byte {
+func HashQuery(
+	entity string,
+	limit int,
+	offset int,
+	sortField string,
+	sortAscending bool,
+	filters map[string]map[string]string,
+	fieldsParam string,
+	includesParam string,
+) []byte {
 	var b []byte
 	b = append(b, entity...)
 	b = append(b, '|')
 	b = append(b, sortField...)
 	b = append(b, '|')
 	b = append(b, fieldsParam...)
+	b = append(b, '|')
+	b = append(b, includesParam...)
 	b = append(b, '|')
 	if sortAscending {
 		b = append(b, 'A')

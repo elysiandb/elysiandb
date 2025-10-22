@@ -36,7 +36,7 @@ func parseDateForSort(s string) (time.Time, bool) {
 }
 
 func GetSortedEntityIdsByField(entity string, field string, ascending bool) []string {
-	data := ListEntities(entity, 0, 0, "", ascending, map[string]map[string]string{})
+	data := ListEntities(entity, 0, 0, "", ascending, map[string]map[string]string{}, "all")
 
 	sort.Slice(data, func(i, j int) bool {
 		a := getSortNestedValue(data[i], field)

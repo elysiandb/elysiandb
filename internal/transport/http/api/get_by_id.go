@@ -14,6 +14,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	id := ctx.UserValue("id").(string)
 	fieldsParam := string(ctx.QueryArgs().Peek("fields"))
 	fields := api_storage.ParseFieldsParam(fieldsParam)
+	includesParam := string(ctx.QueryArgs().Peek("includes"))
 
 	if len(fields) == 0 && globals.GetConfig().Api.Cache.Enabled {
 		if v := cache.CacheStore.GetById(entity, id); v != nil {
@@ -25,6 +26,10 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	}
 
 	data := api_storage.ReadEntityById(entity, id)
+	if data != nil && includesParam != "" {
+		list := []map[string]interface{}{data}
+		data = api_storage.ApplyIncludes(list, includesParam)[0]
+	}
 
 	if len(fields) > 0 {
 		data = api_storage.FilterFields(data, fields)
