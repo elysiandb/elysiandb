@@ -84,6 +84,8 @@ ElysianDB automatically exposes REST endpoints per entity. Entities are inferred
 | `PUT`    | `/api/<entity>`      | Update multiple documents (batch update)                    |
 | `DELETE` | `/api/<entity>/<id>` | Delete document by ID                                       |
 | `DELETE` | `/api/<entity>`      | Delete all documents for an entity                          |
+| `GET`    | `/api/export`        | Dumps all entities as a JSON object                         |
+| `GET`    | `/api/import`        | Imports all objects from a JSON dump                        |
 
 ### Nested Entity Creation (works the same way with update)
 
