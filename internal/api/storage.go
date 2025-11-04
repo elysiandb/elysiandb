@@ -1,8 +1,11 @@
 package api_storage
 
 import (
+	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/storage"
 )
@@ -223,4 +226,35 @@ func UpdateListOfEntities(entity string, updates []map[string]interface{}) []map
 		}
 	}
 	return results
+}
+
+func DumpAll() map[string]interface{} {
+	entities := ListEntityTypes()
+
+	result := make(map[string]interface{})
+	for _, entity := range entities {
+		if entity == schema.SchemaEntity {
+			continue
+		}
+
+		result[entity] = ListEntities(entity, 0, 0, "", true, nil, "")
+	}
+
+	return result
+}
+
+func ImportAll(data map[string][]map[string]interface{}) {
+	for entity, items := range data {
+		storage.DeleteByWildcardKey(globals.ApiEntityIndexPatternKey(entity))
+
+		for _, item := range items {
+			if errs := WriteEntity(entity, item); len(errs) > 0 {
+				log.Error(fmt.Sprintf("Error importing entity %s: %+v", entity, errs))
+			}
+		}
+
+		log.Info(fmt.Sprintf("The entity '%s' has been imported", entity))
+	}
+
+	log.Info("All entities have been imported")
 }
