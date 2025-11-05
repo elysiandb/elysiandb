@@ -85,6 +85,16 @@ func AddEntityType(entity string) {
 	}
 }
 
+func EntityTypeExists(entity string) bool {
+	for _, t := range ListEntityTypes() {
+		if t == entity {
+			return true
+		}
+	}
+
+	return false
+}
+
 func ListEntityTypes() []string {
 	data, _ := storage.GetByKey(globals.ApiAllEntityTypesListKey())
 	return decodeIDs(data)

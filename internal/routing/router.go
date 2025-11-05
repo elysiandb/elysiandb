@@ -32,4 +32,5 @@ func RegisterRoutes(r *router.Router) {
 	r.PUT("/api/{entity}", api.UpdateListController)
 	r.DELETE("/api/{entity}/{id}", api.DeleteByIdController)
 	r.DELETE("/api/{entity}", api.DestroyController)
+	r.POST("/api/{entity}/migrate", api.MigrateController)
 }

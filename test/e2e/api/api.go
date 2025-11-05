@@ -1136,3 +1136,81 @@ func TestAutoREST_GetByID_WithIncludesAll(t *testing.T) {
 		t.Fatalf("expected job Engineer, got %v", jobIn)
 	}
 }
+
+func TestMigrations_SetAction(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	create := mustPOSTJSON(t, client, "http://test/api/users", map[string]any{
+		"name": "OldName",
+		"age":  25,
+	})
+	if create.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", create.StatusCode())
+	}
+
+	body := []map[string]any{
+		{
+			"set": []map[string]any{
+				{"name": "NewName"},
+			},
+		},
+	}
+
+	resp := mustPOSTJSON(t, client, "http://test/api/users/migrate", body)
+	if resp.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("migration expected 200, got %d (%s)", resp.StatusCode(), resp.Body())
+	}
+
+	gr := mustGET(t, client, "http://test/api/users")
+	if gr.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("GET users expected 200, got %d", gr.StatusCode())
+	}
+
+	var users []map[string]any
+	_ = json.Unmarshal(gr.Body(), &users)
+	if len(users) == 0 {
+		t.Fatalf("no users found after migration")
+	}
+	for _, u := range users {
+		if u["name"] != "NewName" {
+			t.Fatalf("expected name NewName, got %v", u["name"])
+		}
+	}
+}
+
+func TestMigrations_SetNestedField(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/accounts", map[string]any{
+		"username": "test",
+		"profile": map[string]any{
+			"city": "Paris",
+		},
+	})
+
+	body := []map[string]any{
+		{
+			"set": []map[string]any{
+				{"profile.city": "Lyon"},
+			},
+		},
+	}
+
+	resp := mustPOSTJSON(t, client, "http://test/api/accounts/migrate", body)
+	if resp.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode())
+	}
+
+	gr := mustGET(t, client, "http://test/api/accounts")
+	var accounts []map[string]any
+	_ = json.Unmarshal(gr.Body(), &accounts)
+	if len(accounts) == 0 {
+		t.Fatalf("no accounts found after migration")
+	}
+	profile, _ := accounts[0]["profile"].(map[string]any)
+	if profile["city"] != "Lyon" {
+		t.Fatalf("expected profile.city Lyon, got %v", profile["city"])
+	}
+}
