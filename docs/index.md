@@ -75,17 +75,81 @@ ElysianDB automatically exposes REST endpoints per entity. Entities are inferred
 
 ### CRUD Operations
 
-| Method   | Endpoint             | Description                                                 |
-| -------- | -------------------- | ----------------------------------------------------------- |
-| `POST`   | `/api/<entity>`      | Create one or multiple JSON documents (auto‑ID if missing)  |
-| `GET`    | `/api/<entity>`      | List all documents, supports pagination, sorting, filtering |
-| `GET`    | `/api/<entity>/<id>` | Retrieve document by ID                                     |
-| `PUT`    | `/api/<entity>/<id>` | Update a single document by ID                              |
-| `PUT`    | `/api/<entity>`      | Update multiple documents (batch update)                    |
-| `DELETE` | `/api/<entity>/<id>` | Delete document by ID                                       |
-| `DELETE` | `/api/<entity>`      | Delete all documents for an entity                          |
-| `GET`    | `/api/export`        | Dumps all entities as a JSON object                         |
-| `GET`    | `/api/import`        | Imports all objects from a JSON dump                        |
+| Method   | Endpoint                | Description                                                 |
+| -------- | ----------------------- | ----------------------------------------------------------- |
+| `POST`   | `/api/<entity>`         | Create one or multiple JSON documents (auto‑ID if missing)  |
+| `GET`    | `/api/<entity>`         | List all documents, supports pagination, sorting, filtering |
+| `GET`    | `/api/<entity>/<id>`    | Retrieve document by ID                                     |
+| `PUT`    | `/api/<entity>/<id>`    | Update a single document by ID                              |
+| `PUT`    | `/api/<entity>`         | Update multiple documents (batch update)                    |
+| `DELETE` | `/api/<entity>/<id>`    | Delete document by ID                                       |
+| `DELETE` | `/api/<entity>`         | Delete all documents for an entity                          |
+| `GET`    | `/api/export`           | Dumps all entities as a JSON object                         |
+| `GET`    | `/api/import`           | Imports all objects from a JSON dump                        |
+| `POST`   | `/api/<entity>/migrate` | Run a **migration** across all documents for an entity      |
+
+---
+
+## Migrations
+
+The **Migration API** allows you to apply **global data updates** declaratively via REST. It is especially useful for updating or cleaning up fields across all records of an entity.
+
+### Endpoint
+
+```
+POST /api/<entity>/migrate
+```
+
+### Supported Actions
+
+| Action | Description                                       |
+| ------ | ------------------------------------------------- |
+| `set`  | Update one or more fields (supports nested paths) |
+
+### Example: Simple `set` Migration
+
+```bash
+curl -X POST http://localhost:8089/api/users/migrate \
+  -H 'Content-Type: application/json' \
+  -d '[
+    { "set": [{ "active": true, "role": "member" }] }
+  ]'
+```
+
+This updates all `users` documents, setting `active = true` and `role = member`.
+
+### Example: Nested Field Migration
+
+```bash
+curl -X POST http://localhost:8089/api/accounts/migrate \
+  -H 'Content-Type: application/json' \
+  -d '[
+    { "set": [{ "profile.city": "Paris", "profile.language": "fr" }] }
+  ]'
+```
+
+ElysianDB automatically traverses the JSON hierarchy, creating intermediate maps if needed, and updates nested fields like `profile.city` for every record.
+
+### Expected Response
+
+```json
+{
+  "message": "Entity 'users' migrated successfully."
+}
+```
+
+If an entity does not exist or the JSON is malformed, the endpoint responds with a 4xx error and a descriptive message.
+
+### Combined Example
+
+```bash
+curl -X POST http://localhost:8089/api/articles/migrate \
+  -H 'Content-Type: application/json' \
+  -d '[
+    { "set": [{ "published": false }] },
+    { "set": [{ "tags": ["archived"] }] }
+  ]'
+```
 
 ### Nested Entity Creation (works the same way with update)
 
