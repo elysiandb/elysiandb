@@ -24,7 +24,7 @@ func RegisterRoutes(r *router.Router) {
 	}
 
 	r.GET("/api/export", api.ExportController)
-	r.GET("/api/import", api.ImportController)
+	r.POST("/api/import", api.ImportController)
 	r.GET("/api/{entity}", api.ListController)
 	r.POST("/api/{entity}", api.CreateController)
 	r.GET("/api/{entity}/{id}", api.GetByIdController)

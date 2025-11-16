@@ -85,7 +85,7 @@ ElysianDB automatically exposes REST endpoints per entity. Entities are inferred
 | `DELETE` | `/api/<entity>/<id>`    | Delete document by ID                                       |
 | `DELETE` | `/api/<entity>`         | Delete all documents for an entity                          |
 | `GET`    | `/api/export`           | Dumps all entities as a JSON object                         |
-| `GET`    | `/api/import`           | Imports all objects from a JSON dump                        |
+| `POST`   | `/api/import`           | Imports all objects from a JSON dump                        |
 | `POST`   | `/api/<entity>/migrate` | Run a **migration** across all documents for an entity      |
 
 ---
