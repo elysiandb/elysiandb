@@ -72,6 +72,7 @@ api:
 ## REST API
 
 ElysianDB automatically exposes REST endpoints per entity. Entities are inferred from the URL.
+(All HTTP requests return a `X-Elysian-Version`)
 
 ### CRUD Operations
 
