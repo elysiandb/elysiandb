@@ -113,6 +113,7 @@ func ListEntities(
 	sortField string,
 	sortAscending bool,
 	filters map[string]map[string]string,
+	search string,
 	includesParam string,
 ) []map[string]interface{} {
 	idList, err := GetListOfIds(entity, sortField, sortAscending)
@@ -140,6 +141,10 @@ func ListEntities(
 	for _, e := range all {
 		if FiltersMatchEntity(e, filters) {
 			filtered = append(filtered, e)
+		}
+
+		if search != "" && !SearchMatchesEntity(e, search) {
+			continue
 		}
 	}
 	if len(filters) > 0 {
@@ -247,7 +252,7 @@ func DumpAll() map[string]interface{} {
 			continue
 		}
 
-		result[entity] = ListEntities(entity, 0, 0, "", true, nil, "")
+		result[entity] = ListEntities(entity, 0, 0, "", true, nil, "", "")
 	}
 
 	return result
