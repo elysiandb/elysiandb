@@ -3,6 +3,8 @@ package stat
 import (
 	"encoding/json"
 	"sync/atomic"
+
+	"github.com/taymour/elysiandb/internal/globals"
 )
 
 type StatsContainer struct {
@@ -12,10 +14,11 @@ type StatsContainer struct {
 	totalRequests       atomic.Uint64
 	hits                atomic.Uint64
 	misses              atomic.Uint64
+	version             string
 }
 
 func NewStatsContainer() *StatsContainer {
-	return &StatsContainer{}
+	return &StatsContainer{version: globals.VERSION}
 }
 
 func (s *StatsContainer) IncrementKeysCount()                 { s.keysCount.Add(1) }
@@ -67,6 +70,7 @@ type statsDTO struct {
 	TotalRequests       uint64 `json:"total_requests,string"`
 	Hits                uint64 `json:"hits,string"`
 	Misses              uint64 `json:"misses,string"`
+	Version             string `json:"version"`
 }
 
 func (s *StatsContainer) ToJson() string {
@@ -77,6 +81,7 @@ func (s *StatsContainer) ToJson() string {
 		TotalRequests:       s.totalRequests.Load(),
 		Hits:                s.hits.Load(),
 		Misses:              s.misses.Load(),
+		Version:             s.version,
 	}
 	b, _ := json.Marshal(dto)
 	return string(b)

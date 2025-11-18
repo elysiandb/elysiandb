@@ -23,6 +23,7 @@ func TestNewStatsContainer_Zeroed(t *testing.T) {
 		"total_requests":        "0",
 		"hits":                  "0",
 		"misses":                "0",
+		"version":               "0.1.6",
 	}
 	for k, want := range wantZero {
 		if got := m[k]; got != want {
@@ -56,6 +57,7 @@ func TestIncrementsAndSets(t *testing.T) {
 		"total_requests":        "1",
 		"hits":                  "1",
 		"misses":                "1",
+		"version":               "0.1.6",
 	}
 	for k, want := range tests {
 		if got := m[k]; got != want {
@@ -104,6 +106,10 @@ func TestReset(t *testing.T) {
 		t.Fatalf("json.Unmarshal failed: %v", err)
 	}
 	for k, v := range m {
+		if k == "version" {
+			continue
+		}
+
 		if v != "0" {
 			t.Errorf("after Reset, %s = %s, want 0", k, v)
 		}
@@ -206,6 +212,10 @@ func TestInit_GlobalStatsIsZeroed(t *testing.T) {
 		t.Fatalf("json.Unmarshal failed: %v", err)
 	}
 	for k, v := range m {
+		if k == "version" {
+			continue
+		}
+
 		if v != "0" {
 			t.Errorf("after Init, %s = %s, want 0", k, v)
 		}
