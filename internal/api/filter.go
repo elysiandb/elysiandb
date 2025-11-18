@@ -9,6 +9,34 @@ import (
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
+func SearchMatchesEntity(entityData map[string]interface{}, pattern string) bool {
+	var stack []interface{}
+	stack = append(stack, entityData)
+
+	for len(stack) > 0 {
+		n := len(stack) - 1
+		cur := stack[n]
+		stack = stack[:n]
+
+		switch v := cur.(type) {
+		case map[string]interface{}:
+			for _, val := range v {
+				stack = append(stack, val)
+			}
+		case []interface{}:
+			for _, val := range v {
+				stack = append(stack, val)
+			}
+		case string:
+			if storage.MatchGlob(pattern, v) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func FiltersMatchEntity(
 	entityData map[string]interface{},
 	filters map[string]map[string]string,

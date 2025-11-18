@@ -208,6 +208,7 @@ This mechanism also works recursively and supports **arrays of sub-entities**, a
 
 * `limit` — Max number of items to return
 * `offset` — Number of items to skip
+* `search` - Full text search
 * `sort[field]=asc|desc` — Sort results (builds index automatically) and works with nested fields or entities
 * `filter[field][op]=value` — Filter results by field
 * `fields=title,slug` — Return only selected fields

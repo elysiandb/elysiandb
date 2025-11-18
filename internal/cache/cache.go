@@ -122,6 +122,7 @@ func HashQuery(
 	sortAscending bool,
 	filters map[string]map[string]string,
 	fieldsParam string,
+	search string,
 	includesParam string,
 ) []byte {
 	var b []byte
@@ -130,6 +131,8 @@ func HashQuery(
 	b = append(b, sortField...)
 	b = append(b, '|')
 	b = append(b, fieldsParam...)
+	b = append(b, '|')
+	b = append(b, search...)
 	b = append(b, '|')
 	b = append(b, includesParam...)
 	b = append(b, '|')
