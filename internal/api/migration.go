@@ -65,7 +65,7 @@ func ExecuteMigrations(migrationQueries []MigrationQuery) error {
 }
 
 func executeMigrationSetAction(entity string, properties map[string]any) error {
-	entities := ListEntities(entity, 0, 0, "", true, map[string]map[string]string{}, "all")
+	entities := ListEntities(entity, 0, 0, "", true, map[string]map[string]string{}, "", "all")
 
 	for _, ent := range entities {
 		for key, value := range properties {

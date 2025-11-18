@@ -63,7 +63,7 @@ func TestReadAllEntities(t *testing.T) {
 	api_storage.WriteEntity(entity, u1)
 	api_storage.WriteEntity(entity, u2)
 
-	all := api_storage.ListEntities(entity, 0, 0, "", true, nil, "")
+	all := api_storage.ListEntities(entity, 0, 0, "", true, nil, "", "")
 	if len(all) != 2 {
 		t.Fatalf("ListEntities len=%d, want 2, all=%v", len(all), all)
 	}
@@ -133,7 +133,7 @@ func TestDeleteAllEntities_RemovesAllForThatEntityOnly(t *testing.T) {
 
 	api_storage.DeleteAllEntities("posts")
 
-	if list := api_storage.ListEntities("posts", 0, 0, "", true, nil, ""); len(list) != 0 {
+	if list := api_storage.ListEntities("posts", 0, 0, "", true, nil, "", ""); len(list) != 0 {
 		t.Fatalf("posts should be empty, got %v", list)
 	}
 	if v := api_storage.ReadEntityById("profiles", "me"); v == nil {
@@ -167,7 +167,7 @@ func TestListEntities_WithFilters(t *testing.T) {
 	api_storage.WriteEntity(entity, map[string]interface{}{"id": "b3", "title": "Advanced Go", "author": "Alice"})
 
 	filters := map[string]map[string]string{"author": {"eq": "Alice"}}
-	results := api_storage.ListEntities(entity, 0, 0, "", true, filters, "")
+	results := api_storage.ListEntities(entity, 0, 0, "", true, filters, "", "")
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results for author=Alice, got %d (%v)", len(results), results)
 	}
@@ -180,13 +180,13 @@ func TestListEntities_WithFilters(t *testing.T) {
 	}
 
 	filters = map[string]map[string]string{"title": {"eq": "Learning Python"}}
-	results = api_storage.ListEntities(entity, 0, 0, "", true, filters, "")
+	results = api_storage.ListEntities(entity, 0, 0, "", true, filters, "", "")
 	if len(results) != 1 || results[0]["id"] != "b2" {
 		t.Fatalf("expected only b2, got %v", results)
 	}
 
 	filters = map[string]map[string]string{"author": {"eq": "Al*"}}
-	results = api_storage.ListEntities(entity, 0, 0, "", true, filters, "")
+	results = api_storage.ListEntities(entity, 0, 0, "", true, filters, "", "")
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results for author wildcard, got %d (%v)", len(results), results)
 	}
@@ -199,7 +199,7 @@ func TestListEntities_WithFilters(t *testing.T) {
 	}
 
 	filters = map[string]map[string]string{"title": {"eq": "*Go*"}}
-	results = api_storage.ListEntities(entity, 0, 0, "", true, filters, "")
+	results = api_storage.ListEntities(entity, 0, 0, "", true, filters, "", "")
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results for title contains Go, got %d (%v)", len(results), results)
 	}
@@ -212,7 +212,7 @@ func TestListEntities_WithFilters(t *testing.T) {
 	}
 
 	filters = map[string]map[string]string{"author": {"neq": "Alice"}}
-	results = api_storage.ListEntities(entity, 0, 0, "", true, filters, "")
+	results = api_storage.ListEntities(entity, 0, 0, "", true, filters, "", "")
 	if len(results) != 1 || results[0]["id"] != "b2" {
 		t.Fatalf("expected only b2 with neq filter, got %v", results)
 	}
@@ -257,19 +257,19 @@ func TestListEntities_WithNestedFilters(t *testing.T) {
 	})
 
 	f1 := map[string]map[string]string{"author.name": {"eq": "Alice"}}
-	r1 := api_storage.ListEntities(entity, 0, 0, "", true, f1, "")
+	r1 := api_storage.ListEntities(entity, 0, 0, "", true, f1, "", "")
 	if len(r1) != 1 || r1[0]["id"] != "a2" {
 		t.Fatalf("expected only a2, got %v", r1)
 	}
 
 	f2 := map[string]map[string]string{"author.name": {"eq": "mister*"}}
-	r2 := api_storage.ListEntities(entity, 0, 0, "", true, f2, "")
+	r2 := api_storage.ListEntities(entity, 0, 0, "", true, f2, "", "")
 	if len(r2) != 1 || r2[0]["id"] != "a1" {
 		t.Fatalf("expected only a1 (case-insensitive, wildcard), got %v", r2)
 	}
 
 	f3 := map[string]map[string]string{"author.category.title": {"eq": "yep"}}
-	r3 := api_storage.ListEntities(entity, 0, 0, "", true, f3, "")
+	r3 := api_storage.ListEntities(entity, 0, 0, "", true, f3, "", "")
 	if len(r3) != 2 {
 		t.Fatalf("expected a1 and a3 for category=yep, got %v", r3)
 	}
@@ -282,7 +282,7 @@ func TestListEntities_WithNestedFilters(t *testing.T) {
 		"author.category.title": {"eq": "yep"},
 		"author.name":           {"neq": "bob"},
 	}
-	r4 := api_storage.ListEntities(entity, 0, 0, "", true, f4, "")
+	r4 := api_storage.ListEntities(entity, 0, 0, "", true, f4, "", "")
 	if len(r4) != 1 || r4[0]["id"] != "a1" {
 		t.Fatalf("expected only a1 for combined eq/neq, got %v", r4)
 	}
@@ -297,37 +297,37 @@ func TestListEntities_WithNumericFilters(t *testing.T) {
 	api_storage.WriteEntity(entity, map[string]interface{}{"id": "p3", "price": float64(30)})
 
 	f1 := map[string]map[string]string{"price": {"eq": "20"}}
-	r1 := api_storage.ListEntities(entity, 0, 0, "", true, f1, "")
+	r1 := api_storage.ListEntities(entity, 0, 0, "", true, f1, "", "")
 	if len(r1) != 1 || r1[0]["id"] != "p2" {
 		t.Fatalf("expected only p2 for eq=20, got %v", r1)
 	}
 
 	f2 := map[string]map[string]string{"price": {"neq": "20"}}
-	r2 := api_storage.ListEntities(entity, 0, 0, "", true, f2, "")
+	r2 := api_storage.ListEntities(entity, 0, 0, "", true, f2, "", "")
 	if len(r2) != 2 {
 		t.Fatalf("expected 2 results for neq=20, got %v", r2)
 	}
 
 	f3 := map[string]map[string]string{"price": {"lt": "20"}}
-	r3 := api_storage.ListEntities(entity, 0, 0, "", true, f3, "")
+	r3 := api_storage.ListEntities(entity, 0, 0, "", true, f3, "", "")
 	if len(r3) != 1 || r3[0]["id"] != "p1" {
 		t.Fatalf("expected only p1 for lt=20, got %v", r3)
 	}
 
 	f4 := map[string]map[string]string{"price": {"lte": "20"}}
-	r4 := api_storage.ListEntities(entity, 0, 0, "", true, f4, "")
+	r4 := api_storage.ListEntities(entity, 0, 0, "", true, f4, "", "")
 	if len(r4) != 2 {
 		t.Fatalf("expected p1 and p2 for lte=20, got %v", r4)
 	}
 
 	f5 := map[string]map[string]string{"price": {"gt": "20"}}
-	r5 := api_storage.ListEntities(entity, 0, 0, "", true, f5, "")
+	r5 := api_storage.ListEntities(entity, 0, 0, "", true, f5, "", "")
 	if len(r5) != 1 || r5[0]["id"] != "p3" {
 		t.Fatalf("expected only p3 for gt=20, got %v", r5)
 	}
 
 	f6 := map[string]map[string]string{"price": {"gte": "20"}}
-	r6 := api_storage.ListEntities(entity, 0, 0, "", true, f6, "")
+	r6 := api_storage.ListEntities(entity, 0, 0, "", true, f6, "", "")
 	if len(r6) != 2 {
 		t.Fatalf("expected p2 and p3 for gte=20, got %v", r6)
 	}
