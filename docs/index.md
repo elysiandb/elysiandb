@@ -73,6 +73,7 @@ api:
 
 ElysianDB automatically exposes REST endpoints per entity. Entities are inferred from the URL.
 (All HTTP requests return a `X-Elysian-Version`)
+For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `MISS`
 
 ### CRUD Operations
 
