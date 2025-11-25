@@ -19,6 +19,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	if len(fields) == 0 && globals.GetConfig().Api.Cache.Enabled {
 		if v := cache.CacheStore.GetById(entity, id); v != nil {
 			ctx.Response.Header.Set("Content-Type", "application/json")
+			ctx.Response.Header.Set("X-Elysian-Cache", "HIT")
 			ctx.SetStatusCode(fasthttp.StatusOK)
 			ctx.SetBody(v)
 			return
@@ -38,6 +39,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	response, err := json.Marshal(data)
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
 		ctx.SetBodyString("Error processing request")
 		return
 	}
@@ -47,6 +49,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	}
 
 	ctx.Response.Header.Set("Content-Type", "application/json")
+	ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
 }

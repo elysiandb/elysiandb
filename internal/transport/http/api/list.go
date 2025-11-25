@@ -26,6 +26,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 		cached := cache.CacheStore.Get(entity, hash)
 		if cached != nil {
 			ctx.Response.Header.Set("Content-Type", "application/json")
+			ctx.Response.Header.Set("X-Elysian-Cache", "HIT")
 			ctx.SetStatusCode(fasthttp.StatusOK)
 			ctx.SetBody(cached)
 			return
@@ -47,11 +48,13 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	response, err := json.Marshal(data)
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
 		ctx.SetBodyString("Error processing request")
 		return
 	}
 
 	ctx.Response.Header.Set("Content-Type", "application/json")
+	ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
 
