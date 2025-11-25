@@ -7,6 +7,79 @@ import (
 	api_storage "github.com/taymour/elysiandb/internal/api"
 )
 
+func TestSearchMatchesEntitySimple(t *testing.T) {
+	entity := map[string]interface{}{
+		"name": "Alice",
+	}
+	if !api_storage.SearchMatchesEntity(entity, "Ali*") {
+		t.Fatalf("expected simple glob match")
+	}
+	if api_storage.SearchMatchesEntity(entity, "Bob*") {
+		t.Fatalf("expected simple glob fail")
+	}
+}
+
+func TestSearchMatchesEntityNestedMap(t *testing.T) {
+	entity := map[string]interface{}{
+		"user": map[string]interface{}{
+			"profile": map[string]interface{}{
+				"city": "Paris",
+			},
+		},
+	}
+	if !api_storage.SearchMatchesEntity(entity, "Par*") {
+		t.Fatalf("expected nested match")
+	}
+	if api_storage.SearchMatchesEntity(entity, "Lon*") {
+		t.Fatalf("expected nested fail")
+	}
+}
+
+func TestSearchMatchesEntityNestedArray(t *testing.T) {
+	entity := map[string]interface{}{
+		"tags": []interface{}{"blue", "green", "red"},
+	}
+	if !api_storage.SearchMatchesEntity(entity, "gr*") {
+		t.Fatalf("expected array match")
+	}
+	if api_storage.SearchMatchesEntity(entity, "ye*") {
+		t.Fatalf("expected no match")
+	}
+}
+
+func TestSearchMatchesEntityMixedStructures(t *testing.T) {
+	entity := map[string]interface{}{
+		"data": []interface{}{
+			map[string]interface{}{
+				"info": []interface{}{
+					"hello",
+					map[string]interface{}{
+						"deep": "world",
+					},
+				},
+			},
+		},
+	}
+	if !api_storage.SearchMatchesEntity(entity, "wor*") {
+		t.Fatalf("expected deep match")
+	}
+	if api_storage.SearchMatchesEntity(entity, "xxx") {
+		t.Fatalf("expected deep fail")
+	}
+}
+
+func TestSearchMatchesEntityNoStringValues(t *testing.T) {
+	entity := map[string]interface{}{
+		"nums": []interface{}{1, 2, 3},
+		"obj": map[string]interface{}{
+			"flag": false,
+		},
+	}
+	if api_storage.SearchMatchesEntity(entity, "*") {
+		t.Fatalf("expected no match with no string values")
+	}
+}
+
 func TestGetNestedValue(t *testing.T) {
 	data := map[string]interface{}{
 		"user": map[string]interface{}{
@@ -348,4 +421,3 @@ func TestFiltersMatchEntityArrayMixedTypes(t *testing.T) {
 		t.Fatalf("expected none match for absent values")
 	}
 }
-

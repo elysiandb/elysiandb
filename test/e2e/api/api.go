@@ -1214,3 +1214,136 @@ func TestMigrations_SetNestedField(t *testing.T) {
 		t.Fatalf("expected profile.city Lyon, got %v", profile["city"])
 	}
 }
+
+func TestAutoREST_FullTextSearch_Simple(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/books", map[string]any{"title": "The Go Programming Language"})
+	mustPOSTJSON(t, client, "http://test/api/books", map[string]any{"title": "Go in Action"})
+	mustPOSTJSON(t, client, "http://test/api/books", map[string]any{"title": "Python Tricks"})
+
+	gr := mustGET(t, client, "http://test/api/books?search=Go*")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", sc)
+	}
+	var list []map[string]any
+	_ = json.Unmarshal(gr.Body(), &list)
+	if len(list) != 2 {
+		t.Fatalf("expected 2 results, got %d (%v)", len(list), list)
+	}
+}
+
+func TestAutoREST_FullTextSearch_OnNestedFields(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/posts", map[string]any{
+		"title": "Learning Go",
+		"meta": map[string]any{
+			"author": "Alice",
+			"tags":   []string{"go", "code"},
+		},
+	})
+	mustPOSTJSON(t, client, "http://test/api/posts", map[string]any{
+		"title": "Deep Python",
+		"meta": map[string]any{
+			"author": "Bob",
+			"tags":   []string{"python", "ai"},
+		},
+	})
+	mustPOSTJSON(t, client, "http://test/api/posts", map[string]any{
+		"title": "Go Concurrency",
+		"meta": map[string]any{
+			"author": "Charlie",
+			"tags":   []string{"go", "parallel"},
+		},
+	})
+
+	gr := mustGET(t, client, "http://test/api/posts?search=*go*")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", sc)
+	}
+	var res []map[string]any
+	_ = json.Unmarshal(gr.Body(), &res)
+	if len(res) != 2 {
+		t.Fatalf("expected 2 posts containing 'go', got %d (%v)", len(res), res)
+	}
+}
+
+func TestAutoREST_FullTextSearch_NoMatches(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/products", map[string]any{"name": "Keyboard"})
+	mustPOSTJSON(t, client, "http://test/api/products", map[string]any{"name": "Mouse"})
+
+	gr := mustGET(t, client, "http://test/api/products?search=XYZ*")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", sc)
+	}
+	var res []map[string]any
+	_ = json.Unmarshal(gr.Body(), &res)
+	if len(res) != 0 {
+		t.Fatalf("expected 0 results, got %v", res)
+	}
+}
+
+func TestAutoREST_FullTextSearch_ArrayValues(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/tags", map[string]any{
+		"name": "Item1",
+		"tags": []string{"blue", "green", "red"},
+	})
+	mustPOSTJSON(t, client, "http://test/api/tags", map[string]any{
+		"name": "Item2",
+		"tags": []string{"yellow", "purple"},
+	})
+
+	gr := mustGET(t, client, "http://test/api/tags?search=gr*")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", sc)
+	}
+	var res []map[string]any
+	_ = json.Unmarshal(gr.Body(), &res)
+	if len(res) != 1 || res[0]["name"] != "Item1" {
+		t.Fatalf("expected Item1, got %v", res)
+	}
+}
+
+func TestAutoREST_FullTextSearch_DeepNestedArrays(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/profiles", map[string]any{
+		"username": "user1",
+		"data": []any{
+			map[string]any{
+				"info": []any{
+					"hello",
+					map[string]any{"bio": "golang developer"},
+				},
+			},
+		},
+	})
+	mustPOSTJSON(t, client, "http://test/api/profiles", map[string]any{
+		"username": "user2",
+		"data": []any{
+			map[string]any{
+				"info": []any{
+					"random",
+					map[string]any{"bio": "python hacker"},
+				},
+			},
+		},
+	})
+
+	gr := mustGET(t, client, "http://test/api/profiles?search=*go*")
+	var res []map[string]any
+	_ = json.Unmarshal(gr.Body(), &res)
+	if len(res) != 1 || res[0]["username"] != "user1" {
+		t.Fatalf("expected only user1, got %v", res)
+	}
+}
