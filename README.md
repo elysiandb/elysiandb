@@ -53,18 +53,35 @@ No setup, no schema — just start and query.
 
 ---
 
-## Performance
+## Performance Benchmarks (MacBook Pro M4 Max)
 
-| Scenario   | Load                | p95 Latency | RPS      | Errors |
-| ---------- | ------------------- | ----------- | -------- | ------ |
-| Dev Local  | 3 VUs / 100 keys    | **0.20 ms** | ~18.4k/s | 0%     |
-| Small App  | 10 VUs / 500 keys   | **0.48 ms** | ~34.7k/s | 0%     |
-| Light Prod | 25 VUs / 1000 keys  | **1.54 ms** | ~38.0k/s | 0%     |
-| Heavy Load | 200 VUs / 5000 keys | **47.7 ms** | ~23.3k/s | 0%     |
+The following benchmarks were executed locally on a **MacBook Pro M4**, using the `elysian_api_k6.js` workload generator. Each scenario simulates a different type of real-world usage pattern, from development environments to heavy production traffic.
 
+All tests use:
 
+* **30 seconds duration**
+* **Mixed CRUD, filtering, sorting, nested create, includes, list, and get-by-id** operations
+* HTTP tests over `fasthttp`
 
-> Sub‑millisecond latency under realistic workloads — true instant REST APIs.
+ElysianDB benefits from its **sharded arena allocator**, **zero-copy GET path**, and **in-memory JSON store**, providing extremely low latency even under significant load.
+
+### Benchmark Summary
+
+| Scenario       | Load                | p95 Latency | RPS      | Errors |
+| -------------- | ------------------- | ----------- | -------- | ------ |
+| **Dev Local**  | 3 VUs / 100 keys    | **62 µs**   | ~52.7k/s | 0%     |
+| **Small App**  | 10 VUs / 500 keys   | **184 µs**  | ~81.3k/s | 0%     |
+| **Light Prod** | 25 VUs / 1000 keys  | **412 µs**  | ~95.5k/s | 0%     |
+| **Heavy Load** | 200 VUs / 5000 keys | **12.6 ms** | ~60.6k/s | 0%     |
+
+### Notes
+
+* Sub-millisecond latency is maintained up to **25 VUs / 1000 keys**, suitable for real production workloads.
+* Even at **200 VUs** and **millions of total requests**, p95 latency stays far below typical REST engines.
+* Heavy load tests push over **1.7 GB/s** of response traffic on a single M4 machine.
+* Error rate is consistently **0%**, showing that ElysianDB remains stable under extreme load.
+
+ElysianDB delivers **high-throughput, low-latency REST APIs** backed by an optimized in-memory JSON engine.
 
 ---
 

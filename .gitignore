@@ -3,6 +3,5 @@
 .idea
 elysiandb
 coverage.out
-merge.sh
-all.go.txt
-fusion.sh
+*.sh
+*.txt
