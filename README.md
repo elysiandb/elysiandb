@@ -1,36 +1,27 @@
-# ElysianDB — Lightweight KV Store with **Zero‑Config Auto‑Generated REST API**
+# ElysianDB — Lightweight KV Store with **Instant Zero-Config REST API**
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/taymour/elysiandb.svg)](https://hub.docker.com/r/taymour/elysiandb)
-[![Tests](https://img.shields.io/github/actions/workflow/status/taymour/elysiandb/ci.yaml?branch=main&label=tests)](https://github.com/taymour/elysiandb/actions/workflows/ci.yaml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/taymour/elysiandb/ci.yaml?branch=main\&label=tests)](https://github.com/taymour/elysiandb/actions/workflows/ci.yaml)
 [![Coverage](https://codecov.io/gh/elysiandb/elysiandb/branch/main/graph/badge.svg)](https://codecov.io/gh/taymour/elysiandb)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**ElysianDB** is a lightweight, fast key–value store written in Go. It speaks both **HTTP** and **TCP**:
+**ElysianDB** is a blazing-fast, in-memory key–value store with a **zero-configuration, auto-generated REST API**. Written in Go and optimized with a **sharded arena allocator**, **zero-copy GET path**, and **cache-friendly JSON storage**, ElysianDB lets you spin up a full backend in seconds.
 
-* a minimal Redis‑style **text protocol** over TCP for max performance,
-* a simple **KV HTTP API**, and now
-* a **zero‑configuration, auto‑generated REST API** that lets you treat ElysianDB like an **instant backend** for your frontend.
-
-> **One‑liner:** You get an **auto‑generated REST API** (CRUD, pagination, sort) **with no configuration**; **entities are inferred from the URL**, and **indexes** are created automatically.
-
-* See [CONTRIBUTING.md](CONTRIBUTING.md) if you’d like to help.
-* Here is the [documentation](https://github.com/elysiandb/elysiandb/blob/main/docs/index.md).
-* Full documentation, benchmarks, and examples are available at [elysiandb.com](https://elysiandb.com).
-* For a distributed system, please look at [ElysianGate](https://github.com/elysiandb/elysian-gate)
+No schema files. No migrations. No ORMs. **Just start and query.**
 
 ---
 
 ## Highlights
 
-* **Zero‑Config REST API** — auto-generated CRUD endpoints per entity (`/api/<entity>`)
-* **Fast KV Engine** — in-memory sharded store with optional TTL and on-disk persistence
-* **Multi‑Protocol** — HTTP, TCP (Redis-style text protocol), and Instant REST
-* **Automatic Indexing** — lazy-built indexes on first sort request
-* **Schema‑less JSON** — store any structure; IDs generated automatically
-* **Schema validation if enabled** — Inferred schema from POST and validate future POST
-* **Persistence** — automatic periodic flush and graceful shutdown
-* **Nested Entity Creation** — automatic creation and linking of sub-entities detected by @entity fields in JSON
-* **Migrations** — perform global updates via /api/<entity>/migrate endpoint with declarative actions like set
+* **Instant REST API** — CRUD, pagination, sorting, filtering, includes (`/api/<entity>`) *with zero configuration*
+* **Fast In-Memory KV Engine** — sharded store, optional TTL, atomic counters
+* **Auto-Indexing** — lazy index creation on first sort request
+* **Schema-less JSON** — dynamic structures; IDs generated automatically
+* **Optional Schema Validation** — infer schema from first POST, enforce afterwards
+* **Nested Entity Creation** — auto-create sub-entities via `@entity` fields
+* **Persistence** — periodic flush + crash recovery log
+* **Protocols** — HTTP REST, TCP (Redis-style text protocol)
+* **Built for Speed** — no GC churn thanks to arena allocation
 
 ---
 
@@ -49,23 +40,13 @@ const res = await fetch("http://localhost:8089/api/articles?limit=20&offset=0&so
 const articles = await res.json();
 ```
 
-No setup, no schema — just start and query.
-
 ---
 
-## Performance Benchmarks (MacBook Pro M4 Max)
+## Performance Benchmarks (MacBook Pro M4)
 
-The following benchmarks were executed locally on a **MacBook Pro M4**, using the `elysian_api_k6.js` workload generator. Each scenario simulates a different type of real-world usage pattern, from development environments to heavy production traffic.
+Run with **mixed CRUD, filtering, sorting, nested create, includes**, and heavy JSON workloads — not microbenchmarks.
 
-All tests use:
-
-* **30 seconds duration**
-* **Mixed CRUD, filtering, sorting, nested create, includes, list, and get-by-id** operations
-* HTTP tests over `fasthttp`
-
-ElysianDB benefits from its **sharded arena allocator**, **zero-copy GET path**, and **in-memory JSON store**, providing extremely low latency even under significant load.
-
-### Benchmark Summary
+### Summary
 
 | Scenario       | Load                | p95 Latency | RPS      | Errors |
 | -------------- | ------------------- | ----------- | -------- | ------ |
@@ -74,14 +55,14 @@ ElysianDB benefits from its **sharded arena allocator**, **zero-copy GET path**,
 | **Light Prod** | 25 VUs / 1000 keys  | **412 µs**  | ~95.5k/s | 0%     |
 | **Heavy Load** | 200 VUs / 5000 keys | **12.6 ms** | ~60.6k/s | 0%     |
 
-### Notes
+### Why this matters
 
-* Sub-millisecond latency is maintained up to **25 VUs / 1000 keys**, suitable for real production workloads.
-* Even at **200 VUs** and **millions of total requests**, p95 latency stays far below typical REST engines.
-* Heavy load tests push over **1.7 GB/s** of response traffic on a single M4 machine.
-* Error rate is consistently **0%**, showing that ElysianDB remains stable under extreme load.
+* **Sub-millisecond latency** up to 25 VUs
+* **~60k requests/second** under heavy mixed load
+* **Zero errors** across millions of requests
+* **1.7 GB/s response throughput**, on a laptop
 
-ElysianDB delivers **high-throughput, low-latency REST APIs** backed by an optimized in-memory JSON engine.
+> **Bottom line:** ElysianDB outperforms most REST backends on mixed JSON workloads — while staying simpler than MongoDB.
 
 ---
 
@@ -91,7 +72,7 @@ ElysianDB delivers **high-throughput, low-latency REST APIs** backed by an optim
 docker run --rm -p 8089:8089 -p 8088:8088 taymour/elysiandb:latest
 ```
 
-Default config:
+Default configuration:
 
 ```yaml
 store:
@@ -99,9 +80,11 @@ store:
   shards: 512
   flushIntervalSeconds: 5
   crashRecovery: { enabled: true, maxLogMB: 100 }
+  json:
+    arenaChunkSize: 1048576  # 1 MiB
 server:
-  http: { enabled: true,  host: 0.0.0.0, port: 8089 }
-  tcp:  { enabled: true,  host: 0.0.0.0, port: 8088 }
+  http: { enabled: true, host: 0.0.0.0, port: 8089 }
+  tcp:  { enabled: true, host: 0.0.0.0, port: 8088 }
 log:
   flushIntervalSeconds: 5
 stats:
@@ -112,22 +95,21 @@ api:
   cache:
     enabled: true
     cleanupIntervalSeconds: 10
-
 ```
 
 ---
 
 ## Protocols
 
-### HTTP REST
+### **HTTP REST**
 
 * `POST   /api/<entity>` → Create
-* `GET    /api/<entity>` → List (`limit`, `offset`, `sort[field]=asc|desc`, `filter`)
+* `GET    /api/<entity>` → List (pagination, filtering, sorting)
 * `GET    /api/<entity>/<id>` → Read
 * `PUT    /api/<entity>/<id>` → Update
 * `DELETE /api/<entity>/<id>` → Delete
 
-### TCP (Redis‑style)
+### **TCP (Redis-style)**
 
 * `SET <key> <value>`
 * `GET <key>` / `MGET key1 key2`
@@ -135,12 +117,12 @@ api:
 
 ---
 
-## Stats & Persistence
+## Persistence & Stats
 
-* Automatic periodic persistence to disk
-* Logged writes and crash replay
-* Graceful flush on shutdown
-* `/stats` endpoint for runtime metrics (if enabled)
+* Periodic flush to disk
+* Crash-safe write-ahead log
+* Graceful shutdown flush
+* `/stats` endpoint for runtime metrics
 
 ---
 
@@ -151,3 +133,7 @@ go build && ./elysiandb
 # or
 go run elysiandb.go
 ```
+
+---
+
+ElysianDB is built to be **simple**, **fast**, and **practical** — a real backend you can ship in minutes.
