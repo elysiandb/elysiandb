@@ -1347,3 +1347,107 @@ func TestAutoREST_FullTextSearch_DeepNestedArrays(t *testing.T) {
 		t.Fatalf("expected only user1, got %v", res)
 	}
 }
+
+func TestSchema_GetSchema_NotFound(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	gr := mustGET(t, client, "http://test/api/unknown/schema")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusNotFound {
+		t.Fatalf("expected 404 for unknown schema, got %d", sc)
+	}
+}
+
+func TestSchema_GetSchema_AfterCreation(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/books", map[string]any{
+		"title": "Go 101",
+		"pages": 300,
+	})
+
+	gr := mustGET(t, client, "http://test/api/books/schema")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("expected 200 for schema, got %d", sc)
+	}
+
+	var schema map[string]any
+	_ = json.Unmarshal(gr.Body(), &schema)
+	fields := schema["fields"].(map[string]any)
+
+	if fields["title"].(map[string]any)["type"] != "string" {
+		t.Fatalf("expected string for title in schema")
+	}
+	if fields["pages"].(map[string]any)["type"] != "number" {
+		t.Fatalf("expected number for pages in schema")
+	}
+}
+
+func TestSchema_GetSchema_Nested(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/posts", map[string]any{
+		"title": "Nested",
+		"meta": map[string]any{
+			"author": map[string]any{
+				"name": "Alice",
+				"age":  30,
+			},
+		},
+	})
+
+	gr := mustGET(t, client, "http://test/api/posts/schema")
+	if sc := gr.StatusCode(); sc != fasthttp.StatusOK {
+		t.Fatalf("expected 200 for schema, got %d", sc)
+	}
+
+	var schema map[string]any
+	_ = json.Unmarshal(gr.Body(), &schema)
+	fields := schema["fields"].(map[string]any)
+	meta := fields["meta"].(map[string]any)
+	metaFields := meta["fields"].(map[string]any)
+	author := metaFields["author"].(map[string]any)
+	authorFields := author["fields"].(map[string]any)
+
+	if authorFields["name"].(map[string]any)["type"] != "string" {
+		t.Fatalf("expected string for meta.author.name")
+	}
+	if authorFields["age"].(map[string]any)["type"] != "number" {
+		t.Fatalf("expected number for meta.author.age")
+	}
+}
+
+func TestSchema_GetSchema_MultipleEntities(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/users", map[string]any{
+		"name": "Alice",
+		"age":  22,
+	})
+
+	mustPOSTJSON(t, client, "http://test/api/orders", map[string]any{
+		"ref": "ORD1",
+		"qty": 5,
+	})
+
+	gr1 := mustGET(t, client, "http://test/api/users/schema")
+	if gr1.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200 for users schema")
+	}
+
+	gr2 := mustGET(t, client, "http://test/api/orders/schema")
+	if gr2.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200 for orders schema")
+	}
+
+	var s1, s2 map[string]any
+	_ = json.Unmarshal(gr1.Body(), &s1)
+	_ = json.Unmarshal(gr2.Body(), &s2)
+
+	if s1["id"] != "users" || s2["id"] != "orders" {
+		t.Fatalf("expected schemas for users and orders")
+	}
+}

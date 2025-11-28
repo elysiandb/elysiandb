@@ -34,6 +34,10 @@ func RegisterRoutes(r *router.Router) {
 	r.DELETE("/api/{entity}/{id}", Version(api.DeleteByIdController))
 	r.DELETE("/api/{entity}", Version(api.DestroyController))
 	r.POST("/api/{entity}/migrate", Version(api.MigrateController))
+
+	if globals.GetConfig().Api.Schema.Enabled {
+		r.GET("/api/{entity}/schema", Version(api.GetSchemaController))
+	}
 }
 
 func Version(requestHandler fasthttp.RequestHandler) fasthttp.RequestHandler {

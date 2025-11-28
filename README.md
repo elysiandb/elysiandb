@@ -92,6 +92,8 @@ stats:
 api:
   index:
     workers: 4
+  schema:
+    enabled: true
   cache:
     enabled: true
     cleanupIntervalSeconds: 10
@@ -108,6 +110,7 @@ api:
 * `GET    /api/<entity>/<id>` → Read
 * `PUT    /api/<entity>/<id>` → Update
 * `DELETE /api/<entity>/<id>` → Delete
+* `GET    /api/<entity>/schema` → Schema for entity (if config api.schema is enabled)
 
 ### **TCP (Redis-style)**
 

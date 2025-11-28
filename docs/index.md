@@ -8,7 +8,7 @@ This document explains how to use ElysianDB, its features, configuration, and ru
 
 ## Overview
 
-ElysianDB lets you store and query data instantly — without defining schemas or models.
+ElysianDB lets you store and query data instantly — with or without defining schemas or models.
 
 You can:
 
@@ -81,6 +81,7 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 | -------- | ----------------------- | ----------------------------------------------------------- |
 | `POST`   | `/api/<entity>`         | Create one or multiple JSON documents (auto‑ID if missing)  |
 | `GET`    | `/api/<entity>`         | List all documents, supports pagination, sorting, filtering |
+| `GET`    | `/api/<entity>/schema`  | Schema for entity                                           |
 | `GET`    | `/api/<entity>/<id>`    | Retrieve document by ID                                     |
 | `PUT`    | `/api/<entity>/<id>`    | Update a single document by ID                              |
 | `PUT`    | `/api/<entity>`         | Update multiple documents (batch update)                    |
@@ -89,6 +90,68 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 | `GET`    | `/api/export`           | Dumps all entities as a JSON object                         |
 | `POST`   | `/api/import`           | Imports all objects from a JSON dump                        |
 | `POST`   | `/api/<entity>/migrate` | Run a **migration** across all documents for an entity      |
+
+---
+
+## Schema API
+
+ElysianDB now infers schemas automatically and exposes them through a simple endpoint. This helps understand your data structure instantly, without configuration.
+
+---
+
+### How It Works
+
+* When you insert or update `/api/<entity>`, ElysianDB analyzes the JSON.
+* It detects: strings, numbers, booleans, objects, arrays.
+* It stores the inferred structure under the special entity `schema/<entity>`.
+
+Example input:
+
+```json
+{"title":"Example","author":{"name":"Alice"},"tags":["go"]}
+```
+
+Becomes:
+
+```json
+{
+    "fields": {
+        "author": {
+            "fields": {
+                "name": {
+                    "name": "name",
+                    "type": "string"
+                }
+            },
+            "name": "author",
+            "type": "object"
+        },
+        "tags": {
+            "name": "tags",
+            "type": "array"
+        },
+        "title": {
+            "name": "title",
+            "type": "string"
+        }
+    },
+    "id": "article"
+}
+```
+
+---
+
+### Endpoint
+
+#### `GET /api/<entity>/schema`
+
+Returns the current schema inferred from existing documents.
+
+If no documents exist yet:
+
+```json
+{"error":"schema not found"}
+```
 
 ---
 

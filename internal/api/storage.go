@@ -31,6 +31,7 @@ func WriteEntity(entity string, data map[string]interface{}) []schema.Validation
 
 	persistEntity(entity, data)
 	updateSchemaIfNeeded(entity, data)
+
 	return []schema.ValidationError{}
 }
 
@@ -41,6 +42,7 @@ func persistEntity(entity string, data map[string]interface{}) {
 	storage.PutJsonValue(key, data)
 	AddIdToindexes(entity, id)
 	AddEntityType(entity)
+
 	if old != nil {
 		UpdateIndexesForEntity(entity, id, old, data)
 	} else {

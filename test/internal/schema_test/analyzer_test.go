@@ -29,16 +29,14 @@ func TestAnalyzeEntitySchema_Simple(t *testing.T) {
 		t.Fatalf("expected id=users, got %v", result["id"])
 	}
 
-	fields, ok := result["fields"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected fields map, got %T", result["fields"])
-	}
+	fields := result["fields"].(map[string]interface{})
 
 	if fields["name"].(map[string]interface{})["type"] != "string" {
 		t.Fatalf("expected type string for name, got %v", fields["name"].(map[string]interface{})["type"])
 	}
-	if fields["age"].(map[string]interface{})["type"] != "int" {
-		t.Fatalf("expected type int for age, got %v", fields["age"].(map[string]interface{})["type"])
+
+	if fields["age"].(map[string]interface{})["type"] != "number" {
+		t.Fatalf("expected type number for age, got %v", fields["age"].(map[string]interface{})["type"])
 	}
 }
 
@@ -60,8 +58,8 @@ func TestAnalyzeEntitySchema_Nested(t *testing.T) {
 	if subFields["name"].(map[string]interface{})["type"] != "string" {
 		t.Fatalf("expected nested field type string for author.name, got %v", subFields["name"].(map[string]interface{})["type"])
 	}
-	if subFields["age"].(map[string]interface{})["type"] != "int" {
-		t.Fatalf("expected nested field type int for author.age, got %v", subFields["age"].(map[string]interface{})["type"])
+	if subFields["age"].(map[string]interface{})["type"] != "number" {
+		t.Fatalf("expected nested field type number for author.age, got %v", subFields["age"].(map[string]interface{})["type"])
 	}
 }
 
@@ -70,7 +68,7 @@ func TestValidateEntity_ValidData(t *testing.T) {
 		ID: "users",
 		Fields: map[string]schema.Field{
 			"name": {Name: "name", Type: "string"},
-			"age":  {Name: "age", Type: "int"},
+			"age":  {Name: "age", Type: "number"},
 		},
 	}
 	restore := patchLoadSchema(mockSchema)
@@ -92,7 +90,7 @@ func TestValidateEntity_TypeMismatch(t *testing.T) {
 		ID: "users",
 		Fields: map[string]schema.Field{
 			"name": {Name: "name", Type: "string"},
-			"age":  {Name: "age", Type: "int"},
+			"age":  {Name: "age", Type: "number"},
 		},
 	}
 	restore := patchLoadSchema(mockSchema)
@@ -115,10 +113,10 @@ func TestValidateEntity_NestedMismatch(t *testing.T) {
 		Fields: map[string]schema.Field{
 			"customer": {
 				Name: "customer",
-				Type: "map[string]interface {}",
+				Type: "object",
 				Fields: map[string]schema.Field{
 					"name": {Name: "name", Type: "string"},
-					"age":  {Name: "age", Type: "int"},
+					"age":  {Name: "age", Type: "number"},
 				},
 			},
 		},
