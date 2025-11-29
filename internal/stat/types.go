@@ -15,6 +15,7 @@ type StatsContainer struct {
 	hits                atomic.Uint64
 	misses              atomic.Uint64
 	version             string
+	EntitiesCount       int
 }
 
 func NewStatsContainer() *StatsContainer {
@@ -71,6 +72,7 @@ type statsDTO struct {
 	Hits                uint64 `json:"hits,string"`
 	Misses              uint64 `json:"misses,string"`
 	Version             string `json:"version"`
+	EntitiesCount       int    `json:"entities_count,string"`
 }
 
 func (s *StatsContainer) ToJson() string {
@@ -82,6 +84,7 @@ func (s *StatsContainer) ToJson() string {
 		Hits:                s.hits.Load(),
 		Misses:              s.misses.Load(),
 		Version:             s.version,
+		EntitiesCount:       s.EntitiesCount,
 	}
 	b, _ := json.Marshal(dto)
 	return string(b)

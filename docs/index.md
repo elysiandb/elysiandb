@@ -540,13 +540,14 @@ Crash recovery ensures data durability even if the process crashes mid-write.
 
 When `stats.enabled: true`, the following metrics are available at `/stats`:
 
-| Metric                  | Description                  |
-| ----------------------- | ---------------------------- |
-| `keys_count`            | Number of active keys        |
-| `expiration_keys_count` | Keys with TTL                |
-| `uptime_seconds`        | Time since start             |
-| `total_requests`        | Total requests handled       |
-| `hits` / `misses`       | Successful vs failed lookups |
+| Metric                  | Description                     |
+| ----------------------- | ------------------------------- |
+| `keys_count`            | Number of active keys           |
+| `expiration_keys_count` | Keys with TTL                   |
+| `uptime_seconds`        | Time since start                |
+| `total_requests`        | Total requests handled          |
+| `hits` / `misses`       | Successful vs failed lookups    |
+| `entities_count`        | Counts all entites in JsonStore |
 
 Example output:
 
@@ -557,7 +558,8 @@ Example output:
   "uptime_seconds": "3605",
   "total_requests": "184467",
   "hits": "160002",
-  "misses": "24465"
+  "misses": "24465",
+  "entities_count": "11062"
 }
 ```
 

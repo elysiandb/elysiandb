@@ -280,6 +280,21 @@ func DumpAll() map[string]interface{} {
 	return result
 }
 
+func CountAllEntities() int {
+	counter := 0
+	entities := ListEntityTypes()
+
+	for _, entity := range entities {
+		if entity == schema.SchemaEntity {
+			continue
+		}
+
+		counter += len(ListEntities(entity, 0, 0, "", true, nil, "", ""))
+	}
+
+	return counter
+}
+
 func ImportAll(data map[string][]map[string]interface{}) {
 	for entity, items := range data {
 		storage.DeleteByWildcardKey(globals.ApiEntityIndexPatternKey(entity))
