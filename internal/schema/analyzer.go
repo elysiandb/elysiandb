@@ -34,7 +34,7 @@ func AnalyzeEntitySchema(entity string, data map[string]interface{}) map[string]
 		Fields: analyzeFields(data, true),
 	}
 
-	return schemaEntityToStorableStructure(schema)
+	return SchemaEntityToStorableStructure(schema)
 }
 
 func analyzeFields(data map[string]interface{}, isRoot bool) map[string]Field {
@@ -46,7 +46,7 @@ func analyzeFields(data map[string]interface{}, isRoot bool) map[string]Field {
 		}
 
 		f := Field{Name: k}
-		typeName := detectJSONType(v)
+		typeName := DetectJSONType(v)
 		f.Type = typeName
 
 		switch typeName {
@@ -70,7 +70,7 @@ func analyzeFields(data map[string]interface{}, isRoot bool) map[string]Field {
 	return fields
 }
 
-func detectJSONType(v interface{}) string {
+func DetectJSONType(v interface{}) string {
 	switch val := v.(type) {
 	case string:
 		return "string"
@@ -117,7 +117,7 @@ func validateFieldsRecursive(fields map[string]Field, data map[string]interface{
 		}
 
 		expected := fieldDef.Type
-		actual := detectJSONType(value)
+		actual := DetectJSONType(value)
 
 		if actual != expected {
 			*errors = append(*errors, ValidationError{
@@ -161,14 +161,22 @@ func validateFieldsRecursive(fields map[string]Field, data map[string]interface{
 	}
 }
 
-func schemaEntityToStorableStructure(entity Entity) map[string]interface{} {
+func IsManualSchema(entity string) bool {
+	key := globals.ApiSingleEntityKey(SchemaEntity, entity)
+	data, _ := storage.GetJsonByKey(key)
+	_, ok := data["_manual"]
+
+	return ok
+}
+
+func SchemaEntityToStorableStructure(entity Entity) map[string]interface{} {
 	return map[string]interface{}{
 		"id":     entity.ID,
-		"fields": fieldsToMap(entity.Fields),
+		"fields": FieldsToMap(entity.Fields),
 	}
 }
 
-func fieldsToMap(fields map[string]Field) map[string]interface{} {
+func FieldsToMap(fields map[string]Field) map[string]interface{} {
 	out := make(map[string]interface{})
 	for k, v := range fields {
 		fieldMap := map[string]interface{}{
@@ -177,7 +185,7 @@ func fieldsToMap(fields map[string]Field) map[string]interface{} {
 		}
 
 		if len(v.Fields) > 0 {
-			fieldMap["fields"] = fieldsToMap(v.Fields)
+			fieldMap["fields"] = FieldsToMap(v.Fields)
 		}
 
 		out[k] = fieldMap
@@ -186,7 +194,7 @@ func fieldsToMap(fields map[string]Field) map[string]interface{} {
 	return out
 }
 
-func mapToFields(m map[string]interface{}) map[string]Field {
+func MapToFields(m map[string]interface{}) map[string]Field {
 	fields := make(map[string]Field)
 	for k, v := range m {
 		if fieldMap, ok := v.(map[string]interface{}); ok {
@@ -197,7 +205,7 @@ func mapToFields(m map[string]interface{}) map[string]Field {
 			}
 
 			if subFields, ok := fieldMap["fields"].(map[string]interface{}); ok {
-				f.Fields = mapToFields(subFields)
+				f.Fields = MapToFields(subFields)
 			}
 
 			fields[k] = f
@@ -213,7 +221,7 @@ func loadSchemaForEntity(entity string) *Entity {
 
 	schema := &Entity{ID: entity}
 	if fieldsMap, ok := data["fields"].(map[string]interface{}); ok {
-		schema.Fields = mapToFields(fieldsMap)
+		schema.Fields = MapToFields(fieldsMap)
 	}
 
 	return schema

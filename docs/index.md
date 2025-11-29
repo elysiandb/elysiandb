@@ -95,15 +95,15 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 
 ## Schema API
 
-ElysianDB now infers schemas automatically and exposes them through a simple endpoint. This helps understand your data structure instantly, without configuration.
+ElysianDB supports two schema modes:
 
----
+### 1. Automatic Schema Inference
 
-### How It Works
+When `api.schema.enabled: true` and no manual schema exists:
 
-* When you insert or update `/api/<entity>`, ElysianDB analyzes the JSON.
-* It detects: strings, numbers, booleans, objects, arrays.
-* It stores the inferred structure under the special entity `schema/<entity>`.
+* The first inserted document becomes the baseline
+* Subsequent documents must match types
+* New fields extend the schema unless strict mode is enabled
 
 Example input:
 
@@ -115,29 +115,61 @@ Becomes:
 
 ```json
 {
-    "fields": {
-        "author": {
-            "fields": {
-                "name": {
-                    "name": "name",
-                    "type": "string"
-                }
-            },
-            "name": "author",
-            "type": "object"
-        },
-        "tags": {
-            "name": "tags",
-            "type": "array"
-        },
-        "title": {
-            "name": "title",
-            "type": "string"
-        }
-    },
-    "id": "article"
+  "id": "articles",
+  "fields": {
+    "title": {"type": "string"},
+    "author": {"type": "object", "fields": {"name": {"type": "string"}}},
+    "tags": {"type": "array"}
+  }
 }
 ```
+
+### 2. Manual Schema (Strict Mode)
+
+You can explicitly define a schema:
+
+```
+PUT /api/<entity>/schema
+```
+
+After this:
+
+* The schema is marked as **manual**
+* Strict mode applies: no new fields allowed
+* All writes are validated against the schema
+
+Example manual schema payload:
+
+```json
+{
+  "fields": {
+    "title": {"type": "string"},
+    "published": {"type": "boolean"}
+  }
+}
+```
+
+### Endpoints
+
+#### Get Schema
+
+```
+GET /api/<entity>/schema
+```
+
+If not found:
+
+```json
+{"error": "schema not found"}
+```
+
+#### Set Manual Schema
+
+```
+PUT /api/<entity>/schema
+```
+
+This overwrites any inferred schema and locks the entity to strict mode.
 
 ---
 

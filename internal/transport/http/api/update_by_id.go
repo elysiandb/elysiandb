@@ -6,6 +6,7 @@ import (
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/valyala/fasthttp"
 )
 
@@ -13,6 +14,19 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 	id := ctx.UserValue("id").(string)
 	body := ctx.PostBody()
+
+	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity) {
+		var obj map[string]interface{}
+		if json.Unmarshal(body, &obj) == nil {
+			if errs := schema.ValidateEntity(entity, obj); len(errs) > 0 {
+				b, _ := json.Marshal(errs)
+				ctx.SetStatusCode(fasthttp.StatusBadRequest)
+				ctx.Response.Header.Set("Content-Type", "application/json")
+				ctx.SetBody(b)
+				return
+			}
+		}
+	}
 
 	if handleSingleUpdate(ctx, entity, id, body) {
 		finalizeUpdate(ctx, entity)
@@ -25,6 +39,21 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 func UpdateListController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 	body := ctx.PostBody()
+
+	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity) {
+		var arr []map[string]interface{}
+		if json.Unmarshal(body, &arr) == nil {
+			for _, obj := range arr {
+				if errs := schema.ValidateEntity(entity, obj); len(errs) > 0 {
+					b, _ := json.Marshal(errs)
+					ctx.SetStatusCode(fasthttp.StatusBadRequest)
+					ctx.Response.Header.Set("Content-Type", "application/json")
+					ctx.SetBody(b)
+					return
+				}
+			}
+		}
+	}
 
 	if handleBatchUpdate(ctx, entity, body) {
 		finalizeUpdate(ctx, entity)

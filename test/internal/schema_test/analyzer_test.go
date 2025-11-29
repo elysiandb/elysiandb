@@ -63,6 +63,45 @@ func TestAnalyzeEntitySchema_Nested(t *testing.T) {
 	}
 }
 
+func TestAnalyzeEntitySchema_ArrayNested(t *testing.T) {
+	data := map[string]interface{}{
+		"tags": []interface{}{
+			map[string]interface{}{
+				"label": "go",
+				"score": 1,
+			},
+		},
+	}
+
+	result := schema.AnalyzeEntitySchema("items", data)
+	fields := result["fields"].(map[string]interface{})
+	tags := fields["tags"].(map[string]interface{})
+	sub := tags["fields"].(map[string]interface{})
+
+	if sub["label"].(map[string]interface{})["type"] != "string" {
+		t.Fatalf("expected string for tags.label")
+	}
+	if sub["score"].(map[string]interface{})["type"] != "number" {
+		t.Fatalf("expected number for tags.score")
+	}
+}
+
+func TestDetectJSONType_All(t *testing.T) {
+	cases := map[string]interface{}{
+		"string":  "a",
+		"number":  12,
+		"boolean": true,
+		"object":  map[string]interface{}{"x": 1},
+		"array":   []interface{}{1, 2},
+	}
+
+	for expected, value := range cases {
+		if schema.DetectJSONType(value) != expected {
+			t.Fatalf("expected %s, got %s", expected, schema.DetectJSONType(value))
+		}
+	}
+}
+
 func TestValidateEntity_ValidData(t *testing.T) {
 	mockSchema := &schema.Entity{
 		ID: "users",
@@ -134,5 +173,73 @@ func TestValidateEntity_NestedMismatch(t *testing.T) {
 	errors := schema.ValidateEntity("orders", data)
 	if len(errors) != 2 {
 		t.Fatalf("expected 2 nested validation errors, got %d", len(errors))
+	}
+}
+
+func TestValidateEntity_ArrayMismatch(t *testing.T) {
+	mockSchema := &schema.Entity{
+		ID: "tags",
+		Fields: map[string]schema.Field{
+			"tags": {
+				Name: "tags",
+				Type: "array",
+				Fields: map[string]schema.Field{
+					"label": {Name: "label", Type: "string"},
+				},
+			},
+		},
+	}
+	restore := patchLoadSchema(mockSchema)
+	defer restore()
+
+	data := map[string]interface{}{
+		"tags": "notArray",
+	}
+
+	errors := schema.ValidateEntity("tags", data)
+	if len(errors) != 1 {
+		t.Fatalf("expected 1 error, got %d", len(errors))
+	}
+}
+
+func TestMapToFields_RoundTrip(t *testing.T) {
+	fields := map[string]schema.Field{
+		"a": {Name: "a", Type: "string"},
+		"b": {Name: "b", Type: "number", Fields: map[string]schema.Field{
+			"c": {Name: "c", Type: "boolean"},
+		}},
+	}
+	mapped := schema.FieldsToMap(fields)
+	round := schema.MapToFields(mapped)
+
+	if round["a"].Type != "string" {
+		t.Fatalf("roundtrip failed for field a")
+	}
+	if round["b"].Fields["c"].Type != "boolean" {
+		t.Fatalf("roundtrip failed for nested c")
+	}
+}
+
+func TestSchemaEntityToStorableStructure(t *testing.T) {
+	ent := schema.Entity{
+		ID: "test",
+		Fields: map[string]schema.Field{
+			"x": {Name: "x", Type: "string"},
+		},
+	}
+
+	out := schema.SchemaEntityToStorableStructure(ent)
+	if out["id"] != "test" {
+		t.Fatalf("id mismatch")
+	}
+	fields := out["fields"].(map[string]interface{})
+	if fields["x"].(map[string]interface{})["type"] != "string" {
+		t.Fatalf("field missing")
+	}
+}
+
+func TestIsManualSchema_NoFlag(t *testing.T) {
+	if schema.IsManualSchema("unknown") {
+		t.Fatalf("expected false for unknown manual schema")
 	}
 }

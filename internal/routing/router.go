@@ -37,6 +37,7 @@ func RegisterRoutes(r *router.Router) {
 
 	if globals.GetConfig().Api.Schema.Enabled {
 		r.GET("/api/{entity}/schema", Version(api.GetSchemaController))
+		r.PUT("/api/{entity}/schema", Version(api.PutSchemaController))
 	}
 }
 
