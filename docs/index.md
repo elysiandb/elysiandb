@@ -42,6 +42,7 @@ stats:
 api:
   schema:
     enabled: true
+    strict: true
   index:
     workers: 4
   cache:
@@ -51,21 +52,22 @@ api:
 
 ### Configuration Fields
 
-| Key                                  | Description                                            |
-| ------------------------------------ | ------------------------------------------------------ |
-| **store.folder**                     | Path where data is persisted to disk                   |
-| **store.shards**                     | Number of memory shards (must be a power of two)       |
-| **store.flushIntervalSeconds**       | Interval for automatic persistence to disk             |
-| **store.crashRecovery.enabled**      | Enables crash recovery logs for durability             |
-| **store.crashRecovery.maxLogMB**     | Maximum size of recovery logs before flush             |
-| **server.http**                      | Enables and configures the HTTP REST/KV interface      |
-| **server.tcp**                       | Enables and configures the TCP text protocol interface |
-| **log.flushIntervalSeconds**         | Interval for flushing in‑memory logs                   |
-| **stats.enabled**                    | Enables runtime metrics and `/stats` endpoint          |
-| **api.index.workers**                | Number of workers that rebuild dirty indexes           |
-| **api.cache.enabled**                | Enables REST API caching for repeated queries          |
-| **api.schema.enabled**               | Enables automatic schema inference and validation      |
-| **api.cache.cleanupIntervalSeconds** | Interval for cache expiration cleanup                  |
+| Key                                  | Description                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------------- |
+| **store.folder**                     | Path where data is persisted to disk                                                  |
+| **store.shards**                     | Number of memory shards (must be a power of two)                                      |
+| **store.flushIntervalSeconds**       | Interval for automatic persistence to disk                                            |
+| **store.crashRecovery.enabled**      | Enables crash recovery logs for durability                                            |
+| **store.crashRecovery.maxLogMB**     | Maximum size of recovery logs before flush                                            |
+| **server.http**                      | Enables and configures the HTTP REST/KV interface                                     |
+| **server.tcp**                       | Enables and configures the TCP text protocol interface                                |
+| **log.flushIntervalSeconds**         | Interval for flushing in‑memory logs                                                  |
+| **stats.enabled**                    | Enables runtime metrics and `/stats` endpoint                                         |
+| **api.index.workers**                | Number of workers that rebuild dirty indexes                                          |
+| **api.cache.enabled**                | Enables REST API caching for repeated queries                                         |
+| **api.schema.enabled**               | Enables automatic schema inference and validation                                     |
+| **api.schema.strict**                | If true and schema is manual, new fields are rejected and deep validation is enforced |
+| **api.cache.cleanupIntervalSeconds** | Interval for cache expiration cleanup                                                 |
 
 ---
 
@@ -93,25 +95,43 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 
 ---
 
-## Schema API
+# Schema API
 
-ElysianDB supports two schema modes:
+ElysianDB provides two complementary schema systems: **automatic inference** and **manual strict schemas**. Both ensure consistency between inserted documents while remaining flexible when needed.
 
-### 1. Automatic Schema Inference
+---
 
-When `api.schema.enabled: true` and no manual schema exists:
+## 1. Automatic Schema Inference
 
-* The first inserted document becomes the baseline
-* Subsequent documents must match types
-* New fields extend the schema unless strict mode is enabled
+When `api.schema.enabled: true` **and no manual schema exists**, ElysianDB will automatically infer the schema from incoming documents.
 
-Example input:
+### How it works
+
+* The **first inserted document defines the initial schema**.
+* Each field's type is extracted (string, number, boolean, object, array).
+* For nested objects, all subfields are recursively analyzed.
+* For arrays, only the type of the first element is analyzed (if any).
+
+### Behavior on subsequent writes
+
+* If `api.schema.strict = false` (default):
+
+  * Type mismatches are rejected.
+  * **New fields are allowed** and automatically extend the schema.
+* If `api.schema.strict = true`:
+
+  * **New fields are rejected**.
+  * Only fields already present in the schema are allowed.
+
+### Example
+
+**Inserted document:**
 
 ```json
-{"title":"Example","author":{"name":"Alice"},"tags":["go"]}
+{"title": "Example", "author": {"name": "Alice"}, "tags": ["go"]}
 ```
 
-Becomes:
+**Inferred schema:**
 
 ```json
 {
@@ -124,21 +144,32 @@ Becomes:
 }
 ```
 
-### 2. Manual Schema (Strict Mode)
+---
 
-You can explicitly define a schema:
+## 2. Manual Schema (Strict Mode)
+
+You may explicitly define a schema for an entity using:
 
 ```
 PUT /api/<entity>/schema
 ```
 
-After this:
+### What happens when you set a manual schema
 
-* The schema is marked as **manual**
-* Strict mode applies: no new fields allowed
-* All writes are validated against the schema
+* The schema is stored as an entity inside ElysianDB.
+* An internal flag `_manual: true` is added.
+* **Strict mode is permanently enabled** for this entity:
 
-Example manual schema payload:
+  * No new fields allowed.
+  * All writes must match the declared types.
+
+### Example manual schema
+
+```
+PUT /api/articles/schema
+```
+
+Payload:
 
 ```json
 {
@@ -149,41 +180,66 @@ Example manual schema payload:
 }
 ```
 
-### Endpoints
+After this, any write with extra fields—e.g. `{"title": "x", "foo": 1}`—will be rejected.
 
-#### Get Schema
+---
 
+## Schema Endpoints
+
+### **GET /api/<entity>/schema**
+
+Returns the schema (manual or inferred).
+
+**If found:**
+
+```json
+{
+  "id": "articles",
+  "fields": {
+    "title": {"name": "title", "type": "string"},
+    "published": {"name": "published", "type": "boolean"}
+  }
+}
 ```
-GET /api/<entity>/schema
-```
 
-If not found:
+**If the entity exists but no documents have been inserted yet:**
 
 ```json
 {"error": "schema not found"}
 ```
 
-#### Set Manual Schema
+### **PUT /api/<entity>/schema**
 
-```
-PUT /api/<entity>/schema
-```
+Sets a new **manual** schema.
 
-This overwrites any inferred schema and locks the entity to strict mode.
+* Any previous schema (automatic or manual) is replaced.
+* `_manual: true` is automatically added.
+* Strict mode applies immediately.
+
+Example response:
+
+```json
+{
+  "id": "articles",
+  "fields": {
+    "title": {"type": "string"},
+    "published": {"type": "boolean"}
+  },
+  "_manual": true
+}
+```
 
 ---
 
-### Endpoint
+## Summary
 
-#### `GET /api/<entity>/schema`
-
-Returns the current schema inferred from existing documents.
-
-If no documents exist yet:
-
-```json
-{"error":"schema not found"}
-```
+| Feature         | Automatic Schema        | Manual Schema          |
+| --------------- | ----------------------- | ---------------------- |
+| Creation        | On first write          | Explicit `PUT /schema` |
+| Strict mode     | Optional                | Always strict          |
+| New fields      | Allowed (if non-strict) | Forbidden              |
+| Type validation | Yes                     | Yes                    |
+| Best for        | Flexible prototyping    | Production stability   |
 
 ---
 
