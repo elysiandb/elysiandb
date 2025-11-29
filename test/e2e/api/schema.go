@@ -208,3 +208,98 @@ func TestSchemaStrict_GetAfterPut(t *testing.T) {
 		t.Fatalf("missing age")
 	}
 }
+
+func TestSchemaStrict_DeepNestedStructureValidation(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Enabled = true
+	cfg.Api.Schema.Strict = true
+	globals.SetConfig(cfg)
+
+	mustPUTJSON(t, client, "http://test/api/articles/schema", map[string]any{
+		"fields": map[string]any{
+			"title": map[string]any{"type": "string"},
+			"author": map[string]any{
+				"type": "object",
+				"fields": map[string]any{
+					"name": map[string]any{"type": "string"},
+					"meta": map[string]any{
+						"type": "object",
+						"fields": map[string]any{
+							"age": map[string]any{"type": "number"},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	r1 := mustPOSTJSON(t, client, "http://test/api/articles", map[string]any{
+		"title": "ok",
+		"author": map[string]any{
+			"name": "x",
+			"meta": map[string]any{
+				"age": 22,
+			},
+		},
+	})
+	if r1.StatusCode() != 200 {
+		t.Fatalf("expected success")
+	}
+
+	r2 := mustPOSTJSON(t, client, "http://test/api/articles", map[string]any{
+		"title": "bad",
+		"author": map[string]any{
+			"name": "x",
+			"meta": map[string]any{
+				"age": "wrong",
+			},
+		},
+	})
+	if r2.StatusCode() == 200 {
+		t.Fatalf("expected failure")
+	}
+}
+
+func TestSchemaStrict_ArrayNestedValidation(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Enabled = true
+	cfg.Api.Schema.Strict = true
+	globals.SetConfig(cfg)
+
+	mustPUTJSON(t, client, "http://test/api/library/schema", map[string]any{
+		"fields": map[string]any{
+			"books": map[string]any{
+				"type": "array",
+				"fields": map[string]any{
+					"title": map[string]any{"type": "string"},
+					"year":  map[string]any{"type": "number"},
+				},
+			},
+		},
+	})
+
+	r1 := mustPOSTJSON(t, client, "http://test/api/library", map[string]any{
+		"books": []any{
+			map[string]any{"title": "A", "year": 2000},
+			map[string]any{"title": "B", "year": 1999},
+		},
+	})
+	if r1.StatusCode() != 200 {
+		t.Fatalf("expected 200")
+	}
+
+	r2 := mustPOSTJSON(t, client, "http://test/api/library", map[string]any{
+		"books": []any{
+			map[string]any{"title": "A", "year": "wrong"},
+		},
+	})
+	if r2.StatusCode() == 200 {
+		t.Fatalf("expected failure")
+	}
+}

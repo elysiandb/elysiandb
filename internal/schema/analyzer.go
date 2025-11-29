@@ -39,7 +39,6 @@ func AnalyzeEntitySchema(entity string, data map[string]interface{}) map[string]
 
 func analyzeFields(data map[string]interface{}, isRoot bool) map[string]Field {
 	fields := make(map[string]Field)
-
 	for k, v := range data {
 		if isRoot && k == "id" {
 			continue
@@ -48,13 +47,10 @@ func analyzeFields(data map[string]interface{}, isRoot bool) map[string]Field {
 		f := Field{Name: k}
 		typeName := DetectJSONType(v)
 		f.Type = typeName
-
 		switch typeName {
-
 		case "object":
 			sub, _ := v.(map[string]interface{})
 			f.Fields = analyzeFields(sub, false)
-
 		case "array":
 			arr := v.([]interface{})
 			if len(arr) > 0 {
@@ -93,18 +89,63 @@ func DetectJSONType(v interface{}) string {
 
 func ValidateEntity(entity string, data map[string]interface{}) []ValidationError {
 	var errors []ValidationError
-
-	schema := LoadSchemaForEntity(entity)
-	if schema == nil {
+	s := LoadSchemaForEntity(entity)
+	if s == nil {
 		return errors
 	}
 
-	validateFieldsRecursive(schema.Fields, data, "", &errors)
+	if globals.GetConfig().Api.Schema.Strict && IsManualSchema(entity) {
+		validateNoExtraFieldsRecursive(s.Fields, data, "", &errors)
+	}
+
+	validateFieldsRecursive(s.Fields, data, "", &errors)
+
 	return errors
+}
+
+func validateNoExtraFieldsRecursive(fields map[string]Field, data map[string]interface{}, prefix string, errors *[]ValidationError) {
+	for key, val := range data {
+		if key == "id" {
+			continue
+		}
+
+		fieldDef, ok := fields[key]
+		full := key
+		if prefix != "" {
+			full = prefix + "." + key
+		}
+
+		if !ok {
+			*errors = append(*errors, ValidationError{
+				Field:   full,
+				Message: "field not allowed by strict schema",
+			})
+			continue
+		}
+
+		if fieldDef.Type == "object" {
+			if sub, ok := val.(map[string]interface{}); ok {
+				validateNoExtraFieldsRecursive(fieldDef.Fields, sub, full, errors)
+			}
+		}
+
+		if fieldDef.Type == "array" && len(fieldDef.Fields) > 0 {
+			if arr, ok := val.([]interface{}); ok {
+				for i, item := range arr {
+					if obj, ok := item.(map[string]interface{}); ok {
+						validateNoExtraFieldsRecursive(fieldDef.Fields, obj, fmt.Sprintf("%s[%d]", full, i), errors)
+					}
+				}
+			}
+		}
+	}
 }
 
 func validateFieldsRecursive(fields map[string]Field, data map[string]interface{}, prefix string, errors *[]ValidationError) {
 	for fieldName, fieldDef := range fields {
+		if fieldName == "id" {
+			continue
+		}
 
 		fullName := fieldName
 		if prefix != "" {
@@ -118,13 +159,11 @@ func validateFieldsRecursive(fields map[string]Field, data map[string]interface{
 
 		expected := fieldDef.Type
 		actual := DetectJSONType(value)
-
 		if actual != expected {
 			*errors = append(*errors, ValidationError{
 				Field:   fullName,
 				Message: fmt.Sprintf("expected type %s but got %s", expected, actual),
 			})
-
 			continue
 		}
 
@@ -137,6 +176,7 @@ func validateFieldsRecursive(fields map[string]Field, data map[string]interface{
 				})
 				continue
 			}
+
 			validateFieldsRecursive(fieldDef.Fields, sub, fullName, errors)
 		}
 
@@ -183,7 +223,6 @@ func FieldsToMap(fields map[string]Field) map[string]interface{} {
 			"name": v.Name,
 			"type": v.Type,
 		}
-
 		if len(v.Fields) > 0 {
 			fieldMap["fields"] = FieldsToMap(v.Fields)
 		}
@@ -199,7 +238,6 @@ func MapToFields(m map[string]interface{}) map[string]Field {
 	for k, v := range m {
 		if fieldMap, ok := v.(map[string]interface{}); ok {
 			f := Field{Name: k}
-
 			if typeName, ok := fieldMap["type"].(string); ok {
 				f.Type = typeName
 			}
@@ -218,7 +256,6 @@ func MapToFields(m map[string]interface{}) map[string]Field {
 func loadSchemaForEntity(entity string) *Entity {
 	key := globals.ApiSingleEntityKey(SchemaEntity, entity)
 	data, _ := storage.GetJsonByKey(key)
-
 	schema := &Entity{ID: entity}
 	if fieldsMap, ok := data["fields"].(map[string]interface{}); ok {
 		schema.Fields = MapToFields(fieldsMap)

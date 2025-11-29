@@ -54,7 +54,9 @@ func GetJsonRaw(key string) ([]byte, error) {
 	return raw, nil
 }
 
-func GetJsonByKey(key string) (map[string]interface{}, error) {
+var GetJsonByKey = getJsonByKeyImpl
+
+func getJsonByKeyImpl(key string) (map[string]interface{}, error) {
 	js := mainJsonStore.Load()
 	if js == nil {
 		return nil, fmt.Errorf("json store not initialized")
