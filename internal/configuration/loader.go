@@ -54,6 +54,7 @@ type StatsConfig struct {
 
 type ApiSchemaConfig struct {
 	Enabled bool `yaml:"enabled"`
+	Strict  bool `yaml:"strict"`
 }
 
 type ApiConfig struct {
