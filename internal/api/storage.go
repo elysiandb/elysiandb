@@ -11,10 +11,6 @@ import (
 )
 
 func WriteEntity(entity string, data map[string]interface{}) []schema.ValidationError {
-	if entity == schema.SchemaEntity {
-		data["_manual"] = true
-	}
-
 	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
 		errors := schema.ValidateEntity(entity, data)
 		if len(errors) > 0 {
