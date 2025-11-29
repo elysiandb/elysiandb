@@ -19,8 +19,8 @@ func TestSchemaStrict_PutSchema_Create_Update_Validation(t *testing.T) {
 
 	put1 := mustPUTJSON(t, client, "http://test/api/books/schema", map[string]any{
 		"fields": map[string]any{
-			"title": map[string]any{"type": "string"},
-			"pages": map[string]any{"type": "number"},
+			"title": map[string]any{"type": "string", "required": true},
+			"pages": map[string]any{"type": "number", "required": true},
 		},
 	})
 	if put1.StatusCode() != fasthttp.StatusOK {
@@ -99,7 +99,7 @@ func TestSchemaStrict_PutSchema_AddNewFieldRejected(t *testing.T) {
 
 	mustPUTJSON(t, client, "http://test/api/users/schema", map[string]any{
 		"fields": map[string]any{
-			"name": map[string]any{"type": "string"},
+			"name": map[string]any{"type": "string", "required": true},
 		},
 	})
 
@@ -130,7 +130,7 @@ func TestSchemaStrict_UpdateSchema_ThenValidateNewRules(t *testing.T) {
 
 	mustPUTJSON(t, client, "http://test/api/profiles/schema", map[string]any{
 		"fields": map[string]any{
-			"username": map[string]any{"type": "string"},
+			"username": map[string]any{"type": "string", "required": true},
 		},
 	})
 
@@ -143,8 +143,8 @@ func TestSchemaStrict_UpdateSchema_ThenValidateNewRules(t *testing.T) {
 
 	put2 := mustPUTJSON(t, client, "http://test/api/profiles/schema", map[string]any{
 		"fields": map[string]any{
-			"username": map[string]any{"type": "string"},
-			"score":    map[string]any{"type": "number"},
+			"username": map[string]any{"type": "string", "required": true},
+			"score":    map[string]any{"type": "number", "required": false},
 		},
 	})
 	if put2.StatusCode() != 200 {
@@ -186,8 +186,8 @@ func TestSchemaStrict_GetAfterPut(t *testing.T) {
 
 	put := mustPUTJSON(t, client, "http://test/api/accounts/schema", map[string]any{
 		"fields": map[string]any{
-			"email": map[string]any{"type": "string"},
-			"age":   map[string]any{"type": "number"},
+			"email": map[string]any{"type": "string", "required": true},
+			"age":   map[string]any{"type": "number", "required": false},
 		},
 	})
 	if put.StatusCode() != 200 {
@@ -220,15 +220,17 @@ func TestSchemaStrict_DeepNestedStructureValidation(t *testing.T) {
 
 	mustPUTJSON(t, client, "http://test/api/articles/schema", map[string]any{
 		"fields": map[string]any{
-			"title": map[string]any{"type": "string"},
+			"title": map[string]any{"type": "string", "required": true},
 			"author": map[string]any{
-				"type": "object",
+				"type":     "object",
+				"required": true,
 				"fields": map[string]any{
-					"name": map[string]any{"type": "string"},
+					"name": map[string]any{"type": "string", "required": true},
 					"meta": map[string]any{
-						"type": "object",
+						"type":     "object",
+						"required": false,
 						"fields": map[string]any{
-							"age": map[string]any{"type": "number"},
+							"age": map[string]any{"type": "number", "required": false},
 						},
 					},
 				},
@@ -275,10 +277,11 @@ func TestSchemaStrict_ArrayNestedValidation(t *testing.T) {
 	mustPUTJSON(t, client, "http://test/api/library/schema", map[string]any{
 		"fields": map[string]any{
 			"books": map[string]any{
-				"type": "array",
+				"type":     "array",
+				"required": true,
 				"fields": map[string]any{
-					"title": map[string]any{"type": "string"},
-					"year":  map[string]any{"type": "number"},
+					"title": map[string]any{"type": "string", "required": true},
+					"year":  map[string]any{"type": "number", "required": true},
 				},
 			},
 		},

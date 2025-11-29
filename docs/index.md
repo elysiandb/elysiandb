@@ -97,31 +97,36 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 
 # Schema API
 
-ElysianDB provides two complementary schema systems: **automatic inference** and **manual strict schemas**. Both ensure consistency between inserted documents while remaining flexible when needed.
+ElysianDB provides two complementary schema systems: **automatic inference** and **manual strict schemas**, both now supporting **required fields**.
 
 ---
 
 ## 1. Automatic Schema Inference
 
-When `api.schema.enabled: true` **and no manual schema exists**, ElysianDB will automatically infer the schema from incoming documents.
+When `api.schema.enabled: true` **and no manual schema exists**, ElysianDB automatically infers the schema from incoming documents.
 
 ### How it works
 
 * The **first inserted document defines the initial schema**.
-* Each field's type is extracted (string, number, boolean, object, array).
-* For nested objects, all subfields are recursively analyzed.
-* For arrays, only the type of the first element is analyzed (if any).
+* Each field's type is extracted (`string`, `number`, `boolean`, `object`, `array`).
+* Nested objects and arrays are recursively analyzed.
+* Inferred fields automatically include:
+
+  * `required = false` when `api.schema.strict = false`
+  * `required = true` when `api.schema.strict = true`
 
 ### Behavior on subsequent writes
 
-* If `api.schema.strict = false` (default):
+#### If `api.schema.strict = false` (default):
 
-  * Type mismatches are rejected.
-  * **New fields are allowed** and automatically extend the schema.
-* If `api.schema.strict = true`:
+* Type mismatches are rejected.
+* **New fields are allowed** and auto-extend the schema (with `required=false`).
 
-  * **New fields are rejected**.
-  * Only fields already present in the schema are allowed.
+#### If `api.schema.strict = true`:
+
+* **New fields are rejected**.
+* Only fields already defined in the schema may appear.
+* Missing fields marked `required=true` produce validation errors.
 
 ### Example
 
@@ -137,31 +142,41 @@ When `api.schema.enabled: true` **and no manual schema exists**, ElysianDB will 
 {
   "id": "articles",
   "fields": {
-    "title": {"type": "string"},
-    "author": {"type": "object", "fields": {"name": {"type": "string"}}},
-    "tags": {"type": "array"}
+    "title":   {"type": "string", "required": false},
+    "author":  {"type": "object", "required": false, "fields": {
+      "name": {"type": "string", "required": false}
+    }},
+    "tags":    {"type": "array", "required": false}
   }
 }
 ```
+
+(If strict mode was enabled globally, all `required` would be `true`.)
 
 ---
 
 ## 2. Manual Schema (Strict Mode)
 
-You may explicitly define a schema for an entity using:
+You may explicitly define a schema using:
 
 ```
 PUT /api/<entity>/schema
 ```
 
-### What happens when you set a manual schema
+### Behavior when setting a manual schema
 
-* The schema is stored as an entity inside ElysianDB.
-* An internal flag `_manual: true` is added.
-* **Strict mode is permanently enabled** for this entity:
+* The schema is saved as an entity inside ElysianDB.
+* `_manual: true` marks the schema as user-defined.
+* **Strict mode automatically applies for the entity**:
 
   * No new fields allowed.
-  * All writes must match the declared types.
+  * Missing fields marked `required: true` produce validation errors.
+
+Each field may explicitly define:
+
+```json
+{"type": "string", "required": true}
+```
 
 ### Example manual schema
 
@@ -174,13 +189,19 @@ Payload:
 ```json
 {
   "fields": {
-    "title": {"type": "string"},
-    "published": {"type": "boolean"}
+    "title":     {"type": "string", "required": true},
+    "published": {"type": "boolean", "required": false}
   }
 }
 ```
 
-After this, any write with extra fields—e.g. `{"title": "x", "foo": 1}`—will be rejected.
+After this, writes such as:
+
+```json
+{"published": true}
+```
+
+will be rejected because `title` is required.
 
 ---
 
@@ -188,33 +209,36 @@ After this, any write with extra fields—e.g. `{"title": "x", "foo": 1}`—will
 
 ### **GET /api/<entity>/schema**
 
-Returns the schema (manual or inferred).
+Returns the current schema (manual or inferred).
 
-**If found:**
+Example:
 
 ```json
 {
   "id": "articles",
   "fields": {
-    "title": {"name": "title", "type": "string"},
-    "published": {"name": "published", "type": "boolean"}
+    "title":     {"name": "title", "type": "string",  "required": true},
+    "published": {"name": "published", "type": "boolean", "required": false}
   }
 }
 ```
 
-**If the entity exists but no documents have been inserted yet:**
+If no schema exists yet:
 
 ```json
 {"error": "schema not found"}
 ```
 
+---
+
 ### **PUT /api/<entity>/schema**
 
-Sets a new **manual** schema.
+Defines a new **manual schema**.
 
-* Any previous schema (automatic or manual) is replaced.
-* `_manual: true` is automatically added.
+* Replaces any existing schema.
+* `_manual: true` is automatically set.
 * Strict mode applies immediately.
+* All `required` flags provided in the payload are preserved.
 
 Example response:
 
@@ -222,8 +246,8 @@ Example response:
 {
   "id": "articles",
   "fields": {
-    "title": {"type": "string"},
-    "published": {"type": "boolean"}
+    "title":     {"type": "string",  "required": true},
+    "published": {"type": "boolean", "required": false}
   },
   "_manual": true
 }
@@ -233,13 +257,14 @@ Example response:
 
 ## Summary
 
-| Feature         | Automatic Schema        | Manual Schema          |
-| --------------- | ----------------------- | ---------------------- |
-| Creation        | On first write          | Explicit `PUT /schema` |
-| Strict mode     | Optional                | Always strict          |
-| New fields      | Allowed (if non-strict) | Forbidden              |
-| Type validation | Yes                     | Yes                    |
-| Best for        | Flexible prototyping    | Production stability   |
+| Feature     | Automatic Schema (strict=false) | Automatic Schema (strict=true) | Manual Schema |
+| ----------- | ------------------------------- | ------------------------------ | ------------- |
+| Creation    | On first write                  | On first write                 | `PUT /schema` |
+| Required    | All fields `required=false`     | All fields `required=true`     | Declarative   |
+| Strict mode | No                              | Yes                            | Always on     |
+| New fields  | Allowed                         | Rejected                       | Rejected      |
+| Type checks | Yes                             | Yes                            | Yes           |
+| Best for    | Prototyping                     | Controlled API evolution       | Production    |
 
 ---
 
