@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/valyala/fasthttp"
 )
 
@@ -23,22 +24,26 @@ func PutSchemaController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	fields, ok := payload["fields"].(map[string]interface{})
+	fieldsRaw, ok := payload["fields"].(map[string]interface{})
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error":"schema.fields must be an object"}`)
 		return
 	}
 
-	schemaData := map[string]interface{}{
-		"id":      entity,
-		"fields":  fields,
-		"_manual": true,
+	fields := schema.MapToFields(fieldsRaw)
+
+	entitySchema := schema.Entity{
+		ID:     entity,
+		Fields: fields,
 	}
 
-	api_storage.WriteEntity("schema", schemaData)
+	storable := schema.SchemaEntityToStorableStructure(entitySchema)
+	storable["_manual"] = true
 
-	out, _ := json.Marshal(schemaData)
+	api_storage.WriteEntity("schema", storable)
+
+	out, _ := json.Marshal(storable)
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(out)
 }

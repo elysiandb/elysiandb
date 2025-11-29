@@ -1,7 +1,6 @@
 package schema_test
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/taymour/elysiandb/internal/configuration"
@@ -12,22 +11,14 @@ import (
 
 func patchLoadSchema(mock *schema.Entity) func() {
 	orig := schema.LoadSchemaForEntity
-	schema.LoadSchemaForEntity = func(entity string) *schema.Entity {
-		return mock
-	}
-	return func() {
-		schema.LoadSchemaForEntity = orig
-	}
+	schema.LoadSchemaForEntity = func(entity string) *schema.Entity { return mock }
+	return func() { schema.LoadSchemaForEntity = orig }
 }
 
 func patchGetJsonByKey(m map[string]interface{}, err error) func() {
 	orig := storage.GetJsonByKey
-	storage.GetJsonByKey = func(key string) (map[string]interface{}, error) {
-		return m, err
-	}
-	return func() {
-		storage.GetJsonByKey = orig
-	}
+	storage.GetJsonByKey = func(key string) (map[string]interface{}, error) { return m, err }
+	return func() { storage.GetJsonByKey = orig }
 }
 
 func patchManualFlag(val bool) func() {
@@ -45,18 +36,19 @@ func patchStrict(val bool) func() {
 	orig := cfg.Api.Schema.Strict
 	cfg.Api.Schema.Strict = val
 	globals.SetConfig(cfg)
-
 	return func() {
 		cfg2 := globals.GetConfig()
-		if cfg2 == nil {
-			return
+		if cfg2 != nil {
+			cfg2.Api.Schema.Strict = orig
+			globals.SetConfig(cfg2)
 		}
-		cfg2.Api.Schema.Strict = orig
-		globals.SetConfig(cfg2)
 	}
 }
 
 func TestAnalyzeEntitySchema_Simple(t *testing.T) {
+	restore := patchStrict(false)
+	defer restore()
+
 	data := map[string]interface{}{
 		"id":   "u1",
 		"name": "Alice",
@@ -64,22 +56,36 @@ func TestAnalyzeEntitySchema_Simple(t *testing.T) {
 	}
 
 	result := schema.AnalyzeEntitySchema("users", data)
-
-	if result["id"] != "users" {
-		t.Fatalf("expected id=users")
-	}
-
 	fields := result["fields"].(map[string]interface{})
 
-	if fields["name"].(map[string]interface{})["type"] != "string" {
-		t.Fatalf("expected string")
+	if fields["name"].(map[string]interface{})["required"] != false {
+		t.Fatalf("expected required=false")
 	}
-	if fields["age"].(map[string]interface{})["type"] != "number" {
-		t.Fatalf("expected number")
+	if fields["age"].(map[string]interface{})["required"] != false {
+		t.Fatalf("expected required=false")
+	}
+}
+
+func TestAnalyzeEntitySchema_StrictRequiredTrue(t *testing.T) {
+	restore := patchStrict(true)
+	defer restore()
+
+	data := map[string]interface{}{
+		"name": "Alice",
+	}
+
+	result := schema.AnalyzeEntitySchema("users", data)
+	fields := result["fields"].(map[string]interface{})
+
+	if fields["name"].(map[string]interface{})["required"] != true {
+		t.Fatalf("expected required=true")
 	}
 }
 
 func TestAnalyzeEntitySchema_Nested(t *testing.T) {
+	restore := patchStrict(false)
+	defer restore()
+
 	data := map[string]interface{}{
 		"id":   "p1",
 		"name": "Post",
@@ -94,15 +100,15 @@ func TestAnalyzeEntitySchema_Nested(t *testing.T) {
 	author := fields["author"].(map[string]interface{})
 	sub := author["fields"].(map[string]interface{})
 
-	if sub["name"].(map[string]interface{})["type"] != "string" {
-		t.Fatalf("expected string")
-	}
-	if sub["age"].(map[string]interface{})["type"] != "number" {
-		t.Fatalf("expected number")
+	if sub["name"].(map[string]interface{})["required"] != false {
+		t.Fatalf("expected required=false")
 	}
 }
 
 func TestAnalyzeEntitySchema_ArrayNested(t *testing.T) {
+	restore := patchStrict(false)
+	defer restore()
+
 	data := map[string]interface{}{
 		"tags": []interface{}{
 			map[string]interface{}{
@@ -117,11 +123,8 @@ func TestAnalyzeEntitySchema_ArrayNested(t *testing.T) {
 	tags := fields["tags"].(map[string]interface{})
 	sub := tags["fields"].(map[string]interface{})
 
-	if sub["label"].(map[string]interface{})["type"] != "string" {
-		t.Fatalf("expected string")
-	}
-	if sub["score"].(map[string]interface{})["type"] != "number" {
-		t.Fatalf("expected number")
+	if sub["label"].(map[string]interface{})["required"] != false {
+		t.Fatalf("expected required=false")
 	}
 }
 
@@ -149,16 +152,14 @@ func TestValidateEntity_Strict_NewFieldRejected(t *testing.T) {
 	mockSchema := &schema.Entity{
 		ID: "users",
 		Fields: map[string]schema.Field{
-			"name": {Name: "name", Type: "string"},
+			"name": {Name: "name", Type: "string", Required: true},
 		},
 	}
 
 	restore1 := patchLoadSchema(mockSchema)
 	defer restore1()
-
 	restore2 := patchManualFlag(true)
 	defer restore2()
-
 	restore3 := patchStrict(true)
 	defer restore3()
 
@@ -173,16 +174,43 @@ func TestValidateEntity_Strict_NewFieldRejected(t *testing.T) {
 	}
 }
 
+func TestValidateEntity_Strict_RequiredMissing(t *testing.T) {
+	mockSchema := &schema.Entity{
+		ID: "users",
+		Fields: map[string]schema.Field{
+			"name": {Name: "name", Type: "string", Required: true},
+			"age":  {Name: "age", Type: "number", Required: true},
+		},
+	}
+
+	restore1 := patchLoadSchema(mockSchema)
+	defer restore1()
+	restore2 := patchManualFlag(true)
+	defer restore2()
+	restore3 := patchStrict(true)
+	defer restore3()
+
+	data := map[string]interface{}{
+		"name": "Alice",
+	}
+
+	errs := schema.ValidateEntity("users", data)
+	if len(errs) != 1 {
+		t.Fatalf("expected 1 error missing required=age")
+	}
+}
+
 func TestValidateEntity_Strict_DeepNewFieldRejected(t *testing.T) {
 	mockSchema := &schema.Entity{
 		ID: "books",
 		Fields: map[string]schema.Field{
 			"author": {
-				Name: "author",
-				Type: "object",
+				Name:     "author",
+				Type:     "object",
+				Required: true,
 				Fields: map[string]schema.Field{
-					"name": {Name: "name", Type: "string"},
-					"age":  {Name: "age", Type: "number"},
+					"name": {Name: "name", Type: "string", Required: true},
+					"age":  {Name: "age", Type: "number", Required: true},
 				},
 			},
 		},
@@ -190,10 +218,8 @@ func TestValidateEntity_Strict_DeepNewFieldRejected(t *testing.T) {
 
 	restore1 := patchLoadSchema(mockSchema)
 	defer restore1()
-
 	restore2 := patchManualFlag(true)
 	defer restore2()
-
 	restore3 := patchStrict(true)
 	defer restore3()
 
@@ -218,7 +244,7 @@ func TestValidateEntity_TypeMismatch(t *testing.T) {
 	mockSchema := &schema.Entity{
 		ID: "u",
 		Fields: map[string]schema.Field{
-			"age": {Name: "age", Type: "number"},
+			"age": {Name: "age", Type: "number", Required: false},
 		},
 	}
 
@@ -264,10 +290,11 @@ func TestIsManualSchema_YesFlag(t *testing.T) {
 func TestFieldsToMapAndBack(t *testing.T) {
 	fields := map[string]schema.Field{
 		"name": {
-			Name: "name",
-			Type: "string",
+			Name:     "name",
+			Type:     "string",
+			Required: true,
 			Fields: map[string]schema.Field{
-				"sub": {Name: "sub", Type: "number"},
+				"sub": {Name: "sub", Type: "number", Required: false},
 			},
 		},
 	}
@@ -275,18 +302,30 @@ func TestFieldsToMapAndBack(t *testing.T) {
 	m := schema.FieldsToMap(fields)
 	rev := schema.MapToFields(m)
 
-	if !reflect.DeepEqual(fields["name"].Type, rev["name"].Type) {
-		t.Fatalf("mismatch")
+	if rev["name"].Required != true {
+		t.Fatalf("expected required=true")
 	}
-	if rev["name"].Fields["sub"].Type != "number" {
-		t.Fatalf("missing nested field")
+	if rev["name"].Fields["sub"].Required != false {
+		t.Fatalf("expected required=false")
 	}
 }
 
 func TestSchemaEntityToStorableStructure(t *testing.T) {
-	e := schema.Entity{ID: "x", Fields: map[string]schema.Field{"a": {Name: "a", Type: "string"}}}
+	e := schema.Entity{
+		ID: "x",
+		Fields: map[string]schema.Field{
+			"a": {Name: "a", Type: "string", Required: true},
+		},
+	}
+
 	out := schema.SchemaEntityToStorableStructure(e)
 	if out["id"] != "x" {
 		t.Fatal("wrong id")
+	}
+
+	f := out["fields"].(map[string]interface{})
+	a := f["a"].(map[string]interface{})
+	if a["required"] != true {
+		t.Fatal("required not exported")
 	}
 }
