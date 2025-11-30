@@ -1,6 +1,8 @@
 package api
 
 import (
+	"encoding/json"
+
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/valyala/fasthttp"
@@ -16,8 +18,8 @@ func GetSchemaController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	raw, ok := api_storage.ReadEntityRawById(schema.SchemaEntity, entity)
-	if !ok || raw == nil {
+	schema := api_storage.ReadEntityById(schema.SchemaEntity, entity)
+	if schema == nil {
 		ctx.SetStatusCode(fasthttp.StatusNotFound)
 		ctx.Response.Header.Set("Content-Type", "application/json")
 		ctx.SetBodyString(`{"error":"schema not found"}`)
@@ -26,5 +28,12 @@ func GetSchemaController(ctx *fasthttp.RequestCtx) {
 
 	ctx.Response.Header.Set("Content-Type", "application/json")
 	ctx.SetStatusCode(fasthttp.StatusOK)
-	ctx.SetBody(raw)
+	data, err := json.Marshal(schema)
+	if err != nil {
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		ctx.SetBodyString(`{"error":"failed to marshal schema"}`)
+		return
+	}
+
+	ctx.SetBody(data)
 }

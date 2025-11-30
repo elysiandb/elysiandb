@@ -36,16 +36,11 @@ type CrashRecoveryConfig struct {
 	MaxLogMB int64 `yaml:"maxLogMB"`
 }
 
-type JsonStoreConfig struct {
-	ArenaChunkSize int `yaml:"arenaChunkSize"`
-}
-
 type StoreConfig struct {
 	Folder               string              `yaml:"folder"`
 	Shards               int                 `yaml:"shards"`
 	FlushIntervalSeconds int                 `yaml:"flushIntervalSeconds"`
 	CrashRecovery        CrashRecoveryConfig `yaml:"crashRecovery"`
-	Json                 JsonStoreConfig     `yaml:"json"`
 }
 
 type StatsConfig struct {

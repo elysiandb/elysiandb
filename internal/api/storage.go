@@ -111,16 +111,6 @@ func ReadEntityById(entity string, id string) map[string]interface{} {
 	return data
 }
 
-func ReadEntityRawById(entity string, id string) ([]byte, bool) {
-	key := globals.ApiSingleEntityKey(entity, id)
-	data, err := storage.GetJsonRaw(key)
-	if err != nil || data == nil {
-		return nil, false
-	}
-
-	return data, true
-}
-
 func ListEntities(
 	entity string,
 	limit int,

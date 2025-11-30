@@ -3,8 +3,6 @@ store:
   shards: 512
   flushIntervalSeconds: 5
   crashRecovery: { enabled: true, maxLogMB: 100 }
-  json:
-    arenaChunkSize: 1048576  # 1 MiB
 server:
   http: { enabled: true,  host: 0.0.0.0, port: 8089 }
   tcp:  { enabled: true,  host: 0.0.0.0, port: 8088 }

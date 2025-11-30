@@ -10,7 +10,6 @@ import (
 
 	xxhash "github.com/cespare/xxhash/v2"
 	"github.com/taymour/elysiandb/internal/configuration"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/recovery"
@@ -18,6 +17,7 @@ import (
 )
 
 var mainJsonStore atomic.Pointer[JsonStore]
+var GetJsonByKey func(key string) (map[string]interface{}, error)
 
 func LoadJsonDB() {
 	cfg := globals.GetConfig()
@@ -35,48 +35,33 @@ func createJsonStore(file string) *JsonStore {
 	newStore := NewJsonStore()
 	newStore.FromMap(data)
 	newStore.saved.Store(true)
+
+	GetJsonByKey = GetJsonByKeyImpl
+
 	return newStore
 }
 
 func GetJsonByKeyNoCopy(key string) (map[string]interface{}, error) {
-	return GetJsonByKey(key)
-}
-
-func GetJsonRaw(key string) ([]byte, error) {
 	js := mainJsonStore.Load()
 	if js == nil {
 		return nil, fmt.Errorf("json store not initialized")
 	}
-	raw, ok := js.getRaw(key)
+	val, ok := js.get(key)
 	if !ok {
 		return nil, fmt.Errorf("key not found: %s", key)
 	}
-	return raw, nil
+	return val, nil
 }
 
-var GetJsonByKey = getJsonByKeyImpl
-
-func getJsonByKeyImpl(key string) (map[string]interface{}, error) {
-	js := mainJsonStore.Load()
-	if js == nil {
-		return nil, fmt.Errorf("json store not initialized")
+func GetJsonByKeyImpl(key string) (map[string]interface{}, error) {
+	v, err := GetJsonByKeyNoCopy(key)
+	if err != nil {
+		return nil, err
 	}
-
-	raw, ok := js.getRaw(key)
-	if !ok {
-		return nil, fmt.Errorf("key not found: %s", key)
+	cp := make(map[string]interface{}, len(v))
+	for k, x := range v {
+		cp[k] = x
 	}
-
-	var out map[string]interface{}
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, fmt.Errorf("error decoding json for key %s: %w", key, err)
-	}
-
-	cp := make(map[string]interface{}, len(out))
-	for k, v := range out {
-		cp[k] = v
-	}
-
 	return cp, nil
 }
 
@@ -86,20 +71,11 @@ func PutJsonValue(key string, value map[string]interface{}) error {
 	if js == nil {
 		return fmt.Errorf("json store not initialized")
 	}
-
-	_, existed := js.getRaw(key)
-
-	data, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Errorf("error encoding json value: %w", err)
-	}
-
-	js.putRaw(key, data)
-
+	_, existed := js.get(key)
+	js.put(key, value)
 	if cfg.Stats.Enabled && !existed {
 		stat.Stats.IncrementKeysCount()
 	}
-
 	return nil
 }
 
@@ -109,7 +85,7 @@ func DeleteJsonByKey(key string) {
 	if js == nil {
 		return
 	}
-	_, existed := js.getRaw(key)
+	_, existed := js.get(key)
 	js.del(key)
 	if cfg.Stats.Enabled && existed {
 		stat.Stats.DecrementKeysCount()
@@ -143,8 +119,7 @@ func DeleteJsonByPrefix(prefix string) int {
 }
 
 type jsonShard struct {
-	m  sync.Map
-	ar *engine.Arena
+	m sync.Map
 }
 
 type JsonStore struct {
@@ -155,20 +130,14 @@ type JsonStore struct {
 }
 
 func NewJsonStore() *JsonStore {
-	cfg := globals.GetConfig()
-	n := cfg.Store.Shards
-	chunkSize := cfg.Store.Json.ArenaChunkSize
-
+	n := globals.GetConfig().Store.Shards
 	s := &JsonStore{
 		shards:     make([]*jsonShard, n),
 		shardMask:  uint64(n - 1),
 		shardCount: n,
 	}
 	for i := 0; i < n; i++ {
-		s.shards[i] = &jsonShard{
-			m:  sync.Map{},
-			ar: engine.NewArena(chunkSize),
-		}
+		s.shards[i] = &jsonShard{}
 	}
 	s.saved.Store(true)
 	return s
@@ -190,7 +159,6 @@ func (s *JsonStore) CountTotalKeys() uint64 {
 func (s *JsonStore) reset() {
 	for i := 0; i < s.shardCount; i++ {
 		s.shards[i].m = sync.Map{}
-		s.shards[i].ar.Reset()
 	}
 	s.saved.Store(false)
 	if globals.GetConfig().Store.CrashRecovery.Enabled {
@@ -203,29 +171,21 @@ func (s *JsonStore) shardIndex(key string) int {
 	return int(h & s.shardMask)
 }
 
-func (s *JsonStore) getRaw(key string) ([]byte, bool) {
+func (s *JsonStore) get(key string) (map[string]interface{}, bool) {
 	sh := s.shards[s.shardIndex(key)]
 	v, ok := sh.m.Load(key)
 	if !ok {
 		return nil, false
 	}
-	return v.([]byte), true
+	return v.(map[string]interface{}), true
 }
 
-func (s *JsonStore) putRaw(key string, data []byte) {
+func (s *JsonStore) put(key string, value map[string]interface{}) {
 	sh := s.shards[s.shardIndex(key)]
-
-	buf := sh.ar.Alloc(len(data))
-	copy(buf, data)
-
-	sh.m.Store(key, buf)
+	sh.m.Store(key, value)
 	s.saved.Store(false)
-
 	if globals.GetConfig().Store.CrashRecovery.Enabled {
-		var decoded map[string]interface{}
-		if err := json.Unmarshal(buf, &decoded); err == nil {
-			recovery.LogJsonPut(key, decoded)
-		}
+		recovery.LogJsonPut(key, value)
 	}
 }
 
@@ -241,11 +201,7 @@ func (s *JsonStore) del(key string) {
 func (s *JsonStore) Iterate(fn func(k string, v map[string]interface{})) {
 	for i := 0; i < s.shardCount; i++ {
 		s.shards[i].m.Range(func(k, v any) bool {
-			raw := v.([]byte)
-			var decoded map[string]interface{}
-			if err := json.Unmarshal(raw, &decoded); err == nil {
-				fn(k.(string), decoded)
-			}
+			fn(k.(string), v.(map[string]interface{}))
 			return true
 		})
 	}
@@ -253,11 +209,8 @@ func (s *JsonStore) Iterate(fn func(k string, v map[string]interface{})) {
 
 func (s *JsonStore) FromMap(src map[string]map[string]interface{}) {
 	for k, v := range src {
-		data, err := json.Marshal(v)
-		if err != nil {
-			continue
-		}
-		s.putRaw(k, data)
+		sh := s.shards[s.shardIndex(k)]
+		sh.m.Store(k, v)
 	}
 	s.saved.Store(true)
 }
@@ -265,11 +218,7 @@ func (s *JsonStore) FromMap(src map[string]map[string]interface{}) {
 func (s *JsonStore) ToMap() map[string]map[string]interface{} {
 	result := make(map[string]map[string]interface{})
 	s.Iterate(func(k string, v map[string]interface{}) {
-		cp := make(map[string]interface{}, len(v))
-		for fk, fv := range v {
-			cp[fk] = fv
-		}
-		result[k] = cp
+		result[k] = v
 	})
 	return result
 }
