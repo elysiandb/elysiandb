@@ -79,20 +79,21 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 
 ### CRUD Operations
 
-| Method   | Endpoint                | Description                                                 |
-| -------- | ----------------------- | ----------------------------------------------------------- |
-| `POST`   | `/api/<entity>`         | Create one or multiple JSON documents (auto‑ID if missing)  |
-| `GET`    | `/api/<entity>`         | List all documents, supports pagination, sorting, filtering |
-| `GET`    | `/api/<entity>/schema`  | Schema for entity                                           |
-| `GET`    | `/api/<entity>/<id>`    | Retrieve document by ID                                     |
-| `PUT`    | `/api/<entity>/<id>`    | Update a single document by ID                              |
-| `PUT`    | `/api/<entity>`         | Update multiple documents (batch update)                    |
-| `DELETE` | `/api/<entity>/<id>`    | Delete document by ID                                       |
-| `DELETE` | `/api/<entity>`         | Delete all documents for an entity                          |
-| `GET`    | `/api/export`           | Dumps all entities as a JSON object                         |
-| `POST`   | `/api/import`           | Imports all objects from a JSON dump                        |
-| `POST`   | `/api/<entity>/migrate` | Run a **migration** across all documents for an entity      |
-| `GET`   | `/api/<entity>/count`    | Counts all documents for an entity                          |
+| Method   | Endpoint                      | Description                                                 |
+| -------- | ----------------------------- | ----------------------------------------------------------- |
+| `POST`   | `/api/<entity>`               | Create one or multiple JSON documents (auto‑ID if missing)  |
+| `GET`    | `/api/<entity>`               | List all documents, supports pagination, sorting, filtering |
+| `GET`    | `/api/<entity>/schema`        | Schema for entity                                           |
+| `GET`    | `/api/<entity>/<id>`          | Retrieve document by ID                                     |
+| `PUT`    | `/api/<entity>/<id>`          | Update a single document by ID                              |
+| `PUT`    | `/api/<entity>`               | Update multiple documents (batch update)                    |
+| `DELETE` | `/api/<entity>/<id>`          | Delete document by ID                                       |
+| `DELETE` | `/api/<entity>`               | Delete all documents for an entity                          |
+| `GET`    | `/api/export`                 | Dumps all entities as a JSON object                         |
+| `POST`   | `/api/import`                 | Imports all objects from a JSON dump                        |
+| `POST`   | `/api/<entity>/migrate`       | Run a **migration** across all documents for an entity      |
+| `GET`    | `/api/<entity>/count`         | Counts all documents for an entity                          |
+| `GET`    | `/api/<entity>/<id>/exists`   | Verifiy if an entity exists                                 |
 
 ---
 

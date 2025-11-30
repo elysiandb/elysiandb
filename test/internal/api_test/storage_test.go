@@ -383,3 +383,43 @@ func TestCountEntities_IgnoresOtherEntities(t *testing.T) {
 		t.Fatalf("expected 2, got %d", n)
 	}
 }
+
+func TestEntityExists_True(t *testing.T) {
+	initTestStore(t)
+
+	entity := "cars"
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "c1", "brand": "bmw"})
+
+	if !api_storage.EntityExists(entity, "c1") {
+		t.Fatalf("expected EntityExists=true for c1")
+	}
+}
+
+func TestEntityExists_False(t *testing.T) {
+	initTestStore(t)
+
+	entity := "cars"
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "c1", "brand": "bmw"})
+
+	if api_storage.EntityExists(entity, "doesnotexist") {
+		t.Fatalf("expected EntityExists=false for missing id")
+	}
+}
+
+func TestEntityExists_WrongEntity(t *testing.T) {
+	initTestStore(t)
+
+	api_storage.WriteEntity("authors", map[string]interface{}{"id": "a1", "name": "Alice"})
+
+	if api_storage.EntityExists("books", "a1") {
+		t.Fatalf("expected EntityExists=false for mismatched entity")
+	}
+}
+
+func TestEntityExists_EmptyStore(t *testing.T) {
+	initTestStore(t)
+
+	if api_storage.EntityExists("ghost", "id123") {
+		t.Fatalf("expected EntityExists=false for empty store")
+	}
+}
