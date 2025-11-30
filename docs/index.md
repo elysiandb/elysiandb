@@ -92,6 +92,7 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 | `GET`    | `/api/export`           | Dumps all entities as a JSON object                         |
 | `POST`   | `/api/import`           | Imports all objects from a JSON dump                        |
 | `POST`   | `/api/<entity>/migrate` | Run a **migration** across all documents for an entity      |
+| `GET`   | `/api/<entity>/count`    | Counts all documents for an entity                          |
 
 ---
 

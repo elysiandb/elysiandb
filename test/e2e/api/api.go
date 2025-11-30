@@ -1451,3 +1451,63 @@ func TestSchema_GetSchema_MultipleEntities(t *testing.T) {
 		t.Fatalf("expected schemas for users and orders")
 	}
 }
+
+func TestAutoREST_CountEntities_OK(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/cars", map[string]any{"brand": "bmw"})
+	mustPOSTJSON(t, client, "http://test/api/cars", map[string]any{"brand": "audi"})
+	mustPOSTJSON(t, client, "http://test/api/cars", map[string]any{"brand": "ford"})
+
+	gr := mustGET(t, client, "http://test/api/cars/count")
+	if gr.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", gr.StatusCode())
+	}
+
+	var resp map[string]any
+	json.Unmarshal(gr.Body(), &resp)
+	if resp["count"] != float64(3) {
+		t.Fatalf("expected count=3, got %v", resp["count"])
+	}
+}
+
+func TestAutoREST_CountEntities_Empty(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	gr := mustGET(t, client, "http://test/api/empty/count")
+	if gr.StatusCode() != fasthttp.StatusNotFound {
+		t.Fatalf("expected 404, got %d", gr.StatusCode())
+	}
+}
+
+func TestAutoREST_CountEntities_NotFound(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	gr := mustGET(t, client, "http://test/api/ghost/count")
+	if gr.StatusCode() != fasthttp.StatusNotFound {
+		t.Fatalf("expected 404, got %d", gr.StatusCode())
+	}
+}
+
+func TestAutoREST_CountEntities_IgnoresOtherEntities(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/movies", map[string]any{"title": "Inception"})
+	mustPOSTJSON(t, client, "http://test/api/movies", map[string]any{"title": "Interstellar"})
+	mustPOSTJSON(t, client, "http://test/api/songs", map[string]any{"title": "Song1"})
+
+	gr := mustGET(t, client, "http://test/api/movies/count")
+	if gr.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", gr.StatusCode())
+	}
+
+	var resp map[string]any
+	json.Unmarshal(gr.Body(), &resp)
+	if resp["count"] != float64(2) {
+		t.Fatalf("expected count=2, got %v", resp["count"])
+	}
+}

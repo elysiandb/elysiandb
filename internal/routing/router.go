@@ -33,6 +33,7 @@ func RegisterRoutes(r *router.Router) {
 	r.PUT("/api/{entity}", Version(api.UpdateListController))
 	r.DELETE("/api/{entity}/{id}", Version(api.DeleteByIdController))
 	r.DELETE("/api/{entity}", Version(api.DestroyController))
+	r.GET("/api/{entity}/count", Version(api.CountController))
 	r.POST("/api/{entity}/migrate", Version(api.MigrateController))
 
 	if globals.GetConfig().Api.Schema.Enabled {
