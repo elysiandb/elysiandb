@@ -270,6 +270,10 @@ func DumpAll() map[string]interface{} {
 	return result
 }
 
+func EntityExists(entity string, id string) bool {
+	return ReadEntityById(entity, id) != nil
+}
+
 func CountAllEntities() int {
 	counter := 0
 	entities := ListEntityTypes()

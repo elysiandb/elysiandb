@@ -1511,3 +1511,63 @@ func TestAutoREST_CountEntities_IgnoresOtherEntities(t *testing.T) {
 		t.Fatalf("expected count=2, got %v", resp["count"])
 	}
 }
+
+func TestAutoREST_Exists_True(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	resp := mustPOSTJSON(t, client, "http://test/api/books", map[string]any{
+		"title": "Go in Action",
+	})
+	var created map[string]any
+	_ = json.Unmarshal(resp.Body(), &created)
+	id := created["id"].(string)
+
+	gr := mustGET(t, client, "http://test/api/books/"+id+"/exists")
+	if gr.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", gr.StatusCode())
+	}
+
+	var out map[string]any
+	_ = json.Unmarshal(gr.Body(), &out)
+	if out["exists"] != true {
+		t.Fatalf("expected exists=true, got %v", out)
+	}
+}
+
+func TestAutoREST_Exists_False(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	gr := mustGET(t, client, "http://test/api/books/doesnotexist/exists")
+	if gr.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", gr.StatusCode())
+	}
+
+	var out map[string]any
+	_ = json.Unmarshal(gr.Body(), &out)
+	if out["exists"] != false {
+		t.Fatalf("expected exists=false, got %v", out)
+	}
+}
+
+func TestAutoREST_Exists_IgnoresOtherEntities(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	a := mustPOSTJSON(t, client, "http://test/api/authors", map[string]any{"name": "Alice"})
+	var author map[string]any
+	_ = json.Unmarshal(a.Body(), &author)
+	id := author["id"].(string)
+
+	gr := mustGET(t, client, "http://test/api/books/"+id+"/exists")
+	if gr.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", gr.StatusCode())
+	}
+
+	var out map[string]any
+	_ = json.Unmarshal(gr.Body(), &out)
+	if out["exists"] != false {
+		t.Fatalf("expected exists=false for wrong entity, got %v", out)
+	}
+}
