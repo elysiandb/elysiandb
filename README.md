@@ -129,37 +129,6 @@ api:
     cleanupIntervalSeconds: 10
 ```
 
----
-
-## Protocols
-
-### HTTP REST
-
-* POST /api/<entity> → Create
-* GET /api/<entity> → List (pagination, filtering, sorting)
-* GET /api/<entity>/<id> → Read
-* PUT /api/<entity>/<id> → Update
-* DELETE /api/<entity>/<id> → Delete
-* GET /api/<entity>/schema → Retrieve schema
-* PUT /api/<entity>/schema → Define manual schema and enable strict mode
-
-### TCP (Redis-style)
-
-* SET <key> <value>
-* GET <key> / MGET key1 key2
-* DEL <key> / RESET / SAVE / PING
-
----
-
-## Persistence and Stats
-
-* Periodic flush to disk
-* Crash-safe write-ahead log
-* Graceful shutdown flush
-* /stats endpoint for runtime metrics
-
----
-
 ## Build and Run
 
 ```bash
