@@ -23,7 +23,7 @@ func TestNewStatsContainer_Zeroed(t *testing.T) {
 		"total_requests":        "0",
 		"hits":                  "0",
 		"misses":                "0",
-		"version":               "0.1.6",
+		"version":               "0.1.9",
 	}
 	for k, want := range wantZero {
 		if got := m[k]; got != want {
@@ -57,7 +57,7 @@ func TestIncrementsAndSets(t *testing.T) {
 		"total_requests":        "1",
 		"hits":                  "1",
 		"misses":                "1",
-		"version":               "0.1.6",
+		"version":               "0.1.9",
 	}
 	for k, want := range tests {
 		if got := m[k]; got != want {
