@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
@@ -19,21 +20,50 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	search := string(ctx.QueryArgs().Peek("search"))
 	fieldsParam := string(ctx.QueryArgs().Peek("fields"))
 	includesParam := string(ctx.QueryArgs().Peek("includes"))
+	countOnlyParam := ctx.QueryArgs().GetBool("countOnly")
 
 	var hash []byte
 	if globals.GetConfig().Api.Cache.Enabled {
-		hash = cache.HashQuery(entity, limit, offset, sortField, sortAscending, filters, fieldsParam, search, includesParam)
+		hash = cache.HashQuery(
+			entity,
+			limit,
+			offset,
+			sortField,
+			sortAscending,
+			filters,
+			fieldsParam,
+			search,
+			includesParam,
+			countOnlyParam,
+		)
 		cached := cache.CacheStore.Get(entity, hash)
 		if cached != nil {
 			ctx.Response.Header.Set("Content-Type", "application/json")
 			ctx.Response.Header.Set("X-Elysian-Cache", "HIT")
 			ctx.SetStatusCode(fasthttp.StatusOK)
 			ctx.SetBody(cached)
+
 			return
 		}
 	}
 
 	data := api_storage.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
+
+	if countOnlyParam {
+		countResult := int64(len(data))
+		response := []byte(`{"count":` + fmt.Sprintf("%d", countResult) + `}`)
+
+		ctx.Response.Header.Set("Content-Type", "application/json")
+		ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
+		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetBody(response)
+
+		if globals.GetConfig().Api.Cache.Enabled {
+			cache.CacheStore.Set(entity, hash, response)
+		}
+
+		return
+	}
 
 	fields := api_storage.ParseFieldsParam(fieldsParam)
 	if len(fields) > 0 {

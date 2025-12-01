@@ -124,6 +124,7 @@ func HashQuery(
 	fieldsParam string,
 	search string,
 	includesParam string,
+	countOnlyParam bool,
 ) []byte {
 	var b []byte
 	b = append(b, entity...)
@@ -135,6 +136,12 @@ func HashQuery(
 	b = append(b, search...)
 	b = append(b, '|')
 	b = append(b, includesParam...)
+	b = append(b, '|')
+	if countOnlyParam {
+		b = append(b, '1')
+	} else {
+		b = append(b, '0')
+	}
 	b = append(b, '|')
 	if sortAscending {
 		b = append(b, 'A')

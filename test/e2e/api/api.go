@@ -1571,3 +1571,99 @@ func TestAutoREST_Exists_IgnoresOtherEntities(t *testing.T) {
 		t.Fatalf("expected exists=false for wrong entity, got %v", out)
 	}
 }
+
+func TestAutoREST_List_CountOnly_OK(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/books", map[string]any{"title": "A"})
+	mustPOSTJSON(t, client, "http://test/api/books", map[string]any{"title": "B"})
+	mustPOSTJSON(t, client, "http://test/api/books", map[string]any{"title": "C"})
+
+	gr := mustGET(t, client, "http://test/api/books?countOnly=true")
+	if gr.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", gr.StatusCode())
+	}
+
+	var out map[string]any
+	_ = json.Unmarshal(gr.Body(), &out)
+	if out["count"] != float64(3) {
+		t.Fatalf("expected count=3, got %v", out["count"])
+	}
+}
+
+func TestAutoREST_List_CountOnly_Empty(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	gr := mustGET(t, client, "http://test/api/empty?countOnly=true")
+	if gr.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", gr.StatusCode())
+	}
+
+	var out map[string]any
+	_ = json.Unmarshal(gr.Body(), &out)
+	if out["count"] != float64(0) {
+		t.Fatalf("expected count=0, got %v", out["count"])
+	}
+}
+
+func TestAutoREST_List_CountOnly_IgnoresOtherEntities(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/users", map[string]any{"name": "u1"})
+	mustPOSTJSON(t, client, "http://test/api/users", map[string]any{"name": "u2"})
+	mustPOSTJSON(t, client, "http://test/api/orders", map[string]any{"ref": "o1"})
+
+	gr := mustGET(t, client, "http://test/api/users?countOnly=true")
+	if gr.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", gr.StatusCode())
+	}
+
+	var out map[string]any
+	_ = json.Unmarshal(gr.Body(), &out)
+	if out["count"] != float64(2) {
+		t.Fatalf("expected count=2, got %v", out["count"])
+	}
+}
+
+func TestAutoREST_List_CountOnly_WithFilters(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/products", map[string]any{"name": "A", "price": 10})
+	mustPOSTJSON(t, client, "http://test/api/products", map[string]any{"name": "B", "price": 20})
+	mustPOSTJSON(t, client, "http://test/api/products", map[string]any{"name": "C", "price": 20})
+
+	gr := mustGET(t, client, "http://test/api/products?filter[price]=20&countOnly=true")
+	if gr.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", gr.StatusCode())
+	}
+
+	var out map[string]any
+	_ = json.Unmarshal(gr.Body(), &out)
+	if out["count"] != float64(2) {
+		t.Fatalf("expected 2, got %v", out["count"])
+	}
+}
+
+func TestAutoREST_List_CountOnly_WithSearch(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/movies", map[string]any{"title": "Star Wars"})
+	mustPOSTJSON(t, client, "http://test/api/movies", map[string]any{"title": "Star Trek"})
+	mustPOSTJSON(t, client, "http://test/api/movies", map[string]any{"title": "Inception"})
+
+	gr := mustGET(t, client, "http://test/api/movies?search=Star*&countOnly=true")
+	if gr.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", gr.StatusCode())
+	}
+
+	var out map[string]any
+	_ = json.Unmarshal(gr.Body(), &out)
+	if out["count"] != float64(2) {
+		t.Fatalf("expected 2, got %v", out["count"])
+	}
+}

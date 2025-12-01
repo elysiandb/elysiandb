@@ -385,6 +385,7 @@ This mechanism also works recursively and supports **arrays of sub-entities**, a
 
 ### Query Parameters
 
+* `countOnly` — If true, returns only the count
 * `limit` — Max number of items to return
 * `offset` — Number of items to skip
 * `search` - Full text search
