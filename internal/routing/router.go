@@ -4,6 +4,7 @@ import (
 	"github.com/fasthttp/router"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/transport/http/api"
+	api_transaction "github.com/taymour/elysiandb/internal/transport/http/api/transactions"
 	"github.com/taymour/elysiandb/internal/transport/http/controller"
 	"github.com/valyala/fasthttp"
 )
@@ -41,6 +42,13 @@ func RegisterRoutes(r *router.Router) {
 		r.GET("/api/{entity}/schema", Version(api.GetSchemaController))
 		r.PUT("/api/{entity}/schema", Version(api.PutSchemaController))
 	}
+
+	r.POST("/api/tx/begin", Version(api_transaction.BeginTransactionController))
+	r.POST("/api/tx/{txId}/rollback", Version(api_transaction.RollbackTransactionController))
+	r.POST("/api/tx/{txId}/entity/{entity}", Version(api_transaction.WriteTransactionController))
+	r.PUT("/api/tx/{txId}/entity/{entity}/{id}", Version(api_transaction.UpdateTransactionController))
+	r.DELETE("/api/tx/{txId}/entity/{entity}/{id}", Version(api_transaction.DeleteTransactionController))
+	r.POST("/api/tx/{txId}/commit", Version(api_transaction.CommitTransactionController))
 }
 
 func Version(requestHandler fasthttp.RequestHandler) fasthttp.RequestHandler {
