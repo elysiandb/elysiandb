@@ -13,18 +13,19 @@ No schema files. No migrations. No ORMs. Just start and query.
 
 ## Highlights
 
-* Instant REST API — CRUD, pagination, filtering, sorting, includes (/api/<entity>) with zero configuration
+* Instant REST API — CRUD, pagination, filtering, sorting, includes (/api/entity) with zero configuration
 * Fast In-Memory KV Engine — sharded store, optional TTL, atomic counters
 * Auto-Indexing — lazy index creation on first sort request
 * Schema-less JSON — dynamic structures; IDs generated automatically
 * Automatic Schema Inference — schemas inferred from observed documents
-* Schema API — GET /api/<entity>/schema for live schema inspection
-* Manual Schema Override — PUT /api/<entity>/schema to define strict schemas
+* Schema API — GET /api/entity/schema for live schema inspection
+* Manual Schema Override — PUT /api/entity/schema to define strict schemas
 * Strict Schema Validation — reject writes that do not match the manual schema
 * Nested Entity Creation — auto-create sub-entities via @entity fields
 * Persistence — periodic flush plus crash recovery log
 * Protocols — HTTP REST, TCP (Redis-style text protocol)
 * High performance — minimal allocations and cache-friendly design
+* Transactions - basic transactions and atomic operations
 
 ---
 
