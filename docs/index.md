@@ -462,6 +462,100 @@ Using `includes=all` expands all linked entities recursively.
 
 ---
 
+## Transactions
+
+ElysianDB provides a lightweight transaction system allowing clients to queue multiple write, update, and delete operations into an isolated context before applying them atomically.
+
+### Transaction Lifecycle
+
+A transaction follows this sequence:
+
+1. Begin a new transaction.
+2. Add operations to the transaction.
+3. Commit the transaction to apply all operations.
+4. Optionally roll back to discard all pending operations.
+
+### Endpoints
+
+#### Begin a Transaction
+
+```
+POST /api/tx/begin
+```
+
+Returns a transaction identifier used for subsequent operations.
+
+#### Add Operations
+
+Write:
+
+```
+POST /api/tx/{txId}/entity/{entity}
+```
+
+Body contains the JSON object to create.
+
+Update:
+
+```
+PUT /api/tx/{txId}/entity/{entity}/{id}
+```
+
+Body contains the fields to update.
+
+Delete:
+
+```
+DELETE /api/tx/{txId}/entity/{entity}/{id}
+```
+
+Each operation is stored in memory and not applied until commit.
+
+#### Commit
+
+```
+POST /api/tx/{txId}/commit
+```
+
+Executes all queued operations in order. If any write validation fails or an update targets a non-existing document, the commit aborts and returns an error.
+
+#### Rollback
+
+```
+POST /api/tx/{txId}/rollback
+```
+
+Discards all pending operations.
+
+### Isolation and Behavior
+
+Transactions are isolated from the live datastore until committed. Operations accumulated inside a transaction do not affect the current state and cannot be observed by other requests.
+
+A commit applies operations sequentially:
+
+* Write operations call the standard entity creation logic, including schema validation and sub-entity processing.
+* Update operations apply partial updates to the existing document.
+* Delete operations remove the targeted entity.
+
+If any operation fails, the transaction is aborted, and no changes are applied.
+
+### Error Handling
+
+* Unknown transaction identifiers return an error for commit or when retrieving the transaction.
+* Write validation errors cause commit to fail.
+* Updates on missing entities cause commit to fail.
+* Rollback on unknown transactions succeeds without effect.
+
+### Use Cases
+
+* Batch creation of multiple entities.
+* Complex multi-step updates requiring atomicity.
+* Staging modifications before applying them.
+
+This system provides atomic grouped modifications while keeping the overall design simple and lightweight.
+
+---
+
 ## KV HTTP API
 
 The KV API is a minimal interface for basic key–value operations.
