@@ -1,6 +1,6 @@
 module github.com/taymour/elysiandb
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.7
 
@@ -9,6 +9,8 @@ require (
 	github.com/fasthttp/router v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/valyala/fasthttp v1.65.0
+	golang.org/x/crypto v0.45.0
+	golang.org/x/term v0.37.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -17,4 +19,5 @@ require (
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/savsgio/gotils v0.0.0-20240704082632-aef3928b8a38 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
 )
