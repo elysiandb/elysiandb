@@ -12,7 +12,7 @@ func ExistsController(ctx *fasthttp.RequestCtx) {
 
 	exists := api_storage.EntityExists(entity, id)
 	response := []byte(`{"exists": false}`)
-	if !exists {
+	if exists {
 		response = []byte(`{"exists": true}`)
 	}
 

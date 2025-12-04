@@ -214,8 +214,12 @@ func validateFieldsRecursive(fields map[string]Field, data map[string]interface{
 func IsManualSchema(entity string) bool {
 	key := globals.ApiSingleEntityKey(SchemaEntity, entity)
 	data, _ := storage.GetJsonByKey(key)
-	_, ok := data["_manual"]
 
+	if data == nil {
+		return false
+	}
+
+	_, ok := data["_manual"]
 	return ok
 }
 
@@ -272,6 +276,10 @@ func MapToFields(m map[string]interface{}) map[string]Field {
 func loadSchemaForEntity(entity string) *Entity {
 	key := globals.ApiSingleEntityKey(SchemaEntity, entity)
 	data, _ := storage.GetJsonByKey(key)
+	if data == nil {
+		return nil
+	}
+
 	schema := &Entity{ID: entity}
 	if fieldsMap, ok := data["fields"].(map[string]interface{}); ok {
 		schema.Fields = MapToFields(fieldsMap)

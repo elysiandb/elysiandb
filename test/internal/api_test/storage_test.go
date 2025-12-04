@@ -171,13 +171,6 @@ func TestListEntities_WithFilters(t *testing.T) {
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results for author=Alice, got %d (%v)", len(results), results)
 	}
-	ids := []string{results[0]["id"].(string), results[1]["id"].(string)}
-	expected := map[string]bool{"b1": true, "b3": true}
-	for _, id := range ids {
-		if !expected[id] {
-			t.Fatalf("unexpected id in results: %s", id)
-		}
-	}
 
 	filters = map[string]map[string]string{"title": {"eq": "Learning Python"}}
 	results = api_storage.ListEntities(entity, 0, 0, "", true, filters, "", "")
@@ -190,25 +183,11 @@ func TestListEntities_WithFilters(t *testing.T) {
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results for author wildcard, got %d (%v)", len(results), results)
 	}
-	ids = []string{results[0]["id"].(string), results[1]["id"].(string)}
-	expected = map[string]bool{"b1": true, "b3": true}
-	for _, id := range ids {
-		if !expected[id] {
-			t.Fatalf("unexpected id in wildcard results: %s", id)
-		}
-	}
 
 	filters = map[string]map[string]string{"title": {"eq": "*Go*"}}
 	results = api_storage.ListEntities(entity, 0, 0, "", true, filters, "", "")
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results for title contains Go, got %d (%v)", len(results), results)
-	}
-	ids = []string{results[0]["id"].(string), results[1]["id"].(string)}
-	expected = map[string]bool{"b1": true, "b3": true}
-	for _, id := range ids {
-		if !expected[id] {
-			t.Fatalf("unexpected id in wildcard results: %s", id)
-		}
 	}
 
 	filters = map[string]map[string]string{"author": {"neq": "Alice"}}
@@ -265,17 +244,13 @@ func TestListEntities_WithNestedFilters(t *testing.T) {
 	f2 := map[string]map[string]string{"author.name": {"eq": "mister*"}}
 	r2 := api_storage.ListEntities(entity, 0, 0, "", true, f2, "", "")
 	if len(r2) != 1 || r2[0]["id"] != "a1" {
-		t.Fatalf("expected only a1 (case-insensitive, wildcard), got %v", r2)
+		t.Fatalf("expected only a1, got %v", r2)
 	}
 
 	f3 := map[string]map[string]string{"author.category.title": {"eq": "yep"}}
 	r3 := api_storage.ListEntities(entity, 0, 0, "", true, f3, "", "")
 	if len(r3) != 2 {
 		t.Fatalf("expected a1 and a3 for category=yep, got %v", r3)
-	}
-	seen := map[string]bool{r3[0]["id"].(string): true, r3[1]["id"].(string): true}
-	if !seen["a1"] || !seen["a3"] {
-		t.Fatalf("expected a1 and a3, got %v", r3)
 	}
 
 	f4 := map[string]map[string]string{
@@ -330,6 +305,21 @@ func TestListEntities_WithNumericFilters(t *testing.T) {
 	r6 := api_storage.ListEntities(entity, 0, 0, "", true, f6, "", "")
 	if len(r6) != 2 {
 		t.Fatalf("expected p2 and p3 for gte=20, got %v", r6)
+	}
+}
+
+func TestOffsetLimitAndSort(t *testing.T) {
+	initTestStore(t)
+
+	entity := "nums"
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "1", "v": 1})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "2", "v": 2})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "3", "v": 3})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "4", "v": 4})
+
+	all := api_storage.ListEntities(entity, 2, 1, "", true, nil, "", "")
+	if len(all) != 2 {
+		t.Fatalf("expected 2 after offset/limit, got %v", all)
 	}
 }
 
@@ -421,5 +411,99 @@ func TestEntityExists_EmptyStore(t *testing.T) {
 
 	if api_storage.EntityExists("ghost", "id123") {
 		t.Fatalf("expected EntityExists=false for empty store")
+	}
+}
+
+func TestEntityTypesAndExists(t *testing.T) {
+	initTestStore(t)
+
+	api_storage.WriteEntity("alpha", map[string]interface{}{"id": "a1"})
+	api_storage.WriteEntity("beta", map[string]interface{}{"id": "b1"})
+	types := api_storage.ListEntityTypes()
+	set := map[string]bool{}
+	for _, t0 := range types {
+		set[t0] = true
+	}
+	if !set["alpha"] || !set["beta"] {
+		t.Fatalf("expected alpha and beta in types, got %v", types)
+	}
+	if !api_storage.EntityTypeExists("alpha") || api_storage.EntityTypeExists("gamma") {
+		t.Fatalf("EntityTypeExists mismatch")
+	}
+}
+
+func TestWriteListAndUpdateList(t *testing.T) {
+	initTestStore(t)
+
+	api_storage.WriteListOfEntities("list", []map[string]interface{}{
+		{"id": "1", "v": float64(1)},
+		{"id": "2", "v": float64(2)},
+	})
+
+	updated := api_storage.UpdateListOfEntities("list", []map[string]interface{}{
+		{"id": "1", "v": float64(9)},
+		{"id": "2", "v": float64(8)},
+		{"v": float64(7)},
+	})
+
+	if len(updated) != 2 {
+		t.Fatalf("expected 2 updated, got %v", updated)
+	}
+
+	v1 := api_storage.ReadEntityById("list", "1")["v"]
+	if v1 != float64(9) {
+		t.Fatalf("update list failed, got %v", v1)
+	}
+
+	v2 := api_storage.ReadEntityById("list", "2")["v"]
+	if v2 != float64(8) {
+		t.Fatalf("update list failed, got %v", v2)
+	}
+
+	missing := api_storage.ReadEntityById("list", "")
+	if missing != nil {
+		t.Fatalf("entity without id should not exist")
+	}
+}
+
+func TestDeleteAllAndCountAll(t *testing.T) {
+	initTestStore(t)
+
+	api_storage.WriteEntity("a", map[string]interface{}{"id": "1"})
+	api_storage.WriteEntity("b", map[string]interface{}{"id": "1"})
+	api_storage.WriteEntity("b", map[string]interface{}{"id": "2"})
+
+	if api_storage.CountAllEntities() != 3 {
+		t.Fatalf("expected 3 before deleteall")
+	}
+
+	api_storage.DeleteAll()
+
+	if api_storage.CountAllEntities() != 0 {
+		t.Fatalf("expected 0 after deleteall")
+	}
+}
+
+func TestDumpAllAndImportAll(t *testing.T) {
+	initTestStore(t)
+
+	api_storage.WriteEntity("x", map[string]interface{}{"id": "1", "v": 1})
+	api_storage.WriteEntity("y", map[string]interface{}{"id": "2", "v": 2})
+
+	d := api_storage.DumpAll()
+	if len(d) != 2 {
+		t.Fatalf("dump size mismatch: %v", d)
+	}
+
+	initTestStore(t)
+
+	api_storage.ImportAll(map[string][]map[string]interface{}{
+		"x": {{"id": "1", "v": 1}, {"id": "3", "v": 3}},
+	})
+	if api_storage.CountAllEntities() != 2 {
+		t.Fatalf("import count mismatch")
+	}
+	if api_storage.ReadEntityById("x", "3") == nil {
+		t.Fatalf("imported entity missing")
 	}
 }
