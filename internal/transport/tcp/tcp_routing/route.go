@@ -46,6 +46,11 @@ func RouteLine(line []byte, c net.Conn) []byte {
 
 func extractTTLFromQuery(query *[]byte) int {
 	ttlParam, rest := parsing.FirstWordBytes(*query)
+
+	if len(ttlParam) < 4 {
+		return 0
+	}
+
 	if parsing.EqASCII(ttlParam[:4], []byte("TTL=")) {
 		ttl, err := parsing.ParseDecimalBytes(ttlParam[4:])
 		if err != nil || ttl < 0 {
@@ -53,7 +58,6 @@ func extractTTLFromQuery(query *[]byte) int {
 		}
 
 		*query = rest
-
 		return ttl
 	}
 

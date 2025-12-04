@@ -210,6 +210,14 @@ func DeleteAllEntities(entity string) {
 	RemoveEntityIndexes(entity)
 }
 
+func DeleteAll() {
+	entities := ListEntityTypes()
+
+	for _, entity := range entities {
+		DeleteAllEntities(entity)
+	}
+}
+
 func UpdateEntityById(entity string, id string, updated map[string]interface{}) map[string]interface{} {
 	existing := ReadEntityById(entity, id)
 	if existing == nil {
