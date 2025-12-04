@@ -10,6 +10,10 @@ log:
   flushIntervalSeconds: 5
 stats:
   enabled: false
+security:
+  authentication:
+    enabled: false
+    mode: basic
 api:
   schema:
     enabled: true

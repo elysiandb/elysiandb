@@ -1,64 +1,28 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 
-	"github.com/taymour/elysiandb/internal/boot"
+	"github.com/taymour/elysiandb/internal/cmd"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
-	"github.com/taymour/elysiandb/internal/storage"
-)
-
-const (
-	reset  = "\033[0m"
-	bold   = "\033[1m"
-	faint  = "\033[2m"
-	gold   = "\033[38;5;220m"
-	blue   = "\033[38;5;27m"
-	violet = "\033[38;5;57m"
-	gray   = "\033[38;5;245m"
 )
 
 func banner() {
-	fmt.Printf("\n%s", blue)
+	fmt.Printf("\n%s", globals.Blue)
 	fmt.Println(" ╔═══════════════════════════════════════════════════════════════════╗")
-	fmt.Printf(" ║ %s%-63s%s   ║\n", gold+bold, "ElysianDB", reset+blue)
-	fmt.Printf(" ║ %s%-63s%s   ║\n", gray, "A modern, lightweight KV datastore", reset+blue)
-	fmt.Printf(" ║ %s%-63s%s   ║\n", gold, "→ Instant REST API, out of the box", reset+blue)
-	fmt.Println(" ╚═══════════════════════════════════════════════════════════════════╝" + reset)
+	fmt.Printf(" ║ %s%-63s%s   ║\n", globals.Gold+globals.Bold, "ElysianDB", globals.Reset+globals.Blue)
+	fmt.Printf(" ║ %s%-63s%s   ║\n", globals.Gray, "A modern, lightweight KV datastore", globals.Reset+globals.Blue)
+	fmt.Printf(" ║ %s%-63s%s   ║\n", globals.Gold, "→ Instant REST API, out of the box", globals.Reset+globals.Blue)
+	fmt.Println(" ╚═══════════════════════════════════════════════════════════════════╝" + globals.Reset)
 }
 
 func main() {
 	banner()
 
-	args := os.Args
-
-	if len(args) == 1 {
-		StartServer()
-		return
-	}
-
-	switch args[1] {
-	case "server":
-		StartServer()
-	default:
-		fmt.Printf("%sUnknown command: %s%s\n", gold, args[1], reset)
-		printListOfCommands()
-	}
-}
-
-func printListOfCommands() {
-	fmt.Printf("%sAvailable commands:%s\n", gold, reset)
-	fmt.Printf("  %sserver%s       Start ElysianDB server\n", bold, reset)
-}
-
-func StartServer() {
 	configFilename := flag.String("config", "elysian.yaml", "Path to configuration file")
 	flag.Parse()
 
@@ -69,31 +33,26 @@ func StartServer() {
 	}
 	globals.SetConfig(cfg)
 
-	fmt.Printf("%s%sStorage%s  %s%s%s\n", violet, bold, reset, gray, globals.GetConfig().Store.Folder, reset)
+	args := os.Args
 
-	if cfg.Stats.Enabled {
-		boot.BootStats()
+	if len(args) == 1 {
+		cmd.StartServer()
+		return
 	}
 
-	boot.InitDB()
-
-	fmt.Printf("%s%sReady%s   %sServing a KV datastore with %sInstant REST API%s.\n", blue, bold, reset, gray, gold, reset)
-
-	if cfg.Server.HTTP.Enabled {
-		go boot.StartHTTP()
-		fmt.Printf("%sHTTP%s     %shttp://%s:%d%s  %s(KV store & Instant REST API)%s\n",
-			gold, reset, bold, cfg.Server.HTTP.Host, cfg.Server.HTTP.Port, reset, gray, reset)
+	switch args[1] {
+	case "server":
+		cmd.StartServer()
+	case "create-user":
+		cmd.CreateUser()
+	default:
+		fmt.Printf("%sUnknown command: %s%s\n", globals.Gold, args[1], globals.Reset)
+		printListOfCommands()
 	}
-	if cfg.Server.TCP.Enabled {
-		go boot.InitTCP()
-		fmt.Printf("%sTCP %s     %s%s:%d%s\n", gold, reset, bold, cfg.Server.TCP.Host, cfg.Server.TCP.Port, reset)
-	}
+}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	<-ctx.Done()
-
-	storage.WriteToDB()
-	fmt.Printf("\n%sPersisted%s  %sAll data flushed to disk.%s\n", gold, reset, gray, reset)
-	fmt.Printf("%sGoodbye%s   %sElysianDB shutting down gracefully.%s\n", blue, reset, faint, reset)
+func printListOfCommands() {
+	fmt.Printf("%sAvailable commands:%s\n", globals.Gold, globals.Reset)
+	fmt.Printf("  %sserver%s       Start ElysianDB server\n", globals.Bold, globals.Reset)
+	fmt.Printf("  %screate-user%s  Create a new user\n", globals.Bold, globals.Reset)
 }

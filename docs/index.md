@@ -61,13 +61,15 @@ api:
 | **store.crashRecovery.maxLogMB**     | Maximum size of recovery logs before flush                                            |
 | **server.http**                      | Enables and configures the HTTP REST/KV interface                                     |
 | **server.tcp**                       | Enables and configures the TCP text protocol interface                                |
-| **log.flushIntervalSeconds**         | Interval for flushing in‑memory logs                                                  |
+| **log.flushIntervalSeconds**         | Interval for flushing in-memory logs                                                  |
 | **stats.enabled**                    | Enables runtime metrics and `/stats` endpoint                                         |
 | **api.index.workers**                | Number of workers that rebuild dirty indexes                                          |
 | **api.cache.enabled**                | Enables REST API caching for repeated queries                                         |
 | **api.schema.enabled**               | Enables automatic schema inference and validation                                     |
 | **api.schema.strict**                | If true and schema is manual, new fields are rejected and deep validation is enforced |
 | **api.cache.cleanupIntervalSeconds** | Interval for cache expiration cleanup                                                 |
+| **security.authentication.enabled**  | Enables authentication layer for all endpoints                                        |
+| **security.authentication.mode**     | Authentication mode (currently supports `basic`)                                      |
 
 ---
 
@@ -459,6 +461,78 @@ curl "http://localhost:8089/api/posts?includes=author,author.job&filter[author.j
 ```
 
 Using `includes=all` expands all linked entities recursively.
+
+---
+
+## Authentication
+
+ElysianDB supports optional HTTP Basic authentication to protect all REST and KV endpoints.
+
+### Configuration
+
+Enable authentication in your `elysian.yaml`:
+
+```yaml
+security:
+  authentication:
+    enabled: true
+    mode: basic
+```
+
+If `enabled` is false, all endpoints are publicly accessible.
+
+---
+
+## User Management
+
+Users are stored in the `users.json` file inside the configured `store.folder` directory.
+Passwords are hashed with bcrypt and salted using a server-generated key stored in `users.key`.
+
+---
+
+## Client Usage
+
+All requests must include an `Authorization` header.
+
+Format:
+
+```
+Authorization: Basic base64(username:password)
+```
+
+Example for `admin:secret`:
+
+```
+Authorization: Basic YWRtaW46c2VjcmV0
+```
+
+### curl
+
+```bash
+curl -u admin:secret http://localhost:8089/api
+```
+
+---
+
+## Error Handling
+
+If authentication fails, the server returns:
+
+```
+401 Unauthorized
+```
+
+Requests without authentication headers are rejected when authentication is enabled.
+
+---
+
+## Security Notes
+
+* Passwords are never stored in plaintext
+* Hashing is done using bcrypt
+* A per-instance secret key is used as a salt
+* Deleting `users.key` invalidates all existing passwords
+* Deleting `users.json` removes all users
 
 ---
 

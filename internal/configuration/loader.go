@@ -8,12 +8,22 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+type SecurityConfig struct {
+	Authentication AuthenticationConfig `yaml:"authentication"`
+}
+
+type AuthenticationConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Mode    string `yaml:"mode"`
+}
+
 type Config struct {
-	Store  StoreConfig   `yaml:"store"`
-	Server ServersConfig `yaml:"server"`
-	Log    LogConfig     `yaml:"log"`
-	Stats  StatsConfig   `yaml:"stats"`
-	Api    ApiConfig     `yaml:"api"`
+	Store    StoreConfig    `yaml:"store"`
+	Server   ServersConfig  `yaml:"server"`
+	Log      LogConfig      `yaml:"log"`
+	Security SecurityConfig `yaml:"security"`
+	Stats    StatsConfig    `yaml:"stats"`
+	Api      ApiConfig      `yaml:"api"`
 }
 
 type ServersConfig struct {
