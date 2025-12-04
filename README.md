@@ -133,9 +133,9 @@ api:
 ## Build and Run
 
 ```bash
-go build && ./elysiandb
+go build && ./elysiandb server
 # or
-go run elysiandb.go
+go run elysiandb.go server
 ```
 
 ---

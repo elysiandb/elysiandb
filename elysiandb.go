@@ -37,6 +37,28 @@ func banner() {
 func main() {
 	banner()
 
+	args := os.Args
+
+	if len(args) == 1 {
+		StartServer()
+		return
+	}
+
+	switch args[1] {
+	case "server":
+		StartServer()
+	default:
+		fmt.Printf("%sUnknown command: %s%s\n", gold, args[1], reset)
+		printListOfCommands()
+	}
+}
+
+func printListOfCommands() {
+	fmt.Printf("%sAvailable commands:%s\n", gold, reset)
+	fmt.Printf("  %sserver%s       Start ElysianDB server\n", bold, reset)
+}
+
+func StartServer() {
 	configFilename := flag.String("config", "elysian.yaml", "Path to configuration file")
 	flag.Parse()
 
