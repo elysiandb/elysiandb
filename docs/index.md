@@ -665,9 +665,9 @@ Example output:
 ## Development
 
 ```bash
-go build && ./elysiandb
+go build && ./elysiandb server
 # or
-make run
+make server
 ```
 
 Run tests:

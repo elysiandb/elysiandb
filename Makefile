@@ -31,3 +31,6 @@ test-cover:
 install:
 	rm -f /usr/local/bin/elysiandb
 	go build -o /usr/local/bin/elysiandb .
+
+server:
+	go run . server
