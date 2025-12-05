@@ -466,35 +466,45 @@ Using `includes=all` expands all linked entities recursively.
 
 ## Authentication
 
-ElysianDB supports optional HTTP Basic authentication to protect all REST and KV endpoints.
+ElysianDB supports optional authentication to protect all REST and KV endpoints. Two modes are available: `basic` and `token`.
 
 ### Configuration
 
 Enable authentication in your `elysian.yaml`:
 
 ```yaml
-security:
-  authentication:
-    enabled: true
-    mode: basic
+authentication:
+  enabled: true
+  mode: basic   # basic or token
 ```
 
 If `enabled` is false, all endpoints are publicly accessible.
 
+When using `token` mode, define a token:
+
+```yaml
+authentication:
+  enabled: true
+  mode: token
+  token: my-secret-token
+```
+
 ---
 
-## User Management
+## User Management (Basic Auth)
 
-Users are stored in the `users.json` file inside the configured `store.folder` directory.
-Passwords are hashed with bcrypt and salted using a server-generated key stored in `users.key`.
+When running in `basic` mode, users are stored in the `users.json` file inside the configured `store.folder` directory.
+Passwords are hashed with bcrypt after combining them with a server-generated secret stored in `users.key`.
+
+Both files are automatically created when needed.
 
 ---
 
 ## Client Usage
 
-All requests must include an `Authorization` header.
+### Basic Authentication
 
-Format:
+All requests must include an `Authorization` header:
 
 ```
 Authorization: Basic base64(username:password)
@@ -506,10 +516,32 @@ Example for `admin:secret`:
 Authorization: Basic YWRtaW46c2VjcmV0
 ```
 
-### curl
+### Token Authentication
+
+When using token mode:
+
+```
+Authorization: Bearer your-token
+```
+
+Example:
+
+```
+Authorization: Bearer my-secret-token
+```
+
+### curl Examples
+
+Basic auth:
 
 ```bash
 curl -u admin:secret http://localhost:8089/api
+```
+
+token auth:
+
+```bash
+curl -H "Authorization: Bearer my-secret-token" http://localhost:8089/api
 ```
 
 ---
@@ -530,9 +562,10 @@ Requests without authentication headers are rejected when authentication is enab
 
 * Passwords are never stored in plaintext
 * Hashing is done using bcrypt
-* A per-instance secret key is used as a salt
-* Deleting `users.key` invalidates all existing passwords
+* A per-instance secret key is used as part of the hashing process
+* Deleting `users.key` invalidates all stored password hashes
 * Deleting `users.json` removes all users
+* In `token` mode, anyone with the token can fully access the API
 
 ---
 

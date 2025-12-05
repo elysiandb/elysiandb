@@ -12,8 +12,9 @@ stats:
   enabled: false
 security:
   authentication:
-    enabled: false
-    mode: basic
+    enabled: true
+    mode: token
+    token: "your_secure_token_here"
 api:
   schema:
     enabled: true

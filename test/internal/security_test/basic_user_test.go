@@ -1,6 +1,7 @@
 package security_test
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func setup(t *testing.T) string {
@@ -148,24 +150,43 @@ func TestToHasedUser(t *testing.T) {
 }
 
 func TestCheckBasicAuthenticationSuccess(t *testing.T) {
-	setup(t)
+	globals.SetConfig(&configuration.Config{})
+	globals.GetConfig().Store.Folder = t.TempDir()
+	globals.GetConfig().Security.Authentication.Enabled = true
+	globals.GetConfig().Security.Authentication.Mode = "basic"
 
-	user := &security.BasicUser{Username: "admin", Password: "secret"}
-	if err := security.CreateBasicUser(user); err != nil {
-		t.Fatal(err)
+	key, err := security.CreateKeyFileOrGetKey()
+	if err != nil {
+		t.Fatalf("key error: %v", err)
 	}
 
-	req := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(req)
+	sum := sha256.Sum256([]byte("secret" + key))
+	pass := sum[:]
 
-	token := base64.StdEncoding.EncodeToString([]byte("admin:secret"))
-	req.Header.Set("Authorization", "Basic "+token)
+	hashed, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("bcrypt error: %v", err)
+	}
+
+	user := &security.BasicHashedcUser{
+		Username: "john",
+		Password: string(hashed),
+	}
+
+	if err := security.AddUserToFile(user); err != nil {
+		t.Fatalf("add user error: %v", err)
+	}
+
+	header := "Basic " + base64.StdEncoding.EncodeToString([]byte("john:secret"))
+
+	req := fasthttp.AcquireRequest()
+	req.Header.Set("Authorization", header)
 
 	ctx := fasthttp.RequestCtx{}
 	ctx.Init(req, nil, nil)
 
 	if !security.CheckBasicAuthentication(&ctx) {
-		t.Fatal("authentication failed")
+		t.Fatalf("authentication failed")
 	}
 }
 

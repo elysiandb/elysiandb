@@ -45,8 +45,8 @@ func (u *BasicUser) ToHasedUser() (*BasicHashedcUser, error) {
 }
 
 type BasicHashedcUser struct {
-	Username string
-	Password string
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 type UsersFile struct {
@@ -79,10 +79,13 @@ func GenerateKey() (string, error) {
 
 func CreateKeyFileOrGetKey() (string, error) {
 	cfg := globals.GetConfig()
-	file, err := os.OpenFile(fmt.Sprintf("%s/%s", cfg.Store.Folder, KeyFilename), os.O_RDWR|os.O_CREATE, 0644)
+	path := fmt.Sprintf("%s/%s", cfg.Store.Folder, KeyFilename)
+
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return "", err
 	}
+	defer file.Close()
 
 	fileInfo, err := file.Stat()
 	if err != nil {
@@ -95,14 +98,15 @@ func CreateKeyFileOrGetKey() (string, error) {
 			return "", err
 		}
 
-		_, err = file.WriteString(key)
-		if err != nil {
+		if _, err := file.WriteAt([]byte(key), 0); err != nil {
 			return "", err
 		}
 
-		defer file.Close()
-
 		return key, nil
+	}
+
+	if _, err := file.Seek(0, 0); err != nil {
+		return "", err
 	}
 
 	var key string
@@ -110,8 +114,6 @@ func CreateKeyFileOrGetKey() (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	defer file.Close()
 
 	return key, nil
 }
@@ -168,7 +170,7 @@ func LoadUsersFromFile() (*UsersFile, error) {
 	return &users, nil
 }
 
-func CheckBasicAuthentication(ctx *fasthttp.RequestCtx) bool {
+var CheckBasicAuthentication = func(ctx *fasthttp.RequestCtx) bool {
 	header := string(ctx.Request.Header.Peek("Authorization"))
 	if header == "" || !strings.HasPrefix(header, "Basic ") {
 		return false
