@@ -793,6 +793,74 @@ make api_benchmark # requires installing k6
 
 ---
 
+## Command-Line Interface (CLI)
+
+ElysianDB provides a simple command-line interface with three available commands.
+
+### 1. `server` (default)
+
+Starts the ElysianDB server using the configuration file.
+
+```bash
+elysiandb server
+```
+
+Running the binary without arguments is equivalent:
+
+```bash
+elysiandb
+```
+
+---
+
+### 2. `create-user` (basic authentication only)
+
+Creates a new user when the authentication mode is set to `basic`.
+
+```bash
+elysiandb create-user
+```
+
+The command interactively prompts for:
+
+* username
+* password
+
+The user is stored in:
+
+```
+<store.folder>/users.json
+```
+
+---
+
+### 3. `delete-user` (basic authentication only)
+
+Deletes an existing user.
+
+```bash
+elysiandb delete-user
+```
+
+The command prompts for the username to remove. If the user does not exist, an error is returned.
+
+---
+
+## Requirements
+
+Both `create-user` and `delete-user` require the following configuration:
+
+```yaml
+security:
+  authentication:
+    enabled: true
+    mode: basic
+```
+
+These commands are not available when using the `token` authentication mode.
+
+---
+
 ## Docker
 
 ```bash

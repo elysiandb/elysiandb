@@ -13,7 +13,7 @@ stats:
 security:
   authentication:
     enabled: true
-    mode: token
+    mode: basic
     token: "your_secure_token_here"
 api:
   schema:
