@@ -15,6 +15,7 @@ type SecurityConfig struct {
 type AuthenticationConfig struct {
 	Enabled bool   `yaml:"enabled"`
 	Mode    string `yaml:"mode"`
+	Token   string `yaml:"token"`
 }
 
 type Config struct {
@@ -89,6 +90,12 @@ func LoadConfig(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		log.Fatal("error:", err)
 		return nil, err
+	}
+
+	if cfg.Security.Authentication.Enabled && cfg.Security.Authentication.Mode == "token" {
+		if cfg.Security.Authentication.Token == "" {
+			return nil, fmt.Errorf("token authentication is enabled but no token is provided in the configuration")
+		}
 	}
 
 	return &cfg, nil

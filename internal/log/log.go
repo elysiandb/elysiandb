@@ -31,6 +31,10 @@ func DirectInfo(args ...interface{}) {
 	directLog("INFO", cyan, args...)
 }
 
+func DirectError(args ...interface{}) {
+	directLog("ERROR", red, args...)
+}
+
 func Success(args ...interface{}) {
 	go log("SUCCESS", green, args...)
 }

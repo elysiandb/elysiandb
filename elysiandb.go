@@ -28,9 +28,10 @@ func main() {
 
 	cfg, err := configuration.LoadConfig(*configFilename)
 	if err != nil {
-		log.Error("Error loading config:", err)
+		log.DirectError("Error loading config:", err)
 		return
 	}
+
 	globals.SetConfig(cfg)
 
 	args := os.Args

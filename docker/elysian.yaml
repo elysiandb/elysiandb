@@ -12,6 +12,11 @@ log:
   flushIntervalSeconds: 5
 stats:
   enabled: false
+security:
+  authentication:
+    enabled: false
+    mode: token
+    token: "your_secure_token_here"
 api:
   index:
     workers: 4

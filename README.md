@@ -26,7 +26,7 @@ No schema files. No migrations. No ORMs. Just start and query.
 * Protocols — HTTP REST, TCP (Redis-style text protocol)
 * High performance — minimal allocations and cache-friendly design
 * Transactions - basic transactions and atomic operations
-* Built-in Authentication — optional HTTP Basic authentication with salted bcrypt hashing
+* Built-in Authentication — optional HTTP Basic authentication with salted bcrypt hashing or Token based authentication
 
 ---
 
@@ -123,7 +123,8 @@ stats:
 security:
   authentication:
     enabled: false
-    mode: basic
+    mode: token
+    token: "your_secure_token"
 api:
   index:
     workers: 4
