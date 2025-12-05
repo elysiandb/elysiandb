@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -61,6 +62,46 @@ func CreateBasicUser(user *BasicUser) error {
 
 	err = AddUserToFile(hashedUser)
 	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func DeleteBasicUser(username string) error {
+	usersFile, err := LoadUsersFromFile()
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("no users exist yet")
+		}
+		return err
+	}
+
+	var updatedUsers []BasicHashedcUser
+	found := false
+	for _, user := range usersFile.Users {
+		if user.Username != username {
+			updatedUsers = append(updatedUsers, user)
+		} else {
+			found = true
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("user '%s' not found", username)
+	}
+
+	usersFile.Users = updatedUsers
+
+	cfg := globals.GetConfig()
+	file, err := os.OpenFile(fmt.Sprintf("%s/%s", cfg.Store.Folder, UsersFilename), os.O_RDWR|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	if err := encoder.Encode(usersFile); err != nil {
 		return err
 	}
 

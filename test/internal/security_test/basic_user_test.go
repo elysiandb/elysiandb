@@ -236,3 +236,47 @@ func TestCheckBasicAuthenticationMalformedHeader(t *testing.T) {
 		t.Fatal("authentication should fail")
 	}
 }
+
+func TestDeleteBasicUser_Success(t *testing.T) {
+	setup(t)
+
+	user := &security.BasicUser{Username: "john", Password: "secret"}
+	if err := security.CreateBasicUser(user); err != nil {
+		t.Fatal(err)
+	}
+
+	err := security.DeleteBasicUser("john")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	users, err := security.LoadUsersFromFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(users.Users) != 0 {
+		t.Fatalf("expected user to be deleted")
+	}
+}
+
+func TestDeleteBasicUser_NotFound(t *testing.T) {
+	setup(t)
+
+	err := security.DeleteBasicUser("missing")
+	if err == nil {
+		t.Fatalf("expected error for missing user")
+	}
+}
+
+func TestDeleteBasicUser_NoUsersFile(t *testing.T) {
+	dir := setup(t)
+
+	path := filepath.Join(dir, security.UsersFilename)
+	os.Remove(path)
+
+	err := security.DeleteBasicUser("john")
+	if err == nil {
+		t.Fatalf("expected error when users.json does not exist")
+	}
+}
