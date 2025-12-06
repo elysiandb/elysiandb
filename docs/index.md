@@ -448,7 +448,7 @@ This expands nested linked entities recursively:
 
 #### Filtering on Included Entities
 
-Filters can reference sub-entity fields when `includes` are provided.
+Filters can reference sub-entity fields whether `includes` are provided or not.
 
 ```bash
 curl "http://localhost:8089/api/articles?includes=author&filter[author.fullname][eq]=Alice"

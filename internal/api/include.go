@@ -117,3 +117,59 @@ func buildNextTree(subs []string, forceAll bool) map[string][]string {
 	}
 	return next
 }
+
+func ExtractAutoIncludes(filters map[string]map[string]string) string {
+	set := map[string]struct{}{}
+	for field := range filters {
+		if strings.Contains(field, ".") {
+			parts := strings.Split(field, ".")
+			include := strings.Join(parts[:len(parts)-1], ".")
+			set[include] = struct{}{}
+		}
+	}
+	out := ""
+	first := true
+	for inc := range set {
+		if first {
+			out = inc
+			first = false
+		} else {
+			out = out + "," + inc
+		}
+	}
+	return out
+}
+
+func MergeIncludes(a, b string) string {
+	if a == "" {
+		return b
+	}
+	if b == "" {
+		return a
+	}
+	seen := map[string]struct{}{}
+	out := ""
+
+	add := func(s string) {
+		parts := strings.Split(s, ",")
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
+			}
+			if _, ok := seen[p]; !ok {
+				seen[p] = struct{}{}
+				if out == "" {
+					out = p
+				} else {
+					out = out + "," + p
+				}
+			}
+		}
+	}
+
+	add(a)
+	add(b)
+
+	return out
+}

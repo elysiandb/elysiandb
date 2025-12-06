@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
@@ -192,5 +193,45 @@ func TestApplyIncludes_MissingRelations(t *testing.T) {
 	val := result[0]["unknown"].(map[string]interface{})
 	if val["@entity"] != "missing" {
 		t.Fatalf("unexpected missing entity behavior: %+v", val)
+	}
+}
+
+func TestExtractAutoIncludes_Simple(t *testing.T) {
+	in := map[string]map[string]string{
+		"author.name": {"eq": "John"},
+	}
+	got := api_storage.ExtractAutoIncludes(in)
+	if got != "author" {
+		t.Fatalf("expected author, got %v", got)
+	}
+}
+
+func TestExtractAutoIncludes_Multiple(t *testing.T) {
+	in := map[string]map[string]string{
+		"author.name":        {"eq": "John"},
+		"author.profile.age": {"eq": "20"},
+		"category.title":     {"eq": "news"},
+		"title":              {"eq": "x"},
+	}
+	got := api_storage.ExtractAutoIncludes(in)
+	s := map[string]bool{}
+	for _, v := range strings.Split(got, ",") {
+		s[v] = true
+	}
+	if !s["author"] || !s["author.profile"] || !s["category"] {
+		t.Fatalf("auto includes mismatch: %v", got)
+	}
+}
+
+func TestMergeIncludes(t *testing.T) {
+	a := "author,profile"
+	b := "profile,category"
+	got := api_storage.MergeIncludes(a, b)
+	s := map[string]bool{}
+	for _, v := range strings.Split(got, ",") {
+		s[v] = true
+	}
+	if !s["author"] || !s["profile"] || !s["category"] {
+		t.Fatalf("merge mismatch: %v", got)
 	}
 }

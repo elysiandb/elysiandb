@@ -507,3 +507,78 @@ func TestDumpAllAndImportAll(t *testing.T) {
 		t.Fatalf("imported entity missing")
 	}
 }
+
+func TestListEntities_AutoIncludeNested(t *testing.T) {
+	initTestStore(t)
+
+	entity := "articles"
+	api_storage.WriteEntity(entity, map[string]interface{}{
+		"id":    "a1",
+		"title": "X",
+		"author": map[string]interface{}{
+			"id":   "u1",
+			"name": "Alice",
+		},
+	})
+	api_storage.WriteEntity(entity, map[string]interface{}{
+		"id":    "a2",
+		"title": "Y",
+		"author": map[string]interface{}{
+			"id":   "u2",
+			"name": "Bob",
+		},
+	})
+
+	filters := map[string]map[string]string{"author.name": {"eq": "Alice"}}
+	res := api_storage.ListEntities(entity, 0, 0, "", true, filters, "", "")
+
+	if len(res) != 1 || res[0]["id"] != "a1" {
+		t.Fatalf("expected auto-include match a1, got %v", res)
+	}
+
+	_, ok := res[0]["author"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected author sub-entity to be expanded automatically, got %v", res[0])
+	}
+}
+
+func TestListEntities_AutoIncludeDeepNested(t *testing.T) {
+	initTestStore(t)
+
+	entity := "articles"
+	api_storage.WriteEntity(entity, map[string]interface{}{
+		"id":    "a1",
+		"title": "X",
+		"author": map[string]interface{}{
+			"id":   "u1",
+			"name": "Alice",
+			"profile": map[string]interface{}{
+				"city": "Paris",
+			},
+		},
+	})
+	api_storage.WriteEntity(entity, map[string]interface{}{
+		"id":    "a2",
+		"title": "Y",
+		"author": map[string]interface{}{
+			"id":   "u2",
+			"name": "Bob",
+			"profile": map[string]interface{}{
+				"city": "Lyon",
+			},
+		},
+	})
+
+	filters := map[string]map[string]string{"author.profile.city": {"eq": "Paris"}}
+	res := api_storage.ListEntities(entity, 0, 0, "", true, filters, "", "")
+
+	if len(res) != 1 || res[0]["id"] != "a1" {
+		t.Fatalf("expected only a1, got %v", res)
+	}
+
+	author := res[0]["author"].(map[string]interface{})
+	profile := author["profile"].(map[string]interface{})
+	if profile["city"] != "Paris" {
+		t.Fatalf("expected nested include applied, got %v", res[0])
+	}
+}

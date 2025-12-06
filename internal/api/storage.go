@@ -143,6 +143,9 @@ func ListEntities(
 		}
 	}
 
+	autoInc := ExtractAutoIncludes(filters)
+	includesParam = MergeIncludes(includesParam, autoInc)
+
 	if includesParam != "" {
 		all = ApplyIncludes(all, includesParam)
 	}
