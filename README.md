@@ -7,9 +7,7 @@
 [![JS Client](https://img.shields.io/badge/JS%20Client-available-brightgreen)](https://github.com/elysiandb/client-js)
 
 
-ElysianDB is a blazing-fast, in-memory key–value store with a zero-configuration, auto-generated REST API. Written in Go and optimized with a sharded arena allocator, zero-copy GET path, and cache-friendly JSON storage, ElysianDB lets you spin up a full backend in seconds.
-
-No schema files. No ORMs. Just start and query.
+Its built-in database, automatic REST API generation, and high-performance sharded engine make it one of the fastest ways to build and query data without configuration or tooling.
 
 An Admin Web Interface is currently under development and will soon be available.
 
