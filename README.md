@@ -7,7 +7,9 @@
 
 ElysianDB is a blazing-fast, in-memory key–value store with a zero-configuration, auto-generated REST API. Written in Go and optimized with a sharded arena allocator, zero-copy GET path, and cache-friendly JSON storage, ElysianDB lets you spin up a full backend in seconds.
 
-No schema files. No migrations. No ORMs. Just start and query.
+No schema files. No ORMs. Just start and query.
+
+An Admin Web Interface is currently under development and will soon be available.
 
 ---
 
@@ -27,6 +29,7 @@ No schema files. No migrations. No ORMs. Just start and query.
 * High performance — minimal allocations and cache-friendly design
 * Transactions - basic transactions and atomic operations
 * Built-in Authentication — optional HTTP Basic authentication with salted bcrypt hashing or Token based authentication
+* Admin UI — in progress
 
 ---
 

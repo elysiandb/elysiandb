@@ -68,6 +68,18 @@ func StartServer() {
 		)
 	}
 
+	if cfg.AdminUI.Enabled {
+		fmt.Printf(
+			"%sAdmin dashboard%s    %shttp://%s:%d/admin%s\n",
+			globals.Gold,
+			globals.Reset,
+			globals.Bold,
+			cfg.Server.HTTP.Host,
+			cfg.Server.HTTP.Port,
+			globals.Reset,
+		)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	<-ctx.Done()

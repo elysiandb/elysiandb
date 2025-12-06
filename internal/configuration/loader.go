@@ -1,6 +1,7 @@
 package configuration
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -18,13 +19,10 @@ type AuthenticationConfig struct {
 	Token   string `yaml:"token"`
 }
 
-type Config struct {
-	Store    StoreConfig    `yaml:"store"`
-	Server   ServersConfig  `yaml:"server"`
-	Log      LogConfig      `yaml:"log"`
-	Security SecurityConfig `yaml:"security"`
-	Stats    StatsConfig    `yaml:"stats"`
-	Api      ApiConfig      `yaml:"api"`
+type AdminUIConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
 }
 
 type ServersConfig struct {
@@ -76,6 +74,28 @@ type ApiIndexConfig struct {
 type ApiCacheConfig struct {
 	Enabled                bool `yaml:"enabled"`
 	CleanupIntervalSeconds int  `yaml:"cleanupIntervalSeconds"`
+}
+
+type Config struct {
+	Store    StoreConfig    `yaml:"store"`
+	Server   ServersConfig  `yaml:"server"`
+	Log      LogConfig      `yaml:"log"`
+	Security SecurityConfig `yaml:"security"`
+	Stats    StatsConfig    `yaml:"stats"`
+	Api      ApiConfig      `yaml:"api"`
+	AdminUI  AdminUIConfig  `yaml:"adminui"`
+}
+
+func (c *Config) ToJson() string {
+	copyConfig := *c
+	copyConfig.AdminUI.Password = "******"
+	data, err := json.Marshal(copyConfig)
+	if err != nil {
+		log.Fatal("error:", err)
+		return ""
+	}
+
+	return string(data)
 }
 
 func LoadConfig(path string) (*Config, error) {

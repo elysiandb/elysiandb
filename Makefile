@@ -34,3 +34,9 @@ install:
 
 server:
 	go run . server
+
+build-admin:
+	cd adminui && npm install && npm run build
+
+watch-admin:
+	cd adminui && npm run build:watch

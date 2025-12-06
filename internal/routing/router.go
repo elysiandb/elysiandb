@@ -4,6 +4,7 @@ import (
 	"github.com/fasthttp/router"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/security"
+	http_adminui "github.com/taymour/elysiandb/internal/transport/http/adminui"
 	"github.com/taymour/elysiandb/internal/transport/http/api"
 	api_transaction "github.com/taymour/elysiandb/internal/transport/http/api/transactions"
 	"github.com/taymour/elysiandb/internal/transport/http/controller"
@@ -50,6 +51,11 @@ func RegisterRoutes(r *router.Router) {
 	r.PUT("/api/tx/{txId}/entity/{entity}/{id}", Version(security.Authenticate(api_transaction.UpdateTransactionController)))
 	r.DELETE("/api/tx/{txId}/entity/{entity}/{id}", Version(security.Authenticate(api_transaction.DeleteTransactionController)))
 	r.POST("/api/tx/{txId}/commit", Version(security.Authenticate(api_transaction.CommitTransactionController)))
+
+	if globals.GetConfig().AdminUI.Enabled {
+		r.GET("/admin/config", http_adminui.AdminUIAuth(controller.GetConfigController))
+		r.GET("/admin/{filepath:*}", http_adminui.AdminUIAuth(http_adminui.AdminUIHandler))
+	}
 }
 
 func Version(requestHandler fasthttp.RequestHandler) fasthttp.RequestHandler {
