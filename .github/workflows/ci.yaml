@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: ["1.23.x"]
+        go-version: ["1.24.x"]
 
     steps:
       - name: Checkout
@@ -24,6 +24,9 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
+
+      - name: Ensure adminui dist exists
+        run: mkdir -p adminui/dist
 
       - name: Verify go.mod
         run: go mod tidy && git diff --exit-code
