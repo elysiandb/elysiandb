@@ -1,4 +1,4 @@
-# ElysianDB — Lightweight KV Store with Instant Zero-Config REST API
+# ElysianDB — The Database That Generates Your API
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/taymour/elysiandb.svg)](https://hub.docker.com/r/taymour/elysiandb)
 [![Tests](https://img.shields.io/github/actions/workflow/status/taymour/elysiandb/ci.yaml?branch=main\&label=tests)](https://github.com/taymour/elysiandb/actions/workflows/ci.yaml)
