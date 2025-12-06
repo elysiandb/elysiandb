@@ -4,6 +4,8 @@
 [![Tests](https://img.shields.io/github/actions/workflow/status/taymour/elysiandb/ci.yaml?branch=main\&label=tests)](https://github.com/taymour/elysiandb/actions/workflows/ci.yaml)
 [![Coverage](https://codecov.io/gh/elysiandb/elysiandb/branch/main/graph/badge.svg)](https://codecov.io/gh/taymour/elysiandb)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![JS Client](https://img.shields.io/badge/JS%20Client-available-brightgreen)](https://github.com/elysiandb/client-js)
+
 
 ElysianDB is a blazing-fast, in-memory key–value store with a zero-configuration, auto-generated REST API. Written in Go and optimized with a sharded arena allocator, zero-copy GET path, and cache-friendly JSON storage, ElysianDB lets you spin up a full backend in seconds.
 
@@ -63,40 +65,11 @@ Mixed CRUD, filtering, sorting, nested create, includes. Not microbenchmarks.
 
 ---
 
-## Schema Features
+## Official Clients
 
-ElysianDB now includes complete schema handling:
-
-### Automatic Inference
-
-* First inserted document defines the inferred schema
-* Schema evolves as fields appear, unless strict mode is enabled
-
-### Schema Inspection
-
-* GET /api/<entity>/schema returns the current schema
-
-### Manual Schema Definition
-
-* PUT /api/<entity>/schema replaces the inferred schema and locks it
-* Manual schemas take precedence and stop automatic evolution
-
-### Strict Mode
-
-Configured via:
-
-```yaml
-api:
-  schema:
-    enabled: true
-    strict: true
-```
-
-When strict is enabled:
-
-* New fields are rejected
-* Writes must match the schema exactly
-* Nested fields and arrays are validated recursively
+### JavaScript / TypeScript
+Repository: https://github.com/elysiandb/elysiandbjs-client  
+Install: `npm install @elysiandbjs/client`
 
 ---
 
