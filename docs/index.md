@@ -1,6 +1,7 @@
 # ElysianDB Documentation
 
-ElysianDB is a **lightweight key–value datastore** written in Go. It provides a **zero‑configuration REST API**, a **simple KV HTTP API**, and a **Redis‑style TCP protocol**.
+ElysianDB turns raw JSON into a complete backend instantly.
+With a built-in datastore, auto-generated REST API, and optional KV/TCP interfaces, it gives you a database and a backend in a single, ultra-fast Go binary.
 
 This document explains how to use ElysianDB, its features, configuration, and runtime behavior.
 
