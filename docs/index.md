@@ -84,6 +84,7 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 
 | Method   | Endpoint                      | Description                                                 |
 | -------- | ----------------------------- | ----------------------------------------------------------- |
+| `POST`   | `/api/<entity>/create`        | Create a new type of entity with schema                     |
 | `POST`   | `/api/<entity>`               | Create one or multiple JSON documents (auto‑ID if missing)  |
 | `GET`    | `/api/<entity>`               | List all documents, supports pagination, sorting, filtering |
 | `GET`    | `/api/<entity>/schema`        | Schema for entity                                           |
@@ -97,6 +98,122 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 | `POST`   | `/api/<entity>/migrate`       | Run a **migration** across all documents for an entity      |
 | `GET`    | `/api/<entity>/count`         | Counts all documents for an entity                          |
 | `GET`    | `/api/<entity>/<id>/exists`   | Verifiy if an entity exists                                 |
+
+---
+
+### Entity Type Creation
+
+ElysianDB allows you to explicitly **declare an entity type and its schema** before inserting any data.
+This uses the same schema format and validation rules described in the **Schema API section** of the documentation.
+
+---
+
+#### Endpoint
+
+```http
+POST /api/<entity>/create
+```
+
+`<entity>` is the name of the entity you want to define (e.g. `books`, `movies`, `users`).
+
+---
+
+#### Request Body
+
+The body must contain a `fields` object describing the schema of the entity.
+Two forms are supported:
+
+**Shorthand form:**
+
+```json
+{
+  "fields": {
+    "title": "string",
+    "pages": "number"
+  }
+}
+```
+
+**Full form (same structure as manual schemas):**
+
+```json
+{
+  "fields": {
+    "title": { "type": "string", "required": true },
+    "pages": { "type": "number", "required": false }
+  }
+}
+```
+
+ElysianDB converts this payload into a **manual schema** for the entity.
+
+---
+
+#### Behavior
+
+On success:
+
+* The entity type is registered.
+* A manual schema is stored for the entity (see Schema API for details).
+* Strict schema rules immediately apply for that entity. You can later adjust or replace this schema at any time using `PUT /api/<entity>/schema`.
+
+Example response:
+
+```json
+{
+  "id": "books",
+  "fields": {
+    "title": { "type": "string", "required": true },
+    "pages": { "type": "number", "required": false }
+  },
+  "_manual": true
+}
+```
+
+---
+
+#### Error Handling
+
+`400 Bad Request` is returned when:
+
+* the JSON body is invalid
+* the `fields` property is missing or invalid
+* the entity type already exists
+
+In all error cases, nothing is created.
+
+---
+
+#### Example Usage
+
+**1) Declare the entity type:**
+
+```bash
+curl -X POST http://localhost:8089/api/book/create \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "fields": {
+      "title": { "type": "string", "required": true },
+      "pages": { "type": "number", "required": false }
+    }
+  }'
+```
+
+**2) Insert a valid book:**
+
+```bash
+curl -X POST http://localhost:8089/api/book \
+  -H 'Content-Type: application/json' \
+  -d '{ "title": "Dune", "pages": 700 }'
+```
+
+**3) Invalid insert (missing required field):**
+
+```bash
+curl -X POST http://localhost:8089/api/book \
+  -H 'Content-Type: application/json' \
+  -d '{ "pages": 123 }'
+```
 
 ---
 

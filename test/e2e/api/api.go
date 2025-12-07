@@ -1667,3 +1667,127 @@ func TestAutoREST_List_CountOnly_WithSearch(t *testing.T) {
 		t.Fatalf("expected 2, got %v", out["count"])
 	}
 }
+
+func TestTypeAPI_CreateType_OK(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	resp := mustPOSTJSON(t, client, "http://test/api/book/create", map[string]any{
+		"fields": map[string]any{
+			"title": "string",
+			"pages": "number",
+		},
+	})
+	if resp.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", resp.StatusCode(), resp.Body())
+	}
+
+	gr := mustGET(t, client, "http://test/api/book/schema")
+	if gr.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200 schema, got %d", gr.StatusCode())
+	}
+
+	var schema map[string]any
+	json.Unmarshal(gr.Body(), &schema)
+	f := schema["fields"].(map[string]any)
+
+	if _, ok := f["title"]; !ok {
+		t.Fatalf("missing field title")
+	}
+	if _, ok := f["pages"]; !ok {
+		t.Fatalf("missing field pages")
+	}
+}
+
+func TestTypeAPI_CreateType_InvalidJSON(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	req.Header.SetMethod("POST")
+	req.SetRequestURI("http://test/api/badtype/create")
+	req.SetBody([]byte(`{invalid-json`))
+	client.Do(req, resp)
+	fasthttp.ReleaseRequest(req)
+
+	if resp.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.StatusCode())
+	}
+
+	gr := mustGET(t, client, "http://test/api/badtype/schema")
+	if gr.StatusCode() != fasthttp.StatusNotFound {
+		t.Fatalf("type should not be created on invalid JSON, got %d", gr.StatusCode())
+	}
+}
+
+func TestTypeAPI_CreateType_NoFields(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	resp := mustPOSTJSON(t, client, "http://test/api/test/create", map[string]any{
+		"x": 1,
+	})
+	if resp.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatalf("expected 400, got %d (%s)", resp.StatusCode(), resp.Body())
+	}
+
+	gr := mustGET(t, client, "http://test/api/test/schema")
+	if gr.StatusCode() != fasthttp.StatusNotFound {
+		t.Fatalf("expected rollback for missing fields, got %d", gr.StatusCode())
+	}
+}
+
+func TestTypeAPI_CreateType_AlreadyExists(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/demo/create", map[string]any{
+		"fields": map[string]any{"a": "string"},
+	})
+
+	resp := mustPOSTJSON(t, client, "http://test/api/demo/create", map[string]any{
+		"fields": map[string]any{"a": "string"},
+	})
+	if resp.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.StatusCode())
+	}
+}
+
+func TestTypeAPI_CreateType_ThenCreateEntity(t *testing.T) {
+	client, stop := startTestServer(t)
+	defer stop()
+
+	mustPOSTJSON(t, client, "http://test/api/movie/create", map[string]any{
+		"fields": map[string]any{
+			"title": "string",
+			"year":  "number",
+		},
+	})
+
+	resp := mustPOSTJSON(t, client, "http://test/api/movie", map[string]any{
+		"title": "Inception",
+		"year":  2010,
+	})
+	if resp.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode())
+	}
+
+	var movie map[string]any
+	json.Unmarshal(resp.Body(), &movie)
+
+	id := movie["id"].(string)
+	gr := mustGET(t, client, "http://test/api/movie/"+id)
+	if gr.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200 getById, got %d", gr.StatusCode())
+	}
+
+	var got map[string]any
+	json.Unmarshal(gr.Body(), &got)
+	if got["title"] != "Inception" {
+		t.Fatalf("expected Inception, got %+v", got)
+	}
+	if got["year"] != float64(2010) {
+		t.Fatalf("expected year 2010, got %+v", got)
+	}
+}

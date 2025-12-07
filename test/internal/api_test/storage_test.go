@@ -582,3 +582,85 @@ func TestListEntities_AutoIncludeDeepNested(t *testing.T) {
 		t.Fatalf("expected nested include applied, got %v", res[0])
 	}
 }
+
+func TestCreateEntityType(t *testing.T) {
+	initTestStore(t)
+
+	err := api_storage.CreateEntityType("foo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !api_storage.EntityTypeExists("foo") {
+		t.Fatalf("expected foo to exist after creation")
+	}
+
+	err = api_storage.CreateEntityType("foo")
+	if err == nil {
+		t.Fatalf("expected error when creating existing type")
+	}
+}
+
+func TestDeleteEntityType(t *testing.T) {
+	initTestStore(t)
+
+	api_storage.CreateEntityType("foo")
+	api_storage.WriteEntity("foo", map[string]interface{}{"id": "1"})
+	api_storage.WriteEntity("foo", map[string]interface{}{"id": "2"})
+
+	err := api_storage.DeleteEntityType("foo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if api_storage.EntityTypeExists("foo") {
+		t.Fatalf("foo type should not exist after deletion")
+	}
+
+	res := api_storage.ListEntities("foo", 0, 0, "", true, nil, "", "")
+	if len(res) != 0 {
+		t.Fatalf("expected no entities left after delete, got %v", res)
+	}
+
+	err = api_storage.DeleteEntityType("foo")
+	if err == nil {
+		t.Fatalf("expected error deleting non-existent type")
+	}
+}
+
+func TestUpdateEntitySchema(t *testing.T) {
+	initTestStore(t)
+
+	fields := map[string]interface{}{
+		"title": "string",
+		"age":   "number",
+	}
+
+	out := api_storage.UpdateEntitySchema("person", fields)
+
+	if out["id"] != "person" {
+		t.Fatalf("schema id mismatch: got %v", out["id"])
+	}
+
+	if out["_manual"] != true {
+		t.Fatalf("expected _manual = true")
+	}
+
+	stored := api_storage.ReadEntityById("schema", "person")
+	if stored == nil {
+		t.Fatalf("stored schema missing")
+	}
+
+	for k, v := range out {
+		if k == "_manual" || k == "id" {
+			if stored[k] != v {
+				t.Fatalf("mismatch on field %s: got %v want %v", k, stored[k], v)
+			}
+			continue
+		}
+
+		if !reflect.DeepEqual(stored[k], v) {
+			t.Fatalf("stored schema field mismatch for %s: got %v want %v", k, stored[k], v)
+		}
+	}
+}

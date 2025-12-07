@@ -8,7 +8,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func AdminUIAuth(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+var AdminUIAuth func(next fasthttp.RequestHandler) fasthttp.RequestHandler = func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
 		cfg := globals.GetConfig()
 
