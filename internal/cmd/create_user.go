@@ -9,15 +9,18 @@ import (
 	"golang.org/x/term"
 )
 
+var Printf = fmt.Printf
+var ReadPassword = term.ReadPassword
+
 func CreateUser() {
 	cfg := globals.GetConfig()
 	if !cfg.Security.Authentication.Enabled {
-		fmt.Printf("%sAuthentication is disabled in the configuration.%s\n", globals.Gold, globals.Reset)
+		Printf("%sAuthentication is disabled in the configuration.%s\n", globals.Gold, globals.Reset)
 		return
 	}
 
 	if cfg.Security.Authentication.Mode != "basic" {
-		fmt.Printf("%sCreate user command only supports basic authentication mode.%s\n", globals.Gold, globals.Reset)
+		Printf("%sCreate user command only supports basic authentication mode.%s\n", globals.Gold, globals.Reset)
 		return
 	}
 
@@ -29,26 +32,42 @@ func CreateUser() {
 
 	err = security.CreateBasicUser(newUser)
 	if err != nil {
-		fmt.Printf("%sFailed to create user: %v%s\n", globals.Red, err, globals.Reset)
+		Printf("%sFailed to create user: %v%s\n", globals.Red, err, globals.Reset)
 		return
 	}
 
-	fmt.Printf("%sUser '%s' created successfully.%s\n", globals.Gold, newUser.Username, globals.Reset)
+	Printf("%sUser '%s' created successfully.%s\n", globals.Gold, newUser.Username, globals.Reset)
 }
 
 func getUserInput() (*security.BasicUser, error) {
 	var username string
+	var roleInput int
+
 	fmt.Print("Enter new username: ")
 	fmt.Scanln(&username)
-	fmt.Print("Enter new password: ")
-	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
+
+	fmt.Println("Select role:")
+	fmt.Println("1) admin")
+	fmt.Println("2) user")
+	fmt.Print("Choice: ")
+	fmt.Scanln(&roleInput)
+
+	var role security.Role
+	if roleInput == 1 {
+		role = security.RoleAdmin
+	} else {
+		role = security.RoleUser
+	}
+
+	Printf("Enter new password: ")
+	bytePassword, err := ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()
 	if err != nil {
 		return nil, fmt.Errorf("%sFailed to read password: %v%s", globals.Red, err, globals.Reset)
 	}
 
-	fmt.Print("Re-enter new password: ")
-	bytePasswordConfirm, err := term.ReadPassword(int(os.Stdin.Fd()))
+	Printf("Re-enter new password: ")
+	bytePasswordConfirm, err := ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()
 	if err != nil {
 		return nil, fmt.Errorf("%sFailed to read password confirmation: %v%s", globals.Red, err, globals.Reset)
@@ -61,5 +80,6 @@ func getUserInput() (*security.BasicUser, error) {
 	return &security.BasicUser{
 		Username: username,
 		Password: string(bytePassword),
+		Role:     role,
 	}, nil
 }

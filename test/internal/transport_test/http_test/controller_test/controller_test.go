@@ -163,3 +163,42 @@ func TestStatsController(t *testing.T) {
 		t.Fatal("invalid stats json")
 	}
 }
+
+func TestGetConfigController(t *testing.T) {
+	setup(t)
+
+	ctx := newCtx("GET", "/config", "")
+	controller.GetConfigController(ctx)
+
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	body := ctx.Response.Body()
+	if len(body) == 0 {
+		t.Fatalf("empty body")
+	}
+
+	var out map[string]interface{}
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+
+	if len(out) == 0 {
+		t.Fatalf("expected non-empty config object")
+	}
+
+	found := false
+	for k := range out {
+		if strings.Contains(strings.ToLower(k), "store") ||
+			strings.Contains(strings.ToLower(k), "folder") ||
+			strings.Contains(strings.ToLower(k), "shard") {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Fatalf("config json does not contain expected storage-related keys: %v", out)
+	}
+}

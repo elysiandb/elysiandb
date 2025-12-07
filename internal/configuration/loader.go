@@ -20,9 +20,7 @@ type AuthenticationConfig struct {
 }
 
 type AdminUIConfig struct {
-	Enabled  bool   `yaml:"enabled"`
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
+	Enabled bool `yaml:"enabled"`
 }
 
 type ServersConfig struct {
@@ -88,7 +86,6 @@ type Config struct {
 
 func (c *Config) ToJson() string {
 	copyConfig := *c
-	copyConfig.AdminUI.Password = "******"
 	data, err := json.Marshal(copyConfig)
 	if err != nil {
 		log.Fatal("error:", err)

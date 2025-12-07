@@ -232,7 +232,7 @@ func SchemaEntityToStorableStructure(entity Entity) map[string]interface{} {
 
 func FieldsToMap(fields map[string]Field) map[string]interface{} {
 	out := make(map[string]interface{})
-	for k, v := range fields {
+	for _, v := range fields {
 		fieldMap := map[string]interface{}{
 			"name":     v.Name,
 			"type":     v.Type,
@@ -243,7 +243,7 @@ func FieldsToMap(fields map[string]Field) map[string]interface{} {
 			fieldMap["fields"] = FieldsToMap(v.Fields)
 		}
 
-		out[k] = fieldMap
+		out[v.Name] = fieldMap
 	}
 
 	return out
@@ -266,7 +266,12 @@ func MapToFields(m map[string]interface{}) map[string]Field {
 				f.Fields = MapToFields(subFields)
 			}
 
-			fields[k] = f
+			if name, ok := fieldMap["name"].(string); ok {
+				f.Name = name
+				fields[name] = f
+			} else {
+				fields[k] = f
+			}
 		}
 	}
 

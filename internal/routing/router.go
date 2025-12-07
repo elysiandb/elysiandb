@@ -40,6 +40,8 @@ func RegisterRoutes(r *router.Router) {
 	r.GET("/api/{entity}/{id}/exists", Version(security.Authenticate(api.ExistsController)))
 	r.POST("/api/{entity}/migrate", Version(security.Authenticate(api.MigrateController)))
 
+	r.GET("/api/entity/types", Version(security.Authenticate(api.GetEntityTypesController)))
+
 	if globals.GetConfig().Api.Schema.Enabled {
 		r.POST("/api/{entity}/create", Version(security.Authenticate(api.CreateTypeController)))
 		r.GET("/api/{entity}/schema", Version(security.Authenticate(api.GetSchemaController)))
@@ -53,9 +55,13 @@ func RegisterRoutes(r *router.Router) {
 	r.DELETE("/api/tx/{txId}/entity/{entity}/{id}", Version(security.Authenticate(api_transaction.DeleteTransactionController)))
 	r.POST("/api/tx/{txId}/commit", Version(security.Authenticate(api_transaction.CommitTransactionController)))
 
+	r.GET("/config", Version(security.Authenticate(controller.GetConfigController)))
+
 	if globals.GetConfig().AdminUI.Enabled {
-		r.GET("/admin/config", http_adminui.AdminUIAuth(controller.GetConfigController))
-		r.GET("/admin/{filepath:*}", http_adminui.AdminUIAuth(http_adminui.AdminUIHandler))
+		r.POST("/admin/login", http_adminui.LoginController)
+		r.POST("/admin/logout", http_adminui.AdminAuth(http_adminui.LogoutController))
+		r.GET("/admin/me", http_adminui.AdminAuth(http_adminui.MeController))
+		r.GET("/admin/{filepath:*}", http_adminui.AdminUIHandler)
 	}
 }
 

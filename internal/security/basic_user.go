@@ -18,13 +18,22 @@ import (
 )
 
 const (
-	UsersFilename = "users.json"
-	KeyFilename   = "users.key"
+	UsersFilename    = "users.json"
+	KeyFilename      = "users.key"
+	SessionsFilename = "sessions.json"
+)
+
+type Role string
+
+const (
+	RoleAdmin Role = "admin"
+	RoleUser  Role = "user"
 )
 
 type BasicUser struct {
 	Username string
 	Password string
+	Role     Role
 }
 
 func (u *BasicUser) ToHasedUser() (*BasicHashedcUser, error) {
@@ -39,15 +48,22 @@ func (u *BasicUser) ToHasedUser() (*BasicHashedcUser, error) {
 		return nil, err
 	}
 
+	role := u.Role
+	if role == "" {
+		role = RoleUser
+	}
+
 	return &BasicHashedcUser{
 		Username: u.Username,
 		Password: string(hashedPassword),
+		Role:     role,
 	}, nil
 }
 
 type BasicHashedcUser struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Role     Role   `json:"role"`
 }
 
 type UsersFile struct {
@@ -211,6 +227,33 @@ func LoadUsersFromFile() (*UsersFile, error) {
 	return &users, nil
 }
 
+func AuthenticateUser(username, password string) (*BasicHashedcUser, bool) {
+	users, err := LoadUsersFromFile()
+	if err != nil {
+		return nil, false
+	}
+
+	key, err := CreateKeyFileOrGetKey()
+	if err != nil {
+		return nil, false
+	}
+
+	sum := sha256.Sum256([]byte(password + key))
+	pass := sum[:]
+
+	for i := range users.Users {
+		u := users.Users[i]
+		if u.Username == username {
+			if bcrypt.CompareHashAndPassword([]byte(u.Password), pass) == nil {
+				return &u, true
+			}
+			return nil, false
+		}
+	}
+
+	return nil, false
+}
+
 var CheckBasicAuthentication = func(ctx *fasthttp.RequestCtx) bool {
 	header := string(ctx.Request.Header.Peek("Authorization"))
 	if header == "" || !strings.HasPrefix(header, "Basic ") {
@@ -230,24 +273,6 @@ var CheckBasicAuthentication = func(ctx *fasthttp.RequestCtx) bool {
 	username := parts[0]
 	password := parts[1]
 
-	users, err := LoadUsersFromFile()
-	if err != nil {
-		return false
-	}
-
-	key, err := CreateKeyFileOrGetKey()
-	if err != nil {
-		return false
-	}
-
-	sum := sha256.Sum256([]byte(password + key))
-	pass := sum[:]
-
-	for _, user := range users.Users {
-		if user.Username == username {
-			return bcrypt.CompareHashAndPassword([]byte(user.Password), pass) == nil
-		}
-	}
-
-	return false
+	_, ok := AuthenticateUser(username, password)
+	return ok
 }

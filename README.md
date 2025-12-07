@@ -108,6 +108,8 @@ api:
   cache:
     enabled: true
     cleanupIntervalSeconds: 10
+adminui:
+  enabled: true
 ```
 
 ## Build and Run

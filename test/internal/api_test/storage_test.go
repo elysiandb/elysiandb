@@ -664,3 +664,213 @@ func TestUpdateEntitySchema(t *testing.T) {
 		}
 	}
 }
+
+func TestGetListOfIds_NoSortField(t *testing.T) {
+	initTestStore(t)
+
+	entity := "xxx"
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "1"})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "2"})
+
+	data, err := api_storage.GetListOfIds(entity, "", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(data) == 0 {
+		t.Fatalf("expected id list, got empty")
+	}
+}
+
+func TestGetEntitySchema(t *testing.T) {
+	initTestStore(t)
+
+	api_storage.UpdateEntitySchema("u", map[string]interface{}{
+		"name": "string",
+	})
+
+	out := api_storage.GetEntitySchema("u")
+	if out == nil {
+		t.Fatalf("expected schema to be returned, got nil")
+	}
+
+	if out["id"] != "u" {
+		t.Fatalf("schema id mismatch")
+	}
+}
+
+func TestUpdateSchemaIfNeeded_Disabled(t *testing.T) {
+	initTestStore(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Enabled = false
+	globals.SetConfig(cfg)
+
+	api_storage.WriteEntity("xxx", map[string]interface{}{"id": "1", "name": "abc"})
+
+	if sc := api_storage.ReadEntityById("schema", "xxx"); sc != nil {
+		t.Fatalf("schema should not be created when disabled, got %v", sc)
+	}
+}
+
+func TestUpdateSchemaIfNeeded_Enabled(t *testing.T) {
+	initTestStore(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Enabled = true
+	globals.SetConfig(cfg)
+
+	api_storage.WriteEntity("xxx", map[string]interface{}{"id": "1", "name": "abc"})
+
+	sc := api_storage.ReadEntityById("schema", "xxx")
+	if sc == nil {
+		t.Fatalf("expected schema to be updated")
+	}
+}
+
+func TestWriteListOfEntities_ReturnsValidationErrors(t *testing.T) {
+	initTestStore(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Enabled = true
+	cfg.Api.Schema.Strict = true
+	globals.SetConfig(cfg)
+
+	api_storage.UpdateEntitySchema("u", map[string]interface{}{
+		"name":    "string",
+		"age":     "number",
+		"country": "string",
+	})
+
+	in := []map[string]interface{}{
+		{"id": "1", "name": "a", "age": float64(20), "country": "fr"},
+		{"id": "2", "name": "b", "age": "wrong"},
+	}
+
+	out := api_storage.WriteListOfEntities("u", in)
+
+	if len(out[1]) == 0 {
+		t.Fatalf("expected validation error for invalid entry")
+	}
+}
+
+func TestListEntities_IncludesParam(t *testing.T) {
+	initTestStore(t)
+
+	entity := "orders"
+	api_storage.WriteEntity(entity, map[string]interface{}{
+		"id":   "o1",
+		"item": map[string]interface{}{"id": "i1", "name": "Item1"},
+	})
+	api_storage.WriteEntity(entity, map[string]interface{}{
+		"id":   "o2",
+		"item": map[string]interface{}{"id": "i2", "name": "Item2"},
+	})
+
+	out := api_storage.ListEntities(entity, 0, 0, "", true, nil, "", "item")
+	if len(out) != 2 {
+		t.Fatalf("expected 2 results, got %v", out)
+	}
+
+	if _, ok := out[0]["item"].(map[string]interface{}); !ok {
+		t.Fatalf("expected nested item include")
+	}
+}
+
+func TestListEntities_Empty(t *testing.T) {
+	initTestStore(t)
+
+	out := api_storage.ListEntities("nope", 0, 0, "", true, nil, "", "")
+	if len(out) != 0 {
+		t.Fatalf("expected empty list, got %v", out)
+	}
+}
+
+func TestDeleteAllEntities_RemovesIndexesToo(t *testing.T) {
+	initTestStore(t)
+
+	entity := "xxx"
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "1"})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "2"})
+
+	api_storage.DeleteAllEntities(entity)
+
+	if len(api_storage.ListEntityTypes()) != 0 {
+		t.Fatalf("entity type should be removed")
+	}
+}
+
+func TestGetEntitySchema_NoSchema(t *testing.T) {
+	initTestStore(t)
+
+	out := api_storage.GetEntitySchema("ghost")
+	if out != nil {
+		t.Fatalf("expected nil schema, got %v", out)
+	}
+}
+
+func TestDumpAll_Empty(t *testing.T) {
+	initTestStore(t)
+
+	out := api_storage.DumpAll()
+	if len(out) != 0 {
+		t.Fatalf("expected empty dump, got %v", out)
+	}
+}
+
+func TestImportAll_MultipleEntities(t *testing.T) {
+	initTestStore(t)
+
+	api_storage.ImportAll(map[string][]map[string]interface{}{
+		"a": {{"id": "1"}, {"id": "2"}},
+		"b": {{"id": "10"}},
+	})
+
+	if api_storage.CountAllEntities() != 3 {
+		t.Fatalf("expected 3 entries after import")
+	}
+}
+
+func TestUpdateEntityById_NoExisting(t *testing.T) {
+	initTestStore(t)
+
+	out := api_storage.UpdateEntityById("x", "missing", map[string]interface{}{"a": 1})
+	if out != nil {
+		t.Fatalf("expected nil when updating non-existing")
+	}
+}
+
+func TestWriteEntity_AutoIdAssignment(t *testing.T) {
+	initTestStore(t)
+
+	entity := "items"
+	in := map[string]interface{}{"name": "x"}
+	api_storage.WriteEntity(entity, in)
+
+	if in["id"] == "" {
+		t.Fatalf("expected generated id")
+	}
+
+	got := api_storage.ReadEntityById(entity, in["id"].(string))
+	if got == nil {
+		t.Fatalf("expected entity stored with generated id")
+	}
+}
+
+func TestWriteEntity_SkipSchemaUpdatesForManualStrict(t *testing.T) {
+	initTestStore(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Enabled = true
+	cfg.Api.Schema.Strict = true
+	globals.SetConfig(cfg)
+
+	api_storage.UpdateEntitySchema("p", map[string]interface{}{
+		"name": "string",
+	})
+
+	api_storage.WriteEntity("p", map[string]interface{}{"id": "1", "name": "abc"})
+
+	if sc := api_storage.ReadEntityById("schema", "p"); sc == nil {
+		t.Fatalf("manual schema must exist")
+	}
+}

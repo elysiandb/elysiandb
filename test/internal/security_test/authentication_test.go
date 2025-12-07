@@ -119,3 +119,138 @@ func TestAuthenticate_TokenAuth_Fail(t *testing.T) {
 		t.Fatalf("expected 401 unauthorized")
 	}
 }
+
+func TestAuthenticate_UserAuth_Success(t *testing.T) {
+	cfg := &configuration.Config{}
+	cfg.Security.Authentication.Enabled = true
+	cfg.Security.Authentication.Mode = "user"
+	globals.SetConfig(cfg)
+
+	called := false
+	calledUserAuth := false
+
+	orig := security.UserAuth
+	security.UserAuth = func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
+			calledUserAuth = true
+			next(ctx)
+		}
+	}
+	defer func() { security.UserAuth = orig }()
+
+	handler := security.Authenticate(func(ctx *fasthttp.RequestCtx) {
+		called = true
+	})
+
+	ctx := &fasthttp.RequestCtx{}
+	handler(ctx)
+
+	if !calledUserAuth {
+		t.Fatalf("user auth wrapper should be invoked")
+	}
+	if !called {
+		t.Fatalf("final handler should be called when user auth enabled")
+	}
+}
+
+func TestAuthenticate_UserAuth_Fail(t *testing.T) {
+	cfg := &configuration.Config{}
+	cfg.Security.Authentication.Enabled = true
+	cfg.Security.Authentication.Mode = "user"
+	globals.SetConfig(cfg)
+
+	called := false
+
+	orig := security.UserAuth
+	security.UserAuth = func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
+			ctx.Response.SetStatusCode(fasthttp.StatusUnauthorized)
+		}
+	}
+	defer func() { security.UserAuth = orig }()
+
+	handler := security.Authenticate(func(ctx *fasthttp.RequestCtx) {
+		called = true
+	})
+
+	ctx := &fasthttp.RequestCtx{}
+	handler(ctx)
+
+	if called {
+		t.Fatalf("handler should not be called when user auth fails")
+	}
+	if ctx.Response.StatusCode() != fasthttp.StatusUnauthorized {
+		t.Fatalf("expected 401 status when user auth fails")
+	}
+}
+
+func TestAuthenticationIsEnabled(t *testing.T) {
+	cfg := &configuration.Config{}
+	cfg.Security.Authentication.Enabled = true
+	globals.SetConfig(cfg)
+
+	if !security.AuthenticationIsEnabled() {
+		t.Fatalf("expected authentication enabled")
+	}
+
+	cfg.Security.Authentication.Enabled = false
+	globals.SetConfig(cfg)
+
+	if security.AuthenticationIsEnabled() {
+		t.Fatalf("expected authentication disabled")
+	}
+}
+
+func TestBasicAuthenticationIsEnabled(t *testing.T) {
+	cfg := &configuration.Config{}
+	cfg.Security.Authentication.Enabled = true
+	cfg.Security.Authentication.Mode = "basic"
+	globals.SetConfig(cfg)
+
+	if !security.BasicAuthenticationIsEnabled() {
+		t.Fatalf("basic auth should be enabled")
+	}
+
+	cfg.Security.Authentication.Mode = "token"
+	globals.SetConfig(cfg)
+
+	if security.BasicAuthenticationIsEnabled() {
+		t.Fatalf("basic auth should be disabled")
+	}
+}
+
+func TestTokenAuthenticationIsEnabled(t *testing.T) {
+	cfg := &configuration.Config{}
+	cfg.Security.Authentication.Enabled = true
+	cfg.Security.Authentication.Mode = "token"
+	globals.SetConfig(cfg)
+
+	if !security.TokenAuthenticationIsEnabled() {
+		t.Fatalf("token auth should be enabled")
+	}
+
+	cfg.Security.Authentication.Mode = "basic"
+	globals.SetConfig(cfg)
+
+	if security.TokenAuthenticationIsEnabled() {
+		t.Fatalf("token auth should be disabled")
+	}
+}
+
+func TestUserAuthenticationIsEnabled(t *testing.T) {
+	cfg := &configuration.Config{}
+	cfg.Security.Authentication.Enabled = true
+	cfg.Security.Authentication.Mode = "user"
+	globals.SetConfig(cfg)
+
+	if !security.UserAuthenticationIsEnabled() {
+		t.Fatalf("user auth should be enabled")
+	}
+
+	cfg.Security.Authentication.Mode = "basic"
+	globals.SetConfig(cfg)
+
+	if security.UserAuthenticationIsEnabled() {
+		t.Fatalf("user auth should be disabled")
+	}
+}

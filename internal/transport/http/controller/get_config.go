@@ -5,7 +5,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func GetConfigController(ctx *fasthttp.RequestCtx) {
+var GetConfigController = func(ctx *fasthttp.RequestCtx) {
 	cfg := globals.GetConfig()
 
 	ctx.Response.Header.Set("Content-Type", "application/json")

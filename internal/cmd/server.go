@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,7 +14,7 @@ import (
 func StartServer() {
 	cfg := globals.GetConfig()
 
-	fmt.Printf(
+	Printf(
 		"%s%sStorage%s  %s%s%s\n",
 		globals.Violet,
 		globals.Bold,
@@ -31,7 +30,7 @@ func StartServer() {
 
 	boot.InitDB()
 
-	fmt.Printf(
+	Printf(
 		"%s%sReady%s   %sServing a KV datastore with %sInstant REST API%s.\n",
 		globals.Blue,
 		globals.Bold,
@@ -43,7 +42,7 @@ func StartServer() {
 
 	if cfg.Server.HTTP.Enabled {
 		go boot.StartHTTP()
-		fmt.Printf(
+		Printf(
 			"%sHTTP%s     %shttp://%s:%d%s  %s(KV store & Instant REST API)%s\n",
 			globals.Gold,
 			globals.Reset,
@@ -57,7 +56,7 @@ func StartServer() {
 	}
 	if cfg.Server.TCP.Enabled {
 		go boot.InitTCP()
-		fmt.Printf(
+		Printf(
 			"%sTCP %s     %s%s:%d%s\n",
 			globals.Gold,
 			globals.Reset,
@@ -69,7 +68,7 @@ func StartServer() {
 	}
 
 	if cfg.AdminUI.Enabled {
-		fmt.Printf(
+		Printf(
 			"%sAdmin dashboard%s    %shttp://%s:%d/admin%s\n",
 			globals.Gold,
 			globals.Reset,
@@ -85,14 +84,14 @@ func StartServer() {
 	<-ctx.Done()
 
 	storage.WriteToDB()
-	fmt.Printf(
+	Printf(
 		"\n%sPersisted%s  %sAll data flushed to disk.%s\n",
 		globals.Gold,
 		globals.Reset,
 		globals.Gray,
 		globals.Reset,
 	)
-	fmt.Printf(
+	Printf(
 		"%sGoodbye%s   %sElysianDB shutting down gracefully.%s\n",
 		globals.Blue,
 		globals.Reset,
