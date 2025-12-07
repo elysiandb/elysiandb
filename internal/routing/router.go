@@ -41,6 +41,7 @@ func RegisterRoutes(r *router.Router) {
 	r.POST("/api/{entity}/migrate", Version(security.Authenticate(api.MigrateController)))
 
 	if globals.GetConfig().Api.Schema.Enabled {
+		r.POST("/api/{entity}/create", Version(security.Authenticate(api.CreateTypeController)))
 		r.GET("/api/{entity}/schema", Version(security.Authenticate(api.GetSchemaController)))
 		r.PUT("/api/{entity}/schema", Version(security.Authenticate(api.PutSchemaController)))
 	}
@@ -58,7 +59,7 @@ func RegisterRoutes(r *router.Router) {
 	}
 }
 
-func Version(requestHandler fasthttp.RequestHandler) fasthttp.RequestHandler {
+var Version func(requestHandler fasthttp.RequestHandler) fasthttp.RequestHandler = func(requestHandler fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
 		requestHandler(ctx)
 		ctx.Response.Header.Add("X-Elysian-Version", globals.VERSION)

@@ -236,3 +236,78 @@ func TestMigrateController(t *testing.T) {
 		t.Fatal("migrate failed")
 	}
 }
+
+func TestCreateTypeController_OK(t *testing.T) {
+	setup(t)
+
+	body := `{"fields":{"title":"string","age":"number"}}`
+	ctx := newCtx("POST", "/api/type/person", body)
+	ctx.SetUserValue("entity", "person")
+
+	api_controller.CreateTypeController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	if !api_storage.EntityTypeExists("person") {
+		t.Fatalf("entity type not created")
+	}
+
+	s := api_storage.ReadEntityById("schema", "person")
+	if s == nil {
+		t.Fatalf("schema not created")
+	}
+}
+
+func TestCreateTypeController_InvalidJSON(t *testing.T) {
+	setup(t)
+
+	body := `{invalid`
+	ctx := newCtx("POST", "/api/type/badjson", body)
+	ctx.SetUserValue("entity", "badjson")
+
+	api_controller.CreateTypeController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", ctx.Response.StatusCode())
+	}
+
+	if api_storage.EntityTypeExists("badjson") {
+		t.Fatalf("type should be rolled back on invalid json")
+	}
+}
+
+func TestCreateTypeController_NoFields(t *testing.T) {
+	setup(t)
+
+	body := `{"x":1}`
+	ctx := newCtx("POST", "/api/type/test", body)
+	ctx.SetUserValue("entity", "test")
+
+	api_controller.CreateTypeController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", ctx.Response.StatusCode())
+	}
+
+	if api_storage.EntityTypeExists("test") {
+		t.Fatalf("type should be rolled back when no fields provided")
+	}
+}
+
+func TestCreateTypeController_AlreadyExists(t *testing.T) {
+	setup(t)
+
+	api_storage.CreateEntityType("dup")
+
+	body := `{"fields":{"a":"string"}}`
+	ctx := newCtx("POST", "/api/type/dup", body)
+	ctx.SetUserValue("entity", "dup")
+
+	api_controller.CreateTypeController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", ctx.Response.StatusCode())
+	}
+}

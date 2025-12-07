@@ -38,6 +38,54 @@ func WriteEntity(entity string, data map[string]interface{}) []schema.Validation
 	return []schema.ValidationError{}
 }
 
+func UpdateEntitySchema(entity string, fieldsRaw map[string]interface{}) map[string]interface{} {
+	fields := schema.MapToFields(fieldsRaw)
+
+	entitySchema := schema.Entity{
+		ID:     entity,
+		Fields: fields,
+	}
+
+	storable := schema.SchemaEntityToStorableStructure(entitySchema)
+	storable["_manual"] = true
+
+	WriteEntity("schema", storable)
+
+	return storable
+}
+
+func CreateEntityType(entity string) error {
+	if EntityTypeExists(entity) {
+		return fmt.Errorf("entity type '%s' already exists", entity)
+	}
+
+	AddEntityType(entity)
+
+	return nil
+}
+
+func DeleteEntityType(entity string) error {
+	if !EntityTypeExists(entity) {
+		return fmt.Errorf("entity type '%s' does not exist", entity)
+	}
+
+	DeleteAllEntities(entity)
+	RemoveEntityIndexes(entity)
+
+	key := globals.ApiAllEntityTypesListKey()
+	data, _ := storage.GetByKey(key)
+	types := decodeIDs(data)
+	newTypes := make([]string, 0, len(types))
+	for _, t := range types {
+		if t != entity {
+			newTypes = append(newTypes, t)
+		}
+	}
+	storage.PutKeyValue(key, encodeIDs(newTypes))
+
+	return nil
+}
+
 func persistEntity(entity string, data map[string]interface{}) {
 	id, _ := data["id"].(string)
 	key := globals.ApiSingleEntityKey(entity, id)
