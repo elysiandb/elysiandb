@@ -20,6 +20,11 @@ func TokenAuthenticationIsEnabled() bool {
 	return cfg.Security.Authentication.Enabled && cfg.Security.Authentication.Mode == "token"
 }
 
+func UserAuthenticationIsEnabled() bool {
+	cfg := globals.GetConfig()
+	return cfg.Security.Authentication.Enabled && cfg.Security.Authentication.Mode == "user"
+}
+
 func Authenticate(requestHandler fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
 		if !AuthenticationIsEnabled() {
@@ -34,6 +39,11 @@ func Authenticate(requestHandler fasthttp.RequestHandler) fasthttp.RequestHandle
 
 		if TokenAuthenticationIsEnabled() && !CheckTokenAuthentication(ctx) {
 			ctx.Response.SetStatusCode(fasthttp.StatusUnauthorized)
+			return
+		}
+
+		if UserAuthenticationIsEnabled() {
+			UserAuth(requestHandler)(ctx)
 			return
 		}
 

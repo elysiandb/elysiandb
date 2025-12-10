@@ -7,7 +7,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func AdminUIHandler(ctx *fasthttp.RequestCtx) {
+var AdminUIHandler func(ctx *fasthttp.RequestCtx) = func(ctx *fasthttp.RequestCtx) {
 	p := string(ctx.Path())
 
 	if p == "/admin" || p == "/admin/" {
@@ -15,14 +15,19 @@ func AdminUIHandler(ctx *fasthttp.RequestCtx) {
 	}
 
 	rel := p[len("/admin"):]
-
 	rel = path.Clean(rel)
 
 	fsPath := "dist" + rel
 
 	data, err := adminui.UI.ReadFile(fsPath)
 	if err != nil {
-		ctx.SetStatusCode(404)
+		index, err := adminui.UI.ReadFile("dist/index.html")
+		if err != nil {
+			ctx.SetStatusCode(404)
+			return
+		}
+		ctx.SetContentType("text/html")
+		ctx.SetBody(index)
 		return
 	}
 

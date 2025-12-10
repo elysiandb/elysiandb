@@ -12,8 +12,8 @@ stats:
   enabled: false
 security:
   authentication:
-    enabled: false
-    mode: token
+    enabled: true
+    mode: user
     token: "your_secure_token_here"
 api:
   schema:
@@ -26,5 +26,3 @@ api:
     cleanupIntervalSeconds: 10
 adminui:
   enabled: true
-  username: admin
-  password: admin

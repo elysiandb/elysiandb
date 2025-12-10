@@ -311,3 +311,150 @@ func TestCreateTypeController_AlreadyExists(t *testing.T) {
 		t.Fatalf("expected 400, got %d", ctx.Response.StatusCode())
 	}
 }
+
+func TestPutSchemaController_EntityNotFound(t *testing.T) {
+	setup(t)
+
+	ctx := newCtx("PUT", "/api/ghost/schema", `{"fields":{"a":{"type":"number"}}}`)
+	ctx.SetUserValue("entity", "ghost")
+
+	api_controller.PutSchemaController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusNotFound {
+		t.Fatalf("expected 404, got %d", ctx.Response.StatusCode())
+	}
+}
+
+func TestPutSchemaController_InvalidJSON(t *testing.T) {
+	setup(t)
+
+	api_storage.CreateEntityType("x")
+
+	ctx := newCtx("PUT", "/api/x/schema", `{invalid`)
+	ctx.SetUserValue("entity", "x")
+
+	api_controller.PutSchemaController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", ctx.Response.StatusCode())
+	}
+}
+
+func TestPutSchemaController_NoFieldsObject(t *testing.T) {
+	setup(t)
+
+	api_storage.CreateEntityType("x")
+
+	ctx := newCtx("PUT", "/api/x/schema", `{"fields":123}`)
+	ctx.SetUserValue("entity", "x")
+
+	api_controller.PutSchemaController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", ctx.Response.StatusCode())
+	}
+}
+
+func TestPutSchemaController_OK(t *testing.T) {
+	setup(t)
+
+	api_storage.CreateEntityType("x")
+
+	body := `{"fields":{"name":{"type":"string"}}}`
+	ctx := newCtx("PUT", "/api/x/schema", body)
+	ctx.SetUserValue("entity", "x")
+
+	api_controller.PutSchemaController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	s := api_storage.GetEntitySchema("x")
+	if s == nil {
+		t.Fatalf("schema should exist after update")
+	}
+}
+
+func TestGetEntityTypesController_Empty(t *testing.T) {
+	setup(t)
+
+	ctx := newCtx("GET", "/api/types", "")
+	api_controller.GetEntityTypesController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	var out map[string]interface{}
+	json.Unmarshal(ctx.Response.Body(), &out)
+	entities := out["entities"].([]interface{})
+	if len(entities) != 0 {
+		t.Fatalf("expected empty list, got %v", entities)
+	}
+}
+
+func TestGetEntityTypesController_WithSchemas(t *testing.T) {
+	setup(t)
+
+	api_storage.CreateEntityType("book")
+	api_storage.UpdateEntitySchema("book", map[string]interface{}{
+		"title": "string",
+	})
+
+	api_storage.CreateEntityType("user")
+	api_storage.UpdateEntitySchema("user", map[string]interface{}{
+		"name": "string",
+	})
+
+	ctx := newCtx("GET", "/api/types", "")
+	api_controller.GetEntityTypesController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	var out map[string]interface{}
+	json.Unmarshal(ctx.Response.Body(), &out)
+
+	raw := out["entities"].([]interface{})
+	valid := make([]string, 0)
+	for _, v := range raw {
+		if v == nil {
+			continue
+		}
+		s := v.(string)
+		if s != "null" && len(s) > 0 {
+			valid = append(valid, s)
+		}
+	}
+
+	if len(valid) != 2 {
+		t.Fatalf("expected 2 schemas, got %v", valid)
+	}
+
+	for _, s := range valid {
+		var m map[string]interface{}
+		json.Unmarshal([]byte(s), &m)
+		if m["id"] != "book" && m["id"] != "user" {
+			t.Fatalf("unexpected schema: %v", m)
+		}
+	}
+}
+
+func TestGetEntityTypesController_MarshalError(t *testing.T) {
+	setup(t)
+
+	api_storage.CreateEntityType("x")
+
+	storage.PutJsonValue(globals.ApiSingleEntityKey("schema", "x"), map[string]interface{}{
+		"bad": func() {},
+	})
+
+	ctx := newCtx("GET", "/api/types", "")
+	api_controller.GetEntityTypesController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", ctx.Response.StatusCode())
+	}
+}

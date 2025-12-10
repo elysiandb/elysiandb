@@ -138,6 +138,15 @@ func AddEntityType(entity string) {
 	}
 }
 
+func GetEntitySchema(entity string) map[string]interface{} {
+	schemaData := ReadEntityById(schema.SchemaEntity, entity)
+	if schemaData == nil {
+		return nil
+	}
+
+	return schemaData
+}
+
 func EntityTypeExists(entity string) bool {
 	for _, t := range ListEntityTypes() {
 		if t == entity {
@@ -259,6 +268,16 @@ func DeleteAllEntities(entity string) {
 	prefix := globals.ApiEntitiesAllKey(entity)
 	storage.DeleteJsonByPrefix(prefix)
 	RemoveEntityIndexes(entity)
+	key := globals.ApiAllEntityTypesListKey()
+	data, _ := storage.GetByKey(key)
+	types := decodeIDs(data)
+	newTypes := make([]string, 0, len(types))
+	for _, t := range types {
+		if t != entity {
+			newTypes = append(newTypes, t)
+		}
+	}
+	storage.PutKeyValue(key, encodeIDs(newTypes))
 }
 
 func DeleteAll() {

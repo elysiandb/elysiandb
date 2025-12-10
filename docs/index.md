@@ -40,6 +40,11 @@ log:
   flushIntervalSeconds: 5
 stats:
   enabled: true
+security:
+  authentication:
+    enabled: true
+    mode: "token" # token|basic|user
+    token: "your_token"
 api:
   schema:
     enabled: true
@@ -49,6 +54,8 @@ api:
   cache:
     enabled: true
     cleanupIntervalSeconds: 10
+adminui:
+  enabled: true
 ```
 
 ### Configuration Fields
@@ -70,7 +77,8 @@ api:
 | **api.schema.strict**                | If true and schema is manual, new fields are rejected and deep validation is enforced |
 | **api.cache.cleanupIntervalSeconds** | Interval for cache expiration cleanup                                                 |
 | **security.authentication.enabled**  | Enables authentication layer for all endpoints                                        |
-| **security.authentication.mode**     | Authentication mode (currently supports `basic`)                                      |
+| **security.authentication.mode**     | Authentication mode (currently supports `basic`, `token` `user`)                      |
+| **adminui.enabled**                  | Enables the admin web interface                                                       |
 
 ---
 
@@ -88,6 +96,7 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 | `POST`   | `/api/<entity>`               | Create one or multiple JSON documents (auto‑ID if missing)  |
 | `GET`    | `/api/<entity>`               | List all documents, supports pagination, sorting, filtering |
 | `GET`    | `/api/<entity>/schema`        | Schema for entity                                           |
+| `PUT`    | `/api/<entity>/schema`        | Update schema for entity                                    |
 | `GET`    | `/api/<entity>/<id>`          | Retrieve document by ID                                     |
 | `PUT`    | `/api/<entity>/<id>`          | Update a single document by ID                              |
 | `PUT`    | `/api/<entity>`               | Update multiple documents (batch update)                    |
@@ -98,6 +107,8 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 | `POST`   | `/api/<entity>/migrate`       | Run a **migration** across all documents for an entity      |
 | `GET`    | `/api/<entity>/count`         | Counts all documents for an entity                          |
 | `GET`    | `/api/<entity>/<id>/exists`   | Verifiy if an entity exists                                 |
+| `GET`    | `/api/entity/types`           | Liste of all entity types                                   |
+| `POST`   | `/api/<entity>/schema`        | Create a new entity type                                    |
 
 ---
 
@@ -593,7 +604,7 @@ Enable authentication in your `elysian.yaml`:
 ```yaml
 authentication:
   enabled: true
-  mode: basic   # basic or token
+  mode: basic   # basic, token or user
 ```
 
 If `enabled` is false, all endpoints are publicly accessible.
@@ -684,6 +695,115 @@ Requests without authentication headers are rejected when authentication is enab
 * Deleting `users.key` invalidates all stored password hashes
 * Deleting `users.json` removes all users
 * In `token` mode, anyone with the token can fully access the API
+
+---
+
+## Admin UI
+
+ElysianDB includes an optional, built‑in **Admin UI** that allows you to visually inspect, browse, and manage your data, entity types, schemas, and configuration.
+
+The Admin UI is served directly by the ElysianDB HTTP server and requires no external frontend stack once built.
+
+---
+
+## Enabling the Admin UI
+
+To activate the Admin UI, make sure the following configuration is set in your `elysian.yaml`:
+
+```yaml\adminui:
+  enabled: true
+
+security:
+  authentication:
+    enabled: true
+    mode: "user"   # required for Admin UI
+```
+
+The Admin UI **requires** authentication to be enabled and must run in `user` mode.
+
+---
+
+## ️ Building the Admin UI
+
+Before starting the server, build the UI assets using:
+
+```bash
+make build-admin
+```
+
+This compiles the React Admin interface and embeds the generated assets into the Go binary.
+
+Whenever you change the Admin UI frontend code, rebuild it and restart the server.
+
+---
+
+## Accessing the Admin UI
+
+Once enabled and built, start ElysianDB normally:
+
+```bash
+elysiandb server
+```
+
+Then open:
+
+```
+http://localhost:8089/admin
+```
+
+You will be prompted to log in with your configured credentials. The Admin UI provides:
+
+* A dashboard showing instance information
+* Entity type listing and creation
+* Schema browsing and editing
+* Data browsing with pagination, filters, and search
+* Automatic forms for CRUD operations
+* Live introspection of your datastore
+
+---
+
+## Authentication Requirements
+
+The Admin UI only works when:
+
+* `security.authentication.enabled = true`
+* `security.authentication.mode = "user"`
+
+This mode uses a **session-based login** dedicated to the Admin UI.
+
+---
+
+## Development Workflow
+
+For local development:
+
+```bash
+# Rebuild the UI
+make build-admin
+
+# Run server
+elysiandb server
+```
+
+If you wish to work on the frontend separately, you can use the Vite dev server, but the Admin UI in production always uses the embedded build.
+
+---
+
+## Summary
+
+To enable and test the Admin UI:
+
+1. Set in `elysian.yaml`:
+
+   * `adminui.enabled = true`
+   * `security.authentication.enabled = true`
+   * `security.authentication.mode = "user"`
+2. Run `make build-admin`
+3. Start the server
+4. Visit `http://localhost:8089/admin`
+
+The Admin UI gives you a full graphical interface to interact with ElysianDB without writing any API calls manually.
+
 
 ---
 

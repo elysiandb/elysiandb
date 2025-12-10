@@ -329,3 +329,198 @@ func TestSchemaEntityToStorableStructure(t *testing.T) {
 		t.Fatal("required not exported")
 	}
 }
+
+func TestAnalyzeEntitySchema_IgnoresID(t *testing.T) {
+	restore := patchStrict(false)
+	defer restore()
+
+	data := map[string]interface{}{
+		"id":   "abc",
+		"name": "hello",
+	}
+
+	result := schema.AnalyzeEntitySchema("test", data)
+	fields := result["fields"].(map[string]interface{})
+
+	if _, ok := fields["id"]; ok {
+		t.Fatalf("id field should not be included")
+	}
+	if _, ok := fields["name"]; !ok {
+		t.Fatalf("expected name field")
+	}
+}
+
+func TestAnalyzeEntitySchema_ArrayNoSubfields(t *testing.T) {
+	restore := patchStrict(false)
+	defer restore()
+
+	data := map[string]interface{}{
+		"items": []interface{}{},
+	}
+
+	result := schema.AnalyzeEntitySchema("arr", data)
+	fields := result["fields"].(map[string]interface{})
+
+	item := fields["items"].(map[string]interface{})
+	if item["type"] != "array" {
+		t.Fatalf("expected array")
+	}
+	if _, ok := item["fields"]; ok {
+		t.Fatalf("expected no subfields for empty array")
+	}
+}
+
+func TestValidateEntity_ArrayObjectValidation(t *testing.T) {
+	mock := &schema.Entity{
+		ID: "e",
+		Fields: map[string]schema.Field{
+			"items": {
+				Name:     "items",
+				Type:     "array",
+				Required: true,
+				Fields: map[string]schema.Field{
+					"label": {Name: "label", Type: "string", Required: true},
+				},
+			},
+		},
+	}
+
+	restore1 := patchLoadSchema(mock)
+	defer restore1()
+
+	data := map[string]interface{}{
+		"items": []interface{}{
+			map[string]interface{}{"label": "ok"},
+			map[string]interface{}{"label": 123},
+		},
+	}
+
+	errs := schema.ValidateEntity("e", data)
+	if len(errs) != 1 {
+		t.Fatalf("expected 1 error")
+	}
+}
+
+func TestValidateEntity_ArrayMissingRequired(t *testing.T) {
+	mock := &schema.Entity{
+		ID: "test",
+		Fields: map[string]schema.Field{
+			"arr": {
+				Name:     "arr",
+				Type:     "array",
+				Required: true,
+				Fields: map[string]schema.Field{
+					"n": {Name: "n", Type: "number", Required: true},
+				},
+			},
+		},
+	}
+
+	restore1 := patchLoadSchema(mock)
+	defer restore1()
+	restore2 := patchStrict(true)
+	defer restore2()
+	restore3 := patchManualFlag(true)
+	defer restore3()
+
+	data := map[string]interface{}{
+		"arr": []interface{}{
+			map[string]interface{}{},
+		},
+	}
+
+	errs := schema.ValidateEntity("test", data)
+	if len(errs) != 1 {
+		t.Fatalf("expected missing required error")
+	}
+}
+
+func TestValidateEntity_ObjectWrongType(t *testing.T) {
+	mock := &schema.Entity{
+		ID: "wrong",
+		Fields: map[string]schema.Field{
+			"meta": {Name: "meta", Type: "object", Required: false},
+		},
+	}
+
+	restore := patchLoadSchema(mock)
+	defer restore()
+
+	data := map[string]interface{}{
+		"meta": "not-an-object",
+	}
+
+	errs := schema.ValidateEntity("wrong", data)
+	if len(errs) != 1 {
+		t.Fatalf("expected type mismatch error")
+	}
+}
+
+func TestValidateEntity_ArrayWrongType(t *testing.T) {
+	mock := &schema.Entity{
+		ID: "wrong",
+		Fields: map[string]schema.Field{
+			"items": {Name: "items", Type: "array", Required: false},
+		},
+	}
+
+	restore := patchLoadSchema(mock)
+	defer restore()
+
+	data := map[string]interface{}{
+		"items": "not-array",
+	}
+
+	errs := schema.ValidateEntity("wrong", data)
+	if len(errs) != 1 {
+		t.Fatalf("expected array mismatch error")
+	}
+}
+
+func TestMapToFields_NameOverride(t *testing.T) {
+	m := map[string]interface{}{
+		"x": map[string]interface{}{
+			"name":     "real",
+			"type":     "string",
+			"required": true,
+		},
+	}
+
+	fields := schema.MapToFields(m)
+
+	if _, ok := fields["real"]; !ok {
+		t.Fatalf("expected key 'real'")
+	}
+}
+
+func TestLoadSchemaForEntity_NoData(t *testing.T) {
+	restore := patchGetJsonByKey(nil, nil)
+	defer restore()
+
+	res := schema.LoadSchemaForEntity("x")
+	if res == nil {
+		return
+	}
+	t.Fatalf("expected nil schema")
+}
+
+func TestLoadSchemaForEntity_WithData(t *testing.T) {
+	restore := patchGetJsonByKey(map[string]interface{}{
+		"fields": map[string]interface{}{
+			"a": map[string]interface{}{
+				"name":     "a",
+				"type":     "string",
+				"required": true,
+			},
+		},
+	}, nil)
+	defer restore()
+
+	res := schema.LoadSchemaForEntity("x")
+	if res == nil {
+		t.Fatalf("expected schema")
+	}
+	if _, ok := res.Fields["a"]; !ok {
+		t.Fatalf("expected field a")
+	}
+}
