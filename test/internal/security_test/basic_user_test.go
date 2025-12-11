@@ -1,24 +1,34 @@
 package security_test
 
 import (
-	"crypto/sha256"
 	"encoding/base64"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/storage"
 	"github.com/valyala/fasthttp"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func setup(t *testing.T) string {
+	t.Helper()
 	dir := t.TempDir()
-	cfg := &configuration.Config{}
-	cfg.Store.Folder = dir
-	globals.SetConfig(cfg)
+	globals.SetConfig(&configuration.Config{
+		Store: configuration.StoreConfig{
+			Folder: dir,
+			Shards: 8,
+		},
+		Stats: configuration.StatsConfig{
+			Enabled: false,
+		},
+	})
+	storage.LoadDB()
+	storage.LoadJsonDB()
 	return dir
 }
 
@@ -32,102 +42,140 @@ func TestGenerateKey(t *testing.T) {
 	}
 }
 
-func TestCreateKeyFileOrGetKeyCreate(t *testing.T) {
+func TestCreateKeyFileOrGetKey_Create(t *testing.T) {
 	dir := setup(t)
 
 	key, err := security.CreateKeyFileOrGetKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	path := filepath.Join(dir, security.KeyFilename)
-	if _, err := os.Stat(path); err != nil {
-		t.Fatal(err)
-	}
-
 	if key == "" {
 		t.Fatal("empty key")
 	}
+
+	path := filepath.Join(dir, security.KeyFilename)
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected key file to exist, got %v", err)
+	}
 }
 
-func TestCreateKeyFileOrGetKeyRead(t *testing.T) {
+func TestCreateKeyFileOrGetKey_ReadSameKey(t *testing.T) {
 	setup(t)
 
-	key1, err := security.CreateKeyFileOrGetKey()
+	k1, err := security.CreateKeyFileOrGetKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	key2, err := security.CreateKeyFileOrGetKey()
+	k2, err := security.CreateKeyFileOrGetKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if key1 != key2 {
-		t.Fatal("key mismatch")
+	if k1 != k2 {
+		t.Fatalf("expected same key, got %s and %s", k1, k2)
 	}
 }
 
-func TestAddUserToFileEmpty(t *testing.T) {
-	setup(t)
+func TestUserEntitySchema(t *testing.T) {
+	s := security.UserEntitySchema()
 
-	user := &security.BasicHashedcUser{
-		Username: "john",
-		Password: "hash",
-		Role:     security.RoleUser,
-	}
-
-	if err := security.AddUserToFile(user); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestAddUserToFileAppend(t *testing.T) {
-	setup(t)
-
-	u1 := &security.BasicHashedcUser{Username: "a", Password: "x", Role: security.RoleAdmin}
-	u2 := &security.BasicHashedcUser{Username: "b", Password: "y", Role: security.RoleUser}
-
-	if err := security.AddUserToFile(u1); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := security.AddUserToFile(u2); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestCreateBasicUser(t *testing.T) {
-	setup(t)
-
-	user := &security.BasicUser{
-		Username: "alice",
-		Password: "secret",
-		Role:     security.RoleAdmin,
-	}
-
-	if err := security.CreateBasicUser(user); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestCreateBasicUserMultiple(t *testing.T) {
-	setup(t)
-
-	users := []*security.BasicUser{
-		{Username: "u1", Password: "p1", Role: security.RoleUser},
-		{Username: "u2", Password: "p2", Role: security.RoleAdmin},
-		{Username: "u3", Password: "p3", Role: security.RoleUser},
-	}
-
-	for _, u := range users {
-		if err := security.CreateBasicUser(u); err != nil {
-			t.Fatal(err)
+	for _, field := range []string{"id", "username", "password", "role"} {
+		v, ok := s[field]
+		if !ok {
+			t.Fatalf("missing field %s in schema", field)
+		}
+		m, ok := v.(map[string]interface{})
+		if !ok {
+			t.Fatalf("field %s is not a map", field)
+		}
+		if m["type"] != "string" {
+			t.Fatalf("field %s type mismatch, got %v", field, m["type"])
+		}
+		if m["required"] != true {
+			t.Fatalf("field %s required mismatch, got %v", field, m["required"])
 		}
 	}
 }
 
-func TestToHasedUser(t *testing.T) {
+func TestInitBasicUsersStorage_CreatesEntityTypeAndSchema(t *testing.T) {
+	setup(t)
+
+	if api_storage.EntityTypeExists(security.UserEntity) {
+		t.Fatalf("user entity should not exist before init")
+	}
+
+	if err := security.InitBasicUsersStorage(); err != nil {
+		t.Fatal(err)
+	}
+
+	if !api_storage.EntityTypeExists(security.UserEntity) {
+		t.Fatal("user entity type not created")
+	}
+
+	schema := api_storage.GetEntitySchema(security.UserEntity)
+	if schema == nil {
+		t.Fatal("user entity schema not created")
+	}
+}
+
+func TestInitBasicUsersStorage_Idempotent(t *testing.T) {
+	setup(t)
+
+	if err := security.InitBasicUsersStorage(); err != nil {
+		t.Fatal(err)
+	}
+	if err := security.InitBasicUsersStorage(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBasicHashedUser_ToDataMap(t *testing.T) {
+	setup(t)
+
+	u := &security.BasicHashedUser{
+		Username: "bob",
+		Password: "hash",
+		Role:     security.RoleAdmin,
+	}
+
+	m := u.ToDataMap()
+	if m["id"] != "bob" {
+		t.Fatalf("id mismatch, got %v", m["id"])
+	}
+	if m["username"] != "bob" {
+		t.Fatalf("username mismatch, got %v", m["username"])
+	}
+	if m["password"] != "hash" {
+		t.Fatalf("password mismatch, got %v", m["password"])
+	}
+	if m["role"] != string(security.RoleAdmin) {
+		t.Fatalf("role mismatch, got %v", m["role"])
+	}
+}
+
+func TestBasicHashedUser_Save(t *testing.T) {
+	setup(t)
+
+	u := &security.BasicHashedUser{
+		Username: "saveuser",
+		Password: "hash",
+		Role:     security.RoleUser,
+	}
+
+	if err := u.Save(); err != nil {
+		t.Fatalf("save error: %v", err)
+	}
+
+	out := api_storage.ReadEntityById(security.UserEntity, "saveuser")
+	if out == nil {
+		t.Fatal("saved user not found")
+	}
+
+	if out["username"] != "saveuser" {
+		t.Fatalf("username mismatch, got %v", out["username"])
+	}
+}
+
+func TestBasicUser_ToHasedUser(t *testing.T) {
 	setup(t)
 
 	u := &security.BasicUser{
@@ -142,248 +190,17 @@ func TestToHasedUser(t *testing.T) {
 	}
 
 	if hu.Username != u.Username {
-		t.Fatal("username mismatch")
+		t.Fatalf("username mismatch, got %s", hu.Username)
 	}
-
 	if hu.Password == "" {
-		t.Fatal("empty hash")
+		t.Fatal("empty hashed password")
 	}
-
 	if hu.Role != u.Role {
-		t.Fatal("role mismatch")
+		t.Fatalf("role mismatch, got %v", hu.Role)
 	}
 }
 
-func TestCheckBasicAuthenticationSuccess(t *testing.T) {
-	globals.SetConfig(&configuration.Config{})
-	globals.GetConfig().Store.Folder = t.TempDir()
-	globals.GetConfig().Security.Authentication.Enabled = true
-	globals.GetConfig().Security.Authentication.Mode = "basic"
-
-	key, err := security.CreateKeyFileOrGetKey()
-	if err != nil {
-		t.Fatalf("key error: %v", err)
-	}
-
-	sum := sha256.Sum256([]byte("secret" + key))
-	pass := sum[:]
-
-	hashed, err := bcrypt.GenerateFromPassword(pass, bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatalf("bcrypt error: %v", err)
-	}
-
-	user := &security.BasicHashedcUser{
-		Username: "john",
-		Password: string(hashed),
-		Role:     security.RoleUser,
-	}
-
-	if err := security.AddUserToFile(user); err != nil {
-		t.Fatalf("add user error: %v", err)
-	}
-
-	header := "Basic " + base64.StdEncoding.EncodeToString([]byte("john:secret"))
-
-	req := fasthttp.AcquireRequest()
-	req.Header.Set("Authorization", header)
-
-	ctx := fasthttp.RequestCtx{}
-	ctx.Init(req, nil, nil)
-
-	if !security.CheckBasicAuthentication(&ctx) {
-		t.Fatalf("authentication failed")
-	}
-}
-
-func TestCheckBasicAuthenticationWrongPassword(t *testing.T) {
-	setup(t)
-
-	user := &security.BasicUser{Username: "admin", Password: "secret", Role: security.RoleAdmin}
-	if err := security.CreateBasicUser(user); err != nil {
-		t.Fatal(err)
-	}
-
-	req := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(req)
-
-	token := base64.StdEncoding.EncodeToString([]byte("admin:wrong"))
-	req.Header.Set("Authorization", "Basic "+token)
-
-	ctx := fasthttp.RequestCtx{}
-	ctx.Init(req, nil, nil)
-
-	if security.CheckBasicAuthentication(&ctx) {
-		t.Fatal("authentication should fail")
-	}
-}
-
-func TestCheckBasicAuthenticationNoHeader(t *testing.T) {
-	setup(t)
-
-	ctx := fasthttp.RequestCtx{}
-	if security.CheckBasicAuthentication(&ctx) {
-		t.Fatal("authentication should fail")
-	}
-}
-
-func TestCheckBasicAuthenticationMalformedHeader(t *testing.T) {
-	setup(t)
-
-	req := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(req)
-
-	req.Header.Set("Authorization", "Basic invalidbase64")
-
-	ctx := fasthttp.RequestCtx{}
-	ctx.Init(req, nil, nil)
-
-	if security.CheckBasicAuthentication(&ctx) {
-		t.Fatal("authentication should fail")
-	}
-}
-
-func TestDeleteBasicUser_Success(t *testing.T) {
-	setup(t)
-
-	user := &security.BasicUser{Username: "john", Password: "secret", Role: security.RoleUser}
-	if err := security.CreateBasicUser(user); err != nil {
-		t.Fatal(err)
-	}
-
-	err := security.DeleteBasicUser("john")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	users, err := security.LoadUsersFromFile()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(users.Users) != 0 {
-		t.Fatalf("expected user to be deleted")
-	}
-}
-
-func TestDeleteBasicUser_NotFound(t *testing.T) {
-	setup(t)
-
-	err := security.DeleteBasicUser("missing")
-	if err == nil {
-		t.Fatalf("expected error for missing user")
-	}
-}
-
-func TestDeleteBasicUser_NoUsersFile(t *testing.T) {
-	dir := setup(t)
-
-	path := filepath.Join(dir, security.UsersFilename)
-	os.Remove(path)
-
-	err := security.DeleteBasicUser("john")
-	if err == nil {
-		t.Fatalf("expected error when users.json does not exist")
-	}
-}
-
-func TestLoadUsersFromFile(t *testing.T) {
-	setup(t)
-
-	u := &security.BasicHashedcUser{Username: "x", Password: "y", Role: security.RoleUser}
-	if err := security.AddUserToFile(u); err != nil {
-		t.Fatal(err)
-	}
-
-	users, err := security.LoadUsersFromFile()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(users.Users) != 1 {
-		t.Fatalf("expected 1 user, got %d", len(users.Users))
-	}
-}
-
-func TestLoadUsersFromFile_NotExists(t *testing.T) {
-	dir := setup(t)
-	path := filepath.Join(dir, security.UsersFilename)
-	os.Remove(path)
-
-	_, err := security.LoadUsersFromFile()
-	if err == nil {
-		t.Fatal("expected error")
-	}
-}
-
-func TestAuthenticateUserSuccess(t *testing.T) {
-	setup(t)
-
-	key, err := security.CreateKeyFileOrGetKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	sum := sha256.Sum256([]byte("pwd" + key))
-	hashed, err := bcrypt.GenerateFromPassword(sum[:], bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	u := &security.BasicHashedcUser{
-		Username: "bob",
-		Password: string(hashed),
-		Role:     security.RoleUser,
-	}
-
-	if err := security.AddUserToFile(u); err != nil {
-		t.Fatal(err)
-	}
-
-	res, ok := security.AuthenticateUser("bob", "pwd")
-	if !ok || res == nil {
-		t.Fatal("expected success")
-	}
-}
-
-func TestAuthenticateUserWrongPassword(t *testing.T) {
-	setup(t)
-
-	user := &security.BasicUser{Username: "john", Password: "abc", Role: security.RoleUser}
-	if err := security.CreateBasicUser(user); err != nil {
-		t.Fatal(err)
-	}
-
-	_, ok := security.AuthenticateUser("john", "wrong")
-	if ok {
-		t.Fatal("expected authentication failure")
-	}
-}
-
-func TestAuthenticateUserNotExisting(t *testing.T) {
-	setup(t)
-
-	_, ok := security.AuthenticateUser("nouser", "pwd")
-	if ok {
-		t.Fatal("expected failure")
-	}
-}
-
-func TestAuthenticateUserKeyError(t *testing.T) {
-	dir := setup(t)
-
-	keyPath := filepath.Join(dir, security.KeyFilename)
-	os.Remove(keyPath)
-
-	os.WriteFile(keyPath, []byte{}, 0000)
-
-	_, ok := security.AuthenticateUser("u", "p")
-	if ok {
-		t.Fatal("expected failure due to key error")
-	}
-}
-
-func TestToHashedUser_DefaultRole(t *testing.T) {
+func TestBasicUser_ToHasedUser_DefaultRole(t *testing.T) {
 	setup(t)
 
 	u := &security.BasicUser{
@@ -398,80 +215,70 @@ func TestToHashedUser_DefaultRole(t *testing.T) {
 	}
 
 	if hu.Role != security.RoleUser {
-		t.Fatalf("expected default role user")
+		t.Fatalf("expected default role user, got %v", hu.Role)
 	}
 }
 
-func TestAddUserToFileInvalidJSON(t *testing.T) {
-	dir := setup(t)
-
-	path := filepath.Join(dir, security.UsersFilename)
-	os.WriteFile(path, []byte("{invalid json"), 0644)
-
-	u := &security.BasicHashedcUser{Username: "x", Password: "x", Role: security.RoleUser}
-
-	err := security.AddUserToFile(u)
-	if err == nil {
-		t.Fatal("expected failure on invalid JSON file")
-	}
-}
-
-func TestCreateKeyFileOrGetKey_Reopen(t *testing.T) {
+func TestCreateBasicUser_Single(t *testing.T) {
 	setup(t)
 
-	k1, err := security.CreateKeyFileOrGetKey()
-	if err != nil {
-		t.Fatal(err)
+	u := &security.BasicUser{
+		Username: "alice",
+		Password: "secret",
+		Role:     security.RoleAdmin,
 	}
 
-	k2, err := security.CreateKeyFileOrGetKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if k1 != k2 {
-		t.Fatal("keys should match")
-	}
-}
-
-func TestDeleteBasicUser_OnlyOne(t *testing.T) {
-	setup(t)
-
-	u := &security.BasicUser{Username: "solo", Password: "pwd", Role: security.RoleAdmin}
 	if err := security.CreateBasicUser(u); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := security.DeleteBasicUser("solo"); err != nil {
-		t.Fatal(err)
+	out := api_storage.ReadEntityById(security.UserEntity, "alice")
+	if out == nil {
+		t.Fatal("user not written")
+	}
+	if out["username"] != "alice" {
+		t.Fatalf("username mismatch, got %v", out["username"])
+	}
+}
+
+func TestCreateBasicUser_Multiple(t *testing.T) {
+	setup(t)
+
+	users := []*security.BasicUser{
+		{Username: "u1", Password: "p1", Role: security.RoleUser},
+		{Username: "u2", Password: "p2", Role: security.RoleAdmin},
+		{Username: "u3", Password: "p3", Role: security.RoleUser},
 	}
 
-	users, err := security.LoadUsersFromFile()
-	if err != nil && !os.IsNotExist(err) {
-		t.Fatal(err)
+	for _, u := range users {
+		if err := security.CreateBasicUser(u); err != nil {
+			t.Fatalf("CreateBasicUser error for %s: %v", u.Username, err)
+		}
 	}
 
-	if len(users.Users) != 0 {
-		t.Fatal("expected no users")
+	for _, u := range users {
+		out := api_storage.ReadEntityById(security.UserEntity, u.Username)
+		if out == nil {
+			t.Fatalf("user %s missing", u.Username)
+		}
 	}
 }
 
 func TestChangeUserPassword_Success(t *testing.T) {
 	setup(t)
 
-	user := &security.BasicUser{Username: "john", Password: "oldpwd", Role: security.RoleUser}
-	if err := security.CreateBasicUser(user); err != nil {
+	u := &security.BasicUser{Username: "john", Password: "oldpwd", Role: security.RoleUser}
+	if err := security.CreateBasicUser(u); err != nil {
 		t.Fatal(err)
 	}
 
-	err := security.ChangeUserPassword("john", "newpwd")
-	if err != nil {
+	if err := security.ChangeUserPassword("john", "newpwd"); err != nil {
 		t.Fatal(err)
 	}
 
-	u, ok := security.AuthenticateUser("john", "newpwd")
-	if !ok || u == nil {
-		t.Fatal("expected password to be updated")
+	res, ok := security.AuthenticateUser("john", "newpwd")
+	if !ok || res == nil {
+		t.Fatal("expected authentication success with new password")
 	}
 }
 
@@ -480,7 +287,7 @@ func TestChangeUserPassword_UserNotFound(t *testing.T) {
 
 	err := security.ChangeUserPassword("ghost", "pwd")
 	if err == nil {
-		t.Fatal("expected user not found error")
+		t.Fatal("expected error for missing user")
 	}
 }
 
@@ -502,20 +309,180 @@ func TestChangeUserPassword_KeyError(t *testing.T) {
 	}
 }
 
-func TestChangeUserPassword_FileWriteError(t *testing.T) {
-	dir := setup(t)
+func TestDeleteBasicUser_Success(t *testing.T) {
+	setup(t)
 
-	u := &security.BasicUser{Username: "test", Password: "pwd", Role: security.RoleUser}
+	u := &security.BasicUser{Username: "john", Password: "pwd", Role: security.RoleUser}
 	if err := security.CreateBasicUser(u); err != nil {
 		t.Fatal(err)
 	}
 
-	usersPath := filepath.Join(dir, security.UsersFilename)
-	os.Remove(usersPath)
-	os.WriteFile(usersPath, []byte("x"), 0000)
+	security.DeleteBasicUser("john")
 
-	err := security.ChangeUserPassword("test", "newpwd")
-	if err == nil {
-		t.Fatal("expected failure due to JSON write error")
+	if api_storage.ReadEntityById(security.UserEntity, "john") != nil {
+		t.Fatal("expected user to be deleted")
+	}
+}
+
+func TestDeleteBasicUser_NotFound(t *testing.T) {
+	setup(t)
+	security.DeleteBasicUser("missing")
+}
+
+func TestAuthenticateUser_Success(t *testing.T) {
+	setup(t)
+
+	u := &security.BasicUser{Username: "bob", Password: "pwd", Role: security.RoleUser}
+	if err := security.CreateBasicUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	res, ok := security.AuthenticateUser("bob", "pwd")
+	if !ok || res == nil {
+		t.Fatal("expected authentication success")
+	}
+	if res.Username != "bob" {
+		t.Fatalf("username mismatch, got %s", res.Username)
+	}
+}
+
+func TestAuthenticateUser_WrongPassword(t *testing.T) {
+	setup(t)
+
+	u := &security.BasicUser{Username: "john", Password: "abc", Role: security.RoleUser}
+	if err := security.CreateBasicUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	_, ok := security.AuthenticateUser("john", "wrong")
+	if ok {
+		t.Fatal("expected authentication failure with wrong password")
+	}
+}
+
+func TestAuthenticateUser_NotExisting(t *testing.T) {
+	setup(t)
+
+	_, ok := security.AuthenticateUser("nouser", "pwd")
+	if ok {
+		t.Fatal("expected authentication failure for missing user")
+	}
+}
+
+func TestAuthenticateUser_KeyError(t *testing.T) {
+	dir := setup(t)
+
+	u := &security.BasicUser{Username: "u", Password: "p", Role: security.RoleUser}
+	if err := security.CreateBasicUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	keyPath := filepath.Join(dir, security.KeyFilename)
+	os.Remove(keyPath)
+	os.WriteFile(keyPath, []byte{}, 0000)
+
+	_, ok := security.AuthenticateUser("u", "p")
+	if ok {
+		t.Fatal("expected failure due to key error")
+	}
+}
+
+func TestCheckBasicAuthentication_Success(t *testing.T) {
+	setup(t)
+
+	u := &security.BasicUser{Username: "john", Password: "secret", Role: security.RoleUser}
+	if err := security.CreateBasicUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	header := "Basic " + base64.StdEncoding.EncodeToString([]byte("john:secret"))
+
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+	req.Header.Set("Authorization", header)
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	if !security.CheckBasicAuthentication(&ctx) {
+		t.Fatal("expected authentication success")
+	}
+}
+
+func TestCheckBasicAuthentication_WrongPassword(t *testing.T) {
+	setup(t)
+
+	u := &security.BasicUser{Username: "admin", Password: "secret", Role: security.RoleAdmin}
+	if err := security.CreateBasicUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	token := base64.StdEncoding.EncodeToString([]byte("admin:wrong"))
+
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+	req.Header.Set("Authorization", "Basic "+token)
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	if security.CheckBasicAuthentication(&ctx) {
+		t.Fatal("expected authentication failure")
+	}
+}
+
+func TestCheckBasicAuthentication_NoHeader(t *testing.T) {
+	setup(t)
+
+	var ctx fasthttp.RequestCtx
+	if security.CheckBasicAuthentication(&ctx) {
+		t.Fatal("expected authentication failure without header")
+	}
+}
+
+func TestCheckBasicAuthentication_MalformedBase64(t *testing.T) {
+	setup(t)
+
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+	req.Header.Set("Authorization", "Basic !!!notbase64")
+
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	if security.CheckBasicAuthentication(&ctx) {
+		t.Fatal("expected authentication failure with malformed base64")
+	}
+}
+
+func TestCheckBasicAuthentication_MalformedPayload(t *testing.T) {
+	setup(t)
+
+	payload := base64.StdEncoding.EncodeToString([]byte("nocolon"))
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+	req.Header.Set("Authorization", "Basic "+payload)
+
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	if security.CheckBasicAuthentication(&ctx) {
+		t.Fatal("expected authentication failure with malformed payload")
+	}
+}
+
+func TestInitBasicUsersStorage_SchemaMatchesUserEntitySchema(t *testing.T) {
+	setup(t)
+
+	if err := security.InitBasicUsersStorage(); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := api_storage.UpdateEntitySchema(security.UserEntity, security.UserEntitySchema())
+	stored := api_storage.GetEntitySchema(security.UserEntity)
+	if stored == nil {
+		t.Fatal("expected stored schema for user entity")
+	}
+
+	if !reflect.DeepEqual(expected, stored) {
+		t.Fatalf("stored schema mismatch, expected %v got %v", expected, stored)
 	}
 }

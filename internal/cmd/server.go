@@ -28,7 +28,7 @@ func StartServer() {
 		boot.BootStats()
 	}
 
-	boot.InitDB()
+	boot.BootLogger()
 
 	Printf(
 		"%s%sReady%s   %sServing a KV datastore with %sInstant REST API%s.\n",

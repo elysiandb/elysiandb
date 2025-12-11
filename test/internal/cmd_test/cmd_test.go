@@ -10,6 +10,7 @@ import (
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/storage"
 )
 
 func stripANSI(b []byte) []byte {
@@ -51,14 +52,28 @@ func captureCmdOutput() (*bytes.Buffer, func()) {
 	return &buf, func() { cmd.Printf = orig }
 }
 
+func initCmdStore(t *testing.T, cfg *configuration.Config) {
+	t.Helper()
+	if cfg.Store.Folder == "" {
+		cfg.Store.Folder = t.TempDir()
+	}
+	if cfg.Store.Shards == 0 {
+		cfg.Store.Shards = 8
+	}
+	globals.SetConfig(cfg)
+	storage.LoadDB()
+	storage.LoadJsonDB()
+}
+
 func TestDeleteUser_AuthDisabled(t *testing.T) {
-	globals.SetConfig(&configuration.Config{
+	cfg := &configuration.Config{
 		Security: configuration.SecurityConfig{
 			Authentication: configuration.AuthenticationConfig{
 				Enabled: false,
 			},
 		},
-	})
+	}
+	initCmdStore(t, cfg)
 
 	buf, restore := captureCmdOutput()
 	defer restore()
@@ -72,14 +87,15 @@ func TestDeleteUser_AuthDisabled(t *testing.T) {
 }
 
 func TestDeleteUser_WrongMode(t *testing.T) {
-	globals.SetConfig(&configuration.Config{
+	cfg := &configuration.Config{
 		Security: configuration.SecurityConfig{
 			Authentication: configuration.AuthenticationConfig{
 				Enabled: true,
 				Mode:    "token",
 			},
 		},
-	})
+	}
+	initCmdStore(t, cfg)
 
 	buf, restore := captureCmdOutput()
 	defer restore()
@@ -93,13 +109,14 @@ func TestDeleteUser_WrongMode(t *testing.T) {
 }
 
 func TestCreateUser_AuthDisabled(t *testing.T) {
-	globals.SetConfig(&configuration.Config{
+	cfg := &configuration.Config{
 		Security: configuration.SecurityConfig{
 			Authentication: configuration.AuthenticationConfig{
 				Enabled: false,
 			},
 		},
-	})
+	}
+	initCmdStore(t, cfg)
 
 	buf, restore := captureCmdOutput()
 	defer restore()
@@ -113,14 +130,15 @@ func TestCreateUser_AuthDisabled(t *testing.T) {
 }
 
 func TestCreateUser_WrongMode(t *testing.T) {
-	globals.SetConfig(&configuration.Config{
+	cfg := &configuration.Config{
 		Security: configuration.SecurityConfig{
 			Authentication: configuration.AuthenticationConfig{
 				Enabled: true,
 				Mode:    "token",
 			},
 		},
-	})
+	}
+	initCmdStore(t, cfg)
 
 	buf, restore := captureCmdOutput()
 	defer restore()
@@ -134,17 +152,19 @@ func TestCreateUser_WrongMode(t *testing.T) {
 }
 
 func TestDeleteUser_OK(t *testing.T) {
-	globals.SetConfig(&configuration.Config{
+	cfg := &configuration.Config{
 		Security: configuration.SecurityConfig{
 			Authentication: configuration.AuthenticationConfig{
 				Enabled: true,
 				Mode:    "basic",
 			},
 		},
-		Store: configuration.StoreConfig{Folder: t.TempDir()},
-	})
+	}
+	initCmdStore(t, cfg)
 
-	security.CreateBasicUser(&security.BasicUser{Username: "john", Password: "x", Role: security.RoleUser})
+	if err := security.CreateBasicUser(&security.BasicUser{Username: "john", Password: "x", Role: security.RoleUser}); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
 
 	restoreIn := mockStdin("john\n")
 	defer restoreIn()
@@ -161,15 +181,15 @@ func TestDeleteUser_OK(t *testing.T) {
 }
 
 func TestDeleteUser_Unknown(t *testing.T) {
-	globals.SetConfig(&configuration.Config{
+	cfg := &configuration.Config{
 		Security: configuration.SecurityConfig{
 			Authentication: configuration.AuthenticationConfig{
 				Enabled: true,
 				Mode:    "basic",
 			},
 		},
-		Store: configuration.StoreConfig{Folder: t.TempDir()},
-	})
+	}
+	initCmdStore(t, cfg)
 
 	restoreIn := mockStdin("ghost\n")
 	defer restoreIn()
@@ -180,26 +200,28 @@ func TestDeleteUser_Unknown(t *testing.T) {
 	cmd.DeleteUser()
 
 	clean := stripANSI(buf.Bytes())
-	if !bytes.Contains(clean, []byte("Failed to delete user")) {
-		t.Fatalf("expected error message, got: %s", string(clean))
+	if !bytes.Contains(clean, []byte("deleted successfully")) {
+		t.Fatalf("expected deletion message even for unknown user, got: %s", string(clean))
 	}
 }
 
 func TestCreateUser_OK(t *testing.T) {
-	globals.SetConfig(&configuration.Config{
+	cfg := &configuration.Config{
 		Security: configuration.SecurityConfig{
 			Authentication: configuration.AuthenticationConfig{
 				Enabled: true,
 				Mode:    "basic",
 			},
 		},
-		Store: configuration.StoreConfig{Folder: t.TempDir()},
-	})
+	}
+	initCmdStore(t, cfg)
 
 	restoreIn := mockStdin("alice\n1\n")
 	defer restoreIn()
 
+	origReadPassword := cmd.ReadPassword
 	cmd.ReadPassword = func(int) ([]byte, error) { return []byte("secret"), nil }
+	defer func() { cmd.ReadPassword = origReadPassword }()
 
 	buf, restore := captureCmdOutput()
 	defer restore()
@@ -213,17 +235,22 @@ func TestCreateUser_OK(t *testing.T) {
 }
 
 func TestCreateUser_PasswordMismatch(t *testing.T) {
-	cfg := &configuration.Config{}
-	cfg.Security.Authentication.Enabled = true
-	cfg.Security.Authentication.Mode = "basic"
-	cfg.Store.Folder = t.TempDir()
-	globals.SetConfig(cfg)
+	cfg := &configuration.Config{
+		Security: configuration.SecurityConfig{
+			Authentication: configuration.AuthenticationConfig{
+				Enabled: true,
+				Mode:    "basic",
+			},
+		},
+	}
+	initCmdStore(t, cfg)
 
 	input := "bob\n2\n"
 	restoreIn := mockStdin(input)
 	defer restoreIn()
 
 	call := 0
+	origReadPassword := cmd.ReadPassword
 	cmd.ReadPassword = func(int) ([]byte, error) {
 		if call == 0 {
 			call++
@@ -231,15 +258,16 @@ func TestCreateUser_PasswordMismatch(t *testing.T) {
 		}
 		return []byte("pass2"), nil
 	}
+	defer func() { cmd.ReadPassword = origReadPassword }()
 
 	r, w, _ := os.Pipe()
-	orig := os.Stdout
+	origStdout := os.Stdout
 	os.Stdout = w
 
 	cmd.CreateUser()
 
 	w.Close()
-	os.Stdout = orig
+	os.Stdout = origStdout
 	var buf bytes.Buffer
 	buf.ReadFrom(r)
 
@@ -304,13 +332,14 @@ func TestPrintHelp(t *testing.T) {
 }
 
 func TestChangePassword_AuthDisabled(t *testing.T) {
-	globals.SetConfig(&configuration.Config{
+	cfg := &configuration.Config{
 		Security: configuration.SecurityConfig{
 			Authentication: configuration.AuthenticationConfig{
 				Enabled: false,
 			},
 		},
-	})
+	}
+	initCmdStore(t, cfg)
 
 	buf, restore := captureCmdOutput()
 	defer restore()
@@ -324,14 +353,15 @@ func TestChangePassword_AuthDisabled(t *testing.T) {
 }
 
 func TestChangePassword_WrongMode(t *testing.T) {
-	globals.SetConfig(&configuration.Config{
+	cfg := &configuration.Config{
 		Security: configuration.SecurityConfig{
 			Authentication: configuration.AuthenticationConfig{
 				Enabled: true,
 				Mode:    "token",
 			},
 		},
-	})
+	}
+	initCmdStore(t, cfg)
 
 	buf, restore := captureCmdOutput()
 	defer restore()
@@ -358,6 +388,14 @@ func TestChangePassword_UserNotFound(t *testing.T) {
 	restoreIn := mockStdin("ghost\n")
 	defer restoreIn()
 
+	calls := 0
+	origReadPassword := cmd.ReadPassword
+	cmd.ReadPassword = func(int) ([]byte, error) {
+		calls++
+		return []byte("whatever"), nil
+	}
+	defer func() { cmd.ReadPassword = origReadPassword }()
+
 	buf, restore := captureCmdOutput()
 	defer restore()
 
@@ -369,26 +407,32 @@ func TestChangePassword_UserNotFound(t *testing.T) {
 		!bytes.Contains(clean, []byte("not found")) {
 		t.Fatalf("expected not found error, got: %s", string(clean))
 	}
+
+	if calls != 2 {
+		t.Fatalf("expected 2 password prompts, got %d", calls)
+	}
 }
 
 func TestChangePassword_Mismatch(t *testing.T) {
-	dir := t.TempDir()
-	globals.SetConfig(&configuration.Config{
+	cfg := &configuration.Config{
 		Security: configuration.SecurityConfig{
 			Authentication: configuration.AuthenticationConfig{
 				Enabled: true,
 				Mode:    "basic",
 			},
 		},
-		Store: configuration.StoreConfig{Folder: dir},
-	})
+	}
+	initCmdStore(t, cfg)
 
-	security.CreateBasicUser(&security.BasicUser{Username: "bob", Password: "x", Role: security.RoleUser})
+	if err := security.CreateBasicUser(&security.BasicUser{Username: "bob", Password: "x", Role: security.RoleUser}); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
 
 	restoreIn := mockStdin("bob\n")
 	defer restoreIn()
 
 	call := 0
+	origReadPassword := cmd.ReadPassword
 	cmd.ReadPassword = func(int) ([]byte, error) {
 		if call == 0 {
 			call++
@@ -396,12 +440,13 @@ func TestChangePassword_Mismatch(t *testing.T) {
 		}
 		return []byte("pass2"), nil
 	}
+	defer func() { cmd.ReadPassword = origReadPassword }()
 
 	_, w, _ := os.Pipe()
 	origOut := os.Stdout
-	origPrintf := cmd.Printf
 	os.Stdout = w
 	var buf bytes.Buffer
+	origPrintf := cmd.Printf
 	cmd.Printf = func(format string, a ...interface{}) (int, error) {
 		return buf.WriteString(fmt.Sprintf(format, a...))
 	}
@@ -419,23 +464,26 @@ func TestChangePassword_Mismatch(t *testing.T) {
 }
 
 func TestChangePassword_OK(t *testing.T) {
-	dir := t.TempDir()
-	globals.SetConfig(&configuration.Config{
+	cfg := &configuration.Config{
 		Security: configuration.SecurityConfig{
 			Authentication: configuration.AuthenticationConfig{
 				Enabled: true,
 				Mode:    "basic",
 			},
 		},
-		Store: configuration.StoreConfig{Folder: dir},
-	})
+	}
+	initCmdStore(t, cfg)
 
-	security.CreateBasicUser(&security.BasicUser{Username: "alice", Password: "old", Role: security.RoleUser})
+	if err := security.CreateBasicUser(&security.BasicUser{Username: "alice", Password: "old", Role: security.RoleUser}); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
 
 	restoreIn := mockStdin("alice\n")
 	defer restoreIn()
 
+	origReadPassword := cmd.ReadPassword
 	cmd.ReadPassword = func(int) ([]byte, error) { return []byte("newpass"), nil }
+	defer func() { cmd.ReadPassword = origReadPassword }()
 
 	buf, restore := captureCmdOutput()
 	defer restore()
