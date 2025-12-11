@@ -1,4 +1,3 @@
-// EntityType.jsx
 import {Card, Form, Button, Alert, Row, Col} from "react-bootstrap";
 import { useEffect, useState } from "react";
 import { useEntityTypes } from "../../hooks/entity/useEntityTypes.js";
