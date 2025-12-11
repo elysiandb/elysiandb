@@ -1108,6 +1108,16 @@ The command prompts the list fo available commands.
 
 ---
 
+### 6. `reset`
+
+Reset ElysianDB completely including schemas and users.
+
+```bash
+elysiandb reset
+```
+
+---
+
 ## Requirements
 
 Both `create-user` and `delete-user` require the following configuration:

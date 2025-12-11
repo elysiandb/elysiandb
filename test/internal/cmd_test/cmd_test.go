@@ -255,7 +255,9 @@ func TestGetAvailableCommands(t *testing.T) {
 	if cmds[cmd.ServerCommand] == "" ||
 		cmds[cmd.CreateUserCommand] == "" ||
 		cmds[cmd.DeleteUserCommand] == "" ||
-		cmds[cmd.HelpCommand] == "" {
+		cmds[cmd.HelpCommand] == "" ||
+		cmds[cmd.ChangePasswordCommand] == "" ||
+		cmds[cmd.ResetCommand] == "" {
 		t.Fatalf("expected all commands to be present")
 	}
 }
@@ -266,7 +268,9 @@ func TestGetHandlers(t *testing.T) {
 	if h[cmd.ServerCommand] == nil ||
 		h[cmd.CreateUserCommand] == nil ||
 		h[cmd.DeleteUserCommand] == nil ||
-		h[cmd.HelpCommand] == nil {
+		h[cmd.HelpCommand] == nil ||
+		h[cmd.ChangePasswordCommand] == nil ||
+		h[cmd.ResetCommand] == nil {
 		t.Fatalf("expected all handlers to be present")
 	}
 }
@@ -288,6 +292,8 @@ func TestPrintHelp(t *testing.T) {
 		cmd.CreateUserCommand,
 		cmd.DeleteUserCommand,
 		cmd.HelpCommand,
+		cmd.ChangePasswordCommand,
+		cmd.ResetCommand,
 	}
 
 	for _, e := range expected {
@@ -439,5 +445,63 @@ func TestChangePassword_OK(t *testing.T) {
 	clean := stripANSI(buf.Bytes())
 	if !bytes.Contains(clean, []byte("updated successfully")) {
 		t.Fatalf("expected success message, got: %s", string(clean))
+	}
+}
+
+func TestResetAll_AbortOnNo(t *testing.T) {
+	dir := t.TempDir()
+	globals.SetConfig(&configuration.Config{
+		Store: configuration.StoreConfig{Folder: dir},
+	})
+
+	restoreIn := mockStdin("no\n")
+	defer restoreIn()
+
+	var buf bytes.Buffer
+	origPrintf := cmd.Printf
+	cmd.Printf = func(format string, a ...interface{}) (int, error) {
+		return buf.WriteString(fmt.Sprintf(format, a...))
+	}
+	defer func() { cmd.Printf = origPrintf }()
+
+	cmd.ResetAll()
+
+	out := buf.String()
+
+	if !bytes.Contains([]byte(out), []byte("Reset aborted.")) {
+		t.Fatalf("expected abort message, got: %s", out)
+	}
+
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatalf("expected directory to still exist, got: %v", err)
+	}
+}
+
+func TestResetAll_WithForceDeletesFolder(t *testing.T) {
+	dir := t.TempDir()
+	globals.SetConfig(&configuration.Config{
+		Store: configuration.StoreConfig{Folder: dir},
+	})
+
+	origArgs := os.Args
+	os.Args = []string{"elysiandb", cmd.ResetCommand, "--force"}
+	defer func() { os.Args = origArgs }()
+
+	restoreIn := mockStdin("yes\n")
+	defer restoreIn()
+
+	r, w, _ := os.Pipe()
+	origOut := os.Stdout
+	os.Stdout = w
+
+	cmd.ResetAll()
+
+	w.Close()
+	os.Stdout = origOut
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("expected directory to be removed, got: %v", err)
 	}
 }

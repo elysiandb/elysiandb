@@ -49,7 +49,7 @@ func UpdateEntitySchema(entity string, fieldsRaw map[string]interface{}) map[str
 	storable := schema.SchemaEntityToStorableStructure(entitySchema)
 	storable["_manual"] = true
 
-	WriteEntity("schema", storable)
+	WriteEntity(schema.SchemaEntity, storable)
 
 	return storable
 }

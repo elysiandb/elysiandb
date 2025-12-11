@@ -15,6 +15,7 @@ const DeleteUserCommand = "delete-user"
 const ServerCommand = "server"
 const HelpCommand = "help"
 const ChangePasswordCommand = "change-password"
+const ResetCommand = "reset"
 
 func GetAvailableCommands() map[string]string {
 	return map[string]string{
@@ -22,6 +23,7 @@ func GetAvailableCommands() map[string]string {
 		CreateUserCommand:     "Create a new user (needs security.authentication.mode = basic or user)",
 		DeleteUserCommand:     "Delete an existing user (needs security.authentication.mode = basic or user)",
 		ChangePasswordCommand: "Change password for an existing user (needs security.authentication.mode = basic or user)",
+		ResetCommand:          "Reset the database by deleting all stored data and resets users (requires --force flag)",
 		HelpCommand:           "List available commands",
 	}
 }
@@ -32,6 +34,7 @@ func GetHandlers() map[string]func() {
 		DeleteUserCommand:     DeleteUser,
 		ServerCommand:         StartServer,
 		ChangePasswordCommand: ChangePassword,
+		ResetCommand:          ResetAll,
 		HelpCommand:           PrintHelp,
 	}
 }
