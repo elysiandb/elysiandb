@@ -254,7 +254,7 @@ func TestCreateTypeController_OK(t *testing.T) {
 		t.Fatalf("entity type not created")
 	}
 
-	s := api_storage.ReadEntityById("schema", "person")
+	s := api_storage.ReadEntityById("_elysiandb_core_schema", "person")
 	if s == nil {
 		t.Fatalf("schema not created")
 	}
@@ -447,7 +447,7 @@ func TestGetEntityTypesController_MarshalError(t *testing.T) {
 
 	api_storage.CreateEntityType("x")
 
-	storage.PutJsonValue(globals.ApiSingleEntityKey("schema", "x"), map[string]interface{}{
+	storage.PutJsonValue(globals.ApiSingleEntityKey("_elysiandb_core_schema", "x"), map[string]interface{}{
 		"bad": func() {},
 	})
 

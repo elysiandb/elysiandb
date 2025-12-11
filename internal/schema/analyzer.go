@@ -8,7 +8,7 @@ import (
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
-const SchemaEntity = "schema"
+const SchemaEntity = "_elysiandb_core_schema"
 
 var LoadSchemaForEntity = loadSchemaForEntity
 

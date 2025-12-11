@@ -646,7 +646,7 @@ func TestUpdateEntitySchema(t *testing.T) {
 		t.Fatalf("expected _manual = true")
 	}
 
-	stored := api_storage.ReadEntityById("schema", "person")
+	stored := api_storage.ReadEntityById("_elysiandb_core_schema", "person")
 	if stored == nil {
 		t.Fatalf("stored schema missing")
 	}
@@ -707,7 +707,7 @@ func TestUpdateSchemaIfNeeded_Disabled(t *testing.T) {
 
 	api_storage.WriteEntity("xxx", map[string]interface{}{"id": "1", "name": "abc"})
 
-	if sc := api_storage.ReadEntityById("schema", "xxx"); sc != nil {
+	if sc := api_storage.ReadEntityById("_elysiandb_core_schema", "xxx"); sc != nil {
 		t.Fatalf("schema should not be created when disabled, got %v", sc)
 	}
 }
@@ -721,7 +721,7 @@ func TestUpdateSchemaIfNeeded_Enabled(t *testing.T) {
 
 	api_storage.WriteEntity("xxx", map[string]interface{}{"id": "1", "name": "abc"})
 
-	sc := api_storage.ReadEntityById("schema", "xxx")
+	sc := api_storage.ReadEntityById("_elysiandb_core_schema", "xxx")
 	if sc == nil {
 		t.Fatalf("expected schema to be updated")
 	}
@@ -870,7 +870,7 @@ func TestWriteEntity_SkipSchemaUpdatesForManualStrict(t *testing.T) {
 
 	api_storage.WriteEntity("p", map[string]interface{}{"id": "1", "name": "abc"})
 
-	if sc := api_storage.ReadEntityById("schema", "p"); sc == nil {
+	if sc := api_storage.ReadEntityById("_elysiandb_core_schema", "p"); sc == nil {
 		t.Fatalf("manual schema must exist")
 	}
 }
