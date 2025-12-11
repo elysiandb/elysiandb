@@ -1084,7 +1084,19 @@ The command prompts for the username to remove. If the user does not exist, an e
 
 ---
 
-### 4. `help`
+### 4. `change-password` (basic or user authentication only)
+
+Changes the password of an existing user.
+
+```bash
+elysiandb change-password
+```
+
+The command prompts for the username and the new password. If the user does not exist, an error is returned.
+
+---
+
+### 5. `help`
 
 Deletes an existing user.
 

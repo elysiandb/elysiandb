@@ -455,3 +455,67 @@ func TestDeleteBasicUser_OnlyOne(t *testing.T) {
 		t.Fatal("expected no users")
 	}
 }
+
+func TestChangeUserPassword_Success(t *testing.T) {
+	setup(t)
+
+	user := &security.BasicUser{Username: "john", Password: "oldpwd", Role: security.RoleUser}
+	if err := security.CreateBasicUser(user); err != nil {
+		t.Fatal(err)
+	}
+
+	err := security.ChangeUserPassword("john", "newpwd")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	u, ok := security.AuthenticateUser("john", "newpwd")
+	if !ok || u == nil {
+		t.Fatal("expected password to be updated")
+	}
+}
+
+func TestChangeUserPassword_UserNotFound(t *testing.T) {
+	setup(t)
+
+	err := security.ChangeUserPassword("ghost", "pwd")
+	if err == nil {
+		t.Fatal("expected user not found error")
+	}
+}
+
+func TestChangeUserPassword_KeyError(t *testing.T) {
+	dir := setup(t)
+
+	u := &security.BasicUser{Username: "a", Password: "b", Role: security.RoleUser}
+	if err := security.CreateBasicUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	keyPath := filepath.Join(dir, security.KeyFilename)
+	os.Remove(keyPath)
+	os.WriteFile(keyPath, []byte{}, 0000)
+
+	err := security.ChangeUserPassword("a", "x")
+	if err == nil {
+		t.Fatal("expected key read error")
+	}
+}
+
+func TestChangeUserPassword_FileWriteError(t *testing.T) {
+	dir := setup(t)
+
+	u := &security.BasicUser{Username: "test", Password: "pwd", Role: security.RoleUser}
+	if err := security.CreateBasicUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	usersPath := filepath.Join(dir, security.UsersFilename)
+	os.Remove(usersPath)
+	os.WriteFile(usersPath, []byte("x"), 0000)
+
+	err := security.ChangeUserPassword("test", "newpwd")
+	if err == nil {
+		t.Fatal("expected failure due to JSON write error")
+	}
+}
