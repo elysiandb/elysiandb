@@ -109,6 +109,129 @@ button.navbar-toggler {
 }
 
 /* -----------------------------------
+   NOTIFICATIONS / TOASTS
+----------------------------------- */
+
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.toast-item {
+    padding: 12px 18px;
+    border-radius: 12px;
+    font-weight: 500;
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: var(--text-main);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    animation: toast-enter 0.25s ease-out;
+    min-width: 220px;
+    text-align: left;
+}
+
+.toast-item.success {
+    border-color: rgba(120,255,120,0.35);
+    color: #b5ffb5;
+}
+
+.toast-item.error {
+    border-color: rgba(255,80,80,0.40);
+    color: #ffb5b5;
+}
+
+@keyframes toast-enter {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* -----------------------------------
+   MODAL
+----------------------------------- */
+
+.modal-content {
+    background: rgba(21,24,41,0.85) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    border-radius: 16px !important;
+    backdrop-filter: blur(24px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+    box-shadow: 0 8px 26px rgba(0,0,0,0.45) !important;
+}
+
+.modal-header,
+.modal-body,
+.modal-footer {
+    background: transparent !important;
+    border: none !important;
+}
+
+.modal-title {
+    color: var(--text-main) !important;
+}
+
+.modal-body input {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    color: var(--text-main) !important;
+    border-radius: 8px !important;
+}
+
+.modal-body input:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px rgba(247,214,74,0.25) !important;
+}
+
+.modal-footer button {
+    background: rgba(255,255,255,0.12) !important;
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    color: var(--text-main) !important;
+}
+
+.modal-footer button:hover {
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+}
+
+.modal-body input::placeholder {
+    color: rgba(230,230,240,0.35) !important;
+}
+
+.btn-close {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    background: rgba(255,255,255,0.10) !important;
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    backdrop-filter: blur(14px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(160%) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    opacity: 0.85 !important;
+}
+
+.btn-close::before {
+    content: "×";
+    font-size: 20px;
+    color: var(--text-main);
+    line-height: 1;
+}
+
+.btn-close:hover {
+    background: rgba(255,255,255,0.18) !important;
+    border-color: var(--accent) !important;
+    opacity: 1 !important;
+}
+
+/* -----------------------------------
    SIDEBAR LIST
 ----------------------------------- */
 .list-group-item {
@@ -134,6 +257,13 @@ button.navbar-toggler {
     background-color: var(--accent) !important;
     color: #000 !important;
     font-weight: 600;
+}
+
+.entity-sidebar .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px !important;
 }
 
 /* -----------------------------------
@@ -164,7 +294,7 @@ button:hover, .btn:hover {
 }
 
 /* -----------------------------------
-   TREE STRUCTURE
+   Entity Editor
 ----------------------------------- */
 .entity-toolbar {
     display: flex;
@@ -197,6 +327,45 @@ button:hover, .btn:hover {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+/* CREATE ENTITY BUTTON (sidebar) */
+.create-entity-type-button {
+    margin-left: auto;
+
+    height: 32px;
+    width: 32px;
+    border-radius: 10px;
+
+    background: rgba(255, 255, 255, 0.10) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+
+    color: var(--text-dim) !important;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    transition: 0.2s ease;
+}
+
+.create-entity-type-button:hover {
+    background: rgba(255,255,255,0.20) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    transform: translateY(-1px);
+}
+
+.create-entity-type-button:hover {
+    background: rgba(255,255,255,0.20) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    transform: translateY(-1px);
 }
 
 /* INPUTS SHORT AND MATCHING STYLE */
