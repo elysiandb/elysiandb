@@ -63,7 +63,7 @@ export default function EntityType({ entityType, onDropSuccess }) {
     return (
         <Card className="p-4">
             <h4 className="text-warning mb-4">
-                {localData.id} ({localData.manual ? "manual" : "auto-managed"})
+                {localData.id} ({localData._manual ? "manual" : "auto-managed"})
             </h4>
 
             {error && (

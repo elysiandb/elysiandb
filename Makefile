@@ -35,6 +35,8 @@ install:
 server:
 	go run . server
 
+run: build-admin server
+
 build-admin:
 	cd adminui && npm install && npm run build
 

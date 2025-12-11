@@ -215,8 +215,8 @@ button:hover, .btn:hover {
 }
 
 .entity-add-child {
-    width: 18px;
-    height: 18px;
+    width: 39px;
+    height: 39px;
     border-radius: 50%;
     border: 1px solid rgba(255,255,255,0.25);
     background: rgba(255,255,255,0.08);
@@ -240,8 +240,8 @@ button:hover, .btn:hover {
 }
 
 .entity-delete-field {
-    width: 16px;
-    height: 16px;
+    width: 39px;
+    height: 39px;
     border-radius: 50%;
     border: 1px solid rgba(255,255,255,0.25);
     background: rgba(255,255,255,0.05);
