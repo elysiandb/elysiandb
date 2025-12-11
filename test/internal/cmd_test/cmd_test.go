@@ -296,3 +296,148 @@ func TestPrintHelp(t *testing.T) {
 		}
 	}
 }
+
+func TestChangePassword_AuthDisabled(t *testing.T) {
+	globals.SetConfig(&configuration.Config{
+		Security: configuration.SecurityConfig{
+			Authentication: configuration.AuthenticationConfig{
+				Enabled: false,
+			},
+		},
+	})
+
+	buf, restore := captureCmdOutput()
+	defer restore()
+
+	cmd.ChangePassword()
+
+	clean := stripANSI(buf.Bytes())
+	if !bytes.Contains(clean, []byte("Authentication is disabled")) {
+		t.Fatalf("expected message, got: %s", string(clean))
+	}
+}
+
+func TestChangePassword_WrongMode(t *testing.T) {
+	globals.SetConfig(&configuration.Config{
+		Security: configuration.SecurityConfig{
+			Authentication: configuration.AuthenticationConfig{
+				Enabled: true,
+				Mode:    "token",
+			},
+		},
+	})
+
+	buf, restore := captureCmdOutput()
+	defer restore()
+
+	cmd.ChangePassword()
+
+	clean := stripANSI(buf.Bytes())
+	if !bytes.Contains(clean, []byte("only supports basic")) {
+		t.Fatalf("expected message, got: %s", string(clean))
+	}
+}
+
+func TestChangePassword_UserNotFound(t *testing.T) {
+	globals.SetConfig(&configuration.Config{
+		Security: configuration.SecurityConfig{
+			Authentication: configuration.AuthenticationConfig{
+				Enabled: true,
+				Mode:    "basic",
+			},
+		},
+		Store: configuration.StoreConfig{Folder: t.TempDir()},
+	})
+
+	restoreIn := mockStdin("ghost\n")
+	defer restoreIn()
+
+	buf, restore := captureCmdOutput()
+	defer restore()
+
+	cmd.ChangePassword()
+
+	clean := stripANSI(buf.Bytes())
+
+	if !bytes.Contains(clean, []byte("Failed to update password")) &&
+		!bytes.Contains(clean, []byte("not found")) {
+		t.Fatalf("expected not found error, got: %s", string(clean))
+	}
+}
+
+func TestChangePassword_Mismatch(t *testing.T) {
+	dir := t.TempDir()
+	globals.SetConfig(&configuration.Config{
+		Security: configuration.SecurityConfig{
+			Authentication: configuration.AuthenticationConfig{
+				Enabled: true,
+				Mode:    "basic",
+			},
+		},
+		Store: configuration.StoreConfig{Folder: dir},
+	})
+
+	security.CreateBasicUser(&security.BasicUser{Username: "bob", Password: "x", Role: security.RoleUser})
+
+	restoreIn := mockStdin("bob\n")
+	defer restoreIn()
+
+	call := 0
+	cmd.ReadPassword = func(int) ([]byte, error) {
+		if call == 0 {
+			call++
+			return []byte("pass1"), nil
+		}
+		return []byte("pass2"), nil
+	}
+
+	_, w, _ := os.Pipe()
+	origOut := os.Stdout
+	origPrintf := cmd.Printf
+	os.Stdout = w
+	var buf bytes.Buffer
+	cmd.Printf = func(format string, a ...interface{}) (int, error) {
+		return buf.WriteString(fmt.Sprintf(format, a...))
+	}
+
+	cmd.ChangePassword()
+
+	w.Close()
+	os.Stdout = origOut
+	cmd.Printf = origPrintf
+
+	clean := stripANSI(buf.Bytes())
+	if !bytes.Contains(clean, []byte("Passwords do not match")) {
+		t.Fatalf("expected mismatch message, got: %s", string(clean))
+	}
+}
+
+func TestChangePassword_OK(t *testing.T) {
+	dir := t.TempDir()
+	globals.SetConfig(&configuration.Config{
+		Security: configuration.SecurityConfig{
+			Authentication: configuration.AuthenticationConfig{
+				Enabled: true,
+				Mode:    "basic",
+			},
+		},
+		Store: configuration.StoreConfig{Folder: dir},
+	})
+
+	security.CreateBasicUser(&security.BasicUser{Username: "alice", Password: "old", Role: security.RoleUser})
+
+	restoreIn := mockStdin("alice\n")
+	defer restoreIn()
+
+	cmd.ReadPassword = func(int) ([]byte, error) { return []byte("newpass"), nil }
+
+	buf, restore := captureCmdOutput()
+	defer restore()
+
+	cmd.ChangePassword()
+
+	clean := stripANSI(buf.Bytes())
+	if !bytes.Contains(clean, []byte("updated successfully")) {
+		t.Fatalf("expected success message, got: %s", string(clean))
+	}
+}

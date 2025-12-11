@@ -6,11 +6,7 @@ import (
 
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/security"
-	"golang.org/x/term"
 )
-
-var Printf = fmt.Printf
-var ReadPassword = term.ReadPassword
 
 func CreateUser() {
 	cfg := globals.GetConfig()

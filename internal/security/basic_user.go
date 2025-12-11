@@ -84,6 +84,52 @@ func CreateBasicUser(user *BasicUser) error {
 	return nil
 }
 
+func ChangeUserPassword(username, newPassword string) error {
+	usersFile, err := LoadUsersFromFile()
+	if err != nil {
+		return err
+	}
+
+	var existing *BasicHashedcUser
+	for i := range usersFile.Users {
+		if usersFile.Users[i].Username == username {
+			existing = &usersFile.Users[i]
+			break
+		}
+	}
+
+	if existing == nil {
+		return fmt.Errorf("user '%s' not found", username)
+	}
+
+	key, err := CreateKeyFileOrGetKey()
+	if err != nil {
+		return err
+	}
+
+	sum := sha256.Sum256([]byte(newPassword + key))
+	hashedPassword, err := bcrypt.GenerateFromPassword(sum[:], bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	existing.Password = string(hashedPassword)
+
+	cfg := globals.GetConfig()
+	file, err := os.OpenFile(fmt.Sprintf("%s/%s", cfg.Store.Folder, UsersFilename), os.O_RDWR|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	enc := json.NewEncoder(file)
+	if err := enc.Encode(usersFile); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func DeleteBasicUser(username string) error {
 	usersFile, err := LoadUsersFromFile()
 	if err != nil {
