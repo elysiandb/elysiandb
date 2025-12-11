@@ -62,6 +62,7 @@ export default function EntityFieldEditor({ fieldKey, field, onChange, depth }) 
                 <Form.Check
                     className="entity-field-required"
                     type="checkbox"
+                    label="required"
                     checked={field.required}
                     onChange={(e) => update({ required: e.target.checked })}
                 />
