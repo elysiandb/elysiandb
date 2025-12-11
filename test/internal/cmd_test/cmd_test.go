@@ -248,3 +248,51 @@ func TestCreateUser_PasswordMismatch(t *testing.T) {
 		t.Fatalf("expected mismatch message, got: %s", string(clean))
 	}
 }
+
+func TestGetAvailableCommands(t *testing.T) {
+	cmds := cmd.GetAvailableCommands()
+
+	if cmds[cmd.ServerCommand] == "" ||
+		cmds[cmd.CreateUserCommand] == "" ||
+		cmds[cmd.DeleteUserCommand] == "" ||
+		cmds[cmd.HelpCommand] == "" {
+		t.Fatalf("expected all commands to be present")
+	}
+}
+
+func TestGetHandlers(t *testing.T) {
+	h := cmd.GetHandlers()
+
+	if h[cmd.ServerCommand] == nil ||
+		h[cmd.CreateUserCommand] == nil ||
+		h[cmd.DeleteUserCommand] == nil ||
+		h[cmd.HelpCommand] == nil {
+		t.Fatalf("expected all handlers to be present")
+	}
+}
+
+func TestPrintHelp(t *testing.T) {
+	var buf bytes.Buffer
+	orig := cmd.Printf
+	cmd.Printf = func(format string, a ...interface{}) (int, error) {
+		return buf.WriteString(fmt.Sprintf(format, a...))
+	}
+	defer func() { cmd.Printf = orig }()
+
+	cmd.PrintHelp()
+
+	out := stripANSI(buf.Bytes())
+
+	expected := []string{
+		cmd.ServerCommand,
+		cmd.CreateUserCommand,
+		cmd.DeleteUserCommand,
+		cmd.HelpCommand,
+	}
+
+	for _, e := range expected {
+		if !bytes.Contains(out, []byte(e)) {
+			t.Fatalf("expected help output to contain %s, got: %s", e, string(out))
+		}
+	}
+}

@@ -1051,7 +1051,7 @@ elysiandb
 
 ---
 
-### 2. `create-user` (basic authentication only)
+### 2. `create-user` (basic or user authentication only)
 
 Creates a new user when the authentication mode is set to `basic`.
 
@@ -1072,7 +1072,7 @@ The user is stored in:
 
 ---
 
-### 3. `delete-user` (basic authentication only)
+### 3. `delete-user` (basic or user authentication only)
 
 Deletes an existing user.
 
@@ -1081,6 +1081,18 @@ elysiandb delete-user
 ```
 
 The command prompts for the username to remove. If the user does not exist, an error is returned.
+
+---
+
+### 4. `help`
+
+Deletes an existing user.
+
+```bash
+elysiandb help
+```
+
+The command prompts the list fo available commands.
 
 ---
 

@@ -41,22 +41,20 @@ func main() {
 		return
 	}
 
-	switch args[1] {
-	case "server":
-		cmd.StartServer()
-	case "create-user":
-		cmd.CreateUser()
-	case "delete-user":
-		cmd.DeleteUser()
-	default:
+	handlers := cmd.GetHandlers()
+
+	if handler, ok := handlers[args[1]]; ok {
+		handler()
+	} else {
 		fmt.Printf("%sUnknown command: %s%s\n", globals.Gold, args[1], globals.Reset)
 		printListOfCommands()
 	}
 }
 
 func printListOfCommands() {
-	fmt.Printf("%sAvailable commands:%s\n", globals.Gold, globals.Reset)
-	fmt.Printf("  %sserver%s       Start ElysianDB server\n", globals.Bold, globals.Reset)
-	fmt.Printf("  %screate-user%s  Create a new user\n", globals.Bold, globals.Reset)
-	fmt.Printf("  %sdelete-user%s  Delete an existing user\n", globals.Bold, globals.Reset)
+	commands := cmd.GetAvailableCommands()
+
+	for name, description := range commands {
+		fmt.Printf("  %s%s%s  %s\n", globals.Bold, name, globals.Reset, description)
+	}
 }

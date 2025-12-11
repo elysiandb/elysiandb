@@ -14,8 +14,8 @@ func DeleteUser() {
 		return
 	}
 
-	if cfg.Security.Authentication.Mode != "basic" {
-		Printf("%sDelete user command only supports basic authentication mode.%s\n", globals.Gold, globals.Reset)
+	if cfg.Security.Authentication.Mode != "basic" && cfg.Security.Authentication.Mode != "user" {
+		Printf("%sDelete user command only supports basic and user authentication modes.%s\n", globals.Gold, globals.Reset)
 		return
 	}
 
