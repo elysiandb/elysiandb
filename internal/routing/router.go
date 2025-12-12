@@ -6,6 +6,7 @@ import (
 	"github.com/taymour/elysiandb/internal/security"
 	http_adminui "github.com/taymour/elysiandb/internal/transport/http/adminui"
 	"github.com/taymour/elysiandb/internal/transport/http/api"
+	http_security "github.com/taymour/elysiandb/internal/transport/http/api/security"
 	api_transaction "github.com/taymour/elysiandb/internal/transport/http/api/transactions"
 	"github.com/taymour/elysiandb/internal/transport/http/controller"
 	"github.com/valyala/fasthttp"
@@ -56,6 +57,14 @@ func RegisterRoutes(r *router.Router) {
 	r.POST("/api/tx/{txId}/commit", Version(security.Authenticate(api_transaction.CommitTransactionController)))
 
 	r.GET("/config", Version(security.Authenticate(controller.GetConfigController)))
+
+	if security.AuthenticationIsEnabled() && security.UserAuthenticationIsEnabled() {
+		r.POST("/api/security/user", Version(http_adminui.AdminAuth(http_security.CreateUserController)))
+		r.GET("/api/security/user", Version(http_adminui.AdminAuth(http_security.GetUsersController)))
+		r.GET("/api/security/user/{user_name}", Version(http_adminui.AdminAuth(http_security.GetUserByUsernameController)))
+		r.DELETE("/api/security/user/{user_name}", Version(http_adminui.AdminAuth(http_security.DeleteUserByUsernameController)))
+		r.PUT("/api/security/user/{user_name}/password", Version(http_adminui.AdminAuth(http_security.ChangeUserPasswordController)))
+	}
 
 	if globals.GetConfig().AdminUI.Enabled {
 		r.POST("/admin/login", http_adminui.LoginController)

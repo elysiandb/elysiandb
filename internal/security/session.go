@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/valyala/fasthttp"
 )
 
 type Session struct {
@@ -20,6 +21,33 @@ type Session struct {
 
 type SessionsFile struct {
 	Sessions []Session `json:"sessions"`
+}
+
+func CurrentUserCanManageUser(ctx *fasthttp.RequestCtx, username string) (bool, error) {
+	currentSession, err := CurrentSession(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	return CurrentUserIsAdmin(ctx) || currentSession.Username != username, nil
+}
+
+func CurrentSession(ctx *fasthttp.RequestCtx) (*Session, error) {
+	currentSession, err := GetSession(string(ctx.Request.Header.Cookie(SessionCookieName)))
+	if err != nil {
+		return nil, err
+	}
+
+	return currentSession, nil
+}
+
+func CurrentUserIsAdmin(ctx *fasthttp.RequestCtx) bool {
+	currentSession, err := CurrentSession(ctx)
+	if err != nil || currentSession == nil {
+		return false
+	}
+
+	return currentSession.Role == RoleAdmin
 }
 
 func generateSessionID() (string, error) {

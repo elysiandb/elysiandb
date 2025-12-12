@@ -169,6 +169,48 @@ func InitBasicUsersStorage() error {
 	return nil
 }
 
+func GetBasicUserByUsername(username string) (map[string]interface{}, error) {
+	err := InitBasicUsersStorage()
+	if err != nil {
+		return nil, err
+	}
+
+	u := api_storage.ReadEntityById(UserEntity, username)
+	if u == nil {
+		return nil, fmt.Errorf("user '%s' not found", username)
+	}
+
+	delete(u, "password")
+
+	return u, nil
+}
+
+func ListBasicUsers() ([]map[string]interface{}, error) {
+	err := InitBasicUsersStorage()
+	if err != nil {
+		return nil, err
+	}
+
+	users := api_storage.ListEntities(
+		UserEntity,
+		0,
+		0,
+		"username",
+		true,
+		nil,
+		"",
+		"",
+	)
+
+	result := make([]map[string]interface{}, 0, len(users))
+	for _, u := range users {
+		delete(u, "password")
+		result = append(result, u)
+	}
+
+	return result, nil
+}
+
 func CreateBasicUser(user *BasicUser) error {
 	err := InitBasicUsersStorage()
 	if err != nil {

@@ -7,16 +7,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/valyala/fasthttp"
 )
 
 func setupTempStore(t *testing.T) string {
 	t.Helper()
+
 	dir := t.TempDir()
-	cfg := globals.GetConfig()
+
+	cfg := &configuration.Config{}
 	cfg.Store.Folder = dir
+	cfg.Store.Shards = 4
+	cfg.Security.Authentication.Enabled = false
+
 	globals.SetConfig(cfg)
+
 	return dir
 }
 
@@ -45,6 +53,30 @@ func TestCreateSession(t *testing.T) {
 	_ = json.Unmarshal(data, &sf)
 	if len(sf.Sessions) != 1 {
 		t.Fatalf("session not saved")
+	}
+}
+
+func TestCreateSession_CleansExpired(t *testing.T) {
+	dir := setupTempStore(t)
+
+	expired := security.Session{
+		ID:        "old",
+		Username:  "u",
+		Role:      security.RoleUser,
+		ExpiresAt: time.Now().Unix() - 10,
+	}
+	writeSessions(t, dir, security.SessionsFile{Sessions: []security.Session{expired}})
+
+	_, err := security.CreateSession("new", security.RoleUser, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(dir, security.SessionsFilename))
+	var sf security.SessionsFile
+	_ = json.Unmarshal(data, &sf)
+	if len(sf.Sessions) != 1 {
+		t.Fatalf("expired sessions not cleaned")
 	}
 }
 
@@ -134,5 +166,99 @@ func TestDeleteSessionNonExisting(t *testing.T) {
 	_ = json.Unmarshal(data, &sf)
 	if len(sf.Sessions) != 0 {
 		t.Fatalf("file modified incorrectly")
+	}
+}
+
+func TestCurrentSession(t *testing.T) {
+	setupTempStore(t)
+
+	s, _ := security.CreateSession("me", security.RoleUser, time.Second)
+	req := fasthttp.AcquireRequest()
+	req.Header.SetCookie(security.SessionCookieName, s.ID)
+
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	cs, err := security.CurrentSession(&ctx)
+	if err != nil || cs == nil || cs.Username != "me" {
+		t.Fatalf("current session not resolved")
+	}
+}
+
+func TestCurrentUserIsAdmin(t *testing.T) {
+	setupTempStore(t)
+
+	s, _ := security.CreateSession("admin", security.RoleAdmin, time.Second)
+	req := fasthttp.AcquireRequest()
+	req.Header.SetCookie(security.SessionCookieName, s.ID)
+
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	if !security.CurrentUserIsAdmin(&ctx) {
+		t.Fatalf("expected admin")
+	}
+}
+
+func TestCurrentUserIsAdmin_False(t *testing.T) {
+	setupTempStore(t)
+
+	s, _ := security.CreateSession("user", security.RoleUser, time.Second)
+	req := fasthttp.AcquireRequest()
+	req.Header.SetCookie(security.SessionCookieName, s.ID)
+
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	if security.CurrentUserIsAdmin(&ctx) {
+		t.Fatalf("expected non admin")
+	}
+}
+
+func TestCurrentUserCanManageUser_Admin(t *testing.T) {
+	setupTempStore(t)
+
+	s, _ := security.CreateSession("admin", security.RoleAdmin, time.Second)
+	req := fasthttp.AcquireRequest()
+	req.Header.SetCookie(security.SessionCookieName, s.ID)
+
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	ok, err := security.CurrentUserCanManageUser(&ctx, "someone")
+	if err != nil || !ok {
+		t.Fatalf("admin should manage anyone")
+	}
+}
+
+func TestCurrentUserCanManageUser_Self(t *testing.T) {
+	setupTempStore(t)
+
+	s, _ := security.CreateSession("bob", security.RoleUser, time.Second)
+	req := fasthttp.AcquireRequest()
+	req.Header.SetCookie(security.SessionCookieName, s.ID)
+
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	ok, err := security.CurrentUserCanManageUser(&ctx, "bob")
+	if err != nil || ok {
+		t.Fatalf("user should not manage self")
+	}
+}
+
+func TestCurrentUserCanManageUser_Other(t *testing.T) {
+	setupTempStore(t)
+
+	s, _ := security.CreateSession("bob", security.RoleUser, time.Second)
+	req := fasthttp.AcquireRequest()
+	req.Header.SetCookie(security.SessionCookieName, s.ID)
+
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	ok, err := security.CurrentUserCanManageUser(&ctx, "alice")
+	if err != nil || !ok {
+		t.Fatalf("user should manage other user")
 	}
 }

@@ -6,6 +6,7 @@ import Configuration from "./pages/Configuration.tsx";
 import {AuthStatus, useAuth} from "./hooks/account/useAuth.ts";
 import {Login} from "./pages/Login.tsx";
 import EntityTypesList from "./pages/EntityTypesList.jsx";
+import UsersList from "./pages/UsersList.jsx";
 
 export default function App() {
 
@@ -43,9 +44,13 @@ export default function App() {
                     element: <Configuration />,
                 },
                 {
+                    path: "users",
+                    element: <UsersList />,
+                },
+                {
                     path: "entities",
                     element: <EntityTypesList />,
-                }
+                },
             ],
         },
     ]);
