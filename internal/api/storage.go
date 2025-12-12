@@ -182,6 +182,7 @@ func ListPublicEntityTypes() []string {
 func ReadEntityById(entity string, id string) map[string]interface{} {
 	key := globals.ApiSingleEntityKey(entity, id)
 	data, _ := storage.GetJsonByKey(key)
+
 	return data
 }
 

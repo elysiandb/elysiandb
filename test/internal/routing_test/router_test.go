@@ -122,6 +122,7 @@ func TestRegisterRoutes_NoOptional(t *testing.T) {
 		{"PUT", "/api/tx/t1/entity/x/1"},
 		{"DELETE", "/api/tx/t1/entity/x/1"},
 		{"POST", "/api/tx/t1/commit"},
+		{"GET", "/config"},
 	}
 
 	for _, c := range tests {

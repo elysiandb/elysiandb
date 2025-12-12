@@ -90,25 +90,30 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 
 ### CRUD Operations
 
-| Method   | Endpoint                      | Description                                                 |
-| -------- | ----------------------------- | ----------------------------------------------------------- |
-| `POST`   | `/api/<entity>/create`        | Create a new type of entity with schema                     |
-| `POST`   | `/api/<entity>`               | Create one or multiple JSON documents (auto‑ID if missing)  |
-| `GET`    | `/api/<entity>`               | List all documents, supports pagination, sorting, filtering |
-| `GET`    | `/api/<entity>/schema`        | Schema for entity                                           |
-| `PUT`    | `/api/<entity>/schema`        | Update schema for entity                                    |
-| `GET`    | `/api/<entity>/<id>`          | Retrieve document by ID                                     |
-| `PUT`    | `/api/<entity>/<id>`          | Update a single document by ID                              |
-| `PUT`    | `/api/<entity>`               | Update multiple documents (batch update)                    |
-| `DELETE` | `/api/<entity>/<id>`          | Delete document by ID                                       |
-| `DELETE` | `/api/<entity>`               | Delete all documents for an entity                          |
-| `GET`    | `/api/export`                 | Dumps all entities as a JSON object                         |
-| `POST`   | `/api/import`                 | Imports all objects from a JSON dump                        |
-| `POST`   | `/api/<entity>/migrate`       | Run a **migration** across all documents for an entity      |
-| `GET`    | `/api/<entity>/count`         | Counts all documents for an entity                          |
-| `GET`    | `/api/<entity>/<id>/exists`   | Verifiy if an entity exists                                 |
-| `GET`    | `/api/entity/types`           | Liste of all entity types                                   |
-| `POST`   | `/api/<entity>/schema`        | Create a new entity type                                    |
+| Method   | Endpoint                                  | Description                                                 |
+| -------- | ----------------------------------------- | ----------------------------------------------------------- |
+| `POST`   | `/api/<entity>/create`                    | Create a new type of entity with schema                     |
+| `POST`   | `/api/<entity>`                           | Create one or multiple JSON documents (auto‑ID if missing)  |
+| `GET`    | `/api/<entity>`                           | List all documents, supports pagination, sorting, filtering |
+| `GET`    | `/api/<entity>/schema`                    | Schema for entity                                           |
+| `PUT`    | `/api/<entity>/schema`                    | Update schema for entity                                    |
+| `GET`    | `/api/<entity>/<id>`                      | Retrieve document by ID                                     |
+| `PUT`    | `/api/<entity>/<id>`                      | Update a single document by ID                              |
+| `PUT`    | `/api/<entity>`                           | Update multiple documents (batch update)                    |
+| `DELETE` | `/api/<entity>/<id>`                      | Delete document by ID                                       |
+| `DELETE` | `/api/<entity>`                           | Delete all documents for an entity                          |
+| `GET`    | `/api/export`                             | Dumps all entities as a JSON object                         |
+| `POST`   | `/api/import`                             | Imports all objects from a JSON dump                        |
+| `POST`   | `/api/<entity>/migrate`                   | Run a **migration** across all documents for an entity      |
+| `GET`    | `/api/<entity>/count`                     | Counts all documents for an entity                          |
+| `GET`    | `/api/<entity>/<id>/exists`               | Verifiy if an entity exists                                 |
+| `GET`    | `/api/entity/types`                       | List of all entity types                                    |
+| `POST`   | `/api/<entity>/schema`                    | Create a new entity type                                    |
+| `GET`    | `/api/security/user`                      | List all of the users                                       |
+| `GET`    | `/api/security/user/{user_name}`          | Retrieve a user                                             |
+| `POST`   | `/api/security/user`                      | Create a user                                               |
+| `PUT`    | `/api/security/user/{user_name}/password` | Change a user's password                                    |
+| `DELETE` | `/api/security/user/{user_name}.        ` | Delete a user                                               |
 
 ---
 
@@ -693,6 +698,198 @@ Requests without authentication headers are rejected when authentication is enab
 * A per-instance secret key is used as part of the hashing process
 * Deleting `users.key` invalidates all stored password hashes
 * In `token` mode, anyone with the token can fully access the API
+
+---
+
+## User Management API
+
+The User Management API allows you to manage application users when authentication is enabled in `user` mode. These endpoints are primarily intended for the Admin UI but can also be consumed programmatically.
+
+All endpoints are protected and require a valid **user session**. Most operations require **admin privileges**.
+
+---
+
+## Authentication Requirements
+
+These endpoints are available only if:
+
+```yaml
+security:
+  authentication:
+    enabled: true
+    mode: "user"
+```
+
+Requests must include a valid session cookie obtained via the Admin UI login flow.
+
+---
+
+## Endpoints
+
+### List Users
+
+```
+GET /api/security/user
+```
+
+Returns the list of all users.
+
+**Authorization**
+
+* Admin only
+
+**Response** `200 OK`
+
+```json
+{
+  "users": [
+    { "username": "admin", "role": "admin" },
+    { "username": "john", "role": "user" }
+  ]
+}
+```
+
+**Errors**
+
+* `403 Forbidden` if the current user is not an admin
+
+---
+
+### Get User by Username
+
+```
+GET /api/security/user/{user_name}
+```
+
+Returns a single user.
+
+**Authorization**
+
+* Admin can access any user
+* A user can access any user **except themselves**
+
+**Response** `200 OK`
+
+```json
+{
+  "username": "john",
+  "role": "user"
+}
+```
+
+**Errors**
+
+* `403 Forbidden` if access is not allowed
+* `404 Not Found` if the user does not exist
+
+---
+
+### Create User
+
+```
+POST /api/security/user
+```
+
+Creates a new user.
+
+**Authorization**
+
+* Admin only
+
+**Request Body**
+
+```json
+{
+  "username": "alice",
+  "password": "secret",
+  "role": "user"
+}
+```
+
+**Response** `200 OK`
+
+**Errors**
+
+* `403 Forbidden` if the current user is not an admin
+* `400 Bad Request` if the body is invalid
+* `404 Not Found` if creation fails
+
+---
+
+### Change User Password
+
+```
+PUT /api/security/user/{user_name}/password
+```
+
+Changes the password of a user.
+
+**Authorization**
+
+* Admin can change any password
+* A user can change the password of another user, but not their own
+
+**Request Body**
+
+```json
+{
+  "password": "new-password"
+}
+```
+
+**Response** `200 OK`
+
+**Errors**
+
+* `403 Forbidden` if access is not allowed
+* `400 Bad Request` if the body is invalid
+* `404 Not Found` if the user does not exist
+
+---
+
+### Delete User
+
+```
+DELETE /api/security/user/{user_name}
+```
+
+Deletes a user.
+
+**Authorization**
+
+* Admin can delete any user
+* A user can delete another user, but not themselves
+
+The default `admin` user cannot be deleted.
+
+**Response** `200 OK`
+
+**Errors**
+
+* `403 Forbidden` if access is not allowed
+
+---
+
+## Security Rules Summary
+
+| Action                | Admin | Regular User      |
+| --------------------- | ----- | ----------------- |
+| List users            | Yes   | No                |
+| View another user     | Yes   | Yes               |
+| View self             | Yes   | No                |
+| Create user           | Yes   | No                |
+| Change own password   | No    | No                |
+| Change other password | Yes   | Yes               |
+| Delete user           | Yes   | Yes (except self) |
+
+---
+
+## Notes
+
+* Passwords are never returned by the API
+* Passwords are hashed using bcrypt with a server-side secret
+* All responses are JSON
+* All endpoints return the `X-Elysian-Version` header
 
 ---
 

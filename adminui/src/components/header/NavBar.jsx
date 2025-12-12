@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../../hooks/account/useAuth.ts";
 
 export default function NavBar() {
-    const { logout } = useAuth();
+    const { logout, account } = useAuth();
 
     return (
         <Navbar expand="lg" className="bg-body-tertiary">
@@ -26,6 +26,14 @@ export default function NavBar() {
 
                         <Nav.Link
                             as={NavLink}
+                            to="/admin/users"
+                            end
+                        >
+                            Users
+                        </Nav.Link>
+
+                        <Nav.Link
+                            as={NavLink}
                             to="/admin/entities"
                             end
                         >
@@ -35,7 +43,8 @@ export default function NavBar() {
                     </Nav>
                 </Navbar.Collapse>
 
-                <Nav>
+                <Nav className="align-items-center gap-3">
+                    <span className="navbar-hello">Hello {account?.username}</span>
                     <Button onClick={logout}>Logout</Button>
                 </Nav>
             </Container>

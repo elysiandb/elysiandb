@@ -82,7 +82,6 @@ export default function EntityTypesList() {
     return (
         <Container fluid className="py-4 entity-types-layout">
             <Row className="g-4">
-
                 <Col xs={3}>
                     <Card className="entity-sidebar">
                         <Card.Header className="text-warning fw-bold">

@@ -89,6 +89,15 @@ button.navbar-toggler {
     border-color: rgba(255,255,255,0.2) !important;
 }
 
+.navbar-hello {
+    display: flex;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    line-height: 1;
+}
+
 /* -----------------------------------
    CARDS
 ----------------------------------- */
@@ -114,7 +123,7 @@ button.navbar-toggler {
 
 .toast-container {
     position: fixed;
-    top: 20px;
+    top: 13px;
     right: 20px;
     z-index: 99999;
     display: flex;
@@ -202,6 +211,78 @@ button.navbar-toggler {
 .modal-body input::placeholder {
     color: rgba(230,230,240,0.35) !important;
 }
+
+.modal-body label {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+}
+
+.modal-body .form-control,
+.modal-body .form-select {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    color: var(--text-main) !important;
+    border-radius: 10px !important;
+    padding: 10px 14px !important;
+}
+
+.modal-body .form-control:focus,
+.modal-body .form-select:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px rgba(247,214,74,0.25) !important;
+    background: rgba(255,255,255,0.1) !important;
+}
+
+.modal-body .form-select {
+    width: 100% !important;
+    height: 44px;
+    background: var(--bg-glass) !important;
+    border: 1px solid rgba(255,255,255,0.25) !important;
+    border-radius: 6px !important;
+    color: var(--text-main) !important;
+    padding-right: 34px !important;
+    padding-left: 14px !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg width='14' height='14' viewBox='0 0 20 20' fill='%23e6e6f0' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.516 7.548L10 12.032l4.484-4.484' stroke='%23e6e6f0' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 10px center !important;
+    background-size: 14px 14px !important;
+}
+
+.modal-body .form-select:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px rgba(247,214,74,0.25) !important;
+    outline: none !important;
+}
+
+.modal-body .form-select option {
+    background: var(--bg-section);
+    color: var(--text-main);
+}
+
+.modal-footer .btn {
+    min-width: 90px;
+}
+
+.modal-footer .btn-primary {
+    background: rgba(247,214,74,0.18) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+}
+
+.modal-footer .btn-primary:hover {
+    background: rgba(247,214,74,0.28) !important;
+    color: #000 !important;
+}
+
+.modal-backdrop.show {
+    opacity: 0.55;
+    backdrop-filter: blur(6px);
+}
+
 
 .btn-close {
     width: 32px !important;
@@ -463,4 +544,103 @@ button:hover, .btn:hover {
     margin-left: 18px;
     padding-left: 10px;
     border-left: 1px dashed rgba(255,255,255,0.15);
+}
+
+/* -----------------------------------
+   USERS TABLE — GLASS / ENTITIES STYLE
+----------------------------------- */
+
+.users-table {
+    border-collapse: collapse;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    background: var(--bg-card) !important;
+    border-radius: var(--radius) !important;
+    border: 1px solid rgba(255, 255, 255, .06) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    backdrop-filter: blur(18px) saturate(160%);
+}
+
+.users-table thead th {
+    padding: 18px 26px;
+    background: var(--bg-card);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.9rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.users-table tbody td {
+    padding: 18px 26px;
+    background: #0c1022;
+    color: var(--text-main);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.users-table tbody tr:nth-child(2n) td {
+    background: var(--bg-card);
+}
+
+.users-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.users-table tbody tr:hover td {
+    background: rgba(247,214,74,0.12);
+    color: var(--accent);
+}
+
+.users-table .table-actions {
+    display: flex;
+    gap: 14px;
+}
+
+.users-table .btn {
+    padding: 6px 18px;
+    border-radius: 12px;
+    background: rgba(40,46,80,0.95);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--text-main);
+    font-size: 0.85rem;
+    transition: 0.18s ease;
+}
+
+.users-table .btn:hover {
+    background: rgba(247,214,74,0.18);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.users-table .btn-danger {
+    color: #ffb1b1;
+    background: rgba(255,92,92,0.08);
+    border-color: rgba(255,92,92,0.35);
+}
+
+.users-table .btn-danger:hover {
+    background: rgba(255,92,92,0.18);
+    border-color: rgba(255,92,92,0.9);
+    color: #ffd6d6;
+}
+
+.users-search-input {
+    width: 260px !important;
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    border-radius: 10px !important;
+    color: var(--text-main) !important;
+    padding: 8px 14px !important;
+}
+
+.users-search-input::placeholder {
+    color: rgba(230,230,240,0.35) !important;
+}
+
+.users-search-input:focus {
+    background: rgba(255,255,255,0.1) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px rgba(247,214,74,0.25) !important;
+    outline: none !important;
 }
