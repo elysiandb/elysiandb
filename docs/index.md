@@ -113,7 +113,10 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 | `GET`    | `/api/security/user/{user_name}`          | Retrieve a user                                             |
 | `POST`   | `/api/security/user`                      | Create a user                                               |
 | `PUT`    | `/api/security/user/{user_name}/password` | Change a user's password                                    |
-| `DELETE` | `/api/security/user/{user_name}.        ` | Delete a user                                               |
+| `DELETE` | `/api/security/user/{user_name}`          | Delete a user                                               |
+| `POST`   | `/api/security/login`                     | Log in as a user                                            |
+| `POST`   | `/api/security/logout`                    | Log out as a user                                           |
+| `GET`    | `/api/security/me`                        | Current authenticated user                                  |
 
 ---
 

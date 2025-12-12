@@ -64,12 +64,12 @@ func RegisterRoutes(r *router.Router) {
 		r.GET("/api/security/user/{user_name}", Version(http_adminui.AdminAuth(http_security.GetUserByUsernameController)))
 		r.DELETE("/api/security/user/{user_name}", Version(http_adminui.AdminAuth(http_security.DeleteUserByUsernameController)))
 		r.PUT("/api/security/user/{user_name}/password", Version(http_adminui.AdminAuth(http_security.ChangeUserPasswordController)))
+		r.POST("/api/security/login", Version(http_adminui.LoginController))
+		r.POST("/api/security/logout", Version(http_adminui.AdminAuth(http_adminui.LogoutController)))
+		r.GET("/api/security/me", Version(http_adminui.AdminAuth(http_adminui.MeController)))
 	}
 
 	if globals.GetConfig().AdminUI.Enabled {
-		r.POST("/admin/login", http_adminui.LoginController)
-		r.POST("/admin/logout", http_adminui.AdminAuth(http_adminui.LogoutController))
-		r.GET("/admin/me", http_adminui.AdminAuth(http_adminui.MeController))
 		r.GET("/admin/{filepath:*}", http_adminui.AdminUIHandler)
 	}
 }
