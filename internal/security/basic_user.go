@@ -16,11 +16,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const UserEntity = "_elysiandb_core_user"
-
 const (
-	KeyFilename      = "users.key"
-	SessionsFilename = "sessions.json"
+	KeyFilename          = "users.key"
+	SessionsFilename     = "sessions.json"
+	UserEntity           = "_elysiandb_core_user"
+	DefaultAdminUsername = "admin"
+	DefaultAdminPassword = "admin"
 )
 
 type Role string
@@ -116,6 +117,21 @@ func (u *BasicHashedUser) Save() error {
 	return fmt.Errorf("%s", result)
 }
 
+func InitAdminUserIfNotExists() error {
+	adminUser := api_storage.ReadEntityById(UserEntity, DefaultAdminUsername)
+	if adminUser != nil {
+		return nil
+	}
+
+	user := &BasicUser{
+		Username: DefaultAdminUsername,
+		Password: DefaultAdminPassword,
+		Role:     RoleAdmin,
+	}
+
+	return CreateBasicUser(user)
+}
+
 func UserEntitySchema() map[string]interface{} {
 	return map[string]interface{}{
 		"id": map[string]interface{}{
@@ -206,6 +222,10 @@ func ChangeUserPassword(username, newPassword string) error {
 }
 
 func DeleteBasicUser(username string) {
+	if username == DefaultAdminUsername {
+		return
+	}
+
 	api_storage.DeleteEntityById(UserEntity, username)
 }
 

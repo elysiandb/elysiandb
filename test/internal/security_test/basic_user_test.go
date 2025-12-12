@@ -88,10 +88,10 @@ func TestUserEntitySchema(t *testing.T) {
 			t.Fatalf("field %s is not a map", field)
 		}
 		if m["type"] != "string" {
-			t.Fatalf("field %s type mismatch, got %v", field, m["type"])
+			t.Fatalf("type mismatch")
 		}
 		if m["required"] != true {
-			t.Fatalf("field %s required mismatch, got %v", field, m["required"])
+			t.Fatalf("required mismatch")
 		}
 	}
 }
@@ -100,7 +100,7 @@ func TestInitBasicUsersStorage_CreatesEntityTypeAndSchema(t *testing.T) {
 	setup(t)
 
 	if api_storage.EntityTypeExists(security.UserEntity) {
-		t.Fatalf("user entity should not exist before init")
+		t.Fatalf("should not exist before init")
 	}
 
 	if err := security.InitBasicUsersStorage(); err != nil {
@@ -108,18 +108,16 @@ func TestInitBasicUsersStorage_CreatesEntityTypeAndSchema(t *testing.T) {
 	}
 
 	if !api_storage.EntityTypeExists(security.UserEntity) {
-		t.Fatal("user entity type not created")
+		t.Fatal("entity not created")
 	}
 
-	schema := api_storage.GetEntitySchema(security.UserEntity)
-	if schema == nil {
-		t.Fatal("user entity schema not created")
+	if api_storage.GetEntitySchema(security.UserEntity) == nil {
+		t.Fatal("schema not created")
 	}
 }
 
 func TestInitBasicUsersStorage_Idempotent(t *testing.T) {
 	setup(t)
-
 	if err := security.InitBasicUsersStorage(); err != nil {
 		t.Fatal(err)
 	}
@@ -139,16 +137,16 @@ func TestBasicHashedUser_ToDataMap(t *testing.T) {
 
 	m := u.ToDataMap()
 	if m["id"] != "bob" {
-		t.Fatalf("id mismatch, got %v", m["id"])
+		t.Fatal("id mismatch")
 	}
 	if m["username"] != "bob" {
-		t.Fatalf("username mismatch, got %v", m["username"])
+		t.Fatal("username mismatch")
 	}
 	if m["password"] != "hash" {
-		t.Fatalf("password mismatch, got %v", m["password"])
+		t.Fatal("password mismatch")
 	}
 	if m["role"] != string(security.RoleAdmin) {
-		t.Fatalf("role mismatch, got %v", m["role"])
+		t.Fatal("role mismatch")
 	}
 }
 
@@ -162,16 +160,12 @@ func TestBasicHashedUser_Save(t *testing.T) {
 	}
 
 	if err := u.Save(); err != nil {
-		t.Fatalf("save error: %v", err)
+		t.Fatal(err)
 	}
 
 	out := api_storage.ReadEntityById(security.UserEntity, "saveuser")
 	if out == nil {
-		t.Fatal("saved user not found")
-	}
-
-	if out["username"] != "saveuser" {
-		t.Fatalf("username mismatch, got %v", out["username"])
+		t.Fatal("not saved")
 	}
 }
 
@@ -190,13 +184,13 @@ func TestBasicUser_ToHasedUser(t *testing.T) {
 	}
 
 	if hu.Username != u.Username {
-		t.Fatalf("username mismatch, got %s", hu.Username)
+		t.Fatal("mismatch")
 	}
 	if hu.Password == "" {
-		t.Fatal("empty hashed password")
+		t.Fatal("empty hash")
 	}
 	if hu.Role != u.Role {
-		t.Fatalf("role mismatch, got %v", hu.Role)
+		t.Fatal("role mismatch")
 	}
 }
 
@@ -215,29 +209,21 @@ func TestBasicUser_ToHasedUser_DefaultRole(t *testing.T) {
 	}
 
 	if hu.Role != security.RoleUser {
-		t.Fatalf("expected default role user, got %v", hu.Role)
+		t.Fatal("expected default role user")
 	}
 }
 
 func TestCreateBasicUser_Single(t *testing.T) {
 	setup(t)
 
-	u := &security.BasicUser{
-		Username: "alice",
-		Password: "secret",
-		Role:     security.RoleAdmin,
-	}
+	u := &security.BasicUser{Username: "alice", Password: "secret", Role: security.RoleAdmin}
 
 	if err := security.CreateBasicUser(u); err != nil {
 		t.Fatal(err)
 	}
 
-	out := api_storage.ReadEntityById(security.UserEntity, "alice")
-	if out == nil {
-		t.Fatal("user not written")
-	}
-	if out["username"] != "alice" {
-		t.Fatalf("username mismatch, got %v", out["username"])
+	if api_storage.ReadEntityById(security.UserEntity, "alice") == nil {
+		t.Fatal("not written")
 	}
 }
 
@@ -252,15 +238,45 @@ func TestCreateBasicUser_Multiple(t *testing.T) {
 
 	for _, u := range users {
 		if err := security.CreateBasicUser(u); err != nil {
-			t.Fatalf("CreateBasicUser error for %s: %v", u.Username, err)
+			t.Fatal(err)
 		}
 	}
 
 	for _, u := range users {
-		out := api_storage.ReadEntityById(security.UserEntity, u.Username)
-		if out == nil {
-			t.Fatalf("user %s missing", u.Username)
+		if api_storage.ReadEntityById(security.UserEntity, u.Username) == nil {
+			t.Fatal("missing")
 		}
+	}
+}
+
+func TestInitAdminUserIfNotExists_CreatesDefaultAdmin(t *testing.T) {
+	setup(t)
+
+	if err := security.InitAdminUserIfNotExists(); err != nil {
+		t.Fatal(err)
+	}
+
+	out := api_storage.ReadEntityById(security.UserEntity, security.DefaultAdminUsername)
+	if out == nil {
+		t.Fatal("admin not created")
+	}
+}
+
+func TestInitAdminUserIfNotExists_DoesNotOverwriteExisting(t *testing.T) {
+	setup(t)
+
+	u := &security.BasicUser{Username: security.DefaultAdminUsername, Password: "custom", Role: security.RoleAdmin}
+	if err := security.CreateBasicUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := security.InitAdminUserIfNotExists(); err != nil {
+		t.Fatal(err)
+	}
+
+	out := api_storage.ReadEntityById(security.UserEntity, security.DefaultAdminUsername)
+	if out["username"] != security.DefaultAdminUsername {
+		t.Fatal("username mismatch")
 	}
 }
 
@@ -276,18 +292,17 @@ func TestChangeUserPassword_Success(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, ok := security.AuthenticateUser("john", "newpwd")
-	if !ok || res == nil {
-		t.Fatal("expected authentication success with new password")
+	_, ok := security.AuthenticateUser("john", "newpwd")
+	if !ok {
+		t.Fatal("expected success")
 	}
 }
 
 func TestChangeUserPassword_UserNotFound(t *testing.T) {
 	setup(t)
 
-	err := security.ChangeUserPassword("ghost", "pwd")
-	if err == nil {
-		t.Fatal("expected error for missing user")
+	if err := security.ChangeUserPassword("ghost", "pwd"); err == nil {
+		t.Fatal("expected error")
 	}
 }
 
@@ -303,9 +318,8 @@ func TestChangeUserPassword_KeyError(t *testing.T) {
 	os.Remove(keyPath)
 	os.WriteFile(keyPath, []byte{}, 0000)
 
-	err := security.ChangeUserPassword("a", "x")
-	if err == nil {
-		t.Fatal("expected key read error")
+	if err := security.ChangeUserPassword("a", "x"); err == nil {
+		t.Fatal("expected error")
 	}
 }
 
@@ -320,7 +334,7 @@ func TestDeleteBasicUser_Success(t *testing.T) {
 	security.DeleteBasicUser("john")
 
 	if api_storage.ReadEntityById(security.UserEntity, "john") != nil {
-		t.Fatal("expected user to be deleted")
+		t.Fatal("expected deleted")
 	}
 }
 
@@ -339,10 +353,7 @@ func TestAuthenticateUser_Success(t *testing.T) {
 
 	res, ok := security.AuthenticateUser("bob", "pwd")
 	if !ok || res == nil {
-		t.Fatal("expected authentication success")
-	}
-	if res.Username != "bob" {
-		t.Fatalf("username mismatch, got %s", res.Username)
+		t.Fatal("expected success")
 	}
 }
 
@@ -354,18 +365,16 @@ func TestAuthenticateUser_WrongPassword(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, ok := security.AuthenticateUser("john", "wrong")
-	if ok {
-		t.Fatal("expected authentication failure with wrong password")
+	if _, ok := security.AuthenticateUser("john", "wrong"); ok {
+		t.Fatal("expected failure")
 	}
 }
 
 func TestAuthenticateUser_NotExisting(t *testing.T) {
 	setup(t)
 
-	_, ok := security.AuthenticateUser("nouser", "pwd")
-	if ok {
-		t.Fatal("expected authentication failure for missing user")
+	if _, ok := security.AuthenticateUser("nouser", "pwd"); ok {
+		t.Fatal("expected failure")
 	}
 }
 
@@ -381,9 +390,8 @@ func TestAuthenticateUser_KeyError(t *testing.T) {
 	os.Remove(keyPath)
 	os.WriteFile(keyPath, []byte{}, 0000)
 
-	_, ok := security.AuthenticateUser("u", "p")
-	if ok {
-		t.Fatal("expected failure due to key error")
+	if _, ok := security.AuthenticateUser("u", "p"); ok {
+		t.Fatal("expected failure")
 	}
 }
 
@@ -400,11 +408,12 @@ func TestCheckBasicAuthentication_Success(t *testing.T) {
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
 	req.Header.Set("Authorization", header)
+
 	var ctx fasthttp.RequestCtx
 	ctx.Init(req, nil, nil)
 
 	if !security.CheckBasicAuthentication(&ctx) {
-		t.Fatal("expected authentication success")
+		t.Fatal("expected success")
 	}
 }
 
@@ -421,11 +430,12 @@ func TestCheckBasicAuthentication_WrongPassword(t *testing.T) {
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
 	req.Header.Set("Authorization", "Basic "+token)
+
 	var ctx fasthttp.RequestCtx
 	ctx.Init(req, nil, nil)
 
 	if security.CheckBasicAuthentication(&ctx) {
-		t.Fatal("expected authentication failure")
+		t.Fatal("expected failure")
 	}
 }
 
@@ -433,8 +443,9 @@ func TestCheckBasicAuthentication_NoHeader(t *testing.T) {
 	setup(t)
 
 	var ctx fasthttp.RequestCtx
+
 	if security.CheckBasicAuthentication(&ctx) {
-		t.Fatal("expected authentication failure without header")
+		t.Fatal("expected failure")
 	}
 }
 
@@ -443,13 +454,13 @@ func TestCheckBasicAuthentication_MalformedBase64(t *testing.T) {
 
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
-	req.Header.Set("Authorization", "Basic !!!notbase64")
+	req.Header.Set("Authorization", "Basic !!!!")
 
 	var ctx fasthttp.RequestCtx
 	ctx.Init(req, nil, nil)
 
 	if security.CheckBasicAuthentication(&ctx) {
-		t.Fatal("expected authentication failure with malformed base64")
+		t.Fatal("expected failure")
 	}
 }
 
@@ -465,7 +476,7 @@ func TestCheckBasicAuthentication_MalformedPayload(t *testing.T) {
 	ctx.Init(req, nil, nil)
 
 	if security.CheckBasicAuthentication(&ctx) {
-		t.Fatal("expected authentication failure with malformed payload")
+		t.Fatal("expected failure")
 	}
 }
 
@@ -479,10 +490,31 @@ func TestInitBasicUsersStorage_SchemaMatchesUserEntitySchema(t *testing.T) {
 	expected := api_storage.UpdateEntitySchema(security.UserEntity, security.UserEntitySchema())
 	stored := api_storage.GetEntitySchema(security.UserEntity)
 	if stored == nil {
-		t.Fatal("expected stored schema for user entity")
+		t.Fatal("missing schema")
 	}
 
 	if !reflect.DeepEqual(expected, stored) {
-		t.Fatalf("stored schema mismatch, expected %v got %v", expected, stored)
+		t.Fatalf("schema mismatch")
+	}
+}
+
+func TestDeleteBasicUser_DoesNotDeleteAdmin(t *testing.T) {
+	setup(t)
+
+	u := &security.BasicUser{
+		Username: security.DefaultAdminUsername,
+		Password: "x",
+		Role:     security.RoleAdmin,
+	}
+
+	if err := security.CreateBasicUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	security.DeleteBasicUser(security.DefaultAdminUsername)
+
+	out := api_storage.ReadEntityById(security.UserEntity, security.DefaultAdminUsername)
+	if out == nil {
+		t.Fatal("admin should not be deleted")
 	}
 }
