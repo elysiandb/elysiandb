@@ -25,19 +25,19 @@ export function useAuth() {
     }
 
     const authenticate = useCallback(() => {
-        apiFetch<Account>("/admin/me")
+        apiFetch<Account>("/api/security/me")
             .then(setAccount)
             .catch(() => setAccount(null));
     }, []);
 
     const login = useCallback((username: string, password: string) => {
-        apiFetch<Account>("/admin/login", { method: "POST", json: { username, password } })
+        apiFetch<Account>("/api/security/login", { method: "POST", json: { username, password } })
             .then(setAccount)
             .catch(() => setAccount(null));
     }, []);
 
     const logout = useCallback(() => {
-        apiFetch("/admin/logout", { method: "GET" })
+        apiFetch("/api/security/logout", { method: "GET" })
             .finally(() => setAccount(null));
     }, []);
 
