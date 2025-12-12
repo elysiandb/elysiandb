@@ -10,6 +10,7 @@ import (
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/security"
 )
 
 func banner() {
@@ -36,6 +37,7 @@ func main() {
 	globals.SetConfig(cfg)
 
 	boot.InitDB()
+	security.InitAdminUserIfNotExists()
 
 	args := os.Args
 

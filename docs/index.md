@@ -595,7 +595,8 @@ Using `includes=all` expands all linked entities recursively.
 
 ## Authentication
 
-ElysianDB supports optional authentication to protect all REST and KV endpoints. Two modes are available: `basic` and `token`.
+ElysianDB supports optional authentication to protect all REST and KV endpoints. Three modes are available: `basic`, `user` and `token`.
+When you boot Elysiandb, a default user (username: "admin", password: "admin") is created if it does not exist.
 
 ### Configuration
 
