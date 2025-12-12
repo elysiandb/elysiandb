@@ -29,6 +29,10 @@ type ValidationError struct {
 	Message string
 }
 
+func (v *ValidationError) ToError() error {
+	return fmt.Errorf("Field '%s': %s", v.Field, v.Message)
+}
+
 func AnalyzeEntitySchema(entity string, data map[string]interface{}) map[string]interface{} {
 	required := globals.GetConfig().Api.Schema.Strict
 	schema := Entity{

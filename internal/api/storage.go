@@ -2,6 +2,7 @@ package api_storage
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/taymour/elysiandb/internal/globals"
@@ -9,6 +10,8 @@ import (
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/storage"
 )
+
+const CoreEntityTypePrefix = "_elysiandb_core_"
 
 func WriteEntity(entity string, data map[string]interface{}) []schema.ValidationError {
 	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
@@ -160,6 +163,20 @@ func EntityTypeExists(entity string) bool {
 func ListEntityTypes() []string {
 	data, _ := storage.GetByKey(globals.ApiAllEntityTypesListKey())
 	return decodeIDs(data)
+}
+
+func ListPublicEntityTypes() []string {
+	data, _ := storage.GetByKey(globals.ApiAllEntityTypesListKey())
+	allEntityTypes := decodeIDs(data)
+
+	publicEntityTypes := make([]string, 0, len(allEntityTypes))
+	for _, entityType := range allEntityTypes {
+		if !strings.HasPrefix(entityType, CoreEntityTypePrefix) {
+			publicEntityTypes = append(publicEntityTypes, entityType)
+		}
+	}
+
+	return publicEntityTypes
 }
 
 func ReadEntityById(entity string, id string) map[string]interface{} {

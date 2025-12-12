@@ -622,10 +622,8 @@ authentication:
 
 ## User Management (Basic Auth)
 
-When running in `basic` mode, users are stored in the `users.json` file inside the configured `store.folder` directory.
-Passwords are hashed with bcrypt after combining them with a server-generated secret stored in `users.key`.
-
-Both files are automatically created when needed.
+When running in `basic` mode, users are stored in a core entity.
+Passwords are hashed with bcrypt after combining them with a server-generated secret stored in `users.key`, created when needed.
 
 ---
 
@@ -693,7 +691,6 @@ Requests without authentication headers are rejected when authentication is enab
 * Hashing is done using bcrypt
 * A per-instance secret key is used as part of the hashing process
 * Deleting `users.key` invalidates all stored password hashes
-* Deleting `users.json` removes all users
 * In `token` mode, anyone with the token can fully access the API
 
 ---
@@ -1064,11 +1061,7 @@ The command interactively prompts for:
 * username
 * password
 
-The user is stored in:
-
-```
-<store.folder>/users.json
-```
+The user is stored in a core entity
 
 ---
 

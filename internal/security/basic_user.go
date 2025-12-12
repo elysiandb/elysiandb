@@ -5,20 +5,20 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/crypto/bcrypt"
 )
 
+const UserEntity = "_elysiandb_core_user"
+
 const (
-	UsersFilename    = "users.json"
 	KeyFilename      = "users.key"
 	SessionsFilename = "sessions.json"
 )
@@ -36,7 +36,7 @@ type BasicUser struct {
 	Role     Role
 }
 
-func (u *BasicUser) ToHasedUser() (*BasicHashedcUser, error) {
+func (u *BasicUser) ToHasedUser() (*BasicHashedUser, error) {
 	key, err := CreateKeyFileOrGetKey()
 	if err != nil {
 		return nil, err
@@ -53,30 +53,118 @@ func (u *BasicUser) ToHasedUser() (*BasicHashedcUser, error) {
 		role = RoleUser
 	}
 
-	return &BasicHashedcUser{
+	return &BasicHashedUser{
 		Username: u.Username,
 		Password: string(hashedPassword),
 		Role:     role,
 	}, nil
 }
 
-type BasicHashedcUser struct {
+type BasicHashedUser struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Role     Role   `json:"role"`
 }
 
 type UsersFile struct {
-	Users []BasicHashedcUser `json:"users"`
+	Users []BasicHashedUser `json:"users"`
+}
+
+func (u *BasicHashedUser) ToDataMap() map[string]interface{} {
+	return map[string]interface{}{
+		"id":       u.Username,
+		"username": u.Username,
+		"password": u.Password,
+		"role":     string(u.Role),
+	}
+}
+
+func (u *BasicHashedUser) fromDataMap(data map[string]interface{}) error {
+	username, ok := data["username"].(string)
+	if !ok {
+		return errors.New("invalid username in user data")
+	}
+
+	password, ok := data["password"].(string)
+	if !ok {
+		return errors.New("invalid password in user data")
+	}
+
+	roleStr, ok := data["role"].(string)
+	if !ok {
+		return errors.New("invalid role in user data")
+	}
+
+	u.Username = username
+	u.Password = password
+	u.Role = Role(roleStr)
+
+	return nil
+}
+
+func (u *BasicHashedUser) Save() error {
+	err := api_storage.WriteEntity(UserEntity, u.ToDataMap())
+	if len(err) == 0 {
+		return nil
+	}
+
+	var result string
+	for i, e := range err {
+		result += fmt.Sprintf("Error %d: %s\n", i, e.ToError())
+	}
+
+	return fmt.Errorf("%s", result)
+}
+
+func UserEntitySchema() map[string]interface{} {
+	return map[string]interface{}{
+		"id": map[string]interface{}{
+			"type":     "string",
+			"required": true,
+		},
+		"username": map[string]interface{}{
+			"type":     "string",
+			"required": true,
+		},
+		"password": map[string]interface{}{
+			"type":     "string",
+			"required": true,
+		},
+		"role": map[string]interface{}{
+			"type":     "string",
+			"required": true,
+		},
+	}
+}
+
+func InitBasicUsersStorage() error {
+	exists := api_storage.EntityTypeExists(UserEntity)
+	if exists {
+		return nil
+	}
+
+	err := api_storage.CreateEntityType(UserEntity)
+	if err != nil {
+		return err
+	}
+
+	api_storage.UpdateEntitySchema(UserEntity, UserEntitySchema())
+
+	return nil
 }
 
 func CreateBasicUser(user *BasicUser) error {
+	err := InitBasicUsersStorage()
+	if err != nil {
+		return err
+	}
+
 	hashedUser, err := user.ToHasedUser()
 	if err != nil {
 		return err
 	}
 
-	err = AddUserToFile(hashedUser)
+	err = hashedUser.Save()
 	if err != nil {
 		return err
 	}
@@ -85,21 +173,15 @@ func CreateBasicUser(user *BasicUser) error {
 }
 
 func ChangeUserPassword(username, newPassword string) error {
-	usersFile, err := LoadUsersFromFile()
+	u := api_storage.ReadEntityById(UserEntity, username)
+	if u == nil {
+		return fmt.Errorf("user '%s' not found", username)
+	}
+
+	user := &BasicHashedUser{}
+	err := user.fromDataMap(u)
 	if err != nil {
 		return err
-	}
-
-	var existing *BasicHashedcUser
-	for i := range usersFile.Users {
-		if usersFile.Users[i].Username == username {
-			existing = &usersFile.Users[i]
-			break
-		}
-	}
-
-	if existing == nil {
-		return fmt.Errorf("user '%s' not found", username)
 	}
 
 	key, err := CreateKeyFileOrGetKey()
@@ -113,61 +195,18 @@ func ChangeUserPassword(username, newPassword string) error {
 		return err
 	}
 
-	existing.Password = string(hashedPassword)
+	user.Password = string(hashedPassword)
 
-	cfg := globals.GetConfig()
-	file, err := os.OpenFile(fmt.Sprintf("%s/%s", cfg.Store.Folder, UsersFilename), os.O_RDWR|os.O_TRUNC, 0644)
+	err = user.Save()
 	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	enc := json.NewEncoder(file)
-	if err := enc.Encode(usersFile); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func DeleteBasicUser(username string) error {
-	usersFile, err := LoadUsersFromFile()
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("no users exist yet")
-		}
-		return err
-	}
-
-	var updatedUsers []BasicHashedcUser
-	found := false
-	for _, user := range usersFile.Users {
-		if user.Username != username {
-			updatedUsers = append(updatedUsers, user)
-		} else {
-			found = true
-		}
-	}
-
-	if !found {
-		return fmt.Errorf("user '%s' not found", username)
-	}
-
-	usersFile.Users = updatedUsers
-
-	cfg := globals.GetConfig()
-	file, err := os.OpenFile(fmt.Sprintf("%s/%s", cfg.Store.Folder, UsersFilename), os.O_RDWR|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	if err := encoder.Encode(usersFile); err != nil {
-		return err
-	}
-
-	return nil
+func DeleteBasicUser(username string) {
+	api_storage.DeleteEntityById(UserEntity, username)
 }
 
 func GenerateKey() (string, error) {
@@ -221,60 +260,14 @@ func CreateKeyFileOrGetKey() (string, error) {
 	return key, nil
 }
 
-func AddUserToFile(user *BasicHashedcUser) error {
-	cfg := globals.GetConfig()
-	file, err := os.OpenFile(fmt.Sprintf("%s/%s", cfg.Store.Folder, UsersFilename), os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return err
+func AuthenticateUser(username, password string) (*BasicHashedUser, bool) {
+	u := api_storage.ReadEntityById(UserEntity, username)
+	if u == nil {
+		return nil, false
 	}
 
-	var users UsersFile
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return err
-	}
-
-	if fileInfo.Size() > 0 {
-		decoder := json.NewDecoder(file)
-		if err := decoder.Decode(&users); err != nil && err != io.EOF {
-			return err
-		}
-	}
-
-	users.Users = append(users.Users, *user)
-
-	file.Truncate(0)
-	file.Seek(0, 0)
-	encoder := json.NewEncoder(file)
-	if err := encoder.Encode(users); err != nil {
-		return err
-	}
-
-	defer file.Close()
-
-	return nil
-}
-
-func LoadUsersFromFile() (*UsersFile, error) {
-	cfg := globals.GetConfig()
-	file, err := os.Open(fmt.Sprintf("%s/%s", cfg.Store.Folder, UsersFilename))
-	if err != nil {
-		return nil, err
-	}
-
-	defer file.Close()
-
-	var users UsersFile
-	decoder := json.NewDecoder(file)
-	if err := decoder.Decode(&users); err != nil {
-		return nil, err
-	}
-
-	return &users, nil
-}
-
-func AuthenticateUser(username, password string) (*BasicHashedcUser, bool) {
-	users, err := LoadUsersFromFile()
+	user := &BasicHashedUser{}
+	err := user.fromDataMap(u)
 	if err != nil {
 		return nil, false
 	}
@@ -287,14 +280,8 @@ func AuthenticateUser(username, password string) (*BasicHashedcUser, bool) {
 	sum := sha256.Sum256([]byte(password + key))
 	pass := sum[:]
 
-	for i := range users.Users {
-		u := users.Users[i]
-		if u.Username == username {
-			if bcrypt.CompareHashAndPassword([]byte(u.Password), pass) == nil {
-				return &u, true
-			}
-			return nil, false
-		}
+	if bcrypt.CompareHashAndPassword([]byte(user.Password), pass) == nil {
+		return user, true
 	}
 
 	return nil, false

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/taymour/elysiandb/internal/boot"
 	"github.com/taymour/elysiandb/internal/cmd"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
@@ -33,6 +34,8 @@ func main() {
 	}
 
 	globals.SetConfig(cfg)
+
+	boot.InitDB()
 
 	args := os.Args
 
