@@ -902,6 +902,8 @@ ElysianDB includes an optional, built‑in **Admin UI** that allows you to visua
 
 The Admin UI is served directly by the ElysianDB HTTP server and requires no external frontend stack once built.
 
+By default, there is an admin user created with username = "admin" and password = "admin". Please connect to the AdminUI and change the password.
+
 ---
 
 ## Enabling the Admin UI
