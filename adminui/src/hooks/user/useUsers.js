@@ -22,21 +22,6 @@ export function useUsers() {
             });
     }, []);
 
-    // const loadOne = useCallback((entityType) => {
-    //     setLoading(true);
-    //
-    //     apiFetch("/api/" + entityType + "/schema")
-    //         .then((response) => {
-    //             setEntityTypeData(response);
-    //
-    //             setLoading(false);
-    //         })
-    //         .catch((err) => {
-    //             setError(err);
-    //             setLoading(false);
-    //         });
-    // }, []);
-
     const createUser = useCallback(async (user) => {
         setLoading(true);
 
@@ -73,6 +58,24 @@ export function useUsers() {
         }
     }, [show]);
 
+    const changeUserRole = useCallback(async (username, role) => {
+        setLoading(true);
+
+        try {
+            await apiFetch(`/api/security/user/`+username+`/role`, {
+                method: "PUT",
+                json: {role: role},
+            });
+            show("success", `User's role successfully modified`);
+        } catch (err) {
+            setError(err?.message ?? "Unknown error");
+            show("error", `Failed to change user's role`);
+            throw err;
+        } finally {
+            setLoading(null);
+        }
+    }, [show]);
+
     const deleteUser = useCallback(async (username, password) => {
         setLoading(true);
 
@@ -91,5 +94,5 @@ export function useUsers() {
         }
     }, [show]);
 
-    return { list, loading, error, loadAll, deleteUser, createUser, changeUserPassword };
+    return { list, loading, error, loadAll, deleteUser, createUser, changeUserPassword, changeUserRole };
 }

@@ -113,6 +113,7 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 | `GET`    | `/api/security/user/{user_name}`          | Retrieve a user                                             |
 | `POST`   | `/api/security/user`                      | Create a user                                               |
 | `PUT`    | `/api/security/user/{user_name}/password` | Change a user's password                                    |
+| `PUT`    | `/api/security/user/{user_name}/role`.    | Change a user's role.                                       |
 | `DELETE` | `/api/security/user/{user_name}`          | Delete a user                                               |
 | `POST`   | `/api/security/login`                     | Log in as a user                                            |
 | `POST`   | `/api/security/logout`                    | Log out as a user                                           |
@@ -819,24 +820,23 @@ Creates a new user.
 
 ---
 
-### Change User Password
+### Change User Role
 
 ```
-PUT /api/security/user/{user_name}/password
+PUT /api/security/user/{user_name}/role
 ```
 
-Changes the password of a user.
+Changes the role of a user.
 
 **Authorization**
 
-* Admin can change any password
-* A user can change the password of another user, but not their own
+* Admin can change any role
 
 **Request Body**
 
 ```json
 {
-  "password": "new-password"
+  "role": "user" // or admin
 }
 ```
 

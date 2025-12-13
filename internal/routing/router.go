@@ -64,6 +64,7 @@ func RegisterRoutes(r *router.Router) {
 		r.GET("/api/security/user/{user_name}", Version(http_adminui.AdminAuth(http_security.GetUserByUsernameController)))
 		r.DELETE("/api/security/user/{user_name}", Version(http_adminui.AdminAuth(http_security.DeleteUserByUsernameController)))
 		r.PUT("/api/security/user/{user_name}/password", Version(http_adminui.AdminAuth(http_security.ChangeUserPasswordController)))
+		r.PUT("/api/security/user/{user_name}/role", Version(http_adminui.AdminAuth(http_security.ChangeUserRoleController)))
 		r.POST("/api/security/login", Version(http_adminui.LoginController))
 		r.POST("/api/security/logout", Version(http_adminui.AdminAuth(http_adminui.LogoutController)))
 		r.GET("/api/security/me", Version(http_adminui.AdminAuth(http_adminui.MeController)))

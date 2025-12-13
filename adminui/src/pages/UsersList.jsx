@@ -5,7 +5,7 @@ import UserLine from "../components/user/UserLine.jsx";
 import UserModal from "../components/user/UserModal.jsx";
 
 export default function UsersList() {
-    const { list, loadAll, loading, deleteUser } = useUsers();
+    const { list, loadAll, loading, deleteUser, changeUserRole } = useUsers();
     const [showModal, setShowModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [search, setSearch] = useState("");
@@ -27,6 +27,11 @@ export default function UsersList() {
     const handleDelete = async (username) => {
         if (!window.confirm(`Delete user "${username}" ?`)) return;
         await deleteUser(username);
+        loadAll();
+    };
+
+    const handleRoleChange = async (username, role) => {
+        await changeUserRole(username, role);
         loadAll();
     };
 
@@ -77,6 +82,7 @@ export default function UsersList() {
                             user={user}
                             onChangePassword={changePassword}
                             onDeleted={() => handleDelete(user.username)}
+                            onChangeRole={handleRoleChange}
                         />
                     ))}
                     </tbody>
