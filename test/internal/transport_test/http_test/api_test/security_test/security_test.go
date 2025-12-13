@@ -253,3 +253,80 @@ func TestChangeUserPasswordController_UserNotFound(t *testing.T) {
 		t.Fatal("expected 404")
 	}
 }
+
+func TestChangeUserRoleController_OK(t *testing.T) {
+	setup(t)
+
+	_ = security.CreateBasicUser(&security.BasicUser{
+		Username: "bob",
+		Password: "x",
+		Role:     security.RoleUser,
+	})
+
+	s := login(t, security.DefaultAdminUsername, security.RoleAdmin)
+	ctx := newCtx("PUT", "/api/security/user/bob/role", `{"role":"admin"}`, s)
+	ctx.SetUserValue("user_name", "bob")
+
+	http_security.ChangeUserRoleController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatal("expected 200")
+	}
+
+	u, err := security.GetBasicUserByUsername("bob")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if u["role"] != string(security.RoleAdmin) {
+		t.Fatal("role not updated")
+	}
+}
+
+func TestChangeUserRoleController_Forbidden(t *testing.T) {
+	setup(t)
+
+	_ = security.CreateBasicUser(&security.BasicUser{
+		Username: "bob",
+		Password: "x",
+		Role:     security.RoleUser,
+	})
+
+	s := login(t, "bob", security.RoleUser)
+	ctx := newCtx("PUT", "/api/security/user/bob/role", `{"role":"admin"}`, s)
+	ctx.SetUserValue("user_name", "bob")
+
+	http_security.ChangeUserRoleController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatal("expected 403")
+	}
+}
+
+func TestChangeUserRoleController_InvalidJSON(t *testing.T) {
+	setup(t)
+
+	s := login(t, security.DefaultAdminUsername, security.RoleAdmin)
+	ctx := newCtx("PUT", "/api/security/user/bob/role", `{bad`, s)
+	ctx.SetUserValue("user_name", "bob")
+
+	http_security.ChangeUserRoleController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatal("expected 400")
+	}
+}
+
+func TestChangeUserRoleController_UserNotFound(t *testing.T) {
+	setup(t)
+
+	s := login(t, security.DefaultAdminUsername, security.RoleAdmin)
+	ctx := newCtx("PUT", "/api/security/user/ghost/role", `{"role":"admin"}`, s)
+	ctx.SetUserValue("user_name", "ghost")
+
+	http_security.ChangeUserRoleController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusNotFound {
+		t.Fatal("expected 404")
+	}
+}

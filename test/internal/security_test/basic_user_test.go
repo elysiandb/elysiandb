@@ -416,3 +416,198 @@ func TestInitBasicUsersStorage_SchemaMatchesUserEntitySchema(t *testing.T) {
 		t.Fatalf("schema mismatch")
 	}
 }
+
+func TestChangeUserRole_Success(t *testing.T) {
+	setup(t)
+
+	u := &security.BasicUser{
+		Username: "roleuser",
+		Password: "pwd",
+		Role:     security.RoleUser,
+	}
+
+	if err := security.CreateBasicUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := security.ChangeUserRole("roleuser", string(security.RoleAdmin)); err != nil {
+		t.Fatal(err)
+	}
+
+	out := api_storage.ReadEntityById(security.UserEntity, "roleuser")
+	if out == nil {
+		t.Fatal("user not found")
+	}
+
+	if out["role"] != string(security.RoleAdmin) {
+		t.Fatalf("expected role admin, got %v", out["role"])
+	}
+}
+
+func TestChangeUserRole_UserNotFound(t *testing.T) {
+	setup(t)
+
+	if err := security.ChangeUserRole("missing", string(security.RoleAdmin)); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestChangeUserRole_PreservesPassword(t *testing.T) {
+	setup(t)
+
+	u := &security.BasicUser{
+		Username: "keepPwd",
+		Password: "secret",
+		Role:     security.RoleUser,
+	}
+
+	if err := security.CreateBasicUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	before := api_storage.ReadEntityById(security.UserEntity, "keepPwd")
+	if before == nil {
+		t.Fatal("missing user")
+	}
+
+	if err := security.ChangeUserRole("keepPwd", string(security.RoleAdmin)); err != nil {
+		t.Fatal(err)
+	}
+
+	after := api_storage.ReadEntityById(security.UserEntity, "keepPwd")
+	if after == nil {
+		t.Fatal("missing user after update")
+	}
+
+	if before["password"] != after["password"] {
+		t.Fatal("password should not change")
+	}
+}
+
+func TestChangeUserPassword_UserNotFound(t *testing.T) {
+	setup(t)
+
+	if err := security.ChangeUserPassword("ghost", "x"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestAuthenticateUser_Failure(t *testing.T) {
+	setup(t)
+
+	u := &security.BasicUser{Username: "john", Password: "secret", Role: security.RoleUser}
+	if err := security.CreateBasicUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := security.AuthenticateUser("john", "bad"); ok {
+		t.Fatal("expected failure")
+	}
+}
+
+func TestAuthenticateUser_UserNotFound(t *testing.T) {
+	setup(t)
+
+	if _, ok := security.AuthenticateUser("ghost", "x"); ok {
+		t.Fatal("expected failure")
+	}
+}
+
+func TestDeleteBasicUser_DeletesRegularUser(t *testing.T) {
+	setup(t)
+
+	u := &security.BasicUser{Username: "todelete", Password: "x", Role: security.RoleUser}
+	if err := security.CreateBasicUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	security.DeleteBasicUser("todelete")
+
+	if api_storage.ReadEntityById(security.UserEntity, "todelete") != nil {
+		t.Fatal("user should be deleted")
+	}
+}
+
+func TestCheckBasicAuthentication_MissingHeader(t *testing.T) {
+	setup(t)
+
+	var ctx fasthttp.RequestCtx
+	if security.CheckBasicAuthentication(&ctx) {
+		t.Fatal("expected failure")
+	}
+}
+
+func TestCheckBasicAuthentication_InvalidPrefix(t *testing.T) {
+	setup(t)
+
+	req := fasthttp.AcquireRequest()
+	req.Header.Set("Authorization", "Bearer abc")
+
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	if security.CheckBasicAuthentication(&ctx) {
+		t.Fatal("expected failure")
+	}
+}
+
+func TestCheckBasicAuthentication_InvalidBase64(t *testing.T) {
+	setup(t)
+
+	req := fasthttp.AcquireRequest()
+	req.Header.Set("Authorization", "Basic !!!")
+
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	if security.CheckBasicAuthentication(&ctx) {
+		t.Fatal("expected failure")
+	}
+}
+
+func TestCheckBasicAuthentication_InvalidPayload(t *testing.T) {
+	setup(t)
+
+	req := fasthttp.AcquireRequest()
+	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte("badpayload")))
+
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	if security.CheckBasicAuthentication(&ctx) {
+		t.Fatal("expected failure")
+	}
+}
+
+func TestBasicHashedUser_fromDataMap_InvalidUsername(t *testing.T) {
+	u := &security.BasicHashedUser{}
+	err := u.FromDataMap(map[string]interface{}{
+		"password": "x",
+		"role":     "user",
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestBasicHashedUser_fromDataMap_InvalidPassword(t *testing.T) {
+	u := &security.BasicHashedUser{}
+	err := u.FromDataMap(map[string]interface{}{
+		"username": "x",
+		"role":     "user",
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestBasicHashedUser_fromDataMap_InvalidRole(t *testing.T) {
+	u := &security.BasicHashedUser{}
+	err := u.FromDataMap(map[string]interface{}{
+		"username": "x",
+		"password": "y",
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}

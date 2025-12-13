@@ -80,7 +80,7 @@ func (u *BasicHashedUser) ToDataMap() map[string]interface{} {
 	}
 }
 
-func (u *BasicHashedUser) fromDataMap(data map[string]interface{}) error {
+func (u *BasicHashedUser) FromDataMap(data map[string]interface{}) error {
 	username, ok := data["username"].(string)
 	if !ok {
 		return errors.New("invalid username in user data")
@@ -237,7 +237,7 @@ func ChangeUserPassword(username, newPassword string) error {
 	}
 
 	user := &BasicHashedUser{}
-	err := user.fromDataMap(u)
+	err := user.FromDataMap(u)
 	if err != nil {
 		return err
 	}
@@ -254,6 +254,28 @@ func ChangeUserPassword(username, newPassword string) error {
 	}
 
 	user.Password = string(hashedPassword)
+
+	err = user.Save()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ChangeUserRole(username, newRole string) error {
+	u := api_storage.ReadEntityById(UserEntity, username)
+	if u == nil {
+		return fmt.Errorf("user '%s' not found", username)
+	}
+
+	user := &BasicHashedUser{}
+	err := user.FromDataMap(u)
+	if err != nil {
+		return err
+	}
+
+	user.Role = Role(newRole)
 
 	err = user.Save()
 	if err != nil {
@@ -329,7 +351,7 @@ func AuthenticateUser(username, password string) (*BasicHashedUser, bool) {
 	}
 
 	user := &BasicHashedUser{}
-	err := user.fromDataMap(u)
+	err := user.FromDataMap(u)
 	if err != nil {
 		return nil, false
 	}
