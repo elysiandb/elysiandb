@@ -2,6 +2,8 @@ package globals
 
 import "fmt"
 
+const CoreFieldsPrefix = "_elysiandb_core_"
+
 const (
 	ApiEntityTypesListPattern          = "api:entity:types:list"
 	ApiEntityPattern                   = "api:entity:%s"

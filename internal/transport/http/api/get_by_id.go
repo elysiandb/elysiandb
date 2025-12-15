@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 
+	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/globals"
@@ -27,7 +28,23 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	}
 
 	data := api_storage.ReadEntityById(entity, id)
-	if data != nil && includesParam != "" {
+	if data == nil {
+		ctx.SetStatusCode(fasthttp.StatusNotFound)
+		ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
+		ctx.SetBodyString("Entity not found")
+
+		return
+	}
+
+	if !acl.CanReadEntity(entity, data) {
+		ctx.SetStatusCode(fasthttp.StatusForbidden)
+		ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
+		ctx.SetBodyString("Access denied")
+
+		return
+	}
+
+	if includesParam != "" {
 		list := []map[string]interface{}{data}
 		data = api_storage.ApplyIncludes(list, includesParam)[0]
 	}

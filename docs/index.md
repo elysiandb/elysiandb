@@ -110,14 +110,18 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 | `GET`    | `/api/entity/types`                       | List of all entity types                                    |
 | `POST`   | `/api/<entity>/schema`                    | Create a new entity type                                    |
 | `GET`    | `/api/security/user`                      | List all of the users                                       |
-| `GET`    | `/api/security/user/{user_name}`          | Retrieve a user                                             |
+| `GET`    | `/api/security/user/<user_name>`          | Retrieve a user                                             |
 | `POST`   | `/api/security/user`                      | Create a user                                               |
-| `PUT`    | `/api/security/user/{user_name}/password` | Change a user's password                                    |
-| `PUT`    | `/api/security/user/{user_name}/role`.    | Change a user's role.                                       |
-| `DELETE` | `/api/security/user/{user_name}`          | Delete a user                                               |
+| `PUT`    | `/api/security/user/<user_name>/password` | Change a user's password                                    |
+| `PUT`    | `/api/security/user/<user_name>/role`.    | Change a user's role                                        |
+| `DELETE` | `/api/security/user/<user_name>`          | Delete a user                                               |
 | `POST`   | `/api/security/login`                     | Log in as a user                                            |
 | `POST`   | `/api/security/logout`                    | Log out as a user                                           |
 | `GET`    | `/api/security/me`                        | Current authenticated user                                  |
+| `GET`    | `/api/acl/<user_name>/<entity>`           | Retrieve ACL for username and entity type                   |
+| `GET`    | `/api/acl/<user_name>`                    | Retrieve ACL for username and all entity types              |
+| `PUT`    | `/api/acl/<user_name>/<entity>`           | Update ACL for username and entity type                     |
+| `PUT`    | `/api/acl/<user_name>/<entity>/default`   | restore default ACL for username and entity type            |
 
 ---
 
@@ -893,6 +897,96 @@ The default `admin` user cannot be deleted.
 * Passwords are hashed using bcrypt with a server-side secret
 * All responses are JSON
 * All endpoints return the `X-Elysian-Version` header
+
+---
+
+## Access Control Lists (ACL)
+
+ElysianDB provides a built-in ACL system to control access to entities at the API level.
+
+### Activation
+
+ACLs are enforced only when authentication is enabled and running in `user` mode:
+
+```yaml
+security:
+  authentication:
+    enabled: true
+    mode: "user"
+```
+
+If authentication is disabled, all operations are allowed.
+
+---
+
+### Core Principle
+
+Permissions are evaluated per **(user, entity)** pair.
+
+Each ACL entry defines which actions a given user can perform on a specific entity.
+If no ACL exists for a user/entity pair, access is denied by default.
+
+---
+
+### Permissions
+
+Global permissions:
+
+* `create`
+* `read`
+* `update`
+* `delete`
+
+Owning permissions (apply only to documents owned by the user):
+
+* `owning_read`
+* `owning_update`
+* `owning_delete`
+
+Ownership is determined using the internal field:
+
+```
+_core_username
+```
+
+---
+
+### Evaluation Rules
+
+* **Create**: allowed if `create` is granted
+* **Read**:
+
+  * allowed if `read`
+  * otherwise allowed only if `owning_read` and `_core_username == current user`
+* **Update**:
+
+  * allowed if `update`
+  * otherwise allowed only if `owning_update` and ownership matches
+* **Delete**:
+
+  * allowed if `delete`
+  * otherwise allowed only if `owning_delete` and ownership matches
+
+For list queries, results are automatically filtered to only include readable documents.
+
+---
+
+### Default Permissions
+
+* **Admin**: all permissions granted
+* **Regular user**: only owning permissions granted
+
+ACLs are generated automatically for all users and entities and can be reset to their default state at any time.
+
+---
+
+### Security Model
+
+* Default deny if no ACL is found
+* No implicit access
+* Ownership checks are enforced at read, update, and delete time
+* ACL logic applies uniformly across REST and transactional operations
+
 
 ---
 

@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 
+	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/globals"
@@ -68,9 +69,19 @@ func handleSingleUpdate(ctx *fasthttp.RequestCtx, entity, id string, body []byte
 	if err := json.Unmarshal(body, &single); err != nil || len(single) == 0 {
 		return false
 	}
+
+	if !acl.CanUpdateEntity(entity, single) {
+		ctx.SetStatusCode(fasthttp.StatusForbidden)
+		ctx.SetBody([]byte(`{"error":"forbidden"}`))
+
+		return false
+	}
+
 	data := api_storage.UpdateEntityById(entity, id, single)
+
 	response, _ := json.Marshal(data)
 	sendJSONResponse(ctx, response)
+
 	return true
 }
 
@@ -79,6 +90,14 @@ func handleBatchUpdate(ctx *fasthttp.RequestCtx, entity string, body []byte) boo
 	if err := json.Unmarshal(body, &list); err != nil || len(list) == 0 {
 		return false
 	}
+
+	if !acl.CanUpdateListOfEntities(entity, list) {
+		ctx.SetStatusCode(fasthttp.StatusForbidden)
+		ctx.SetBody([]byte(`{"error":"forbidden"}`))
+
+		return false
+	}
+
 	data := api_storage.UpdateListOfEntities(entity, list)
 	response, _ := json.Marshal(data)
 	sendJSONResponse(ctx, response)

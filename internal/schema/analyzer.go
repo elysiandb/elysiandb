@@ -3,6 +3,7 @@ package schema
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/storage"
@@ -46,7 +47,7 @@ func AnalyzeEntitySchema(entity string, data map[string]interface{}) map[string]
 func analyzeFields(data map[string]interface{}, isRoot bool, required bool) map[string]Field {
 	fields := make(map[string]Field)
 	for k, v := range data {
-		if isRoot && k == "id" {
+		if isRoot && k == "id" || strings.HasPrefix(k, globals.CoreFieldsPrefix) {
 			continue
 		}
 

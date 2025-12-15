@@ -7,7 +7,7 @@ export default function NavBar() {
 
     return (
         <Navbar expand="lg" className="bg-body-tertiary">
-            <Container>
+            <div className="container-fluid">
                 <Navbar.Brand as={NavLink} to="/admin">
                     ElysianDB Admin
                 </Navbar.Brand>
@@ -34,6 +34,14 @@ export default function NavBar() {
 
                         <Nav.Link
                             as={NavLink}
+                            to="/admin/acl"
+                            end
+                        >
+                            ACL
+                        </Nav.Link>
+
+                        <Nav.Link
+                            as={NavLink}
                             to="/admin/entities"
                             end
                         >
@@ -47,7 +55,7 @@ export default function NavBar() {
                     <span className="navbar-hello">Hello {account?.username}</span>
                     <Button onClick={logout}>Logout</Button>
                 </Nav>
-            </Container>
+            </div>
         </Navbar>
     );
 }

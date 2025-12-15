@@ -34,6 +34,13 @@ func writeSessions(t *testing.T, dir string, sf security.SessionsFile) {
 	_ = os.WriteFile(filepath.Join(dir, security.SessionsFilename), b, 0644)
 }
 
+func TestSetAndGetCurrentUsername(t *testing.T) {
+	security.SetCurrentUsername("alice")
+	if security.GetCurrentUsername() != "alice" {
+		t.Fatalf("expected alice")
+	}
+}
+
 func TestCreateSession(t *testing.T) {
 	dir := setupTempStore(t)
 

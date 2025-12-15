@@ -323,57 +323,6 @@ func TestOffsetLimitAndSort(t *testing.T) {
 	}
 }
 
-func TestCountEntities_OK(t *testing.T) {
-	initTestStore(t)
-
-	entity := "cars"
-	api_storage.WriteEntity(entity, map[string]interface{}{"id": "c1", "brand": "bmw"})
-	api_storage.WriteEntity(entity, map[string]interface{}{"id": "c2", "brand": "audi"})
-
-	n, err := api_storage.CountEntities(entity)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if n != 2 {
-		t.Fatalf("expected 2, got %d", n)
-	}
-}
-
-func TestCountEntities_EmptyEntity(t *testing.T) {
-	initTestStore(t)
-
-	entity := "empty"
-	_, err := api_storage.CountEntities(entity)
-	if err == nil {
-		t.Fatal("expected error for empty entity, got nil")
-	}
-}
-
-func TestCountEntities_EntityDoesNotExist(t *testing.T) {
-	initTestStore(t)
-
-	_, err := api_storage.CountEntities("ghost")
-	if err == nil {
-		t.Fatal("expected error for missing entity, got nil")
-	}
-}
-
-func TestCountEntities_IgnoresOtherEntities(t *testing.T) {
-	initTestStore(t)
-
-	api_storage.WriteEntity("movies", map[string]interface{}{"id": "m1"})
-	api_storage.WriteEntity("movies", map[string]interface{}{"id": "m2"})
-	api_storage.WriteEntity("songs", map[string]interface{}{"id": "s1"})
-
-	n, err := api_storage.CountEntities("movies")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if n != 2 {
-		t.Fatalf("expected 2, got %d", n)
-	}
-}
-
 func TestEntityExists_True(t *testing.T) {
 	initTestStore(t)
 

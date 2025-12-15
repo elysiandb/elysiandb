@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
 
@@ -22,6 +24,11 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	includesParam := string(ctx.QueryArgs().Peek("includes"))
 	countOnlyParam := ctx.QueryArgs().GetBool("countOnly")
 
+	currentUser := ""
+	if security.UserAuthenticationIsEnabled() {
+		currentUser = security.GetCurrentUsername()
+	}
+
 	var hash []byte
 	if globals.GetConfig().Api.Cache.Enabled {
 		hash = cache.HashQuery(
@@ -35,6 +42,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 			search,
 			includesParam,
 			countOnlyParam,
+			currentUser,
 		)
 		cached := cache.CacheStore.Get(entity, hash)
 		if cached != nil {
@@ -48,6 +56,8 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	}
 
 	data := api_storage.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
+
+	data = acl.FilterListOfEntities(entity, data)
 
 	if countOnlyParam {
 		countResult := int64(len(data))
