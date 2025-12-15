@@ -385,25 +385,6 @@ func CountAllEntities() int {
 	return counter
 }
 
-func CountEntities(inputEntity string) (int, error) {
-	counter := 0
-	entities := ListEntityTypes()
-
-	for _, entity := range entities {
-		if entity != inputEntity {
-			continue
-		}
-
-		counter += len(ListEntities(entity, 0, 0, "", true, nil, "", ""))
-	}
-
-	if counter == 0 {
-		return 0, fmt.Errorf("entity '%s' does not exist", inputEntity)
-	}
-
-	return counter, nil
-}
-
 func ImportAll(data map[string][]map[string]interface{}) {
 	for entity, items := range data {
 		storage.DeleteByWildcardKey(globals.ApiEntityIndexPatternKey(entity))

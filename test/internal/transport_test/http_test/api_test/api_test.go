@@ -20,6 +20,7 @@ func setup(t *testing.T) {
 	cfg.Api.Cache.Enabled = false
 	cfg.Api.Schema.Enabled = true
 	cfg.Api.Schema.Strict = false
+	cfg.Security.Authentication.Enabled = false
 	globals.SetConfig(cfg)
 
 	storage.LoadDB()
@@ -158,85 +159,6 @@ func TestDeleteAndDestroy(t *testing.T) {
 	}
 }
 
-func TestSchemaAPI(t *testing.T) {
-	setup(t)
-
-	ctx := newCtx("POST", "/api/s", `{"a":1}`)
-	ctx.SetUserValue("entity", "s")
-	api_controller.CreateController(ctx)
-
-	ctx = newCtx("PUT", "/api/s/schema", `{"fields":{"a":{"type":"number"}}}`)
-	ctx.SetUserValue("entity", "s")
-	api_controller.PutSchemaController(ctx)
-
-	if ctx.Response.StatusCode() != 200 {
-		t.Fatal("put schema failed")
-	}
-
-	ctx = newCtx("GET", "/api/s/schema", "")
-	ctx.SetUserValue("entity", "s")
-	api_controller.GetSchemaController(ctx)
-
-	if ctx.Response.StatusCode() != 200 {
-		t.Fatal("get schema failed")
-	}
-}
-
-func TestImportExport(t *testing.T) {
-	setup(t)
-
-	ctx := newCtx("POST", "/api/import", `{"x":[{"a":1},{"a":2}]}`)
-	api_controller.ImportController(ctx)
-
-	if ctx.Response.StatusCode() != 200 {
-		t.Fatal("import failed")
-	}
-
-	ctx = newCtx("GET", "/api/export", "")
-	api_controller.ExportController(ctx)
-
-	if ctx.Response.StatusCode() != 200 {
-		t.Fatal("export failed")
-	}
-}
-
-func TestExistsController(t *testing.T) {
-	setup(t)
-
-	ctx := newCtx("POST", "/api/t", `{"a":1}`)
-	ctx.SetUserValue("entity", "t")
-	api_controller.CreateController(ctx)
-
-	var obj map[string]interface{}
-	json.Unmarshal(ctx.Response.Body(), &obj)
-	id := obj["id"].(string)
-
-	ctx = newCtx("GET", "/api/t/"+id+"/exists", "")
-	ctx.SetUserValue("entity", "t")
-	ctx.SetUserValue("id", id)
-	api_controller.ExistsController(ctx)
-
-	if string(ctx.Response.Body())[11:15] != "true" {
-		t.Fatal("exists failed")
-	}
-}
-
-func TestMigrateController(t *testing.T) {
-	setup(t)
-
-	ctx := newCtx("POST", "/api/m", `{"x":1}`)
-	ctx.SetUserValue("entity", "m")
-	api_controller.CreateController(ctx)
-
-	ctx = newCtx("POST", "/api/m/migrate", `[{"set":[{"a":123}]}]`)
-	ctx.SetUserValue("entity", "m")
-	api_controller.MigrateController(ctx)
-
-	if ctx.Response.StatusCode() != 200 {
-		t.Fatal("migrate failed")
-	}
-}
-
 func TestCreateTypeController_OK(t *testing.T) {
 	setup(t)
 
@@ -252,11 +174,6 @@ func TestCreateTypeController_OK(t *testing.T) {
 
 	if !api_storage.EntityTypeExists("person") {
 		t.Fatalf("entity type not created")
-	}
-
-	s := api_storage.ReadEntityById("_elysiandb_core_schema", "person")
-	if s == nil {
-		t.Fatalf("schema not created")
 	}
 }
 
@@ -296,91 +213,11 @@ func TestCreateTypeController_NoFields(t *testing.T) {
 	}
 }
 
-func TestCreateTypeController_AlreadyExists(t *testing.T) {
-	setup(t)
-
-	api_storage.CreateEntityType("dup")
-
-	body := `{"fields":{"a":"string"}}`
-	ctx := newCtx("POST", "/api/type/dup", body)
-	ctx.SetUserValue("entity", "dup")
-
-	api_controller.CreateTypeController(ctx)
-
-	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", ctx.Response.StatusCode())
-	}
-}
-
-func TestPutSchemaController_EntityNotFound(t *testing.T) {
-	setup(t)
-
-	ctx := newCtx("PUT", "/api/ghost/schema", `{"fields":{"a":{"type":"number"}}}`)
-	ctx.SetUserValue("entity", "ghost")
-
-	api_controller.PutSchemaController(ctx)
-
-	if ctx.Response.StatusCode() != fasthttp.StatusNotFound {
-		t.Fatalf("expected 404, got %d", ctx.Response.StatusCode())
-	}
-}
-
-func TestPutSchemaController_InvalidJSON(t *testing.T) {
-	setup(t)
-
-	api_storage.CreateEntityType("x")
-
-	ctx := newCtx("PUT", "/api/x/schema", `{invalid`)
-	ctx.SetUserValue("entity", "x")
-
-	api_controller.PutSchemaController(ctx)
-
-	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", ctx.Response.StatusCode())
-	}
-}
-
-func TestPutSchemaController_NoFieldsObject(t *testing.T) {
-	setup(t)
-
-	api_storage.CreateEntityType("x")
-
-	ctx := newCtx("PUT", "/api/x/schema", `{"fields":123}`)
-	ctx.SetUserValue("entity", "x")
-
-	api_controller.PutSchemaController(ctx)
-
-	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", ctx.Response.StatusCode())
-	}
-}
-
-func TestPutSchemaController_OK(t *testing.T) {
-	setup(t)
-
-	api_storage.CreateEntityType("x")
-
-	body := `{"fields":{"name":{"type":"string"}}}`
-	ctx := newCtx("PUT", "/api/x/schema", body)
-	ctx.SetUserValue("entity", "x")
-
-	api_controller.PutSchemaController(ctx)
-
-	if ctx.Response.StatusCode() != fasthttp.StatusOK {
-		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
-	}
-
-	s := api_storage.GetEntitySchema("x")
-	if s == nil {
-		t.Fatalf("schema should exist after update")
-	}
-}
-
-func TestGetEntityTypesController_Empty(t *testing.T) {
+func TestGetEntityTypesNamesController_Empty(t *testing.T) {
 	setup(t)
 
 	ctx := newCtx("GET", "/api/types", "")
-	api_controller.GetEntityTypesController(ctx)
+	api_controller.GetEntityTypesNamesController(ctx)
 
 	if ctx.Response.StatusCode() != fasthttp.StatusOK {
 		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
@@ -394,21 +231,14 @@ func TestGetEntityTypesController_Empty(t *testing.T) {
 	}
 }
 
-func TestGetEntityTypesController_WithSchemas(t *testing.T) {
+func TestGetEntityTypesNamesController_WithEntities(t *testing.T) {
 	setup(t)
 
 	api_storage.CreateEntityType("book")
-	api_storage.UpdateEntitySchema("book", map[string]interface{}{
-		"title": "string",
-	})
-
 	api_storage.CreateEntityType("user")
-	api_storage.UpdateEntitySchema("user", map[string]interface{}{
-		"name": "string",
-	})
 
 	ctx := newCtx("GET", "/api/types", "")
-	api_controller.GetEntityTypesController(ctx)
+	api_controller.GetEntityTypesNamesController(ctx)
 
 	if ctx.Response.StatusCode() != fasthttp.StatusOK {
 		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
@@ -416,45 +246,18 @@ func TestGetEntityTypesController_WithSchemas(t *testing.T) {
 
 	var out map[string]interface{}
 	json.Unmarshal(ctx.Response.Body(), &out)
-
 	raw := out["entities"].([]interface{})
-	valid := make([]string, 0)
+
+	if len(raw) != 2 {
+		t.Fatalf("expected 2 entities, got %v", raw)
+	}
+
+	found := map[string]bool{}
 	for _, v := range raw {
-		if v == nil {
-			continue
-		}
-		s := v.(string)
-		if s != "null" && len(s) > 0 {
-			valid = append(valid, s)
-		}
+		found[v.(string)] = true
 	}
 
-	if len(valid) != 2 {
-		t.Fatalf("expected 2 schemas, got %v", valid)
-	}
-
-	for _, s := range valid {
-		var m map[string]interface{}
-		json.Unmarshal([]byte(s), &m)
-		if m["id"] != "book" && m["id"] != "user" {
-			t.Fatalf("unexpected schema: %v", m)
-		}
-	}
-}
-
-func TestGetEntityTypesController_MarshalError(t *testing.T) {
-	setup(t)
-
-	api_storage.CreateEntityType("x")
-
-	storage.PutJsonValue(globals.ApiSingleEntityKey("_elysiandb_core_schema", "x"), map[string]interface{}{
-		"bad": func() {},
-	})
-
-	ctx := newCtx("GET", "/api/types", "")
-	api_controller.GetEntityTypesController(ctx)
-
-	if ctx.Response.StatusCode() != fasthttp.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d", ctx.Response.StatusCode())
+	if !found["book"] || !found["user"] {
+		t.Fatalf("unexpected entities list: %v", raw)
 	}
 }

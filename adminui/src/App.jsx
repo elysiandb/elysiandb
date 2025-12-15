@@ -7,6 +7,7 @@ import {AuthStatus, useAuth} from "./hooks/account/useAuth.ts";
 import {Login} from "./pages/Login.tsx";
 import EntityTypesList from "./pages/EntityTypesList.jsx";
 import UsersList from "./pages/UsersList.jsx";
+import ACLList from "./pages/ACLList.jsx";
 
 export default function App() {
 
@@ -50,6 +51,10 @@ export default function App() {
                 {
                     path: "entities",
                     element: <EntityTypesList />,
+                },
+                {
+                    path: "acl",
+                    element: <ACLList />,
                 },
             ],
         },

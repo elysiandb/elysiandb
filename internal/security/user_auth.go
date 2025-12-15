@@ -22,6 +22,7 @@ var UserAuth func(next fasthttp.RequestHandler) fasthttp.RequestHandler = func(n
 
 		ctx.SetUserValue("username", session.Username)
 		ctx.SetUserValue("role", session.Role)
+		SetCurrentUsername(session.Username)
 
 		next(ctx)
 	}

@@ -3,6 +3,7 @@ package http_security
 import (
 	"encoding/json"
 
+	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
@@ -44,6 +45,8 @@ func CreateUserController(ctx *fasthttp.RequestCtx) {
 
 		return
 	}
+
+	acl.InitACL()
 
 	ctx.SetStatusCode(fasthttp.StatusOK)
 }

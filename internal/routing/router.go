@@ -6,6 +6,7 @@ import (
 	"github.com/taymour/elysiandb/internal/security"
 	http_adminui "github.com/taymour/elysiandb/internal/transport/http/adminui"
 	"github.com/taymour/elysiandb/internal/transport/http/api"
+	http_acl "github.com/taymour/elysiandb/internal/transport/http/api/acl"
 	http_security "github.com/taymour/elysiandb/internal/transport/http/api/security"
 	api_transaction "github.com/taymour/elysiandb/internal/transport/http/api/transactions"
 	"github.com/taymour/elysiandb/internal/transport/http/controller"
@@ -42,6 +43,7 @@ func RegisterRoutes(r *router.Router) {
 	r.POST("/api/{entity}/migrate", Version(security.Authenticate(api.MigrateController)))
 
 	r.GET("/api/entity/types", Version(security.Authenticate(api.GetEntityTypesController)))
+	r.GET("/api/entity/types/name", Version(security.Authenticate(api.GetEntityTypesNamesController)))
 
 	if globals.GetConfig().Api.Schema.Enabled {
 		r.POST("/api/{entity}/create", Version(security.Authenticate(api.CreateTypeController)))
@@ -59,6 +61,7 @@ func RegisterRoutes(r *router.Router) {
 	r.GET("/config", Version(security.Authenticate(controller.GetConfigController)))
 
 	if security.AuthenticationIsEnabled() && security.UserAuthenticationIsEnabled() {
+		// Security - User Management
 		r.POST("/api/security/user", Version(http_adminui.AdminAuth(http_security.CreateUserController)))
 		r.GET("/api/security/user", Version(http_adminui.AdminAuth(http_security.GetUsersController)))
 		r.GET("/api/security/user/{user_name}", Version(http_adminui.AdminAuth(http_security.GetUserByUsernameController)))
@@ -68,6 +71,12 @@ func RegisterRoutes(r *router.Router) {
 		r.POST("/api/security/login", Version(http_adminui.LoginController))
 		r.POST("/api/security/logout", Version(http_adminui.AdminAuth(http_adminui.LogoutController)))
 		r.GET("/api/security/me", Version(http_adminui.AdminAuth(http_adminui.MeController)))
+
+		// ACL
+		r.GET("/api/acl/{user_name}/{entity}", Version(http_adminui.AdminAuth(http_acl.GetACLForUsernameAndEntityController)))
+		r.GET("/api/acl/{user_name}", Version(http_adminui.AdminAuth(http_acl.GetAllACLForUsername)))
+		r.PUT("/api/acl/{user_name}/{entity}", Version(http_adminui.AdminAuth(http_acl.UpdateACLForUsernameAndEntityController)))
+		r.PUT("/api/acl/{user_name}/{entity}/default", Version(http_adminui.AdminAuth(http_acl.SetDefaultACLForUsernameAndEntityController)))
 	}
 
 	if globals.GetConfig().AdminUI.Enabled {

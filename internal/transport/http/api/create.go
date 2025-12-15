@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
+	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/schema"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
 
@@ -71,6 +73,10 @@ func handleSingleEntity(ctx *fasthttp.RequestCtx, entity string, body []byte) bo
 		data["id"] = uuid.New().String()
 	}
 
+	if security.UserAuthenticationIsEnabled() {
+		data[acl.UsernameField] = security.GetCurrentUsername()
+	}
+
 	errors := api_storage.WriteEntity(entity, data)
 	if len(errors) > 0 {
 		response, _ := json.Marshal(errors)
@@ -98,6 +104,10 @@ func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool
 		id, hasId := list[i]["id"].(string)
 		if !hasId || id == "" {
 			list[i]["id"] = uuid.New().String()
+		}
+
+		if security.UserAuthenticationIsEnabled() {
+			list[i][acl.UsernameField] = security.GetCurrentUsername()
 		}
 	}
 
@@ -131,4 +141,6 @@ func finalizeCreate(entity string) {
 	if globals.GetConfig().Api.Cache.Enabled {
 		cache.CacheStore.Purge(entity)
 	}
+
+	acl.InitACL()
 }

@@ -125,6 +125,7 @@ func HashQuery(
 	search string,
 	includesParam string,
 	countOnlyParam bool,
+	username string,
 ) []byte {
 	var b []byte
 	b = append(b, entity...)
@@ -136,6 +137,8 @@ func HashQuery(
 	b = append(b, search...)
 	b = append(b, '|')
 	b = append(b, includesParam...)
+	b = append(b, '|')
+	b = append(b, username...)
 	b = append(b, '|')
 	if countOnlyParam {
 		b = append(b, '1')

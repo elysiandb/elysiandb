@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 
+	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/valyala/fasthttp"
 )
@@ -36,6 +37,8 @@ func CreateTypeController(ctx *fasthttp.RequestCtx) {
 	}
 
 	storable := api_storage.UpdateEntitySchema(entity, fieldsRaw)
+
+	acl.InitACL()
 
 	out, _ := json.Marshal(storable)
 	ctx.SetStatusCode(fasthttp.StatusOK)

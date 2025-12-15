@@ -21,6 +21,20 @@ export function useEntityTypes() {
             });
     }, []);
 
+    const loadAllNames = useCallback(() => {
+        setLoading(true);
+
+        apiFetch("/api/entity/types/name")
+            .then((response) => {
+                setList(response);
+                setLoading(false);
+            })
+            .catch((err) => {
+                setError(err);
+                setLoading(false);
+            });
+    }, []);
+
     const loadOne = useCallback((entityType) => {
         setLoading(true);
 
@@ -36,5 +50,5 @@ export function useEntityTypes() {
             });
     }, []);
 
-    return { list, loading, error, loadAll, loadOne, entityTypeData };
+    return { list, loading, error, loadAll, loadAllNames, loadOne, entityTypeData };
 }

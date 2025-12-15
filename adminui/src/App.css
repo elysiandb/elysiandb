@@ -42,6 +42,10 @@ body {
     padding-top: 72px;
 }
 
+.card {
+    color: var(--text-main);
+}
+
 /* -----------------------------------
    NAVBAR (DARK FULL-WIDTH)
 ----------------------------------- */
@@ -545,6 +549,98 @@ button:hover, .btn:hover {
     padding-left: 10px;
     border-left: 1px dashed rgba(255,255,255,0.15);
 }
+
+/* -----------------------------------
+   ACL
+----------------------------------- */
+
+.acl-table-wrapper {
+    max-height: calc(100vh - 260px);
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+.users-table {
+    min-width: 100%;
+    width: max-content;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.acl-user-cell {
+    position: sticky;
+    left: 0;
+
+    width: 200px;
+    min-width: 200px;
+    max-width: 200px;
+
+    background: rgba(10, 15, 35, 0.98);
+    font-weight: 600;
+
+    z-index: 5;
+    box-shadow: 2px 0 0 rgba(255,255,255,0.08);
+}
+
+.user-sidebar-search {
+    width: calc(100% - 24px);
+    margin: 12px;
+    padding: 10px 14px;
+
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    border-radius: 10px !important;
+
+    color: var(--text-main) !important;
+    font-size: 0.95rem;
+
+    box-sizing: border-box;
+}
+
+.user-sidebar-search::placeholder {
+    color: rgba(230,230,240,0.35) !important;
+}
+
+.user-sidebar-search:focus {
+    background: rgba(255,255,255,0.1) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px rgba(247,214,74,0.25) !important;
+    outline: none !important;
+}
+
+.acl-table-scroll {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.acl-table-scroll .users-table {
+    width: max-content;
+    min-width: 100%;
+}
+
+.entity-table-search {
+    width: 320px;
+    max-width: 100%;
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    border-radius: 10px !important;
+    color: var(--text-main) !important;
+    padding: 8px 14px !important;
+}
+
+.entity-table-search::placeholder {
+    color: rgba(230,230,240,0.35) !important;
+}
+
+.entity-table-search:focus {
+    background: rgba(255,255,255,0.1) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px rgba(247,214,74,0.25) !important;
+    outline: none !important;
+}
+
+
 
 /* -----------------------------------
    USERS TABLE — GLASS / ENTITIES STYLE
