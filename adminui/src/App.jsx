@@ -8,6 +8,7 @@ import {Login} from "./pages/Login.tsx";
 import EntityTypesList from "./pages/EntityTypesList.jsx";
 import UsersList from "./pages/UsersList.jsx";
 import ACLList from "./pages/ACLList.jsx";
+import HooksList from "./pages/HooksList.jsx";
 
 export default function App() {
 
@@ -55,6 +56,10 @@ export default function App() {
                 {
                     path: "acl",
                     element: <ACLList />,
+                },
+                {
+                    path: "hooks",
+                    element: <HooksList />,
                 },
             ],
         },

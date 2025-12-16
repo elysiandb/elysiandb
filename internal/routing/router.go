@@ -7,6 +7,7 @@ import (
 	http_adminui "github.com/taymour/elysiandb/internal/transport/http/adminui"
 	"github.com/taymour/elysiandb/internal/transport/http/api"
 	http_acl "github.com/taymour/elysiandb/internal/transport/http/api/acl"
+	http_hook "github.com/taymour/elysiandb/internal/transport/http/api/hook"
 	http_security "github.com/taymour/elysiandb/internal/transport/http/api/security"
 	api_transaction "github.com/taymour/elysiandb/internal/transport/http/api/transactions"
 	"github.com/taymour/elysiandb/internal/transport/http/controller"
@@ -79,6 +80,16 @@ func RegisterRoutes(r *router.Router) {
 		r.PUT("/api/acl/{user_name}/{entity}/default", Version(http_adminui.AdminAuth(http_acl.SetDefaultACLForUsernameAndEntityController)))
 	}
 
+	// Hooks
+	if globals.GetConfig().Api.Hooks.Enabled {
+		r.GET("/api/hook/{entity}", Version(http_adminui.AdminAuth(http_hook.GetHooksForEntityController)))
+		r.GET("/api/hook/id/{id}", Version(http_adminui.AdminAuth(http_hook.GetHookByIdController)))
+		r.POST("/api/hook/{entity}", Version(http_adminui.AdminAuth(http_hook.CreateHookForEntityController)))
+		r.DELETE("/api/hook/{entity}/{id}", Version(http_adminui.AdminAuth(http_hook.DeleteHookByIdController)))
+		r.PUT("/api/hook/id/{id}", Version(http_adminui.AdminAuth(http_hook.UpdateHookByIdController)))
+	}
+
+	// Admin UI
 	if globals.GetConfig().AdminUI.Enabled {
 		r.GET("/admin/{filepath:*}", http_adminui.AdminUIHandler)
 	}

@@ -24,5 +24,7 @@ api:
   cache:
     enabled: true
     cleanupIntervalSeconds: 10
+  hooks:
+    enabled: true
 adminui:
   enabled: true

@@ -261,3 +261,178 @@ func TestGetEntityTypesNamesController_WithEntities(t *testing.T) {
 		t.Fatalf("unexpected entities list: %v", raw)
 	}
 }
+
+func TestGetById_WithPostReadHook(t *testing.T) {
+	setup(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Hooks.Enabled = true
+	globals.SetConfig(cfg)
+
+	api_storage.CreateEntityType("book")
+
+	api_storage.WriteEntity("_elysiandb_core_hook", map[string]any{
+		"id":         "h1",
+		"name":       "post_read",
+		"entity":     "book",
+		"event":      "post_read",
+		"language":   "javascript",
+		"priority":   1,
+		"enabled":    true,
+		"bypass_acl": true,
+		"script": `
+function postRead(ctx) {
+  ctx.entity.hooked = true
+  return ctx.entity
+}
+`,
+	})
+
+	ctx := newCtx("POST", "/api/book", `{"title":"Dune"}`)
+	ctx.SetUserValue("entity", "book")
+	api_controller.CreateController(ctx)
+
+	var obj map[string]any
+	json.Unmarshal(ctx.Response.Body(), &obj)
+	id := obj["id"].(string)
+
+	ctx = newCtx("GET", "/api/book/"+id, "")
+	ctx.SetUserValue("entity", "book")
+	ctx.SetUserValue("id", id)
+	api_controller.GetByIdController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200")
+	}
+
+	json.Unmarshal(ctx.Response.Body(), &obj)
+
+	if obj["hooked"] != true {
+		t.Fatalf("hook not applied")
+	}
+}
+
+func TestList_WithPostReadHook(t *testing.T) {
+	setup(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Hooks.Enabled = true
+	globals.SetConfig(cfg)
+
+	api_storage.CreateEntityType("item")
+
+	api_storage.WriteEntity("_elysiandb_core_hook", map[string]any{
+		"id":         "h2",
+		"name":       "post_read",
+		"entity":     "item",
+		"event":      "post_read",
+		"language":   "javascript",
+		"priority":   1,
+		"enabled":    true,
+		"bypass_acl": true,
+		"script": `
+function postRead(ctx) {
+  ctx.entity.fromHook = "yes"
+  return ctx.entity
+}
+`,
+	})
+
+	for i := 0; i < 2; i++ {
+		ctx := newCtx("POST", "/api/item", `{"a":1}`)
+		ctx.SetUserValue("entity", "item")
+		api_controller.CreateController(ctx)
+	}
+
+	ctx := newCtx("GET", "/api/item", "")
+	ctx.SetUserValue("entity", "item")
+	api_controller.ListController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200")
+	}
+
+	var list []map[string]any
+	json.Unmarshal(ctx.Response.Body(), &list)
+
+	if len(list) != 2 {
+		t.Fatalf("expected 2 items")
+	}
+
+	for _, it := range list {
+		if it["fromHook"] != "yes" {
+			t.Fatalf("hook not applied on list")
+		}
+	}
+}
+
+func TestList_WithoutHooksEnabled(t *testing.T) {
+	setup(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Hooks.Enabled = false
+	globals.SetConfig(cfg)
+
+	api_storage.CreateEntityType("plain")
+
+	api_storage.WriteEntity("_elysiandb_core_hook", map[string]any{
+		"id":         "h3",
+		"name":       "post_read",
+		"entity":     "plain",
+		"event":      "post_read",
+		"language":   "javascript",
+		"priority":   1,
+		"enabled":    true,
+		"bypass_acl": true,
+		"script": `
+function postRead(ctx) {
+  ctx.entity.x = 1
+  return ctx.entity
+}
+`,
+	})
+
+	ctx := newCtx("POST", "/api/plain", `{"a":1}`)
+	ctx.SetUserValue("entity", "plain")
+	api_controller.CreateController(ctx)
+
+	ctx = newCtx("GET", "/api/plain", "")
+	ctx.SetUserValue("entity", "plain")
+	api_controller.ListController(ctx)
+
+	var out []map[string]any
+	json.Unmarshal(ctx.Response.Body(), &out)
+
+	if _, ok := out[0]["x"]; ok {
+		t.Fatalf("hook should not be applied when disabled")
+	}
+}
+
+func TestGetById_NoHookForEntity(t *testing.T) {
+	setup(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Hooks.Enabled = true
+	globals.SetConfig(cfg)
+
+	api_storage.CreateEntityType("nohook")
+
+	ctx := newCtx("POST", "/api/nohook", `{"a":1}`)
+	ctx.SetUserValue("entity", "nohook")
+	api_controller.CreateController(ctx)
+
+	var obj map[string]any
+	json.Unmarshal(ctx.Response.Body(), &obj)
+	id := obj["id"].(string)
+
+	ctx = newCtx("GET", "/api/nohook/"+id, "")
+	ctx.SetUserValue("entity", "nohook")
+	ctx.SetUserValue("id", id)
+	api_controller.GetByIdController(ctx)
+
+	json.Unmarshal(ctx.Response.Body(), &obj)
+
+	if _, ok := obj["hooked"]; ok {
+		t.Fatalf("unexpected hook application")
+	}
+}

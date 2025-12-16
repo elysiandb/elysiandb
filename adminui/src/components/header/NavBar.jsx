@@ -48,6 +48,14 @@ export default function NavBar() {
                             Entities
                         </Nav.Link>
 
+                        <Nav.Link
+                            as={NavLink}
+                            to="/admin/hooks"
+                            end
+                        >
+                            Hooks
+                        </Nav.Link>
+
                     </Nav>
                 </Navbar.Collapse>
 

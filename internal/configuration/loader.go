@@ -63,6 +63,11 @@ type ApiConfig struct {
 	Index  ApiIndexConfig  `yaml:"index"`
 	Cache  ApiCacheConfig  `yaml:"cache"`
 	Schema ApiSchemaConfig `yaml:"schema"`
+	Hooks  HooksConfig     `yaml:"hooks"`
+}
+
+type HooksConfig struct {
+	Enabled bool `yaml:"enabled"`
 }
 
 type ApiIndexConfig struct {

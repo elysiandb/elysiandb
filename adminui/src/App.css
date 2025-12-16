@@ -780,3 +780,62 @@ button:hover, .btn:hover {
     background: var(--bg-section);
     color: var(--text-main);
 }
+
+.entity-sidebar .form-label {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+}
+
+.entity-sidebar .form-control,
+.entity-sidebar .form-select,
+.entity-sidebar textarea {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    color: var(--text-main) !important;
+    border-radius: 10px !important;
+    padding: 10px 14px !important;
+    backdrop-filter: blur(14px) saturate(160%);
+}
+
+.entity-sidebar .form-control::placeholder,
+.entity-sidebar textarea::placeholder {
+    color: rgba(230,230,240,0.35);
+}
+
+.entity-sidebar .form-control:focus,
+.entity-sidebar .form-select:focus,
+.entity-sidebar textarea:focus {
+    background: rgba(255,255,255,0.1) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px rgba(247,214,74,0.25) !important;
+    outline: none !important;
+}
+
+.entity-sidebar .form-select {
+    height: 44px;
+    background-color: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    color: var(--text-main) !important;
+    border-radius: 10px !important;
+    padding: 10px 40px 10px 14px !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg width='14' height='14' viewBox='0 0 20 20' fill='%23e6e6f0' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.516 7.548L10 12.032l4.484-4.484' stroke='%23e6e6f0' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 10px center !important;
+    background-size: 14px 14px !important;
+}
+
+.entity-sidebar .form-select option {
+    background: var(--bg-section);
+    color: var(--text-main);
+}
+
+.entity-sidebar textarea {
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
