@@ -10,7 +10,7 @@ import (
 func GetEntityTypesController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 
-	entityTypes := api_storage.ListEntityTypes()
+	entityTypes := api_storage.ListPublicEntityTypes()
 	entitySchemas := make([]string, 0, len(entityTypes))
 	for _, entityType := range entityTypes {
 		schema := api_storage.GetEntitySchema(entityType)
