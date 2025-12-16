@@ -1,4 +1,4 @@
-# ElysianDB — The Database That Generates Your API
+# ElysianDB — Turn Raw JSON into a Full Backend Instantly
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/taymour/elysiandb.svg)](https://hub.docker.com/r/taymour/elysiandb)
 [![Tests](https://img.shields.io/github/actions/workflow/status/taymour/elysiandb/ci.yaml?branch=main\&label=tests)](https://github.com/taymour/elysiandb/actions/workflows/ci.yaml)
