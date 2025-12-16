@@ -28,6 +28,7 @@ An Admin Web Interface is currently under development and will soon be available
 * Protocols — HTTP REST, TCP (Redis-style text protocol)
 * High performance — minimal allocations and cache-friendly design
 * Transactions - basic transactions and atomic operations
+* Configurable hooks in JS to manipulate entities on events (post_read...)
 * Built-in Authentication — optional HTTP Basic authentication with salted bcrypt hashing or Token based authentication
 * Admin UI — in progress
 
