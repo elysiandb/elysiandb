@@ -9,6 +9,7 @@ import (
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
@@ -30,7 +31,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	}
 
 	var hash []byte
-	if globals.GetConfig().Api.Cache.Enabled {
+	if !hook.EntityHasHooks(entity) && globals.GetConfig().Api.Cache.Enabled {
 		hash = cache.HashQuery(
 			entity,
 			limit,
@@ -58,6 +59,12 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	data := api_storage.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
 
 	data = acl.FilterListOfEntities(entity, data)
+
+	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasHooks(entity) {
+		for i, item := range data {
+			data[i] = hook.ApplyPostReadHooksForEntity(entity, item)
+		}
+	}
 
 	if countOnlyParam {
 		countResult := int64(len(data))

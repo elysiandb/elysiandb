@@ -58,10 +58,12 @@ func GetJsonByKeyImpl(key string) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	cp := make(map[string]interface{}, len(v))
 	for k, x := range v {
 		cp[k] = x
 	}
+
 	return cp, nil
 }
 

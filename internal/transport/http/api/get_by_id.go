@@ -7,6 +7,7 @@ import (
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/valyala/fasthttp"
 )
 
@@ -17,7 +18,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	fields := api_storage.ParseFieldsParam(fieldsParam)
 	includesParam := string(ctx.QueryArgs().Peek("includes"))
 
-	if len(fields) == 0 && globals.GetConfig().Api.Cache.Enabled {
+	if !hook.EntityHasHooks(entity) && len(fields) == 0 && globals.GetConfig().Api.Cache.Enabled {
 		if v := cache.CacheStore.GetById(entity, id); v != nil {
 			ctx.Response.Header.Set("Content-Type", "application/json")
 			ctx.Response.Header.Set("X-Elysian-Cache", "HIT")
@@ -51,6 +52,10 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 
 	if len(fields) > 0 {
 		data = api_storage.FilterFields(data, fields)
+	}
+
+	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasHooks(entity) {
+		data = hook.ApplyPostReadHooksForEntity(entity, data)
 	}
 
 	response, err := json.Marshal(data)

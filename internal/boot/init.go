@@ -32,4 +32,5 @@ func InitDB() {
 	BootApiCacheCleaner()
 	BootLazyIndexRebuilder()
 	BootACL()
+	BootHooks()
 }

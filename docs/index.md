@@ -1098,6 +1098,165 @@ To enable and test the Admin UI:
 
 The Admin UI gives you a full graphical interface to interact with ElysianDB without writing any API calls manually.
 
+---
+
+## Hooks
+
+ElysianDB provides a built-in **hooks system** that allows you to execute custom logic on entities during their lifecycle. Hooks are designed to enrich or transform data dynamically without modifying stored documents.
+
+Hooks are currently supported on **read operations** (`post_read`) and are executed after an entity (or list of entities) has been loaded but before the response is returned to the client.
+
+---
+
+### Activation
+
+Hooks are disabled by default and must be explicitly enabled in the configuration:
+
+```yaml
+api:
+  hooks:
+    enabled: true
+```
+
+When disabled, hooks are completely bypassed and introduce zero overhead.
+
+---
+
+### Core Concepts
+
+* Hooks are stored as a **core entity** (`_elysiandb_core_hook`)
+* Hooks are scoped per **entity type**
+* Multiple hooks can exist for the same entity and event
+* Hooks are executed **in priority order (highest first)**
+* Hooks can be individually enabled or disabled
+* Hooks may optionally **bypass ACL checks** when querying other entities
+
+Hooks do **not** persist changes back to storage. They only affect the API response.
+
+---
+
+### Supported Events
+
+| Event       | Description                                     |
+| ----------- | ----------------------------------------------- |
+| `post_read` | Executed after an entity or list item is loaded |
+
+---
+
+### Hook Execution Model
+
+Hooks are executed using an embedded JavaScript runtime (Goja).
+Each hook must define a function matching the event name.
+
+For `post_read`, the expected function signature is:
+
+```javascript
+function postRead(ctx) {
+  return ctx.entity
+}
+```
+
+The return value is ignored; mutations are applied directly on `ctx.entity`.
+
+---
+
+### Hook Context (`ctx`)
+
+The `ctx` object exposes:
+
+| Property                 | Description                              |
+| ------------------------ | ---------------------------------------- |
+| `entity`                 | The current entity object being returned |
+| `query(entity, filters)` | Query another entity programmatically    |
+
+#### Example: Querying another entity
+
+```javascript
+function postRead(ctx) {
+  const orders = ctx.query("order", {
+    userId: { eq: ctx.entity.id }
+  })
+
+  ctx.entity.ordersCount = orders.length
+  return ctx.entity
+}
+```
+
+If `bypass_acl` is disabled, results returned by `query` are filtered using ACL rules.
+
+---
+
+### Priority and Ordering
+
+Each hook defines a numeric `priority`.
+Hooks with higher priority values are executed first.
+
+This allows predictable composition of multiple hooks on the same entity.
+
+---
+
+### API Endpoints (Admin Only)
+
+All hook management endpoints require **admin privileges**.
+
+| Method | Endpoint             | Description              |
+| ------ | -------------------- | ------------------------ |
+| GET    | `/api/hook/{entity}` | List hooks for an entity |
+| GET    | `/api/hook/id/{id}`  | Retrieve a hook by ID    |
+| POST   | `/api/hook/{entity}` | Create a new hook        |
+| PUT    | `/api/hook/id/{id}`  | Update an existing hook  |
+| DELETE | `/api/hook/id/{id}`  | Delete a hook            |
+
+---
+
+### Example: Creating a Hook
+
+```bash
+curl -X POST http://localhost:8089/api/hook/book \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "enrichBook",
+    "event": "post_read",
+    "language": "javascript",
+    "priority": 10,
+    "enabled": true,
+    "bypass_acl": true,
+    "script": "function postRead(ctx) { ctx.entity.enriched = true }"
+  }'
+```
+
+---
+
+### Behavior on Lists
+
+When listing entities (`GET /api/<entity>`), hooks are applied **individually to each item** in the result set.
+
+If no hooks exist for an entity, caching and performance behavior remains unchanged.
+
+---
+
+### Caching Interaction
+
+When hooks are enabled for an entity:
+
+* REST API caching is automatically bypassed for that entity
+* Responses are always computed dynamically
+
+This guarantees hook correctness at the cost of caching for affected entities only.
+
+---
+
+### Use Cases
+
+Typical use cases for hooks include:
+
+* Computing derived or aggregated fields
+* Enriching responses with related data
+* Implementing read-time projections
+* Adding virtual or computed fields
+
+Hooks provide a powerful extension point while keeping the core datastore immutable and predictable.
+
 
 ---
 
