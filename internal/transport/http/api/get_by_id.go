@@ -54,7 +54,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 		data = api_storage.FilterFields(data, fields)
 	}
 
-	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasHooks(entity) {
+	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(entity) {
 		data = hook.ApplyPostReadHooksForEntity(entity, data)
 	}
 

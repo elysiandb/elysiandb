@@ -72,7 +72,7 @@ func TestGetHooksForEntity_OK(t *testing.T) {
 	_ = hook.CreateHook(hook.Hook{
 		Entity:   "doc",
 		Name:     "h1",
-		Event:    hook.HookEventBeforeCreate,
+		Event:    hook.HookEventPostRead,
 		Language: "javascript",
 		Enabled:  true,
 	})
@@ -112,7 +112,7 @@ func TestCreateHookForEntity_OK(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{
 		"name":     "h1",
-		"event":    hook.HookEventBeforeCreate,
+		"event":    hook.HookEventPostRead,
 		"language": "javascript",
 		"enabled":  true,
 	})
@@ -159,7 +159,7 @@ func TestGetHookById_OK(t *testing.T) {
 	h := hook.Hook{
 		Entity:   "doc",
 		Name:     "h1",
-		Event:    hook.HookEventBeforeCreate,
+		Event:    hook.HookEventPostRead,
 		Language: "javascript",
 		Enabled:  true,
 	}
@@ -210,7 +210,7 @@ func TestUpdateHookById_OK(t *testing.T) {
 	_ = hook.CreateHook(hook.Hook{
 		Entity:   "doc",
 		Name:     "h1",
-		Event:    hook.HookEventBeforeCreate,
+		Event:    hook.HookEventPostRead,
 		Language: "javascript",
 		Enabled:  true,
 	})
@@ -264,7 +264,7 @@ func TestDeleteHookById_OK(t *testing.T) {
 	_ = hook.CreateHook(hook.Hook{
 		Entity:   "doc",
 		Name:     "h1",
-		Event:    hook.HookEventBeforeCreate,
+		Event:    hook.HookEventPostRead,
 		Language: "javascript",
 		Enabled:  true,
 	})

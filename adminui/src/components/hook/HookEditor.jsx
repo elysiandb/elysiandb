@@ -1,5 +1,5 @@
-import { Card, Button, Form, Spinner } from "react-bootstrap";
-import { useEffect, useState } from "react";
+import { Card, Button, Form, Spinner, Alert } from "react-bootstrap";
+import { useEffect, useMemo, useState } from "react";
 import { Editor } from "@monaco-editor/react";
 
 export default function HookEditor({ hook, loading, onSave }) {
@@ -21,6 +21,17 @@ export default function HookEditor({ hook, loading, onSave }) {
         });
     }, [hook]);
 
+    const error = useMemo(() => {
+        if (!form?.script?.trim()) return null;
+        if (form.event === "post_read" && !form.script.trim().startsWith("function postRead")) {
+            return "post_read hooks must start with: function postRead";
+        }
+        if (form.event === "pre_read" && !form.script.trim().startsWith("function preRead")) {
+            return "pre_read hooks must start with: function preRead";
+        }
+        return null;
+    }, [form]);
+
     if (loading || !form) {
         return (
             <Card className="entity-sidebar">
@@ -36,6 +47,7 @@ export default function HookEditor({ hook, loading, onSave }) {
     };
 
     const save = () => {
+        if (error) return;
         onSave(form);
     };
 
@@ -43,7 +55,7 @@ export default function HookEditor({ hook, loading, onSave }) {
         <Card className="entity-sidebar">
             <Card.Header className="d-flex justify-content-between align-items-center">
                 <span className="text-warning fw-bold">Hook</span>
-                <Button variant="primary" onClick={save}>
+                <Button variant="primary" onClick={save} disabled={!!error}>
                     Save
                 </Button>
             </Card.Header>
@@ -81,9 +93,6 @@ export default function HookEditor({ hook, loading, onSave }) {
                                     checked={form.bypass_acl}
                                     onChange={e => update("bypass_acl", e.target.checked)}
                                 />
-                                <Form.Text style={{ color: "#9aa0c7" }}>
-                                    Allows this hook to bypass ACL checks
-                                </Form.Text>
                             </Form.Group>
 
                             <Form.Group className="mb-3">
@@ -103,6 +112,7 @@ export default function HookEditor({ hook, loading, onSave }) {
                                     onChange={e => update("event", e.target.value)}
                                 >
                                     <option value="post_read">post_read</option>
+                                    <option value="pre_read">pre_read</option>
                                 </Form.Select>
                             </Form.Group>
 
@@ -126,6 +136,12 @@ export default function HookEditor({ hook, loading, onSave }) {
                                 />
                             </Form.Group>
                         </>
+                    )}
+
+                    {error && (
+                        <Alert variant="danger" className="mt-3">
+                            {error}
+                        </Alert>
                     )}
 
                     <Form.Group className="mt-3">

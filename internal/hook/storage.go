@@ -15,12 +15,28 @@ func GetPostReadHooksForEntity(entity string) []Hook {
 
 	postReadHooks := make([]Hook, 0)
 	for _, hook := range hooks {
-		if hook.Event == HookEventBeforeCreate {
+		if hook.Event == HookEventPostRead {
 			postReadHooks = append(postReadHooks, hook)
 		}
 	}
 
 	return postReadHooks
+}
+
+func GetPreReadHooksForEntity(entity string) []Hook {
+	hooks, err := GetHooksForEntity(entity)
+	if err != nil {
+		return []Hook{}
+	}
+
+	preReadHooks := make([]Hook, 0)
+	for _, hook := range hooks {
+		if hook.Event == HookEventPreRead {
+			preReadHooks = append(preReadHooks, hook)
+		}
+	}
+
+	return preReadHooks
 }
 
 func CreateHook(hook Hook) error {
@@ -33,7 +49,11 @@ func CreateHook(hook Hook) error {
 	}
 
 	if hook.Script == "" {
-		hook.Script = GetDefaultHookScriptJSForPostRead()
+		if hook.Event == HookEventPreRead {
+			hook.Script = GetDefaultHookScriptJSForPreRead()
+		} else if hook.Event == HookEventPostRead {
+			hook.Script = GetDefaultHookScriptJSForPostRead()
+		}
 	}
 
 	err := api_storage.WriteEntity(HookEntity, hook.ToDataMap())
@@ -87,6 +107,54 @@ func EntityHasHooks(entity string) bool {
 	filters := map[string]map[string]string{
 		"entity": {
 			"eq": entity,
+		},
+	}
+
+	data := api_storage.ListEntities(
+		HookEntity,
+		0,
+		0,
+		"priority",
+		true,
+		filters,
+		"",
+		"",
+	)
+
+	return len(data) > 0
+}
+
+func EntityHasPostReadHooks(entity string) bool {
+	filters := map[string]map[string]string{
+		"entity": {
+			"eq": entity,
+		},
+		"event": {
+			"eq": HookEventPostRead,
+		},
+	}
+
+	data := api_storage.ListEntities(
+		HookEntity,
+		0,
+		0,
+		"priority",
+		true,
+		filters,
+		"",
+		"",
+	)
+
+	return len(data) > 0
+}
+
+func EntityHasPreReadHooks(entity string) bool {
+	filters := map[string]map[string]string{
+		"entity": {
+			"eq": entity,
+		},
+		"event": {
+			"eq": HookEventPreRead,
 		},
 	}
 

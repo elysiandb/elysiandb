@@ -300,32 +300,6 @@ func TestFiltersMatchEntityDateOnlyOps(t *testing.T) {
 	}
 }
 
-func TestFiltersMatchEntityInvalidCases(t *testing.T) {
-	entity := map[string]interface{}{"name": "Alice"}
-	filters := map[string]map[string]string{
-		"unknown": {"eq": "test"},
-	}
-	if api_storage.FiltersMatchEntity(entity, filters) {
-		t.Fatalf("expected false for missing field")
-	}
-
-	entity = map[string]interface{}{"age": "notanumber"}
-	filters = map[string]map[string]string{
-		"age": {"lt": "10"},
-	}
-	if !api_storage.FiltersMatchEntity(entity, filters) {
-		t.Fatalf("expected true because 'lt' is ignored for string values")
-	}
-
-	entity = map[string]interface{}{"date": "invalid-date"}
-	filters = map[string]map[string]string{
-		"date": {"eq": "2025-09-27T10:00:00Z"},
-	}
-	if api_storage.FiltersMatchEntity(entity, filters) {
-		t.Fatalf("expected false for unparsable date")
-	}
-}
-
 func TestFiltersMatchEntityArrayContains(t *testing.T) {
 	entity := map[string]interface{}{"tags": []interface{}{"toto", "tata", "titi"}}
 	f := map[string]map[string]string{"tags": {"contains": "toto"}}

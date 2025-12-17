@@ -11,7 +11,8 @@ import (
 const HookEntity = "_elysiandb_core_hook"
 
 const (
-	HookEventBeforeCreate = "post_read"
+	HookEventPostRead = "post_read"
+	HookEventPreRead  = "pre_read"
 )
 
 var HookEntitySchema = map[string]any{
@@ -133,8 +134,6 @@ func InitHooks() {
 		return
 	}
 
-	// api_storage.DeleteEntityType(HookEntity)
-
 	if api_storage.EntityTypeExists(HookEntity) {
 		return
 	}
@@ -176,6 +175,32 @@ func ApplyPostReadHooksForEntity(entity string, data map[string]any) map[string]
 
 		if err := ApplyPostReadScript(hook.Script, enriched, hook.ByPassACL); err != nil {
 			log.Error("Error applying post-read hook " + hook.ID + ": " + err.Error())
+		}
+	}
+
+	return enriched
+}
+
+func ApplyPreReadHooksForEntity(entity string, data map[string]any) map[string]any {
+	if !globals.GetConfig().Api.Hooks.Enabled {
+		return data
+	}
+
+	enriched := data
+
+	hooks := GetPreReadHooksForEntity(entity)
+
+	sort.Slice(hooks, func(i, j int) bool {
+		return hooks[i].Priority > hooks[j].Priority
+	})
+
+	for _, hook := range hooks {
+		if !hook.Enabled {
+			continue
+		}
+
+		if err := ApplyPreReadScript(hook.Script, enriched, hook.ByPassACL); err != nil {
+			log.Error("Error applying pre-read hook " + hook.ID + ": " + err.Error())
 		}
 	}
 
