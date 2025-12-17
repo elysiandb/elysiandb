@@ -9,7 +9,7 @@ import (
 	cfgpkg "github.com/taymour/elysiandb/internal/configuration"
 )
 
-func runAsSubprocess(t *testing.T, mode string, arg string) (exitCode int, err error) {
+func runAsSubprocess(t *testing.T, mode, arg string) (exitCode int, err error) {
 	t.Helper()
 
 	cmd := exec.Command(os.Args[0], "-test.run", "^TestConfigHelper$")

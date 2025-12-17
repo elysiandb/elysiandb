@@ -16,8 +16,10 @@ import (
 	"github.com/taymour/elysiandb/internal/stat"
 )
 
-var mainJsonStore atomic.Pointer[JsonStore]
-var GetJsonByKey func(key string) (map[string]interface{}, error)
+var (
+	mainJsonStore atomic.Pointer[JsonStore]
+	GetJsonByKey  func(key string) (map[string]interface{}, error)
+)
 
 func LoadJsonDB() {
 	cfg := globals.GetConfig()

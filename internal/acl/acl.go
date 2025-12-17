@@ -85,7 +85,7 @@ func CanUpdateListOfEntities(entity string, data []map[string]any) bool {
 			return false
 		}
 
-		if !(acl.Can(PermissionOwningUpdate) && dataUsername == username) {
+		if !acl.Can(PermissionOwningUpdate) || dataUsername != username {
 			return false
 		}
 	}

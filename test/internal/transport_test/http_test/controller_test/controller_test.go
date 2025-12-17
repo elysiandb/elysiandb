@@ -22,7 +22,7 @@ func setup(t *testing.T) {
 	storage.ResetStore()
 }
 
-func newCtx(method, path string, body string) *fasthttp.RequestCtx {
+func newCtx(method, path, body string) *fasthttp.RequestCtx {
 	req := fasthttp.AcquireRequest()
 	req.SetRequestURI(path)
 	req.Header.SetMethod(method)

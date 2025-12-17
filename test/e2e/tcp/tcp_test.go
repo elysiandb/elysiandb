@@ -133,7 +133,7 @@ func TestTCP_PING_SET_MGET_GET__WILDCARD__SAVE__RESET(t *testing.T) {
 
 	write("GET user:*")
 	lines := readN(2)
-	if !(contains(lines, "user:1=alice") && contains(lines, "user:2=bob")) {
+	if !contains(lines, "user:1=alice") || !contains(lines, "user:2=bob") {
 		t.Fatalf("GET user:* expected both user:1=alice and user:2=bob, got %v", lines)
 	}
 
@@ -142,7 +142,7 @@ func TestTCP_PING_SET_MGET_GET__WILDCARD__SAVE__RESET(t *testing.T) {
 	if mixed[0] != "hello" {
 		t.Fatalf("MGET mixed[0]: want %q, got %q (all=%v)", "hello", mixed[0], mixed)
 	}
-	if !(contains(mixed[1:3], "user:1=alice") && contains(mixed[1:3], "user:2=bob")) {
+	if !contains(mixed[1:3], "user:1=alice") || !contains(mixed[1:3], "user:2=bob") {
 		t.Fatalf("MGET mixed user block mismatch, got %v", mixed[1:3])
 	}
 	if mixed[3] != "zoo=not found" {

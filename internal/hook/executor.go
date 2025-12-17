@@ -13,7 +13,6 @@ func ApplyPostReadScript(
 	entity map[string]any,
 	bypassAcl bool,
 ) error {
-
 	vm := goja.New()
 
 	ctx := map[string]any{

@@ -30,7 +30,7 @@ func ApiEntitiesAllKey(entity string) string {
 	return fmt.Sprintf(ApiEntitiesPattern, entity)
 }
 
-func ApiSingleEntityKey(entity string, id string) string {
+func ApiSingleEntityKey(entity, id string) string {
 	return fmt.Sprintf(ApiSingleEntityPattern, entity, id)
 }
 
@@ -38,15 +38,15 @@ func ApiEntityIndexIdKey(entity string) string {
 	return fmt.Sprintf(ApiEntityIndexIdPattern, entity)
 }
 
-func ApiEntityIndexFieldKey(entity string, field string) string {
+func ApiEntityIndexFieldKey(entity, field string) string {
 	return fmt.Sprintf(ApiEntityIndexFieldFilterPattern, entity, field)
 }
 
-func ApiEntityIndexFieldSortAscKey(entity string, field string) string {
+func ApiEntityIndexFieldSortAscKey(entity, field string) string {
 	return fmt.Sprintf(ApiEntityIndexFieldSortAscPattern, entity, field)
 }
 
-func ApiEntityIndexFieldSortDescKey(entity string, field string) string {
+func ApiEntityIndexFieldSortDescKey(entity, field string) string {
 	return fmt.Sprintf(ApiEntityIndexFieldSortDescPattern, entity, field)
 }
 
@@ -58,6 +58,6 @@ func ApiEntityIndexPatternKey(entity string) string {
 	return fmt.Sprintf(ApiEntityIndexPattern, entity)
 }
 
-func ApiEntityIndexFieldAllKey(entity string, field string) string {
+func ApiEntityIndexFieldAllKey(entity, field string) string {
 	return fmt.Sprintf(ApiEntityIndexFieldAllPattern, entity, field)
 }

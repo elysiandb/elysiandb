@@ -60,7 +60,6 @@ func WriteJsonDB() {
 	if cfg.Store.CrashRecovery.Enabled {
 		recovery.ClearJsonRecoveryLog()
 	}
-
 }
 
 func writeExpirationsToFile(cfg *configuration.Config, fileName string, expirationContainer *ExpirationContainer) error {

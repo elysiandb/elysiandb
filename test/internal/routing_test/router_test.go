@@ -15,9 +15,11 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-var originalVersion = routing.Version
-var originalGetConfig = controller.GetConfigController
-var originalAdminUI = http_adminui.AdminUIHandler
+var (
+	originalVersion   = routing.Version
+	originalGetConfig = controller.GetConfigController
+	originalAdminUI   = http_adminui.AdminUIHandler
+)
 
 func init() {
 	routing.Version = func(h fasthttp.RequestHandler) fasthttp.RequestHandler {

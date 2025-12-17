@@ -159,7 +159,7 @@ func GetACLEntityId(username, entity string) string {
 	return username + "::" + entity
 }
 
-func GetACLEntityForUsername(entity string, username string) *ACL {
+func GetACLEntityForUsername(entity, username string) *ACL {
 	data := api_storage.ReadEntityById(ACLEntity, GetACLEntityId(username, entity))
 	if data == nil {
 		return nil
@@ -196,7 +196,7 @@ func GetACLEntityForUsername(entity string, username string) *ACL {
 	return acl
 }
 
-func UpdateACLEntityForUsername(entity string, username string, permissions map[Permission]bool) error {
+func UpdateACLEntityForUsername(entity, username string, permissions map[Permission]bool) error {
 	existing := GetACLEntityForUsername(entity, username)
 	if existing == nil {
 		return fmt.Errorf("ACL does not exist for username %s and entity %s", username, entity)
@@ -248,7 +248,7 @@ func DeleteACLForEntityType(entity string) error {
 	return nil
 }
 
-func ResetACLEntityToDefault(entity string, username string) error {
+func ResetACLEntityToDefault(entity, username string) error {
 	users, err := security.ListBasicUsers()
 	if err != nil {
 		return err

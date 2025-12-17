@@ -24,9 +24,7 @@ func SearchMatchesEntity(entityData map[string]interface{}, pattern string) bool
 				stack = append(stack, val)
 			}
 		case []interface{}:
-			for _, val := range v {
-				stack = append(stack, val)
-			}
+			stack = append(stack, v...)
 		case string:
 			if storage.MatchGlob(pattern, v) {
 				return true
@@ -185,7 +183,7 @@ func matchDate(value string, ops map[string]string) (bool, bool) {
 				return true, false
 			}
 		case "lte":
-			if !(tv.Before(tc) || tv.Equal(tc)) {
+			if !tv.Before(tc) && !tv.Equal(tc) {
 				return true, false
 			}
 		case "gt":
@@ -193,7 +191,7 @@ func matchDate(value string, ops map[string]string) (bool, bool) {
 				return true, false
 			}
 		case "gte":
-			if !(tv.After(tc) || tv.Equal(tc)) {
+			if !tv.After(tc) && !tv.Equal(tc) {
 				return true, false
 			}
 		}

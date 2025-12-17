@@ -13,9 +13,11 @@ import (
 	"github.com/taymour/elysiandb/internal/stat"
 )
 
-var mainStore *Store
-var expirationContainer *ExpirationContainer
-var rootMu sync.RWMutex
+var (
+	mainStore           *Store
+	expirationContainer *ExpirationContainer
+	rootMu              sync.RWMutex
+)
 
 func LoadDB() {
 	cfg := globals.GetConfig()
@@ -72,12 +74,12 @@ func createStore(file string) *Store {
 }
 
 func createFolder(folder string) {
-	if err := os.MkdirAll(folder, 0755); err != nil {
+	if err := os.MkdirAll(folder, 0o755); err != nil {
 		log.Fatal("Error creating data folder:", err)
 	}
 }
 
-func createFile(folder string, file string) {
+func createFile(folder, file string) {
 	filePath := folder + "/" + file
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		file, err := os.Create(filePath)

@@ -15,7 +15,7 @@ type MigrationQuery struct {
 
 const ACTION_SET = "set"
 
-func ParseMigrationQuery(s string, entity string) []MigrationQuery {
+func ParseMigrationQuery(s, entity string) []MigrationQuery {
 	var rawItems []map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(s), &rawItems); err != nil {
 		return nil

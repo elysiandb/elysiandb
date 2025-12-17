@@ -307,7 +307,7 @@ func CreateKeyFileOrGetKey() (string, error) {
 	cfg := globals.GetConfig()
 	path := fmt.Sprintf("%s/%s", cfg.Store.Folder, KeyFilename)
 
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
 		return "", err
 	}

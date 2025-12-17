@@ -33,7 +33,7 @@ var store = map[string]map[string]interface{}{
 	},
 }
 
-func mockReadEntityById(entity string, id string) map[string]interface{} {
+func mockReadEntityById(entity, id string) map[string]interface{} {
 	key := entity + ":" + id
 	if v, ok := store[key]; ok {
 		return v

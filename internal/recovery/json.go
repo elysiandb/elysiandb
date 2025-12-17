@@ -13,8 +13,10 @@ import (
 
 const RecoveryFile = "elysiandb.json.recovery.log"
 
-var recoveryMu sync.Mutex
-var recoveryLogActive = false
+var (
+	recoveryMu        sync.Mutex
+	recoveryLogActive = false
+)
 
 var SaveJsonDBFunc func()
 

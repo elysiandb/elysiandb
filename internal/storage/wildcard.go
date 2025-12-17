@@ -9,7 +9,7 @@ func isBareStar(p string) bool {
 	return p[0] == '*'
 }
 
-func MatchGlob(pattern string, s string) bool {
+func MatchGlob(pattern, s string) bool {
 	pattern = strings.ToLower(pattern)
 	s = strings.ToLower(s)
 	p := pattern

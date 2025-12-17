@@ -95,7 +95,7 @@ func saveSessions(sf *SessionsFile) error {
 	cfg := globals.GetConfig()
 	path := fmt.Sprintf("%s/%s", cfg.Store.Folder, SessionsFilename)
 
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return err
 	}

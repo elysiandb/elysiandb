@@ -12,7 +12,7 @@ func BootLogger() {
 	if d <= 0 {
 		return
 	}
-	
+
 	go WriteLogsPeriodically(d)
 }
 
