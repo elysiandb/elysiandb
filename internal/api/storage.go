@@ -195,22 +195,22 @@ func ListEntities(
 	filters map[string]map[string]string,
 	search string,
 	includesParam string,
-) []map[string]interface{} {
+) []map[string]any {
 	idList, err := GetListOfIds(entity, sortField, sortAscending)
 	if err != nil {
-		return []map[string]interface{}{}
+		return []map[string]any{}
 	}
 
 	ids := decodeIDs(idList)
 	if len(ids) == 0 {
-		return []map[string]interface{}{}
+		return []map[string]any{}
 	}
 
 	if len(filters) == 0 {
 		ids = applyOffsetLimit(ids, offset, limit)
 	}
 
-	all := make([]map[string]interface{}, 0, len(ids))
+	all := make([]map[string]any, 0, len(ids))
 	for _, id := range ids {
 		entityData := ReadEntityById(entity, id)
 		if entityData != nil {
@@ -225,7 +225,7 @@ func ListEntities(
 		all = ApplyIncludes(all, includesParam)
 	}
 
-	filtered := make([]map[string]interface{}, 0, len(all))
+	filtered := make([]map[string]any, 0, len(all))
 	for _, e := range all {
 		if search == "" && FiltersMatchEntity(e, filters) {
 			filtered = append(filtered, e)
@@ -238,6 +238,24 @@ func ListEntities(
 
 	if len(filters) > 0 {
 		return applyOffsetLimit(filtered, offset, limit)
+	}
+
+	return filtered
+}
+
+func ApplyFiltersToList(
+	entities []map[string]any,
+	filters map[string]map[string]string,
+) []map[string]any {
+	if len(filters) == 0 {
+		return entities
+	}
+
+	filtered := make([]map[string]any, 0, len(entities))
+	for _, e := range entities {
+		if FiltersMatchEntity(e, filters) {
+			filtered = append(filtered, e)
+		}
 	}
 
 	return filtered

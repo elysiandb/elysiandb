@@ -436,3 +436,166 @@ func TestGetById_NoHookForEntity(t *testing.T) {
 		t.Fatalf("unexpected hook application")
 	}
 }
+
+func TestList_WithPreReadHookFiltering(t *testing.T) {
+	setup(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Hooks.Enabled = true
+	globals.SetConfig(cfg)
+
+	api_storage.CreateEntityType("task")
+
+	api_storage.WriteEntity("_elysiandb_core_hook", map[string]any{
+		"id":         "h_pre_1",
+		"name":       "pre_read",
+		"entity":     "task",
+		"event":      "pre_read",
+		"language":   "javascript",
+		"priority":   1,
+		"enabled":    true,
+		"bypass_acl": true,
+		"script": `
+function preRead(ctx) {
+  ctx.entity.allowed = ctx.entity.value === 1
+  return ctx.entity
+}
+`,
+	})
+
+	ctx := newCtx("POST", "/api/task", `{"value":1}`)
+	ctx.SetUserValue("entity", "task")
+	api_controller.CreateController(ctx)
+
+	ctx = newCtx("POST", "/api/task", `{"value":2}`)
+	ctx.SetUserValue("entity", "task")
+	api_controller.CreateController(ctx)
+
+	ctx = newCtx("GET", "/api/task?filter[allowed][eq]=true", "")
+	ctx.SetUserValue("entity", "task")
+	api_controller.ListController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200")
+	}
+
+	var list []map[string]any
+	json.Unmarshal(ctx.Response.Body(), &list)
+
+	if len(list) != 1 {
+		t.Fatalf("expected 1 item after pre_read filtering")
+	}
+
+	if list[0]["value"] != float64(1) {
+		t.Fatalf("unexpected filtered item")
+	}
+}
+
+func TestList_PreReadHookIgnoredWhenDisabled(t *testing.T) {
+	setup(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Hooks.Enabled = false
+	globals.SetConfig(cfg)
+
+	api_storage.CreateEntityType("preoff")
+
+	api_storage.WriteEntity("_elysiandb_core_hook", map[string]any{
+		"id":         "h_pre_2",
+		"name":       "pre_read",
+		"entity":     "preoff",
+		"event":      "pre_read",
+		"language":   "javascript",
+		"priority":   1,
+		"enabled":    true,
+		"bypass_acl": true,
+		"script": `
+function preRead(ctx) {
+  ctx.entity.flag = true
+  return ctx.entity
+}
+`,
+	})
+
+	ctx := newCtx("POST", "/api/preoff", `{"a":1}`)
+	ctx.SetUserValue("entity", "preoff")
+	api_controller.CreateController(ctx)
+
+	ctx = newCtx("GET", "/api/preoff?filter[flag][eq]=true", "")
+	ctx.SetUserValue("entity", "preoff")
+	api_controller.ListController(ctx)
+
+	var list []map[string]any
+	json.Unmarshal(ctx.Response.Body(), &list)
+
+	if len(list) != 1 {
+		t.Fatalf("expected 1 item when pre_read is disabled")
+	}
+}
+
+func TestList_PreReadAndPostReadTogether(t *testing.T) {
+	setup(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Hooks.Enabled = true
+	globals.SetConfig(cfg)
+
+	api_storage.CreateEntityType("combo")
+
+	api_storage.WriteEntity("_elysiandb_core_hook", map[string]any{
+		"id":         "h_pre_3",
+		"name":       "pre_read",
+		"entity":     "combo",
+		"event":      "pre_read",
+		"language":   "javascript",
+		"priority":   2,
+		"enabled":    true,
+		"bypass_acl": true,
+		"script": `
+function preRead(ctx) {
+  ctx.entity.keep = ctx.entity.x === 1
+  return ctx.entity
+}
+`,
+	})
+
+	api_storage.WriteEntity("_elysiandb_core_hook", map[string]any{
+		"id":         "h_post_3",
+		"name":       "post_read",
+		"entity":     "combo",
+		"event":      "post_read",
+		"language":   "javascript",
+		"priority":   1,
+		"enabled":    true,
+		"bypass_acl": true,
+		"script": `
+function postRead(ctx) {
+  ctx.entity.after = "ok"
+  return ctx.entity
+}
+`,
+	})
+
+	ctx := newCtx("POST", "/api/combo", `{"x":1}`)
+	ctx.SetUserValue("entity", "combo")
+	api_controller.CreateController(ctx)
+
+	ctx = newCtx("POST", "/api/combo", `{"x":2}`)
+	ctx.SetUserValue("entity", "combo")
+	api_controller.CreateController(ctx)
+
+	ctx = newCtx("GET", "/api/combo?filter[keep][eq]=true", "")
+	ctx.SetUserValue("entity", "combo")
+	api_controller.ListController(ctx)
+
+	var list []map[string]any
+	json.Unmarshal(ctx.Response.Body(), &list)
+
+	if len(list) != 1 {
+		t.Fatalf("expected 1 item")
+	}
+
+	if list[0]["after"] != "ok" {
+		t.Fatalf("post_read hook not applied")
+	}
+}

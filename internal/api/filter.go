@@ -46,7 +46,7 @@ func FiltersMatchEntity(
 	for field, ops := range filters {
 		val, ok := GetNestedValue(entityData, field)
 		if !ok {
-			return false
+			continue
 		}
 
 		switch v := val.(type) {
@@ -62,11 +62,32 @@ func FiltersMatchEntity(
 			if !matchArray(v, ops) {
 				return false
 			}
+		case bool:
+			if !matchBoolean(v, ops) {
+				return false
+			}
 		default:
-			return false
+			continue
 		}
 	}
 
+	return true
+}
+
+func matchBoolean(value bool, ops map[string]string) bool {
+	for op, cmp := range ops {
+		b := cmp == "true" || cmp == "1"
+		switch op {
+		case "eq":
+			if value != b {
+				return false
+			}
+		case "neq":
+			if value == b {
+				return false
+			}
+		}
+	}
 	return true
 }
 

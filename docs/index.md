@@ -1102,9 +1102,9 @@ The Admin UI gives you a full graphical interface to interact with ElysianDB wit
 
 ## Hooks
 
-ElysianDB provides a built-in **hooks system** that allows you to execute custom logic on entities during their lifecycle. Hooks are designed to enrich or transform data dynamically without modifying stored documents.
+ElysianDB provides a built-in **hooks system** that allows you to execute custom logic on entities during their lifecycle. Hooks are designed to enrich, transform, or filter data dynamically without modifying stored documents.
 
-Hooks are currently supported on **read operations** (`post_read`) and are executed after an entity (or list of entities) has been loaded but before the response is returned to the client.
+Hooks are supported on **read operations** and can run at two different stages: **before filtering (`pre_read`)** and **after loading (`post_read`)**.
 
 ---
 
@@ -1131,15 +1131,16 @@ When disabled, hooks are completely bypassed and introduce zero overhead.
 * Hooks can be individually enabled or disabled
 * Hooks may optionally **bypass ACL checks** when querying other entities
 
-Hooks do **not** persist changes back to storage. They only affect the API response.
+Hooks do **not** persist changes back to storage. They only affect query processing or the API response.
 
 ---
 
 ### Supported Events
 
-| Event       | Description                                     |
-| ----------- | ----------------------------------------------- |
-| `post_read` | Executed after an entity or list item is loaded |
+| Event       | Description                                                                  |
+| ----------- | ---------------------------------------------------------------------------- |
+| `pre_read`  | Executed after initial filtering and before final in-memory filtering        |
+| `post_read` | Executed after an entity or list item is fully loaded and ready for response |
 
 ---
 
@@ -1148,7 +1149,17 @@ Hooks do **not** persist changes back to storage. They only affect the API respo
 Hooks are executed using an embedded JavaScript runtime (Goja).
 Each hook must define a function matching the event name.
 
-For `post_read`, the expected function signature is:
+#### `pre_read`
+
+```javascript
+function preRead(ctx) {
+  return ctx.entity
+}
+```
+
+`pre_read` hooks are executed **per entity** after the initial query has been resolved. They may add or modify **virtual properties** which can then be used by a second filtering pass.
+
+#### `post_read`
 
 ```javascript
 function postRead(ctx) {
@@ -1156,7 +1167,9 @@ function postRead(ctx) {
 }
 ```
 
-The return value is ignored; mutations are applied directly on `ctx.entity`.
+`post_read` hooks are executed after all filtering has completed and just before the response is returned.
+
+The return value is ignored in both cases; mutations are applied directly on `ctx.entity`.
 
 ---
 
@@ -1164,12 +1177,31 @@ The return value is ignored; mutations are applied directly on `ctx.entity`.
 
 The `ctx` object exposes:
 
-| Property                 | Description                              |
-| ------------------------ | ---------------------------------------- |
-| `entity`                 | The current entity object being returned |
-| `query(entity, filters)` | Query another entity programmatically    |
+| Property                 | Description                               |
+| ------------------------ | ----------------------------------------- |
+| `entity`                 | The current entity object being processed |
+| `query(entity, filters)` | Query another entity programmatically     |
 
-#### Example: Querying another entity
+---
+
+### Example: Virtual Filtering with `pre_read`
+
+```javascript
+function preRead(ctx) {
+  ctx.entity.isLate = ctx.entity.dueDate < new Date().toISOString()
+  return ctx.entity
+}
+```
+
+```http
+GET /api/task?filter[isLate][eq]=true
+```
+
+The filter is ignored during the initial query and applied after the `pre_read` hook has materialized the virtual field.
+
+---
+
+### Example: Enrichment with `post_read`
 
 ```javascript
 function postRead(ctx) {
@@ -1191,7 +1223,29 @@ If `bypass_acl` is disabled, results returned by `query` are filtered using ACL 
 Each hook defines a numeric `priority`.
 Hooks with higher priority values are executed first.
 
-This allows predictable composition of multiple hooks on the same entity.
+This allows predictable composition of multiple hooks on the same entity and event.
+
+---
+
+### Behavior on Lists
+
+When listing entities (`GET /api/<entity>`):
+
+* Initial filtering is applied using stored fields only
+* `pre_read` hooks are executed for each item
+* Filters are re-applied, including those targeting virtual fields
+* `post_read` hooks are executed for each remaining item
+
+---
+
+### Caching Interaction
+
+When hooks are enabled for an entity:
+
+* REST API caching is automatically bypassed for that entity
+* Responses are always computed dynamically
+
+This guarantees hook correctness at the cost of caching for affected entities only.
 
 ---
 
@@ -1215,34 +1269,15 @@ All hook management endpoints require **admin privileges**.
 curl -X POST http://localhost:8089/api/hook/book \
   -H 'Content-Type: application/json' \
   -d '{
-    "name": "enrichBook",
-    "event": "post_read",
+    "name": "filterLateBooks",
+    "event": "pre_read",
     "language": "javascript",
     "priority": 10,
     "enabled": true,
     "bypass_acl": true,
-    "script": "function postRead(ctx) { ctx.entity.enriched = true }"
+    "script": "function preRead(ctx) { ctx.entity.isLate = ctx.entity.year < 2000 }"
   }'
 ```
-
----
-
-### Behavior on Lists
-
-When listing entities (`GET /api/<entity>`), hooks are applied **individually to each item** in the result set.
-
-If no hooks exist for an entity, caching and performance behavior remains unchanged.
-
----
-
-### Caching Interaction
-
-When hooks are enabled for an entity:
-
-* REST API caching is automatically bypassed for that entity
-* Responses are always computed dynamically
-
-This guarantees hook correctness at the cost of caching for affected entities only.
 
 ---
 
@@ -1251,11 +1286,12 @@ This guarantees hook correctness at the cost of caching for affected entities on
 Typical use cases for hooks include:
 
 * Computing derived or aggregated fields
+* Filtering on virtual or computed properties
 * Enriching responses with related data
 * Implementing read-time projections
-* Adding virtual or computed fields
+* Applying business rules without mutating stored data
 
-Hooks provide a powerful extension point while keeping the core datastore immutable and predictable.
+Hooks provide a powerful and controlled extension point while keeping the core datastore immutable and predictable.
 
 
 ---

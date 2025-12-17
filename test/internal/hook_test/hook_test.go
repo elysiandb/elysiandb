@@ -70,6 +70,18 @@ func TestGetDefaultHookScriptJSForPostRead(t *testing.T) {
 	}
 }
 
+func TestGetDefaultHookScriptJSForPreRead(t *testing.T) {
+	setup(t, true)
+
+	s := hook.GetDefaultHookScriptJSForPreRead()
+	if s == "" {
+		t.Fatalf("expected non-empty default script")
+	}
+	if len(s) < 10 {
+		t.Fatalf("expected default script to be longer")
+	}
+}
+
 func TestHookToDataMapAndFromDataMap(t *testing.T) {
 	setup(t, true)
 
@@ -78,7 +90,7 @@ func TestHookToDataMapAndFromDataMap(t *testing.T) {
 		Name:      "name",
 		Script:    "script",
 		Entity:    "toto",
-		Event:     hook.HookEventBeforeCreate,
+		Event:     hook.HookEventPostRead,
 		Language:  "javascript",
 		Priority:  7,
 		ByPassACL: true,
@@ -225,7 +237,7 @@ func TestCreateUpdateDeleteGetHookAndQueries(t *testing.T) {
 	h := hook.Hook{
 		Entity:    "toto",
 		Name:      "h1",
-		Event:     hook.HookEventBeforeCreate,
+		Event:     hook.HookEventPostRead,
 		Language:  "javascript",
 		Priority:  1,
 		Enabled:   true,
@@ -305,7 +317,7 @@ func TestCreateHookDuplicateID(t *testing.T) {
 		ID:       id,
 		Entity:   "toto",
 		Name:     "h1",
-		Event:    hook.HookEventBeforeCreate,
+		Event:    hook.HookEventPostRead,
 		Language: "javascript",
 		Script:   "function postRead(ctx){ return ctx.entity }",
 		Enabled:  true,
@@ -320,7 +332,7 @@ func TestCreateHookDuplicateID(t *testing.T) {
 		ID:       id,
 		Entity:   "toto",
 		Name:     "h2",
-		Event:    hook.HookEventBeforeCreate,
+		Event:    hook.HookEventPostRead,
 		Language: "javascript",
 		Script:   "function postRead(ctx){ return ctx.entity }",
 		Enabled:  true,
@@ -340,7 +352,7 @@ func TestGetPostReadHooksForEntityFiltersEvent(t *testing.T) {
 	_ = hook.CreateHook(hook.Hook{
 		Entity:   "toto",
 		Name:     "a",
-		Event:    hook.HookEventBeforeCreate,
+		Event:    hook.HookEventPostRead,
 		Language: "javascript",
 		Script:   "function postRead(ctx){ ctx.entity.a = 1; return ctx.entity }",
 		Enabled:  true,
@@ -361,7 +373,7 @@ func TestGetPostReadHooksForEntityFiltersEvent(t *testing.T) {
 	if len(list) != 1 {
 		t.Fatalf("expected 1 post_read hook, got %d", len(list))
 	}
-	if list[0].Event != hook.HookEventBeforeCreate {
+	if list[0].Event != hook.HookEventPostRead {
 		t.Fatalf("expected event post_read, got %s", list[0].Event)
 	}
 }
@@ -374,7 +386,7 @@ func TestApplyPostReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.
 	_ = hook.CreateHook(hook.Hook{
 		Entity:   "toto",
 		Name:     "high",
-		Event:    hook.HookEventBeforeCreate,
+		Event:    hook.HookEventPostRead,
 		Language: "javascript",
 		Script:   "function postRead(ctx){ ctx.entity.steps = (ctx.entity.steps || '') + 'A'; return ctx.entity }",
 		Enabled:  true,
@@ -384,7 +396,7 @@ func TestApplyPostReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.
 	_ = hook.CreateHook(hook.Hook{
 		Entity:   "toto",
 		Name:     "low",
-		Event:    hook.HookEventBeforeCreate,
+		Event:    hook.HookEventPostRead,
 		Language: "javascript",
 		Script:   "function postRead(ctx){ ctx.entity.steps = (ctx.entity.steps || '') + 'B'; return ctx.entity }",
 		Enabled:  true,
@@ -394,7 +406,7 @@ func TestApplyPostReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.
 	_ = hook.CreateHook(hook.Hook{
 		Entity:   "toto",
 		Name:     "disabled",
-		Event:    hook.HookEventBeforeCreate,
+		Event:    hook.HookEventPostRead,
 		Language: "javascript",
 		Script:   "function postRead(ctx){ ctx.entity.steps = (ctx.entity.steps || '') + 'X'; return ctx.entity }",
 		Enabled:  false,
@@ -404,7 +416,7 @@ func TestApplyPostReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.
 	_ = hook.CreateHook(hook.Hook{
 		Entity:   "toto",
 		Name:     "broken",
-		Event:    hook.HookEventBeforeCreate,
+		Event:    hook.HookEventPostRead,
 		Language: "javascript",
 		Script:   "function postRead(ctx){ throw new Error('boom') }",
 		Enabled:  true,
@@ -421,5 +433,166 @@ func TestApplyPostReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.
 	steps, _ := out["steps"].(string)
 	if steps != "AB" && steps != "A"+"B" {
 		t.Fatalf("expected steps to be AB, got %#v", out["steps"])
+	}
+}
+
+func TestGetPreReadHooksForEntityFiltersEvent(t *testing.T) {
+	setup(t, true)
+
+	hook.InitHooks()
+
+	_ = hook.CreateHook(hook.Hook{
+		Entity:   "toto",
+		Name:     "a",
+		Event:    hook.HookEventPreRead,
+		Language: "javascript",
+		Script:   "function preRead(ctx){ return ctx.entity }",
+		Enabled:  true,
+		Priority: 1,
+	})
+
+	_ = hook.CreateHook(hook.Hook{
+		Entity:   "toto",
+		Name:     "b",
+		Event:    hook.HookEventPostRead,
+		Language: "javascript",
+		Script:   "function postRead(ctx){ return ctx.entity }",
+		Enabled:  true,
+		Priority: 1,
+	})
+
+	list := hook.GetPreReadHooksForEntity("toto")
+	if len(list) != 1 {
+		t.Fatalf("expected 1 pre_read hook, got %d", len(list))
+	}
+	if list[0].Event != hook.HookEventPreRead {
+		t.Fatalf("expected event pre_read, got %s", list[0].Event)
+	}
+}
+
+func TestApplyPreReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.T) {
+	setup(t, true)
+
+	hook.InitHooks()
+
+	_ = hook.CreateHook(hook.Hook{
+		Entity:   "toto",
+		Name:     "high",
+		Event:    hook.HookEventPreRead,
+		Language: "javascript",
+		Script:   "function preRead(ctx){ ctx.entity.steps = (ctx.entity.steps || '') + 'A'; return ctx.entity }",
+		Enabled:  true,
+		Priority: 10,
+	})
+
+	_ = hook.CreateHook(hook.Hook{
+		Entity:   "toto",
+		Name:     "low",
+		Event:    hook.HookEventPreRead,
+		Language: "javascript",
+		Script:   "function preRead(ctx){ ctx.entity.steps = (ctx.entity.steps || '') + 'B'; return ctx.entity }",
+		Enabled:  true,
+		Priority: 1,
+	})
+
+	_ = hook.CreateHook(hook.Hook{
+		Entity:   "toto",
+		Name:     "disabled",
+		Event:    hook.HookEventPreRead,
+		Language: "javascript",
+		Script:   "function preRead(ctx){ ctx.entity.steps = (ctx.entity.steps || '') + 'X'; return ctx.entity }",
+		Enabled:  false,
+		Priority: 100,
+	})
+
+	_ = hook.CreateHook(hook.Hook{
+		Entity:   "toto",
+		Name:     "broken",
+		Event:    hook.HookEventPreRead,
+		Language: "javascript",
+		Script:   "function preRead(ctx){ throw new Error('boom') }",
+		Enabled:  true,
+		Priority: 5,
+	})
+
+	entity := map[string]any{"id": "1"}
+
+	out := hook.ApplyPreReadHooksForEntity("toto", entity)
+	if out == nil {
+		t.Fatalf("expected non-nil entity")
+	}
+
+	steps, _ := out["steps"].(string)
+	if steps != "AB" && steps != "A"+"B" {
+		t.Fatalf("expected steps to be AB, got %#v", out["steps"])
+	}
+}
+
+func TestApplyPreReadScriptMissingPreReadIsNoop(t *testing.T) {
+	setup(t, true)
+
+	entity := map[string]any{"id": "1", "x": 0}
+	script := `function other(ctx){ return ctx.entity }`
+	if err := hook.ApplyPreReadScript(script, entity, true); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if entity["x"].(int) != 0 {
+		t.Fatalf("expected x unchanged")
+	}
+}
+
+func TestApplyPreReadScriptSyntaxError(t *testing.T) {
+	setup(t, true)
+
+	entity := map[string]any{"id": "1"}
+	script := `function preRead(ctx) {`
+	if err := hook.ApplyPreReadScript(script, entity, true); err == nil {
+		t.Fatalf("expected error")
+	}
+}
+
+func TestApplyPreReadScriptQueryArgError(t *testing.T) {
+	setup(t, true)
+
+	entity := map[string]any{"id": "1"}
+	script := `
+function preRead(ctx) {
+  ctx.query("order")
+  return ctx.entity
+}`
+	if err := hook.ApplyPreReadScript(script, entity, true); err == nil {
+		t.Fatalf("expected error")
+	}
+}
+
+func TestApplyPreReadScriptMutatesEntityAndQueryWorks(t *testing.T) {
+	setup(t, true)
+
+	if err := api_storage.CreateEntityType("order"); err != nil {
+		t.Fatalf("create order entity type: %v", err)
+	}
+
+	_ = api_storage.WriteEntity("order", map[string]any{"id": "o1", "totoId": "1"})
+	_ = api_storage.WriteEntity("order", map[string]any{"id": "o2", "totoId": "1"})
+	_ = api_storage.WriteEntity("order", map[string]any{"id": "o3", "totoId": "2"})
+
+	entity := map[string]any{"id": "1"}
+
+	script := `
+function preRead(ctx) {
+  const orders = ctx.query("order", { totoId: { eq: ctx.entity.id } })
+  ctx.entity.ordersCount = orders.length
+  ctx.entity.ok = true
+  return ctx.entity
+}`
+	if err := hook.ApplyPreReadScript(script, entity, true); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if entity["ordersCount"] != int64(2) && entity["ordersCount"] != 2 {
+		t.Fatalf("expected ordersCount to be 2, got %#v", entity["ordersCount"])
+	}
+	if b, ok := entity["ok"].(bool); !ok || !b {
+		t.Fatalf("expected ok=true, got %#v", entity["ok"])
 	}
 }

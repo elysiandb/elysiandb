@@ -8,8 +8,9 @@ import (
 	api_storage "github.com/taymour/elysiandb/internal/api"
 )
 
-func ApplyPostReadScript(
+func applyScript(
 	script string,
+	fnName string,
 	entity map[string]any,
 	bypassAcl bool,
 ) error {
@@ -25,21 +26,24 @@ func ApplyPostReadScript(
 			targetEntity := call.Arguments[0].String()
 			params, _ := call.Arguments[1].Export().(map[string]any)
 
-			filters := map[string]map[string]string{}
-
+			filters := make(map[string]map[string]string, len(params))
 			for field, cond := range params {
-				if typed, ok := cond.(map[string]any); ok {
-					condMap := map[string]string{}
-					for op, val := range typed {
-						condMap[op] = fmt.Sprintf("%v", val)
-					}
-					filters[field] = condMap
+				typed, ok := cond.(map[string]any)
+				if !ok {
+					continue
 				}
+
+				condMap := make(map[string]string, len(typed))
+				for op, val := range typed {
+					condMap[op] = fmt.Sprintf("%v", val)
+				}
+
+				filters[field] = condMap
 			}
 
 			results := api_storage.ListEntities(
 				targetEntity,
-				50,
+				0,
 				0,
 				"",
 				true,
@@ -64,14 +68,28 @@ func ApplyPostReadScript(
 		return err
 	}
 
-	fn, ok := goja.AssertFunction(vm.Get("postRead"))
+	fn, ok := goja.AssertFunction(vm.Get(fnName))
 	if !ok {
 		return nil
 	}
 
-	if _, err := fn(goja.Undefined(), vm.Get("ctx")); err != nil {
-		return err
-	}
+	_, err := fn(goja.Undefined(), vm.Get("ctx"))
 
-	return nil
+	return err
+}
+
+func ApplyPostReadScript(
+	script string,
+	entity map[string]any,
+	bypassAcl bool,
+) error {
+	return applyScript(script, "postRead", entity, bypassAcl)
+}
+
+func ApplyPreReadScript(
+	script string,
+	entity map[string]any,
+	bypassAcl bool,
+) error {
+	return applyScript(script, "preRead", entity, bypassAcl)
 }

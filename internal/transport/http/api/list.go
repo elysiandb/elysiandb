@@ -60,7 +60,15 @@ func ListController(ctx *fasthttp.RequestCtx) {
 
 	data = acl.FilterListOfEntities(entity, data)
 
-	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasHooks(entity) {
+	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPreReadHooks(entity) {
+		for i, item := range data {
+			data[i] = hook.ApplyPreReadHooksForEntity(entity, item)
+		}
+
+		data = api_storage.ApplyFiltersToList(data, filters)
+	}
+
+	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(entity) {
 		for i, item := range data {
 			data[i] = hook.ApplyPostReadHooksForEntity(entity, item)
 		}
