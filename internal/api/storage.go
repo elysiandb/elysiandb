@@ -34,7 +34,7 @@ func WriteEntity(entity string, data map[string]interface{}) []schema.Validation
 
 	persistEntity(entity, data)
 
-	if !(schema.IsManualSchema(entity) && globals.GetConfig().Api.Schema.Strict) {
+	if !schema.IsManualSchema(entity) || !globals.GetConfig().Api.Schema.Strict {
 		updateSchemaIfNeeded(entity, data)
 	}
 
@@ -179,7 +179,7 @@ func ListPublicEntityTypes() []string {
 	return publicEntityTypes
 }
 
-func ReadEntityById(entity string, id string) map[string]interface{} {
+func ReadEntityById(entity, id string) map[string]interface{} {
 	key := globals.ApiSingleEntityKey(entity, id)
 	data, _ := storage.GetJsonByKey(key)
 
@@ -257,7 +257,7 @@ func applyOffsetLimit[T any](in []T, offset, limit int) []T {
 	return in[start:end]
 }
 
-func GetListOfIds(entity string, sortField string, sortAscending bool) ([]byte, error) {
+func GetListOfIds(entity, sortField string, sortAscending bool) ([]byte, error) {
 	if sortField == "" {
 		idIndexKey := globals.ApiEntityIndexIdKey(entity)
 		return storage.GetByKey(idIndexKey)
@@ -276,7 +276,7 @@ func GetListOfIds(entity string, sortField string, sortAscending bool) ([]byte, 
 	)
 }
 
-func DeleteEntityById(entity string, id string) {
+func DeleteEntityById(entity, id string) {
 	key := globals.ApiSingleEntityKey(entity, id)
 	storage.DeleteJsonByKey(key)
 	RemoveIdFromIndexes(entity, id)
@@ -306,7 +306,7 @@ func DeleteAll() {
 	}
 }
 
-func UpdateEntityById(entity string, id string, updated map[string]interface{}) map[string]interface{} {
+func UpdateEntityById(entity, id string, updated map[string]interface{}) map[string]interface{} {
 	existing := ReadEntityById(entity, id)
 	if existing == nil {
 		return nil
@@ -366,7 +366,7 @@ func DumpAll() map[string]interface{} {
 	return result
 }
 
-func EntityExists(entity string, id string) bool {
+func EntityExists(entity, id string) bool {
 	return ReadEntityById(entity, id) != nil
 }
 

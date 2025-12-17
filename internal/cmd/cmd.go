@@ -7,15 +7,19 @@ import (
 	"golang.org/x/term"
 )
 
-var Printf = fmt.Printf
-var ReadPassword = term.ReadPassword
+var (
+	Printf       = fmt.Printf
+	ReadPassword = term.ReadPassword
+)
 
-const CreateUserCommand = "create-user"
-const DeleteUserCommand = "delete-user"
-const ServerCommand = "server"
-const HelpCommand = "help"
-const ChangePasswordCommand = "change-password"
-const ResetCommand = "reset"
+const (
+	CreateUserCommand     = "create-user"
+	DeleteUserCommand     = "delete-user"
+	ServerCommand         = "server"
+	HelpCommand           = "help"
+	ChangePasswordCommand = "change-password"
+	ResetCommand          = "reset"
+)
 
 func GetAvailableCommands() map[string]string {
 	return map[string]string{

@@ -56,7 +56,7 @@ func Fatal(message string, err error) {
 	os.Exit(1)
 }
 
-func log(level string, color string, args ...interface{}) {
+func log(level, color string, args ...interface{}) {
 	now := time.Now().Format("2006-01-02 15:04:05")
 	msg := fmt.Sprint(args...)
 
@@ -67,7 +67,7 @@ func log(level string, color string, args ...interface{}) {
 	Logs.LogsList = append(Logs.LogsList, fmt.Sprintf("[%s] %s %s", now, levelBadge, msg))
 }
 
-func directLog(level string, color string, args ...interface{}) {
+func directLog(level, color string, args ...interface{}) {
 	now := time.Now().Format("2006-01-02 15:04:05")
 	msg := fmt.Sprint(args...)
 

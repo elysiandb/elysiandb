@@ -31,7 +31,7 @@ func setupTempStore(t *testing.T) string {
 func writeSessions(t *testing.T, dir string, sf security.SessionsFile) {
 	t.Helper()
 	b, _ := json.Marshal(sf)
-	_ = os.WriteFile(filepath.Join(dir, security.SessionsFilename), b, 0644)
+	_ = os.WriteFile(filepath.Join(dir, security.SessionsFilename), b, 0o644)
 }
 
 func TestSetAndGetCurrentUsername(t *testing.T) {

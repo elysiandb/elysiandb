@@ -91,7 +91,7 @@ func handleMGETSingleKey(key string, results *[]multiGetEntry, seen map[string]s
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementMisses()
 		}
-		
+
 		return
 	}
 

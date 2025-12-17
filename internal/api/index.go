@@ -141,7 +141,7 @@ func rebuildIndexForField(entity, field string) {
 	AddFieldToIndexedFields(entity, field)
 }
 
-func RemoveIdFromIndexes(entity string, id string) {
+func RemoveIdFromIndexes(entity, id string) {
 	idIndexKey := globals.ApiEntityIndexIdKey(entity)
 	raw, _ := storage.GetByKey(idIndexKey)
 	ids := decodeIDs(raw)
@@ -156,7 +156,7 @@ func RemoveIdFromIndexes(entity string, id string) {
 	}
 }
 
-func RemoveIdFromNonMasterIndexes(entity string, id string) {
+func RemoveIdFromNonMasterIndexes(entity, id string) {
 	fields := GetListForIndexedFields(entity)
 	for _, field := range fields {
 		for _, sortKey := range []string{
@@ -202,7 +202,7 @@ func encodeIDs(ids []string) []byte {
 	return bytes.Join(parts, []byte{'\n'})
 }
 
-func AddIdToindexes(entity string, id string) {
+func AddIdToindexes(entity, id string) {
 	k := globals.ApiEntityIndexIdKey(entity)
 	raw, _ := storage.GetByKey(k)
 	ids := decodeIDs(raw)
@@ -247,7 +247,7 @@ func EnsureFieldIndex(entity, field, id string, value interface{}) {
 	}
 }
 
-func IndexExistsForField(entity string, field string) bool {
+func IndexExistsForField(entity, field string) bool {
 	ensureFieldIndexFresh(entity, field)
 	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, field)
 	descKey := globals.ApiEntityIndexFieldSortDescKey(entity, field)
@@ -261,7 +261,7 @@ func GetListForIndexedFields(entity string) []string {
 	return decodeIDs(raw)
 }
 
-func AddFieldToIndexedFields(entity string, field string) {
+func AddFieldToIndexedFields(entity, field string) {
 	fields, _ := storage.GetByKey(
 		globals.ApiEntityIndexAllFieldsKey(entity),
 	)
@@ -278,7 +278,7 @@ func AddFieldToIndexedFields(entity string, field string) {
 	)
 }
 
-func UpdateIndexesForEntity(entity string, id string, oldData, newData map[string]interface{}) {
+func UpdateIndexesForEntity(entity, id string, oldData, newData map[string]interface{}) {
 	safeKey := func(v interface{}) string {
 		switch val := v.(type) {
 		case []interface{}:
@@ -319,7 +319,7 @@ func UpdateIndexesForEntity(entity string, id string, oldData, newData map[strin
 	}
 }
 
-func DeleteIndexesForField(entity string, field string) {
+func DeleteIndexesForField(entity, field string) {
 	storage.DeleteByWildcardKey(
 		globals.ApiEntityIndexFieldAllKey(entity, field),
 	)

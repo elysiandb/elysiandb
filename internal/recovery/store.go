@@ -14,8 +14,10 @@ import (
 
 const StoreRecoveryFile = "elysiandb.store.recovery.log"
 
-var storeRecoveryMu sync.Mutex
-var storeRecoveryActive = false
+var (
+	storeRecoveryMu     sync.Mutex
+	storeRecoveryActive = false
+)
 
 var SaveDBFunc func()
 

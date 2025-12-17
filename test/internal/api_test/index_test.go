@@ -352,7 +352,7 @@ func TestProcessNextDirtyField(t *testing.T) {
 	if _, dirty := api_storage.DirtyFields.Load(entity + "|" + "qty"); dirty {
 		t.Fatalf("expected dirty flag cleared after processing")
 	}
-	
+
 	if !api_storage.IndexExistsForField(entity, "qty") {
 		t.Fatalf("expected index rebuilt for qty")
 	}

@@ -90,7 +90,7 @@ func handleSingleKey(key string, ctx *fasthttp.RequestCtx) {
 
 func handleWildcardKey(key string, ctx *fasthttp.RequestCtx) {
 	cfg := globals.GetConfig()
-	var results = make([]multiGetEntry, 0)
+	results := make([]multiGetEntry, 0)
 	data := storage.GetByWildcardKey(key)
 
 	if len(data) == 0 {

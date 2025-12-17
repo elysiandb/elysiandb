@@ -44,7 +44,7 @@ func AnalyzeEntitySchema(entity string, data map[string]interface{}) map[string]
 	return SchemaEntityToStorableStructure(schema)
 }
 
-func analyzeFields(data map[string]interface{}, isRoot bool, required bool) map[string]Field {
+func analyzeFields(data map[string]interface{}, isRoot, required bool) map[string]Field {
 	fields := make(map[string]Field)
 	for k, v := range data {
 		if isRoot && k == "id" || strings.HasPrefix(k, globals.CoreFieldsPrefix) {

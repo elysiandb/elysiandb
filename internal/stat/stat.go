@@ -1,8 +1,6 @@
 package stat
 
-var (
-	Stats StatsContainer
-)
+var Stats StatsContainer
 
 func Init() {
 	Stats = *NewStatsContainer()

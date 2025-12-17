@@ -26,7 +26,7 @@ func FirstWordBytes(b []byte) (cmd, rest []byte) {
 		i++
 	}
 	rest = b[i:]
-	return
+	return cmd, rest
 }
 
 func EqASCII(a, b []byte) bool {

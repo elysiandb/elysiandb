@@ -59,7 +59,7 @@ func (s *cacheStore) Get(entity string, hash []byte) []byte {
 	return it.v
 }
 
-func (s *cacheStore) Set(entity string, hash []byte, value []byte) {
+func (s *cacheStore) Set(entity string, hash, value []byte) {
 	if len(hash) != 32 {
 		return
 	}
