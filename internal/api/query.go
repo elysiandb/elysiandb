@@ -111,7 +111,7 @@ func matchLeafStrict(entity map[string]any, filters map[string]map[string]string
 func matchValue(val any, ops map[string]string) bool {
 	switch v := val.(type) {
 	case string:
-		return matchStringStrict(v, ops)
+		return matchStringOrDate(v, ops)
 	case float64:
 		return matchNumber(v, ops)
 	case []any:
@@ -121,62 +121,6 @@ func matchValue(val any, ops map[string]string) bool {
 	default:
 		return false
 	}
-}
-
-func matchStringStrict(value string, ops map[string]string) bool {
-	for op, cmp := range ops {
-		switch op {
-		case "eq":
-			if !globStrictMatch(cmp, value) {
-				return false
-			}
-		case "neq":
-			if globStrictMatch(cmp, value) {
-				return false
-			}
-		}
-	}
-
-	return true
-}
-
-func globStrictMatch(pattern, value string) bool {
-	if pattern == "*" {
-		return true
-	}
-
-	parts := strings.Split(pattern, "*")
-	if len(parts) == 1 {
-		return value == pattern
-	}
-
-	pos := 0
-	if !strings.HasPrefix(pattern, "*") {
-		if !strings.HasPrefix(value, parts[0]) {
-			return false
-		}
-
-		pos = len(parts[0])
-		parts = parts[1:]
-	}
-
-	for i, part := range parts {
-		if part == "" {
-			continue
-		}
-
-		idx := strings.Index(value[pos:], part)
-		if idx == -1 {
-			return false
-		}
-
-		pos += idx + len(part)
-		if i == len(parts)-1 && !strings.HasSuffix(pattern, "*") && pos != len(value) {
-			return false
-		}
-	}
-
-	return true
 }
 
 func resolveValues(data any, path string) []any {
