@@ -6,33 +6,47 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![JS Client](https://img.shields.io/badge/JS%20Client-available-brightgreen)](https://github.com/elysiandb/client-js)
 
+ElysianDB is a self contained backend engine that turns raw JSON into a usable, queryable API in seconds.
 
-Its built-in database, automatic REST API generation, and high-performance sharded engine make it one of the fastest ways to build and query data without configuration or tooling.
+It combines a built in datastore, automatic REST API generation, advanced querying and indexing, and optional KV and TCP interfaces into a single fast Go binary.
 
-An Admin Web Interface is currently under development and will soon be available.
+The goal is simple: remove backend boilerplate so you can focus on shipping features instead of infrastructure.
 
----
+## Why ElysianDB
 
-## Highlights
+Most projects start the same way: define models, write CRUD endpoints, add filters, pagination, authentication, indexing, caching, migrations, and admin tooling.
 
-* Instant REST API — CRUD, pagination, filtering, sorting, includes (/api/entity) with zero configuration
-* Fast In-Memory KV Engine — sharded store, optional TTL, atomic counters
-* Auto-Indexing — lazy index creation on first sort request
-* Schema-less JSON — dynamic structures; IDs generated automatically
-* Automatic Schema Inference — schemas inferred from observed documents
-* Schema API — GET /api/entity/schema for live schema inspection
-* Manual Schema Override — PUT /api/entity/schema to define strict schemas
-* Strict Schema Validation — reject writes that do not match the manual schema
-* Nested Entity Creation — auto-create sub-entities via @entity fields
-* Persistence — periodic flush plus crash recovery log
-* Protocols — HTTP REST, TCP (Redis-style text protocol)
-* High performance — minimal allocations and cache-friendly design
-* Transactions - basic transactions and atomic operations
-* Configurable hooks in JS to manipulate entities on events (post_read...)
-* Built-in Authentication — optional HTTP Basic authentication with salted bcrypt hashing or Token based authentication
-* Admin UI — in progress
+ElysianDB removes this entire layer.
 
----
+You send JSON. You get a fully functional backend.
+
+No ORM, no migrations to write, no controllers to scaffold, no schema to maintain unless you want one.
+
+## What You Get Out of the Box
+
+Instant REST API with CRUD operations, pagination, sorting, filtering, projections, and includes
+
+Advanced query system with logical operators, nested filters, array traversal, and deterministic caching
+
+High performance in memory datastore with sharding, optional TTL, and crash recovery
+
+Automatic indexing built lazily on first sort
+
+Schema inference with optional strict validation and manual overrides
+
+Nested entity creation and linking using simple JSON conventions
+
+Built in authentication with token, basic, or user based modes
+
+Access control lists enforced at the API level
+
+Configurable JavaScript hooks to enrich or filter data at read time
+
+Optional Admin UI served directly by the binary
+
+HTTP REST API, Redis style TCP protocol, and key value endpoints
+
+All of this ships as a single binary or Docker image.
 
 ## Quick Example
 
@@ -47,30 +61,53 @@ const res = await fetch("http://localhost:8089/api/articles?limit=20&offset=0&so
 const articles = await res.json();
 ```
 
----
+No model definition. No migration. No configuration.
 
-## Performance Benchmarks (MacBook Pro M4)
+## Querying Without SQL
 
-Mixed CRUD, filtering, sorting, nested create, includes. Not microbenchmarks.
+ElysianDB includes a dedicated Query API that lets you express complex conditions in a single request.
 
-### Summary
+You can combine filters, logical operators, sorting, pagination, projections, and counts without writing SQL or custom endpoints.
 
-| Scenario   | Load                | p95 Latency | RPS      | Errors |
-| ---------- | ------------------- | ----------- | -------- | ------ |
-| Dev Local  | 3 VUs / 100 keys    | 62 µs       | ~52.7k/s | 0%     |
-| Small App  | 10 VUs / 500 keys   | 184 µs      | ~81.3k/s | 0%     |
-| Light Prod | 25 VUs / 1000 keys  | 412 µs      | ~95.5k/s | 0%     |
-| Heavy Load | 200 VUs / 5000 keys | 12.6 ms     | ~60.6k/s | 0%     |
+Queries are deterministic, type aware, and executed fully in memory.
 
----
+This makes them predictable, debuggable, and safe to cache.
+
+## Performance
+
+ElysianDB is designed for low latency and high throughput.
+
+The engine uses sharded in memory storage, minimal allocations, and cache friendly data structures.
+
+On a MacBook Pro M4, mixed workloads with CRUD, filtering, sorting, nested writes, and includes reach tens of thousands of requests per second with sub millisecond latencies under moderate load.
+
+These are not synthetic microbenchmarks but real API scenarios.
+
+## When to Use ElysianDB
+
+Rapid prototyping and MVPs
+
+Frontend first development where the backend should not block progress
+
+Internal tools and admin backends
+
+Mocking APIs and datasets
+
+Simple services that do not justify a full database and ORM stack
+
+High performance read heavy APIs with predictable access patterns
+
+## When Not to Use It
+
+ElysianDB is not a relational database replacement.
+
+It is not designed for complex cross entity joins or heavy transactional workloads.
+
+If you need strong relational guarantees, complex SQL queries, or decades of existing tooling, a traditional database may be a better fit.
 
 ## Official Clients
 
-### JavaScript / TypeScript
-Repository: https://github.com/elysiandb/elysiandbjs-client  
-Install: `npm install @elysiandbjs/client`
-
----
+JavaScript and TypeScript client available at [https://github.com/elysiandb/client-js](https://github.com/elysiandb/client-js)
 
 ## Run with Docker
 
@@ -78,49 +115,32 @@ Install: `npm install @elysiandbjs/client`
 docker run --rm -p 8089:8089 -p 8088:8088 taymour/elysiandb:latest
 ```
 
-Default configuration:
-
-```yaml
-store:
-  folder: /data
-  shards: 512
-  flushIntervalSeconds: 5
-  crashRecovery: { enabled: true, maxLogMB: 100 }
-  json:
-    arenaChunkSize: 1048576
-server:
-  http: { enabled: true, host: 0.0.0.0, port: 8089 }
-  tcp:  { enabled: true, host: 0.0.0.0, port: 8088 }
-log:
-  flushIntervalSeconds: 5
-stats:
-  enabled: false
-security:
-  authentication:
-    enabled: false
-    mode: token
-    token: "your_secure_token"
-api:
-  index:
-    workers: 4
-  schema:
-    enabled: true
-    strict: false
-  cache:
-    enabled: true
-    cleanupIntervalSeconds: 10
-adminui:
-  enabled: true
-```
-
-## Build and Run
+## Build and Run Locally
 
 ```bash
 go build && ./elysiandb server
-# or
+```
+
+Or
+
+```bash
 go run elysiandb.go server
 ```
 
----
+## Philosophy
 
-ElysianDB is built to be simple, fast, and practical — a real backend you can ship in minutes.
+ElysianDB favors clarity over magic and determinism over flexibility.
+
+Every query produces the same result for the same input.
+
+There are no hidden joins, no implicit behavior, and no background mutations.
+
+What you send is what you get.
+
+## Status
+
+ElysianDB is actively developed and not already usable in production.
+
+The Admin UI is under active development.
+
+Feedback, issues, and contributions are welcome.
