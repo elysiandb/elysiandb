@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 
@@ -597,5 +598,164 @@ function postRead(ctx) {
 
 	if list[0]["after"] != "ok" {
 		t.Fatalf("post_read hook not applied")
+	}
+}
+
+func TestQueryController_BasicQuery(t *testing.T) {
+	setup(t)
+
+	api_storage.WriteEntity("book", map[string]any{"id": "1", "title": "Go"})
+	api_storage.WriteEntity("book", map[string]any{"id": "2", "title": "Rust"})
+
+	body := `{
+		"entity":"book",
+		"filters":{"title":{"eq":"Go"}}
+	}`
+
+	ctx := newCtx("POST", "/api/query", body)
+	api_controller.QueryController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200")
+	}
+
+	var out []map[string]any
+	json.Unmarshal(ctx.Response.Body(), &out)
+
+	if len(out) != 1 || out[0]["id"] != "1" {
+		t.Fatalf("unexpected result %v", out)
+	}
+}
+
+func TestQueryController_CountOnly(t *testing.T) {
+	setup(t)
+
+	for i := 0; i < 3; i++ {
+		api_storage.WriteEntity("x", map[string]any{"id": string(rune('a' + i))})
+	}
+
+	body := `{
+		"entity":"x",
+		"countOnly":true,
+		"filters":{"id":{"neq":"__never__"}}
+	}`
+
+	ctx := newCtx("POST", "/api/query", body)
+	api_controller.QueryController(ctx)
+
+	var out map[string]int64
+	json.Unmarshal(ctx.Response.Body(), &out)
+
+	if out["count"] != 3 {
+		t.Fatalf("expected count 3, got %v", out)
+	}
+}
+
+func TestQueryController_FieldsFiltering(t *testing.T) {
+	setup(t)
+
+	api_storage.WriteEntity("f", map[string]any{
+		"id":    "1",
+		"title": "Go",
+		"meta":  map[string]any{"x": 1},
+	})
+
+	body := `{
+		"entity":"f",
+		"fields":"id,title",
+		"filters":{"id":{"eq":"1"}}
+	}`
+
+	ctx := newCtx("POST", "/api/query", body)
+	api_controller.QueryController(ctx)
+
+	var out []map[string]any
+	json.Unmarshal(ctx.Response.Body(), &out)
+
+	if len(out) != 1 {
+		t.Fatalf("expected 1 result, got %v", out)
+	}
+
+	if _, ok := out[0]["meta"]; ok {
+		t.Fatalf("meta should be filtered out")
+	}
+}
+
+func TestQueryController_InvalidJSON(t *testing.T) {
+	setup(t)
+
+	ctx := newCtx("POST", "/api/query", `{invalid`)
+	api_controller.QueryController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatalf("expected 400")
+	}
+}
+
+func TestQueryController_InvalidFilter(t *testing.T) {
+	setup(t)
+
+	body := `{
+		"entity":"x",
+		"filters":{"or":"nope"}
+	}`
+
+	ctx := newCtx("POST", "/api/query", body)
+	api_controller.QueryController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatalf("expected 400")
+	}
+}
+
+func TestQueryController_CacheHitAndMiss(t *testing.T) {
+	setup(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Cache.Enabled = true
+	cfg.Api.Hooks.Enabled = false
+	globals.SetConfig(cfg)
+
+	api_storage.DeleteAllEntities("_elysiandb_core_hook")
+	api_storage.DeleteEntityType("_elysiandb_core_hook")
+
+	api_storage.WriteEntity("cachetest", map[string]any{
+		"id": "1",
+		"v":  1,
+	})
+
+	body := `{
+		"entity":"cachetest",
+		"filters":{"id":{"eq":"1"}}
+	}`
+
+	ctx1 := newCtx("POST", "/api/query", body)
+	api_controller.QueryController(ctx1)
+
+	ctx2 := newCtx("POST", "/api/query", body)
+	api_controller.QueryController(ctx2)
+
+	if string(ctx2.Response.Header.Peek("X-Elysian-Cache")) != "HIT" {
+		t.Fatalf("expected cache HIT")
+	}
+}
+
+func TestQueryPayload_HashDeterministic(t *testing.T) {
+	p := api_controller.QueryPayload{
+		Entity: "a",
+		Filters: map[string]any{
+			"or": []any{
+				map[string]any{"x": map[string]any{"eq": "1"}},
+				map[string]any{"y": map[string]any{"eq": "2"}},
+			},
+		},
+		Sorts: map[string]string{"b": "asc", "a": "desc"},
+	}
+
+	h1 := hex.EncodeToString(p.Hash())
+	h2 := hex.EncodeToString(p.Hash())
+
+	if h1 != h2 {
+		t.Fatalf("hash must be stable, got %s vs %s", h1, h2)
 	}
 }

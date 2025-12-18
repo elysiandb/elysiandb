@@ -94,6 +94,7 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 | -------- | ----------------------------------------- | ----------------------------------------------------------- |
 | `POST`   | `/api/<entity>/create`                    | Create a new type of entity with schema                     |
 | `POST`   | `/api/<entity>`                           | Create one or multiple JSON documents (auto‑ID if missing)  |
+| `POST`   | `/api/query`                              | Post a complex query                                        |
 | `GET`    | `/api/<entity>`                           | List all documents, supports pagination, sorting, filtering |
 | `GET`    | `/api/<entity>/schema`                    | Schema for entity                                           |
 | `PUT`    | `/api/<entity>/schema`                    | Update schema for entity                                    |
@@ -122,6 +123,229 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 | `GET`    | `/api/acl/<user_name>`                    | Retrieve ACL for username and all entity types              |
 | `PUT`    | `/api/acl/<user_name>/<entity>`           | Update ACL for username and entity type                     |
 | `PUT`    | `/api/acl/<user_name>/<entity>/default`   | restore default ACL for username and entity type            |
+
+---
+
+## Query API
+
+ElysianDB provides a powerful **Query API** allowing you to express complex filters, logical conditions, sorting, pagination, projections, and counts using a single request. Queries are executed fully in-memory on top of the datastore and support nested fields and arrays.
+
+---
+
+### Endpoint
+
+```http
+POST /api/query
+```
+
+---
+
+### Request Body
+
+```json
+{
+  "entity": "article",
+  "offset": 0,
+  "limit": 10,
+  "filters": { ... },
+  "sorts": { "field": "asc|desc" },
+  "fields": "field1,field2",
+  "countOnly": false
+}
+```
+
+---
+
+### Parameters
+
+| Field       | Type    | Description                             |        |
+| ----------- | ------- | --------------------------------------- | ------ |
+| `entity`    | string  | Target entity type                      |        |
+| `offset`    | number  | Number of items to skip                 |        |
+| `limit`     | number  | Maximum number of items returned        |        |
+| `filters`   | object  | Logical filter tree                     |        |
+| `sorts`     | object  | Sorting rules (`field: asc              | desc`) |
+| `fields`    | string  | Comma-separated list of returned fields |        |
+| `countOnly` | boolean | Return only `{ "count": n }`            |        |
+
+---
+
+### Filtering Model
+
+Filters are expressed as a **logical tree** composed of `and`, `or`, and **leaf conditions**.
+
+#### Logical Nodes
+
+```json
+{
+  "and": [ <filter>, <filter> ]
+}
+```
+
+```json
+{
+  "or": [ <filter>, <filter> ]
+}
+```
+
+#### Leaf Conditions
+
+```json
+{
+  "field.path": { "operator": "value" }
+}
+```
+
+Nested paths and array traversal are supported automatically.
+
+---
+
+### Supported Operators
+
+| Operator   | Description                    |
+| ---------- | ------------------------------ |
+| `eq`       | Equals (supports `*` glob)     |
+| `neq`      | Not equals                     |
+| `lt`       | Less than                      |
+| `lte`      | Less than or equal             |
+| `gt`       | Greater than                   |
+| `gte`      | Greater than or equal          |
+| `contains` | Array or string contains value |
+
+Glob patterns follow strict semantics:
+
+* `*` matches any sequence
+* `abc*def` matches prefix and suffix
+* `*mid*` matches substring
+
+---
+
+### Nested and Array Filtering
+
+Filters automatically traverse nested objects and arrays.
+
+```json
+{
+  "categories.title": { "eq": "coco" }
+}
+```
+
+Matches if **any** array element satisfies the condition.
+
+---
+
+### Complex Example
+
+```json
+{
+  "entity": "article",
+  "offset": 0,
+  "limit": 10,
+  "filters": {
+    "and": [
+      { "status": { "eq": "published" } },
+      {
+        "or": [
+          { "title": { "eq": "*Go*" } },
+          { "excerpt": { "eq": "*distributed*" } }
+        ]
+      },
+      {
+        "or": [
+          {
+            "and": [
+              { "author.name": { "eq": "Taymour*" } },
+              { "tags": { "contains": "Go" } }
+            ]
+          },
+          {
+            "and": [
+              { "categories.title": { "eq": "coco" } },
+              { "publishedAt": { "gte": "2025-01-01" } }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "sorts": { "publishedAt": "desc" }
+}
+```
+
+---
+
+### Sorting
+
+Sorting is applied **before** offset and limit.
+
+```json
+"sorts": {
+  "title": "asc",
+  "publishedAt": "desc"
+}
+```
+
+Indexes are created lazily when a sort field is first used.
+
+---
+
+### Pagination Order
+
+Execution order:
+
+1. Load all entities
+2. Apply filters
+3. Apply sorting
+4. Apply offset
+5. Apply limit
+
+---
+
+### Field Projection
+
+```json
+"fields": "id,title,slug"
+```
+
+Only the listed fields are returned. Nested fields are supported.
+
+---
+
+### Count-Only Queries
+
+```json
+"countOnly": true
+```
+
+Response:
+
+```json
+{ "count": 42 }
+```
+
+Sorting and projection are ignored.
+
+---
+
+### Caching Behavior
+
+* Query results are cached when API cache is enabled
+* Cache keys are deterministic and include filters, sorting, pagination, fields, and user context
+* If hooks are enabled for an entity, caching is automatically bypassed
+* Response header:
+
+```
+X-Elysian-Cache: HIT | MISS
+```
+
+---
+
+### Notes
+
+* Queries are fully deterministic
+* Filters are strict and type-aware
+* Unsupported field types never match
+* Designed for correctness and debuggability rather than SQL-style ambiguity
 
 ---
 

@@ -42,20 +42,25 @@ func (s *cacheStore) Get(entity string, hash []byte) []byte {
 	if len(hash) != 32 {
 		return nil
 	}
+
 	var key [32]byte
 	copy(key[:], hash)
 	s.mu.RLock()
 	e, exists := s.entities[entity]
 	s.mu.RUnlock()
+
 	if !exists {
 		return nil
 	}
+
 	e.mu.RLock()
 	it, ok := e.data[key]
 	e.mu.RUnlock()
+
 	if !ok {
 		return nil
 	}
+
 	return it.v
 }
 
@@ -63,14 +68,17 @@ func (s *cacheStore) Set(entity string, hash, value []byte) {
 	if len(hash) != 32 {
 		return
 	}
+
 	var key [32]byte
 	copy(key[:], hash)
 	s.mu.Lock()
 	e, exists := s.entities[entity]
+
 	if !exists {
 		e = &cacheEntity{data: make(map[[32]byte]cacheItem), ids: make(map[string]cacheItem)}
 		s.entities[entity] = e
 	}
+
 	s.mu.Unlock()
 	exp := time.Now().Add(s.ttl).UnixNano()
 	e.mu.Lock()
@@ -82,15 +90,19 @@ func (s *cacheStore) GetById(entity, id string) []byte {
 	s.mu.RLock()
 	e, exists := s.entities[entity]
 	s.mu.RUnlock()
+
 	if !exists {
 		return nil
 	}
+
 	e.mu.RLock()
 	it, ok := e.ids[id]
 	e.mu.RUnlock()
+
 	if !ok {
 		return nil
 	}
+
 	return it.v
 }
 
@@ -140,32 +152,40 @@ func HashQuery(
 	b = append(b, '|')
 	b = append(b, username...)
 	b = append(b, '|')
+
 	if countOnlyParam {
 		b = append(b, '1')
 	} else {
 		b = append(b, '0')
 	}
+
 	b = append(b, '|')
+
 	if sortAscending {
 		b = append(b, 'A')
 	} else {
 		b = append(b, 'D')
 	}
+
 	b = append(b, '|')
 	b = strconv.AppendInt(b, int64(limit), 10)
 	b = append(b, '|')
 	b = strconv.AppendInt(b, int64(offset), 10)
 	keys := make([]string, 0, len(filters))
+
 	for k := range filters {
 		keys = append(keys, k)
 	}
+
 	sort.Strings(keys)
+
 	for _, k := range keys {
 		ops := filters[k]
 		opsKeys := make([]string, 0, len(ops))
 		for op := range ops {
 			opsKeys = append(opsKeys, op)
 		}
+
 		sort.Strings(opsKeys)
 		for _, op := range opsKeys {
 			b = append(b, '|')
@@ -177,6 +197,7 @@ func HashQuery(
 		}
 	}
 	sum := sha256.Sum256(b)
+
 	return sum[:]
 }
 
@@ -186,8 +207,10 @@ func (s *cacheStore) CleanExpired() {
 	for k, v := range s.entities {
 		entities[k] = v
 	}
+
 	s.mu.RUnlock()
 	now := time.Now().UnixNano()
+
 	for _, e := range entities {
 		e.mu.Lock()
 		for k, it := range e.data {
@@ -195,11 +218,13 @@ func (s *cacheStore) CleanExpired() {
 				delete(e.data, k)
 			}
 		}
+
 		for id, it := range e.ids {
 			if now > it.exp {
 				delete(e.ids, id)
 			}
 		}
+
 		e.mu.Unlock()
 	}
 }
