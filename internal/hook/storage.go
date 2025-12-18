@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/globals"
 )
 
 func GetPostReadHooksForEntity(entity string) []Hook {
@@ -104,6 +105,10 @@ func GetHookById(hookId string) (*Hook, error) {
 }
 
 func EntityHasHooks(entity string) bool {
+	if !globals.GetConfig().Api.Hooks.Enabled {
+		return false
+	}
+
 	filters := map[string]map[string]string{
 		"entity": {
 			"eq": entity,

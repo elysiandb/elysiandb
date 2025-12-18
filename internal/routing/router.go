@@ -33,6 +33,7 @@ func RegisterRoutes(r *router.Router) {
 	r.GET("/api/export", Version(security.Authenticate(api.ExportController)))
 	r.POST("/api/import", Version(security.Authenticate(api.ImportController)))
 	r.GET("/api/{entity}", Version(security.Authenticate(api.ListController)))
+	r.POST("/api/query", Version(security.Authenticate(api.QueryController)))
 	r.POST("/api/{entity}", Version(security.Authenticate(api.CreateController)))
 	r.GET("/api/{entity}/{id}", Version(security.Authenticate(api.GetByIdController)))
 	r.PUT("/api/{entity}/{id}", Version(security.Authenticate(api.UpdateByIdController)))
