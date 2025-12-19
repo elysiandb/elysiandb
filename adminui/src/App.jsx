@@ -9,6 +9,7 @@ import EntityTypesList from "./pages/EntityTypesList.jsx";
 import UsersList from "./pages/UsersList.jsx";
 import ACLList from "./pages/ACLList.jsx";
 import HooksList from "./pages/HooksList.jsx";
+import EntitiesBrowser from "./pages/EntitiesBrowser.jsx";
 
 export default function App() {
 
@@ -50,7 +51,7 @@ export default function App() {
                     element: <UsersList />,
                 },
                 {
-                    path: "entities",
+                    path: "schema",
                     element: <EntityTypesList />,
                 },
                 {
@@ -60,6 +61,10 @@ export default function App() {
                 {
                     path: "hooks",
                     element: <HooksList />,
+                },
+                {
+                    path: "browse",
+                    element: <EntitiesBrowser />,
                 },
             ],
         },

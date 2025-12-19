@@ -12,7 +12,7 @@ stats:
   enabled: false
 security:
   authentication:
-    enabled: false
+    enabled: true
     mode: user
     token: "your_secure_token_here"
 api:

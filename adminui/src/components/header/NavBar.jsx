@@ -42,10 +42,10 @@ export default function NavBar() {
 
                         <Nav.Link
                             as={NavLink}
-                            to="/admin/entities"
+                            to="/admin/schema"
                             end
                         >
-                            Entities
+                            Schema
                         </Nav.Link>
 
                         <Nav.Link
@@ -54,6 +54,14 @@ export default function NavBar() {
                             end
                         >
                             Hooks
+                        </Nav.Link>
+
+                        <Nav.Link
+                            as={NavLink}
+                            to="/admin/browse"
+                            end
+                        >
+                            Browse
                         </Nav.Link>
 
                     </Nav>
