@@ -3,7 +3,7 @@ package acl
 import (
 	"fmt"
 
-	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/security"
 )
@@ -118,8 +118,8 @@ func InitACL() {
 func saveACLList(acls []ACL) {
 	for _, acl := range acls {
 		id := GetACLEntityId(acl.Username, acl.Entity)
-		if !api_storage.EntityExists(ACLEntity, id) {
-			api_storage.WriteEntity(ACLEntity, acl.ToDataMap())
+		if !engine.EntityExists(ACLEntity, id) {
+			engine.WriteEntity(ACLEntity, acl.ToDataMap())
 		}
 	}
 }
@@ -132,7 +132,7 @@ func GenerateACLFoAllrEntities() []ACL {
 		return acls
 	}
 
-	entities := api_storage.ListPublicEntityTypes()
+	entities := engine.ListPublicEntityTypes()
 
 	for _, user := range users {
 		username, ok1 := user["username"].(string)
@@ -160,7 +160,7 @@ func GetACLEntityId(username, entity string) string {
 }
 
 func GetACLEntityForUsername(entity, username string) *ACL {
-	data := api_storage.ReadEntityById(ACLEntity, GetACLEntityId(username, entity))
+	data := engine.ReadEntityById(ACLEntity, GetACLEntityId(username, entity))
 	if data == nil {
 		return nil
 	}
@@ -204,7 +204,7 @@ func UpdateACLEntityForUsername(entity, username string, permissions map[Permiss
 
 	existing.Permissions = permissions
 
-	api_storage.WriteEntity(ACLEntity, existing.ToDataMap())
+	engine.WriteEntity(ACLEntity, existing.ToDataMap())
 
 	return nil
 }
@@ -215,12 +215,12 @@ func StringToPermission(s string) (Permission, bool) {
 }
 
 func DeleteUserACls(username string) error {
-	entities := api_storage.ListPublicEntityTypes()
+	entities := engine.ListPublicEntityTypes()
 
 	for _, entity := range entities {
 		id := GetACLEntityId(username, entity)
-		if api_storage.EntityExists(ACLEntity, id) {
-			api_storage.DeleteEntityById(ACLEntity, id)
+		if engine.EntityExists(ACLEntity, id) {
+			engine.DeleteEntityById(ACLEntity, id)
 		}
 	}
 
@@ -240,8 +240,8 @@ func DeleteACLForEntityType(entity string) error {
 		}
 
 		id := GetACLEntityId(username, entity)
-		if api_storage.EntityExists(ACLEntity, id) {
-			api_storage.DeleteEntityById(ACLEntity, id)
+		if engine.EntityExists(ACLEntity, id) {
+			engine.DeleteEntityById(ACLEntity, id)
 		}
 	}
 
@@ -284,7 +284,7 @@ func ResetACLEntityToDefault(entity, username string) error {
 		existing.Permissions = permissions
 	}
 
-	api_storage.WriteEntity(ACLEntity, existing.ToDataMap())
+	engine.WriteEntity(ACLEntity, existing.ToDataMap())
 
 	return nil
 }

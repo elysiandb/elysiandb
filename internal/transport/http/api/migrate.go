@@ -4,15 +4,22 @@ import (
 	"fmt"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/valyala/fasthttp"
 )
 
 func MigrateController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 
+	if !engine.IsEngineInternal() {
+		ctx.SetStatusCode(fasthttp.StatusNotImplemented)
+		ctx.SetBodyString(`{"error" : "Only the ElysianDB engine is supported for migrations."}`)
+		return
+	}
+
 	entity := ctx.UserValue("entity").(string)
 
-	if !api_storage.EntityTypeExists(entity) {
+	if !engine.EntityTypeExists(entity) {
 		ctx.SetStatusCode(fasthttp.StatusNotFound)
 		ctx.SetBodyString(fmt.Sprintf(`{"error" : "Entity '%s' does not exist."}`, entity))
 

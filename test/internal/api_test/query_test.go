@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/query"
 )
 
 func TestApplyQueryFilter_EmptyNodeMatchesNothing(t *testing.T) {
 	data := []map[string]any{
 		{"id": "1", "title": "abc"},
 	}
-	out := api_storage.ApplyQueryFilter(data, api_storage.FilterNode{})
+	out := api_storage.ApplyQueryFilter(data, query.FilterNode{})
 	if len(out) != 0 {
 		t.Fatalf("expected empty result, got %v", out)
 	}
@@ -37,8 +38,8 @@ func TestApplyQueryFilter_PrimitivesAndNestedArrays(t *testing.T) {
 		},
 	}
 
-	f := api_storage.FilterNode{
-		And: []api_storage.FilterNode{
+	f := query.FilterNode{
+		And: []query.FilterNode{
 			{Leaf: map[string]map[string]string{"price": {"gte": "9"}}},
 			{Leaf: map[string]map[string]string{"flag": {"eq": "true"}}},
 			{Leaf: map[string]map[string]string{"tags": {"contains": "Go"}}},
@@ -60,18 +61,18 @@ func TestApplyQueryFilter_GlobStrictMatchBranches(t *testing.T) {
 
 	cases := []struct {
 		name   string
-		filter api_storage.FilterNode
+		filter query.FilterNode
 		want   int
 	}{
-		{"star matches all", api_storage.FilterNode{Leaf: map[string]map[string]string{"title": {"eq": "*"}}}, 1},
-		{"exact match no star", api_storage.FilterNode{Leaf: map[string]map[string]string{"title": {"eq": "abcXYZdef"}}}, 1},
-		{"prefix and suffix match", api_storage.FilterNode{Leaf: map[string]map[string]string{"title": {"eq": "abc*def"}}}, 1},
-		{"contains with leading trailing star", api_storage.FilterNode{Leaf: map[string]map[string]string{"title": {"eq": "*XYZ*"}}}, 1},
-		{"multiple stars with empty parts", api_storage.FilterNode{Leaf: map[string]map[string]string{"title": {"eq": "**XYZ**"}}}, 1},
-		{"must end when no trailing star", api_storage.FilterNode{Leaf: map[string]map[string]string{"title": {"eq": "*XYZ"}}}, 0},
-		{"prefix mismatch", api_storage.FilterNode{Leaf: map[string]map[string]string{"title": {"eq": "zzz*def"}}}, 0},
-		{"neq rejects when pattern matches", api_storage.FilterNode{Leaf: map[string]map[string]string{"title": {"neq": "*XYZ*"}}}, 0},
-		{"neq passes when pattern does not match", api_storage.FilterNode{Leaf: map[string]map[string]string{"title": {"neq": "*NOPE*"}}}, 1},
+		{"star matches all", query.FilterNode{Leaf: map[string]map[string]string{"title": {"eq": "*"}}}, 1},
+		{"exact match no star", query.FilterNode{Leaf: map[string]map[string]string{"title": {"eq": "abcXYZdef"}}}, 1},
+		{"prefix and suffix match", query.FilterNode{Leaf: map[string]map[string]string{"title": {"eq": "abc*def"}}}, 1},
+		{"contains with leading trailing star", query.FilterNode{Leaf: map[string]map[string]string{"title": {"eq": "*XYZ*"}}}, 1},
+		{"multiple stars with empty parts", query.FilterNode{Leaf: map[string]map[string]string{"title": {"eq": "**XYZ**"}}}, 1},
+		{"must end when no trailing star", query.FilterNode{Leaf: map[string]map[string]string{"title": {"eq": "*XYZ"}}}, 0},
+		{"prefix mismatch", query.FilterNode{Leaf: map[string]map[string]string{"title": {"eq": "zzz*def"}}}, 0},
+		{"neq rejects when pattern matches", query.FilterNode{Leaf: map[string]map[string]string{"title": {"neq": "*XYZ*"}}}, 0},
+		{"neq passes when pattern does not match", query.FilterNode{Leaf: map[string]map[string]string{"title": {"neq": "*NOPE*"}}}, 1},
 	}
 
 	for _, tc := range cases {
@@ -90,8 +91,8 @@ func TestApplyQueryFilter_OrAndNodes(t *testing.T) {
 		{"id": "2", "title": "Python", "status": "draft"},
 	}
 
-	f := api_storage.FilterNode{
-		Or: []api_storage.FilterNode{
+	f := query.FilterNode{
+		Or: []query.FilterNode{
 			{Leaf: map[string]map[string]string{"title": {"eq": "Go"}}},
 			{Leaf: map[string]map[string]string{"title": {"eq": "Rust"}}},
 		},
@@ -107,7 +108,7 @@ func TestApplyQueryFilter_UnsupportedValueTypeFails(t *testing.T) {
 	data := []map[string]any{
 		{"id": "1", "meta": map[string]any{"a": 1}},
 	}
-	filter := api_storage.FilterNode{
+	filter := query.FilterNode{
 		Leaf: map[string]map[string]string{
 			"meta": {"eq": "*"},
 		},
@@ -126,12 +127,12 @@ func TestExecuteQuery_WithSortOffsetLimit(t *testing.T) {
 	api_storage.WriteEntity(entity, map[string]any{"id": "a2", "status": "published", "title": "Rust"})
 	api_storage.WriteEntity(entity, map[string]any{"id": "a3", "status": "published", "title": "Python"})
 
-	q := api_storage.Query{
+	q := query.Query{
 		Entity: entity,
 		Offset: 1,
 		Limit:  1,
 		Sorts:  map[string]string{"title": "asc"},
-		Filter: api_storage.FilterNode{
+		Filter: query.FilterNode{
 			Leaf: map[string]map[string]string{"status": {"eq": "published"}},
 		},
 	}
@@ -168,13 +169,13 @@ func TestExecuteQuery_ComplexNestedQuery(t *testing.T) {
 	}
 	api_storage.WriteEntity(entity, doc)
 
-	q := api_storage.Query{
+	q := query.Query{
 		Entity: entity,
-		Filter: api_storage.FilterNode{
-			And: []api_storage.FilterNode{
+		Filter: query.FilterNode{
+			And: []query.FilterNode{
 				{Leaf: map[string]map[string]string{"status": {"eq": "published"}}},
 				{
-					Or: []api_storage.FilterNode{
+					Or: []query.FilterNode{
 						{Leaf: map[string]map[string]string{"title": {"eq": "*Go*"}}},
 						{Leaf: map[string]map[string]string{"excerpt": {"eq": "*distribuées*"}}},
 					},

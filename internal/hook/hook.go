@@ -3,7 +3,7 @@ package hook
 import (
 	"sort"
 
-	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 )
@@ -134,7 +134,7 @@ func InitHooks() {
 		return
 	}
 
-	if api_storage.EntityTypeExists(HookEntity) {
+	if engine.EntityTypeExists(HookEntity) {
 		return
 	}
 
@@ -145,12 +145,12 @@ func InitHooks() {
 }
 
 func CreateHookEntity() error {
-	err := api_storage.CreateEntityType(HookEntity)
+	err := engine.CreateEntityType(HookEntity)
 	if err != nil {
 		return err
 	}
 
-	api_storage.UpdateEntitySchema(HookEntity, HookEntitySchema)
+	engine.UpdateEntitySchema(HookEntity, HookEntitySchema)
 
 	return nil
 }

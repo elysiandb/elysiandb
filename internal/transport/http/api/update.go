@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/taymour/elysiandb/internal/acl"
-	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/valyala/fasthttp"
@@ -77,7 +77,7 @@ func handleSingleUpdate(ctx *fasthttp.RequestCtx, entity, id string, body []byte
 		return false
 	}
 
-	data := api_storage.UpdateEntityById(entity, id, single)
+	data := engine.UpdateEntityById(entity, id, single)
 
 	response, _ := json.Marshal(data)
 	sendJSONResponse(ctx, response)
@@ -98,7 +98,7 @@ func handleBatchUpdate(ctx *fasthttp.RequestCtx, entity string, body []byte) boo
 		return false
 	}
 
-	data := api_storage.UpdateListOfEntities(entity, list)
+	data := engine.UpdateListOfEntities(entity, list)
 	response, _ := json.Marshal(data)
 	sendJSONResponse(ctx, response)
 	return true

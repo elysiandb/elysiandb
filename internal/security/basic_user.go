@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/crypto/bcrypt"
@@ -104,7 +104,7 @@ func (u *BasicHashedUser) FromDataMap(data map[string]interface{}) error {
 }
 
 func (u *BasicHashedUser) Save() error {
-	err := api_storage.WriteEntity(UserEntity, u.ToDataMap())
+	err := engine.WriteEntity(UserEntity, u.ToDataMap())
 	if len(err) == 0 {
 		return nil
 	}
@@ -118,7 +118,7 @@ func (u *BasicHashedUser) Save() error {
 }
 
 func InitAdminUserIfNotExists() error {
-	adminUser := api_storage.ReadEntityById(UserEntity, DefaultAdminUsername)
+	adminUser := engine.ReadEntityById(UserEntity, DefaultAdminUsername)
 	if adminUser != nil {
 		return nil
 	}
@@ -154,17 +154,17 @@ func UserEntitySchema() map[string]interface{} {
 }
 
 func InitBasicUsersStorage() error {
-	exists := api_storage.EntityTypeExists(UserEntity)
+	exists := engine.EntityTypeExists(UserEntity)
 	if exists {
 		return nil
 	}
 
-	err := api_storage.CreateEntityType(UserEntity)
+	err := engine.CreateEntityType(UserEntity)
 	if err != nil {
 		return err
 	}
 
-	api_storage.UpdateEntitySchema(UserEntity, UserEntitySchema())
+	engine.UpdateEntitySchema(UserEntity, UserEntitySchema())
 
 	return nil
 }
@@ -175,7 +175,7 @@ func GetBasicUserByUsername(username string) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	u := api_storage.ReadEntityById(UserEntity, username)
+	u := engine.ReadEntityById(UserEntity, username)
 	if u == nil {
 		return nil, fmt.Errorf("user '%s' not found", username)
 	}
@@ -191,7 +191,7 @@ func ListBasicUsers() ([]map[string]interface{}, error) {
 		return nil, err
 	}
 
-	users := api_storage.ListEntities(
+	users := engine.ListEntities(
 		UserEntity,
 		0,
 		0,
@@ -231,7 +231,7 @@ func CreateBasicUser(user *BasicUser) error {
 }
 
 func ChangeUserPassword(username, newPassword string) error {
-	u := api_storage.ReadEntityById(UserEntity, username)
+	u := engine.ReadEntityById(UserEntity, username)
 	if u == nil {
 		return fmt.Errorf("user '%s' not found", username)
 	}
@@ -264,7 +264,7 @@ func ChangeUserPassword(username, newPassword string) error {
 }
 
 func ChangeUserRole(username, newRole string) error {
-	u := api_storage.ReadEntityById(UserEntity, username)
+	u := engine.ReadEntityById(UserEntity, username)
 	if u == nil {
 		return fmt.Errorf("user '%s' not found", username)
 	}
@@ -290,7 +290,7 @@ func DeleteBasicUser(username string) {
 		return
 	}
 
-	api_storage.DeleteEntityById(UserEntity, username)
+	engine.DeleteEntityById(UserEntity, username)
 }
 
 func GenerateKey() (string, error) {
@@ -345,7 +345,7 @@ func CreateKeyFileOrGetKey() (string, error) {
 }
 
 func AuthenticateUser(username, password string) (*BasicHashedUser, bool) {
-	u := api_storage.ReadEntityById(UserEntity, username)
+	u := engine.ReadEntityById(UserEntity, username)
 	if u == nil {
 		return nil, false
 	}

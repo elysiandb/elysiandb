@@ -3,7 +3,7 @@ package api_transaction
 import (
 	"encoding/json"
 
-	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/transaction"
@@ -26,7 +26,7 @@ func UpdateTransactionController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	existing := api_storage.ReadEntityById(entity, id)
+	existing := engine.ReadEntityById(entity, id)
 	if existing == nil {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error":"entity not found"}`)

@@ -126,6 +126,77 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 
 ---
 
+## Storage Engine Selection
+
+ElysianDB exposes a **pluggable storage engine abstraction** that allows the core database logic to run independently of the underlying storage implementation.
+
+This makes it possible to switch or extend the storage backend without changing the API, query system, ACLs, hooks, or Admin UI.
+
+---
+
+### Engine Configuration
+
+The storage engine is selected in `elysian.yaml`:
+
+```yaml
+engine:
+  name: internal
+```
+
+---
+
+### Available Engines
+
+#### `internal` (default)
+
+The `internal` engine is the built-in storage engine provided by ElysianDB.
+
+It offers:
+
+* In-memory sharded storage
+* Periodic disk persistence
+* Crash recovery via write-ahead logs
+* Lazy indexing
+* Full compatibility with all ElysianDB features (REST API, Query API, ACLs, hooks, transactions, Admin UI)
+
+This engine is production-ready and is the **only engine available today**.
+
+---
+
+### Future Engines
+
+The engine abstraction is designed to allow additional engines to be implemented in the future, such as:
+
+* Alternative persistence models
+* External or embedded databases
+* Specialized engines optimized for specific workloads
+* Experimental or in-memory–only backends
+
+These engines would be selectable using the same configuration mechanism, without impacting application code or API usage.
+
+---
+
+### Design Goals
+
+The storage engine abstraction follows these principles:
+
+* Clear separation between **API logic** and **storage implementation**
+* No feature loss when switching engines
+* Deterministic behavior across engines
+* Minimal overhead for the default engine
+
+This design allows ElysianDB to evolve without locking users into a single storage strategy.
+
+---
+
+### Notes
+
+* If no engine is specified, `internal` is used by default
+* Engine selection is evaluated at startup
+* Changing the engine may require data migration depending on future implementations
+
+---
+
 ## Query API
 
 ElysianDB provides a powerful **Query API** allowing you to express complex filters, logical conditions, sorting, pagination, projections, and counts using a single request. Queries are executed fully in-memory on top of the datastore and support nested fields and arrays.
