@@ -3,14 +3,14 @@ package api
 import (
 	"encoding/json"
 
-	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/valyala/fasthttp"
 )
 
 func GetEntityTypesNamesController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 
-	entityTypes := api_storage.ListPublicEntityTypes()
+	entityTypes := engine.ListPublicEntityTypes()
 
 	responseBytes, err := json.Marshal(map[string]interface{}{
 		"entities": entityTypes,

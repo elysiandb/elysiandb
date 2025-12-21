@@ -24,3 +24,12 @@ func GetConfig() *configuration.Config {
 
 	return c
 }
+
+func GetEngine() string {
+	c := GetConfig()
+	if c.Engine.Name == "" {
+		return "internal"
+	}
+
+	return c.Engine.Name
+}

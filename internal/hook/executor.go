@@ -5,7 +5,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/taymour/elysiandb/internal/acl"
-	api_storage "github.com/taymour/elysiandb/internal/api"
+	engine "github.com/taymour/elysiandb/internal/engine"
 )
 
 func applyScript(
@@ -41,7 +41,7 @@ func applyScript(
 				filters[field] = condMap
 			}
 
-			results := api_storage.ListEntities(
+			results := engine.ListEntities(
 				targetEntity,
 				0,
 				0,

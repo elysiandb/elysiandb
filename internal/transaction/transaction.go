@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/schema"
 )
 
@@ -39,15 +39,15 @@ type Storage interface {
 type realStorage struct{}
 
 func (realStorage) WriteEntity(e string, d map[string]interface{}) []schema.ValidationError {
-	return api_storage.WriteEntity(e, d)
+	return engine.WriteEntity(e, d)
 }
 
 func (realStorage) UpdateEntityById(e, id string, d map[string]interface{}) map[string]interface{} {
-	return api_storage.UpdateEntityById(e, id, d)
+	return engine.UpdateEntityById(e, id, d)
 }
 
 func (realStorage) DeleteEntityById(e, id string) {
-	api_storage.DeleteEntityById(e, id)
+	engine.DeleteEntityById(e, id)
 }
 
 var storageImpl Storage = realStorage{}

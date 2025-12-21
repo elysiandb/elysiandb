@@ -22,6 +22,37 @@ You send JSON. You get a fully functional backend.
 
 No ORM, no migrations to write, no controllers to scaffold, no schema to maintain unless you want one.
 
+## Storage Engine
+
+ElysianDB uses a **pluggable storage engine abstraction** that separates the core API logic from the underlying data storage implementation.
+
+The storage engine is selected at startup via configuration:
+
+```yaml
+engine:
+  name: internal
+```
+
+### Available Engines
+
+**internal (default)**
+
+The `internal` engine is the built-in storage engine shipped with ElysianDB. It provides:
+
+* Sharded in-memory storage
+* Periodic disk persistence
+* Crash recovery via write-ahead logs
+* Lazy index creation
+* Full compatibility with all ElysianDB features (REST API, Query API, ACLs, hooks, transactions, Admin UI)
+
+This is the **only engine available today** and is production-ready.
+
+### Future Engines
+
+The engine abstraction is designed to support additional storage engines in the future, such as alternative persistence models, embedded or external databases, or specialized engines optimized for specific workloads.
+
+Future engines will be selectable using the same configuration mechanism, without impacting application code or API usage.
+
 ## What You Get Out of the Box
 
 Instant REST API with CRUD operations, pagination, sorting, filtering, projections, and includes

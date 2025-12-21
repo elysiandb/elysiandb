@@ -79,6 +79,10 @@ type ApiCacheConfig struct {
 	CleanupIntervalSeconds int  `yaml:"cleanupIntervalSeconds"`
 }
 
+type EngineConfig struct {
+	Name string `yaml:"name"`
+}
+
 type Config struct {
 	Store    StoreConfig    `yaml:"store"`
 	Server   ServersConfig  `yaml:"server"`
@@ -87,6 +91,7 @@ type Config struct {
 	Stats    StatsConfig    `yaml:"stats"`
 	Api      ApiConfig      `yaml:"api"`
 	AdminUI  AdminUIConfig  `yaml:"adminui"`
+	Engine   EngineConfig   `yaml:"engine"`
 }
 
 func (c *Config) ToJson() string {

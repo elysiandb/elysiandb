@@ -9,8 +9,10 @@ import (
 	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/hook"
+	"github.com/taymour/elysiandb/internal/query"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
@@ -131,7 +133,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	query := api_storage.Query{
+	query := query.Query{
 		Entity: payload.Entity,
 		Offset: payload.Offset,
 		Limit:  payload.Limit,
@@ -139,7 +141,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		Sorts:  payload.Sorts,
 	}
 
-	data, err := api_storage.ExecuteQuery(query)
+	data, err := engine.ExecuteQuery(query)
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		return
@@ -201,71 +203,71 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 	}
 }
 
-func ParseFilterNode(raw map[string]any) (api_storage.FilterNode, error) {
+func ParseFilterNode(raw map[string]any) (query.FilterNode, error) {
 	if raw == nil {
-		return api_storage.FilterNode{}, nil
+		return query.FilterNode{}, nil
 	}
 
 	if orRaw, ok := raw["or"]; ok {
 		arr, ok := orRaw.([]any)
 		if !ok {
-			return api_storage.FilterNode{}, fmt.Errorf("or must be an array")
+			return query.FilterNode{}, fmt.Errorf("or must be an array")
 		}
 
-		nodes := make([]api_storage.FilterNode, 0, len(arr))
+		nodes := make([]query.FilterNode, 0, len(arr))
 		for _, item := range arr {
 			m, ok := item.(map[string]any)
 			if !ok {
-				return api_storage.FilterNode{}, fmt.Errorf("or item must be an object")
+				return query.FilterNode{}, fmt.Errorf("or item must be an object")
 			}
 
 			n, err := ParseFilterNode(m)
 			if err != nil {
-				return api_storage.FilterNode{}, err
+				return query.FilterNode{}, err
 			}
 
 			nodes = append(nodes, n)
 		}
 
-		return api_storage.FilterNode{Or: nodes}, nil
+		return query.FilterNode{Or: nodes}, nil
 	}
 
 	if andRaw, ok := raw["and"]; ok {
 		arr, ok := andRaw.([]any)
 		if !ok {
-			return api_storage.FilterNode{}, fmt.Errorf("and must be an array")
+			return query.FilterNode{}, fmt.Errorf("and must be an array")
 		}
 
-		nodes := make([]api_storage.FilterNode, 0, len(arr))
+		nodes := make([]query.FilterNode, 0, len(arr))
 		for _, item := range arr {
 			m, ok := item.(map[string]any)
 			if !ok {
-				return api_storage.FilterNode{}, fmt.Errorf("and item must be an object")
+				return query.FilterNode{}, fmt.Errorf("and item must be an object")
 			}
 
 			n, err := ParseFilterNode(m)
 			if err != nil {
-				return api_storage.FilterNode{}, err
+				return query.FilterNode{}, err
 			}
 
 			nodes = append(nodes, n)
 		}
 
-		return api_storage.FilterNode{And: nodes}, nil
+		return query.FilterNode{And: nodes}, nil
 	}
 
 	leaf := make(map[string]map[string]string)
 	for field, v := range raw {
 		opsRaw, ok := v.(map[string]any)
 		if !ok {
-			return api_storage.FilterNode{}, fmt.Errorf("invalid filter for field %s", field)
+			return query.FilterNode{}, fmt.Errorf("invalid filter for field %s", field)
 		}
 
 		ops := make(map[string]string)
 		for op, val := range opsRaw {
 			s, ok := val.(string)
 			if !ok {
-				return api_storage.FilterNode{}, fmt.Errorf("invalid value for %s.%s", field, op)
+				return query.FilterNode{}, fmt.Errorf("invalid value for %s.%s", field, op)
 			}
 
 			ops[op] = s
@@ -274,5 +276,5 @@ func ParseFilterNode(raw map[string]any) (api_storage.FilterNode, error) {
 		leaf[field] = ops
 	}
 
-	return api_storage.FilterNode{Leaf: leaf}, nil
+	return query.FilterNode{Leaf: leaf}, nil
 }

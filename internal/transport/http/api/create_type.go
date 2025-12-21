@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 
 	"github.com/taymour/elysiandb/internal/acl"
-	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/valyala/fasthttp"
 )
 
 func CreateTypeController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
-	err := api_storage.CreateEntityType(entity)
+	err := engine.CreateEntityType(entity)
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(err.Error())
@@ -22,7 +22,7 @@ func CreateTypeController(ctx *fasthttp.RequestCtx) {
 	if err := json.Unmarshal(ctx.PostBody(), &payload); err != nil {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error":"invalid json"}`)
-		api_storage.DeleteEntityType(entity)
+		engine.DeleteEntityType(entity)
 
 		return
 	}
@@ -31,12 +31,12 @@ func CreateTypeController(ctx *fasthttp.RequestCtx) {
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error":"schema.fields must be an object"}`)
-		api_storage.DeleteEntityType(entity)
+		engine.DeleteEntityType(entity)
 
 		return
 	}
 
-	storable := api_storage.UpdateEntitySchema(entity, fieldsRaw)
+	storable := engine.UpdateEntitySchema(entity, fieldsRaw)
 
 	acl.InitACL()
 

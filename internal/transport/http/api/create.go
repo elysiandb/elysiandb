@@ -5,8 +5,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/taymour/elysiandb/internal/acl"
-	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/security"
@@ -77,7 +77,7 @@ func handleSingleEntity(ctx *fasthttp.RequestCtx, entity string, body []byte) bo
 		data[acl.UsernameField] = security.GetCurrentUsername()
 	}
 
-	errors := api_storage.WriteEntity(entity, data)
+	errors := engine.WriteEntity(entity, data)
 	if len(errors) > 0 {
 		response, _ := json.Marshal(errors)
 		ctx.Response.Header.Set("Content-Type", "application/json")
@@ -111,7 +111,7 @@ func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool
 		}
 	}
 
-	validationErrors := api_storage.WriteListOfEntities(entity, list)
+	validationErrors := engine.WriteListOfEntities(entity, list)
 	hasErrors := false
 	for _, errs := range validationErrors {
 		if len(errs) > 0 {

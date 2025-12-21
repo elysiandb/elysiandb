@@ -8,6 +8,7 @@ import (
 	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/taymour/elysiandb/internal/security"
@@ -56,7 +57,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
-	data := api_storage.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
+	data := engine.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
 
 	data = acl.FilterListOfEntities(entity, data)
 
@@ -65,7 +66,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 			data[i] = hook.ApplyPreReadHooksForEntity(entity, item)
 		}
 
-		data = api_storage.ApplyFiltersToList(data, filters)
+		data = engine.ApplyFiltersToList(data, filters)
 	}
 
 	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(entity) {
@@ -94,7 +95,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	if len(fields) > 0 {
 		filteredData := make([]map[string]interface{}, len(data))
 		for i, item := range data {
-			filteredData[i] = api_storage.FilterFields(item, fields)
+			filteredData[i] = engine.FilterFields(item, fields)
 		}
 
 		data = filteredData

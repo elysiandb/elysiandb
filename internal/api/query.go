@@ -2,23 +2,11 @@ package api_storage
 
 import (
 	"strings"
+
+	"github.com/taymour/elysiandb/internal/query"
 )
 
-type Query struct {
-	Entity string
-	Offset int
-	Limit  int
-	Filter FilterNode
-	Sorts  map[string]string
-}
-
-type FilterNode struct {
-	Or   []FilterNode
-	And  []FilterNode
-	Leaf map[string]map[string]string
-}
-
-func ExecuteQuery(q Query) ([]map[string]any, error) {
+func ExecuteQuery(q query.Query) ([]map[string]any, error) {
 	sortField := ""
 	sortAsc := true
 
@@ -48,7 +36,7 @@ func ExecuteQuery(q Query) ([]map[string]any, error) {
 	return applyOffsetLimit(filtered, q.Offset, q.Limit), nil
 }
 
-func ApplyQueryFilter(data []map[string]any, filter FilterNode) []map[string]any {
+func ApplyQueryFilter(data []map[string]any, filter query.FilterNode) []map[string]any {
 	filtered := make([]map[string]any, 0, len(data))
 	for _, e := range data {
 		if matchFilterNode(filter, e) {
@@ -59,7 +47,7 @@ func ApplyQueryFilter(data []map[string]any, filter FilterNode) []map[string]any
 	return filtered
 }
 
-func matchFilterNode(node FilterNode, entity map[string]any) bool {
+func matchFilterNode(node query.FilterNode, entity map[string]any) bool {
 	if node.Leaf != nil {
 		return matchLeafStrict(entity, node.Leaf)
 	}
