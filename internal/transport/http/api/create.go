@@ -8,6 +8,7 @@ import (
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/mongodb"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
@@ -17,11 +18,19 @@ func CreateController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 	body := ctx.PostBody()
 
-	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity) {
+	var schemaData map[string]any
+
+	if engine.IsEngineMongoDB() {
+		schemaData = mongodb.GetEntitySchema(entity)
+	} else {
+		schemaData = nil
+	}
+
+	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, schemaData) {
 		var tmp interface{}
 		if json.Unmarshal(body, &tmp) == nil {
 			if obj, ok := tmp.(map[string]interface{}); ok {
-				if errs := schema.ValidateEntity(entity, obj); len(errs) > 0 {
+				if errs := schema.ValidateEntity(entity, obj, schemaData); len(errs) > 0 {
 					b, _ := json.Marshal(errs)
 					ctx.SetStatusCode(fasthttp.StatusBadRequest)
 					ctx.Response.Header.Set("Content-Type", "application/json")
@@ -34,7 +43,7 @@ func CreateController(ctx *fasthttp.RequestCtx) {
 			if arr, ok := tmp.([]interface{}); ok {
 				for _, it := range arr {
 					if obj, ok := it.(map[string]interface{}); ok {
-						if errs := schema.ValidateEntity(entity, obj); len(errs) > 0 {
+						if errs := schema.ValidateEntity(entity, obj, schemaData); len(errs) > 0 {
 							b, _ := json.Marshal(errs)
 							ctx.SetStatusCode(fasthttp.StatusBadRequest)
 							ctx.Response.Header.Set("Content-Type", "application/json")

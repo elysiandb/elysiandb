@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	api_storage "github.com/taymour/elysiandb/internal/api"
+	engine "github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 )
 
@@ -45,19 +45,20 @@ func CreateHook(hook Hook) error {
 		hook.ID = uuid.New().String()
 	}
 
-	if api_storage.EntityExists(HookEntity, hook.ID) {
+	if engine.EntityExists(HookEntity, hook.ID) {
 		return fmt.Errorf("the hook '%s' already exists", hook.Name)
 	}
 
 	if hook.Script == "" {
-		if hook.Event == HookEventPreRead {
+		switch hook.Event {
+		case HookEventPreRead:
 			hook.Script = GetDefaultHookScriptJSForPreRead()
-		} else if hook.Event == HookEventPostRead {
+		case HookEventPostRead:
 			hook.Script = GetDefaultHookScriptJSForPostRead()
 		}
 	}
 
-	err := api_storage.WriteEntity(HookEntity, hook.ToDataMap())
+	err := engine.WriteEntity(HookEntity, hook.ToDataMap())
 	if len(err) > 0 {
 		return fmt.Errorf("an error occured while creating the hook: %v", err)
 	}
@@ -66,11 +67,11 @@ func CreateHook(hook Hook) error {
 }
 
 func UpdateHook(hook *Hook) error {
-	if !api_storage.EntityExists(HookEntity, hook.ID) {
+	if !engine.EntityExists(HookEntity, hook.ID) {
 		return fmt.Errorf("the hook '%s' does not exist", hook.Name)
 	}
 
-	err := api_storage.UpdateEntityById(HookEntity, hook.ID, hook.ToDataMap())
+	err := engine.UpdateEntityById(HookEntity, hook.ID, hook.ToDataMap())
 	if err != nil {
 		return fmt.Errorf("an error occured while updating the hook: %v", err)
 	}
@@ -79,21 +80,21 @@ func UpdateHook(hook *Hook) error {
 }
 
 func DeleteHook(hookId string) error {
-	if !api_storage.EntityExists(HookEntity, hookId) {
+	if !engine.EntityExists(HookEntity, hookId) {
 		return fmt.Errorf("the hook with id '%s' does not exist", hookId)
 	}
 
-	api_storage.DeleteEntityById(HookEntity, hookId)
+	engine.DeleteEntityById(HookEntity, hookId)
 
 	return nil
 }
 
 func GetHookById(hookId string) (*Hook, error) {
-	if !api_storage.EntityExists(HookEntity, hookId) {
+	if !engine.EntityExists(HookEntity, hookId) {
 		return nil, fmt.Errorf("the hook with id '%s' does not exist", hookId)
 	}
 
-	data := api_storage.ReadEntityById(HookEntity, hookId)
+	data := engine.ReadEntityById(HookEntity, hookId)
 	if data == nil {
 		return nil, fmt.Errorf("an error occured while retrieving the hook with id '%s'", hookId)
 	}
@@ -115,7 +116,7 @@ func EntityHasHooks(entity string) bool {
 		},
 	}
 
-	data := api_storage.ListEntities(
+	data := engine.ListEntities(
 		HookEntity,
 		0,
 		0,
@@ -139,7 +140,7 @@ func EntityHasPostReadHooks(entity string) bool {
 		},
 	}
 
-	data := api_storage.ListEntities(
+	data := engine.ListEntities(
 		HookEntity,
 		0,
 		0,
@@ -163,7 +164,7 @@ func EntityHasPreReadHooks(entity string) bool {
 		},
 	}
 
-	data := api_storage.ListEntities(
+	data := engine.ListEntities(
 		HookEntity,
 		0,
 		0,
@@ -184,7 +185,7 @@ func GetHooksForEntity(entity string) ([]Hook, error) {
 		},
 	}
 
-	data := api_storage.ListEntities(
+	data := engine.ListEntities(
 		HookEntity,
 		0,
 		0,

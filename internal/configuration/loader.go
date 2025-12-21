@@ -81,6 +81,7 @@ type ApiCacheConfig struct {
 
 type EngineConfig struct {
 	Name string `yaml:"name"`
+	URI  string `yaml:"uri"`
 }
 
 type Config struct {

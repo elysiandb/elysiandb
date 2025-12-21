@@ -15,7 +15,7 @@ const CoreEntityTypePrefix = "_elysiandb_core_"
 
 func WriteEntity(entity string, data map[string]interface{}) []schema.ValidationError {
 	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
-		errors := schema.ValidateEntity(entity, data)
+		errors := schema.ValidateEntity(entity, data, nil)
 		if len(errors) > 0 {
 			return errors
 		}
@@ -34,7 +34,7 @@ func WriteEntity(entity string, data map[string]interface{}) []schema.Validation
 
 	persistEntity(entity, data)
 
-	if !schema.IsManualSchema(entity) || !globals.GetConfig().Api.Schema.Strict {
+	if !schema.IsManualSchema(entity, nil) || !globals.GetConfig().Api.Schema.Strict {
 		updateSchemaIfNeeded(entity, data)
 	}
 
@@ -84,6 +84,7 @@ func DeleteEntityType(entity string) error {
 			newTypes = append(newTypes, t)
 		}
 	}
+
 	storage.PutKeyValue(key, encodeIDs(newTypes))
 
 	return nil

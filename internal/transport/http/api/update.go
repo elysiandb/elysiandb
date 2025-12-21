@@ -7,6 +7,7 @@ import (
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/mongodb"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/valyala/fasthttp"
 )
@@ -16,10 +17,18 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 	id := ctx.UserValue("id").(string)
 	body := ctx.PostBody()
 
-	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity) {
+	var schemaData map[string]any
+
+	if engine.IsEngineMongoDB() {
+		schemaData = mongodb.GetEntitySchema(entity)
+	} else {
+		schemaData = nil
+	}
+
+	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, schemaData) {
 		var obj map[string]interface{}
 		if json.Unmarshal(body, &obj) == nil {
-			if errs := schema.ValidateEntity(entity, obj); len(errs) > 0 {
+			if errs := schema.ValidateEntity(entity, obj, schemaData); len(errs) > 0 {
 				b, _ := json.Marshal(errs)
 				ctx.SetStatusCode(fasthttp.StatusBadRequest)
 				ctx.Response.Header.Set("Content-Type", "application/json")
@@ -41,11 +50,19 @@ func UpdateListController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 	body := ctx.PostBody()
 
-	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity) {
+	var schemaData map[string]any
+
+	if engine.IsEngineMongoDB() {
+		schemaData = mongodb.GetEntitySchema(entity)
+	} else {
+		schemaData = nil
+	}
+
+	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, schemaData) {
 		var arr []map[string]interface{}
 		if json.Unmarshal(body, &arr) == nil {
 			for _, obj := range arr {
-				if errs := schema.ValidateEntity(entity, obj); len(errs) > 0 {
+				if errs := schema.ValidateEntity(entity, obj, schemaData); len(errs) > 0 {
 					b, _ := json.Marshal(errs)
 					ctx.SetStatusCode(fasthttp.StatusBadRequest)
 					ctx.Response.Header.Set("Content-Type", "application/json")
