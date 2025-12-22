@@ -1,6 +1,7 @@
 package boot
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/cache"
@@ -33,8 +34,11 @@ func InitDB() {
 	BootLazyIndexRebuilder()
 
 	if engine.IsEngineMongoDB() {
+		fmt.Printf("%sStorage engine: %s%s\n", globals.Gold, "MongoDB", globals.Reset)
 		InitMongoDBConnection()
-	} else if !engine.IsEngineInternal() {
+	} else if engine.IsEngineInternal() {
+		fmt.Printf("%sStorage engine: %s%s\n", globals.Gold, "Internal", globals.Reset)
+	} else {
 		panic("Unsupported engine: " + cfg.Engine.Name)
 	}
 
