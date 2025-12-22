@@ -93,14 +93,14 @@ func DetectJSONType(v interface{}) string {
 	}
 }
 
-func ValidateEntity(entity string, data map[string]interface{}) []ValidationError {
+func ValidateEntity(entity string, data map[string]interface{}, schemaData map[string]any) []ValidationError {
 	var errors []ValidationError
-	s := LoadSchemaForEntity(entity)
+	s := LoadSchemaForEntity(entity, schemaData)
 	if s == nil {
 		return errors
 	}
 
-	isStrict := globals.GetConfig().Api.Schema.Strict && IsManualSchema(entity)
+	isStrict := globals.GetConfig().Api.Schema.Strict && IsManualSchema(entity, schemaData)
 
 	if isStrict {
 		validateNoExtraFieldsRecursive(s.Fields, data, "", &errors)
@@ -216,15 +216,18 @@ func validateFieldsRecursive(fields map[string]Field, data map[string]interface{
 	}
 }
 
-func IsManualSchema(entity string) bool {
-	key := globals.ApiSingleEntityKey(SchemaEntity, entity)
-	data, _ := storage.GetJsonByKey(key)
+func IsManualSchema(entity string, schemaData map[string]any) bool {
+	if schemaData == nil {
+		key := globals.ApiSingleEntityKey(SchemaEntity, entity)
+		schemaData, _ = storage.GetJsonByKey(key)
+	}
 
-	if data == nil {
+	if schemaData == nil {
 		return false
 	}
 
-	_, ok := data["_manual"]
+	_, ok := schemaData["_manual"]
+
 	return ok
 }
 
@@ -283,17 +286,33 @@ func MapToFields(m map[string]interface{}) map[string]Field {
 	return fields
 }
 
-func loadSchemaForEntity(entity string) *Entity {
-	key := globals.ApiSingleEntityKey(SchemaEntity, entity)
-	data, _ := storage.GetJsonByKey(key)
-	if data == nil {
-		return nil
+func loadSchemaForEntity(entity string, schemaData map[string]any) *Entity {
+	if schemaData == nil {
+		key := globals.ApiSingleEntityKey(SchemaEntity, entity)
+		raw, _ := storage.GetJsonByKey(key)
+		if raw == nil {
+			return nil
+		}
+		schemaData = normalizeAnyMap(raw)
 	}
 
 	schema := &Entity{ID: entity}
-	if fieldsMap, ok := data["fields"].(map[string]interface{}); ok {
-		schema.Fields = MapToFields(fieldsMap)
+
+	if fields, ok := schemaData["fields"].(map[string]any); ok {
+		schema.Fields = MapToFields(fields)
 	}
 
 	return schema
+}
+
+func normalizeAnyMap(m map[string]interface{}) map[string]any {
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		if sub, ok := v.(map[string]interface{}); ok {
+			out[k] = normalizeAnyMap(sub)
+		} else {
+			out[k] = v
+		}
+	}
+	return out
 }

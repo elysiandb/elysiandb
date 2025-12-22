@@ -11,7 +11,7 @@ import (
 
 func patchLoadSchema(mock *schema.Entity) func() {
 	orig := schema.LoadSchemaForEntity
-	schema.LoadSchemaForEntity = func(entity string) *schema.Entity { return mock }
+	schema.LoadSchemaForEntity = func(entity string, schemaData map[string]any) *schema.Entity { return mock }
 	return func() { schema.LoadSchemaForEntity = orig }
 }
 
@@ -168,7 +168,7 @@ func TestValidateEntity_Strict_NewFieldRejected(t *testing.T) {
 		"age":  30,
 	}
 
-	errs := schema.ValidateEntity("users", data)
+	errs := schema.ValidateEntity("users", data, nil)
 	if len(errs) != 1 {
 		t.Fatalf("expected 1 error")
 	}
@@ -194,7 +194,7 @@ func TestValidateEntity_Strict_RequiredMissing(t *testing.T) {
 		"name": "Alice",
 	}
 
-	errs := schema.ValidateEntity("users", data)
+	errs := schema.ValidateEntity("users", data, nil)
 	if len(errs) != 1 {
 		t.Fatalf("expected 1 error missing required=age")
 	}
@@ -234,7 +234,7 @@ func TestValidateEntity_Strict_DeepNewFieldRejected(t *testing.T) {
 		},
 	}
 
-	errs := schema.ValidateEntity("books", data)
+	errs := schema.ValidateEntity("books", data, nil)
 	if len(errs) != 2 {
 		t.Fatalf("expected 2 errors")
 	}
@@ -253,7 +253,7 @@ func TestValidateEntity_TypeMismatch(t *testing.T) {
 
 	data := map[string]interface{}{"age": "wrong"}
 
-	errs := schema.ValidateEntity("u", data)
+	errs := schema.ValidateEntity("u", data, nil)
 	if len(errs) != 1 {
 		t.Fatal("expected 1 error")
 	}
@@ -263,7 +263,7 @@ func TestValidateEntity_NoSchema(t *testing.T) {
 	restore := patchLoadSchema(nil)
 	defer restore()
 
-	errs := schema.ValidateEntity("x", map[string]interface{}{"a": 1})
+	errs := schema.ValidateEntity("x", map[string]interface{}{"a": 1}, nil)
 	if len(errs) != 0 {
 		t.Fatal("expected no errors")
 	}
@@ -273,7 +273,7 @@ func TestIsManualSchema_NoFlag(t *testing.T) {
 	restore := patchManualFlag(false)
 	defer restore()
 
-	if schema.IsManualSchema("unknown") {
+	if schema.IsManualSchema("unknown", nil) {
 		t.Fatalf("expected false")
 	}
 }
@@ -282,7 +282,7 @@ func TestIsManualSchema_YesFlag(t *testing.T) {
 	restore := patchManualFlag(true)
 	defer restore()
 
-	if !schema.IsManualSchema("e") {
+	if !schema.IsManualSchema("e", nil) {
 		t.Fatalf("expected true")
 	}
 }
@@ -395,7 +395,7 @@ func TestValidateEntity_ArrayObjectValidation(t *testing.T) {
 		},
 	}
 
-	errs := schema.ValidateEntity("e", data)
+	errs := schema.ValidateEntity("e", data, nil)
 	if len(errs) != 1 {
 		t.Fatalf("expected 1 error")
 	}
@@ -429,7 +429,7 @@ func TestValidateEntity_ArrayMissingRequired(t *testing.T) {
 		},
 	}
 
-	errs := schema.ValidateEntity("test", data)
+	errs := schema.ValidateEntity("test", data, nil)
 	if len(errs) != 1 {
 		t.Fatalf("expected missing required error")
 	}
@@ -450,7 +450,7 @@ func TestValidateEntity_ObjectWrongType(t *testing.T) {
 		"meta": "not-an-object",
 	}
 
-	errs := schema.ValidateEntity("wrong", data)
+	errs := schema.ValidateEntity("wrong", data, nil)
 	if len(errs) != 1 {
 		t.Fatalf("expected type mismatch error")
 	}
@@ -471,7 +471,7 @@ func TestValidateEntity_ArrayWrongType(t *testing.T) {
 		"items": "not-array",
 	}
 
-	errs := schema.ValidateEntity("wrong", data)
+	errs := schema.ValidateEntity("wrong", data, nil)
 	if len(errs) != 1 {
 		t.Fatalf("expected array mismatch error")
 	}
@@ -497,7 +497,7 @@ func TestLoadSchemaForEntity_NoData(t *testing.T) {
 	restore := patchGetJsonByKey(nil, nil)
 	defer restore()
 
-	res := schema.LoadSchemaForEntity("x")
+	res := schema.LoadSchemaForEntity("x", nil)
 	if res == nil {
 		return
 	}
@@ -505,9 +505,9 @@ func TestLoadSchemaForEntity_NoData(t *testing.T) {
 }
 
 func TestLoadSchemaForEntity_WithData(t *testing.T) {
-	restore := patchGetJsonByKey(map[string]interface{}{
-		"fields": map[string]interface{}{
-			"a": map[string]interface{}{
+	restore := patchGetJsonByKey(map[string]any{
+		"fields": map[string]any{
+			"a": map[string]any{
 				"name":     "a",
 				"type":     "string",
 				"required": true,
@@ -516,7 +516,7 @@ func TestLoadSchemaForEntity_WithData(t *testing.T) {
 	}, nil)
 	defer restore()
 
-	res := schema.LoadSchemaForEntity("x")
+	res := schema.LoadSchemaForEntity("x", nil)
 	if res == nil {
 		t.Fatalf("expected schema")
 	}

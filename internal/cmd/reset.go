@@ -2,10 +2,14 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"os"
 	"strings"
 
+	"github.com/taymour/elysiandb/internal/boot"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/mongodb"
 )
 
 func ResetAll() {
@@ -39,4 +43,17 @@ func ResetAll() {
 	dir := cfg.Store.Folder
 
 	os.RemoveAll(dir)
+
+	if engine.IsEngineMongoDB() {
+		boot.InitMongoDBConnection()
+		defer globals.MongoClient.Disconnect(context.Background())
+
+		types := engine.ListEntityTypes()
+		for _, t := range types {
+			err := mongodb.DeleteEntityType(t)
+			if err != nil {
+				Printf("Failed to delete entity type '%s': %v\n", t, err)
+			}
+		}
+	}
 }

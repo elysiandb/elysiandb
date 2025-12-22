@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"github.com/taymour/elysiandb/internal/boot"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/storage"
 )
@@ -24,7 +25,7 @@ func StartServer() {
 		globals.Reset,
 	)
 
-	if cfg.Stats.Enabled {
+	if cfg.Stats.Enabled && engine.IsEngineInternal() {
 		boot.BootStats()
 	}
 
@@ -91,6 +92,11 @@ func StartServer() {
 		globals.Gray,
 		globals.Reset,
 	)
+
+	if globals.MongoClient != nil {
+		_ = globals.MongoClient.Disconnect(context.Background())
+	}
+
 	Printf(
 		"%sGoodbye%s   %sElysianDB shutting down gracefully.%s\n",
 		globals.Blue,

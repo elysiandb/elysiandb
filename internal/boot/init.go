@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/taymour/elysiandb/internal/cache"
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/recovery"
 	"github.com/taymour/elysiandb/internal/storage"
@@ -29,8 +30,15 @@ func InitDB() {
 
 	BootSaver()
 	BootExpirationHandler()
-	BootApiCacheCleaner()
 	BootLazyIndexRebuilder()
+
+	if engine.IsEngineMongoDB() {
+		InitMongoDBConnection()
+	} else if !engine.IsEngineInternal() {
+		panic("Unsupported engine: " + cfg.Engine.Name)
+	}
+
 	BootACL()
 	BootHooks()
+	BootApiCacheCleaner()
 }
