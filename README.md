@@ -6,9 +6,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![JS Client](https://img.shields.io/badge/JS%20Client-available-brightgreen)](https://github.com/elysiandb/client-js)
 
-ElysianDB is a self contained backend engine that turns raw JSON into a usable, queryable API in seconds.
+ElysianDB is a self-contained backend engine that turns raw JSON into a usable, queryable API in seconds.
 
-It combines a built in datastore, automatic REST API generation, advanced querying and indexing, and optional KV and TCP interfaces into a single fast Go binary.
+It combines automatic REST API generation, advanced querying and indexing, authentication, ACLs, hooks, and optional KV and TCP interfaces into a single fast Go binary, while supporting multiple storage backends through a pluggable engine system.
 
 The goal is simple: remove backend boilerplate so you can focus on shipping features instead of infrastructure.
 
@@ -20,11 +20,13 @@ ElysianDB removes this entire layer.
 
 You send JSON. You get a fully functional backend.
 
-No ORM, no migrations to write, no controllers to scaffold, no schema to maintain unless you want one.
+No ORM. No controllers to scaffold. No migrations to write. No schema to maintain unless you explicitly want one.
 
 ## Storage Engine
 
-ElysianDB uses a **pluggable storage engine abstraction** that separates the core API logic from the underlying data storage implementation.
+ElysianDB uses a **pluggable storage engine abstraction** that cleanly separates API logic from the underlying persistence layer.
+
+The same REST API, Query API, ACLs, hooks, transactions, and Admin UI work identically regardless of the selected engine.
 
 The storage engine is selected at startup via configuration:
 
@@ -37,21 +39,48 @@ engine:
 
 **internal (default)**
 
-The `internal` engine is the built-in storage engine shipped with ElysianDB. It provides:
+The `internal` engine is the original storage engine shipped with ElysianDB. It provides:
 
 * Sharded in-memory storage
 * Periodic disk persistence
 * Crash recovery via write-ahead logs
 * Lazy index creation
-* Full compatibility with all ElysianDB features (REST API, Query API, ACLs, hooks, transactions, Admin UI)
+* Very high throughput and low latency
+* Full compatibility with all ElysianDB features
 
-This is the **only engine available today** and is production-ready.
+This engine is production-ready and optimized for speed, prototyping, and controlled workloads.
+
+**mongodb**
+
+The `mongodb` engine allows ElysianDB to run on top of MongoDB while keeping the same API surface and behavior.
+
+It provides:
+
+* Persistence backed by MongoDB
+* Better durability guarantees for long-lived datasets
+* Horizontal scalability through MongoDB deployments
+* Identical REST API, Query API, ACLs, hooks, and Admin UI behavior
+
+Example configuration:
+
+```yaml
+engine:
+  name: mongodb
+  uri: mongodb://elysian:elysian@localhost:27017/elysiandb
+```
+
+The MongoDB engine is designed for users who want ElysianDB’s API and query model while relying on an external database for storage, replication, or operational constraints.
 
 ### Future Engines
 
-The engine abstraction is designed to support additional storage engines in the future, such as alternative persistence models, embedded or external databases, or specialized engines optimized for specific workloads.
+The engine abstraction is designed to support additional backends in the future, such as:
 
-Future engines will be selectable using the same configuration mechanism, without impacting application code or API usage.
+* Alternative persistence models
+* Embedded databases
+* Specialized engines optimized for specific workloads
+* Experimental or in-memory–only backends
+
+All engines are selected using the same configuration mechanism, without impacting application code or API usage.
 
 ## What You Get Out of the Box
 
@@ -59,15 +88,13 @@ Instant REST API with CRUD operations, pagination, sorting, filtering, projectio
 
 Advanced query system with logical operators, nested filters, array traversal, and deterministic caching
 
-High performance in memory datastore with sharding, optional TTL, and crash recovery
+High-performance datastore with lazy indexing and predictable execution
 
-Automatic indexing built lazily on first sort
-
-Schema inference with optional strict validation and manual overrides
+Optional strict schema validation with manual overrides
 
 Nested entity creation and linking using simple JSON conventions
 
-Built in authentication with token, basic, or user based modes
+Built-in authentication with token, basic, or user-based modes
 
 Access control lists enforced at the API level
 
@@ -75,7 +102,7 @@ Configurable JavaScript hooks to enrich or filter data at read time
 
 Optional Admin UI served directly by the binary
 
-HTTP REST API, Redis style TCP protocol, and key value endpoints
+HTTP REST API, Redis-style TCP protocol, and key–value endpoints
 
 All of this ships as a single binary or Docker image.
 
@@ -100,45 +127,46 @@ ElysianDB includes a dedicated Query API that lets you express complex condition
 
 You can combine filters, logical operators, sorting, pagination, projections, and counts without writing SQL or custom endpoints.
 
-Queries are deterministic, type aware, and executed fully in memory.
-
-This makes them predictable, debuggable, and safe to cache.
+Queries are deterministic, type-aware, and executed predictably, making them easy to debug and safe to cache.
 
 ## Performance
 
 ElysianDB is designed for low latency and high throughput.
 
-The engine uses sharded in memory storage, minimal allocations, and cache friendly data structures.
+With the internal engine, the system relies on sharded in-memory storage, minimal allocations, and cache-friendly data structures.
 
-On a MacBook Pro M4, mixed workloads with CRUD, filtering, sorting, nested writes, and includes reach tens of thousands of requests per second with sub millisecond latencies under moderate load.
+On a MacBook Pro M4, mixed workloads with CRUD, filtering, sorting, nested writes, and includes reach tens of thousands of requests per second with sub-millisecond latencies under moderate load.
 
-These are not synthetic microbenchmarks but real API scenarios.
+With the MongoDB engine, performance is naturally bounded by MongoDB and network latency, but remains stable and predictable while enabling durability and scalability.
+
+These are real API scenarios, not synthetic microbenchmarks.
 
 ## When to Use ElysianDB
 
 Rapid prototyping and MVPs
 
-Frontend first development where the backend should not block progress
+Frontend-first development where the backend should not block progress
 
 Internal tools and admin backends
 
 Mocking APIs and datasets
 
-Simple services that do not justify a full database and ORM stack
+Simple services that do not justify a full ORM or framework-heavy backend
 
-High performance read heavy APIs with predictable access patterns
+High-performance read-heavy APIs with predictable access patterns
 
 ## When Not to Use It
 
 ElysianDB is not a relational database replacement.
 
-It is not designed for complex cross entity joins or heavy transactional workloads.
+It is not designed for complex cross-entity joins or heavy transactional workloads.
 
-If you need strong relational guarantees, complex SQL queries, or decades of existing tooling, a traditional database may be a better fit.
+If you need strong relational guarantees, complex SQL queries, or decades of ecosystem tooling, a traditional relational database may be a better fit.
 
 ## Official Clients
 
-JavaScript and TypeScript client available at [https://github.com/elysiandb/client-js](https://github.com/elysiandb/client-js)
+JavaScript and TypeScript client available at:
+[https://github.com/elysiandb/client-js](https://github.com/elysiandb/client-js)
 
 ## Run with Docker
 
@@ -152,7 +180,7 @@ docker run --rm -p 8089:8089 -p 8088:8088 taymour/elysiandb:latest
 go build && ./elysiandb server
 ```
 
-Or
+Or:
 
 ```bash
 go run elysiandb.go server
@@ -170,8 +198,8 @@ What you send is what you get.
 
 ## Status
 
-ElysianDB is actively developed and not already usable in production.
+ElysianDB is actively developed and evolving.
 
-The Admin UI is under active development.
+The MongoDB engine expands its applicability to more persistent and scalable workloads, while the internal engine remains ideal for speed and simplicity.
 
 Feedback, issues, and contributions are welcome.

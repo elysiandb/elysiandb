@@ -1,9 +1,11 @@
 # ElysianDB Documentation
 
 ElysianDB turns raw JSON into a complete backend instantly.
-With a built-in datastore, auto-generated REST API, and optional KV/TCP interfaces, it gives you a database and a backend in a single, ultra-fast Go binary.
 
-This document explains how to use ElysianDB, its features, configuration, and runtime behavior.
+It combines a pluggable storage engine, an auto-generated REST API, advanced querying, and optional KV/TCP interfaces into a single, high-performance Go binary. Depending on your needs, ElysianDB can run with its built-in internal engine or delegate persistence and scalability to MongoDB, without changing your API or application logic.
+
+This document explains how to use ElysianDB, its features, configuration, storage engines, and runtime behavior.
+
 
 ---
 
@@ -130,7 +132,7 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 
 ElysianDB exposes a **pluggable storage engine abstraction** that allows the core database logic to run independently of the underlying storage implementation.
 
-This makes it possible to switch or extend the storage backend without changing the API, query system, ACLs, hooks, or Admin UI.
+This makes it possible to switch storage backends **without changing the API, query language, ACL rules, hooks, transactions, or Admin UI**. The same requests, payloads, and behaviors apply regardless of the engine in use.
 
 ---
 
@@ -142,6 +144,8 @@ The storage engine is selected in `elysian.yaml`:
 engine:
   name: internal
 ```
+
+Some engines may require additional configuration fields.
 
 ---
 
@@ -157,22 +161,41 @@ It offers:
 * Periodic disk persistence
 * Crash recovery via write-ahead logs
 * Lazy indexing
+* Deterministic query execution
 * Full compatibility with all ElysianDB features (REST API, Query API, ACLs, hooks, transactions, Admin UI)
 
-This engine is production-ready and is the **only engine available today**.
+This engine is **production-ready** and requires no external dependencies. It is well suited for prototyping, embedded deployments, internal tools, and high-performance read-heavy workloads.
 
 ---
 
-### Future Engines
+#### `mongodb`
 
-The engine abstraction is designed to allow additional engines to be implemented in the future, such as:
+The `mongodb` engine allows ElysianDB to use **MongoDB as its persistence layer** while preserving the same API surface and developer experience.
 
-* Alternative persistence models
-* External or embedded databases
-* Specialized engines optimized for specific workloads
-* Experimental or in-memory–only backends
+It provides:
 
-These engines would be selectable using the same configuration mechanism, without impacting application code or API usage.
+* External persistence backed by MongoDB
+* Improved durability and operational familiarity
+* Horizontal scalability through MongoDB tooling
+* Native BSON support and efficient document storage
+* Full compatibility with ElysianDB features (REST API, Query API, ACLs, hooks, includes, Admin UI)
+
+This engine is ideal when you want:
+
+* An external, battle-tested database
+* Easier backups and replication
+* Shared storage across multiple instances
+* A smoother transition from prototypes to long-running services
+
+##### Configuration Example
+
+```yaml
+engine:
+  name: mongodb
+  uri: mongodb://elysian:elysian@localhost:27017/elysiandb
+```
+
+Switching between `internal` and `mongodb` **does not require any API or payload changes**.
 
 ---
 
@@ -181,11 +204,12 @@ These engines would be selectable using the same configuration mechanism, withou
 The storage engine abstraction follows these principles:
 
 * Clear separation between **API logic** and **storage implementation**
+* Identical API behavior across engines
 * No feature loss when switching engines
-* Deterministic behavior across engines
+* Deterministic results regardless of backend
 * Minimal overhead for the default engine
 
-This design allows ElysianDB to evolve without locking users into a single storage strategy.
+This design allows ElysianDB to scale from an embedded, single-binary backend to an externally backed system without rewriting application logic.
 
 ---
 
@@ -193,7 +217,9 @@ This design allows ElysianDB to evolve without locking users into a single stora
 
 * If no engine is specified, `internal` is used by default
 * Engine selection is evaluated at startup
-* Changing the engine may require data migration depending on future implementations
+* Switching engines may require data migration
+* All engines share the same query model, schema rules, ACLs, and hooks
+
 
 ---
 
