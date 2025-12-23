@@ -71,8 +71,8 @@ type UsersFile struct {
 	Users []BasicHashedUser `json:"users"`
 }
 
-func (u *BasicHashedUser) ToDataMap() map[string]interface{} {
-	return map[string]interface{}{
+func (u *BasicHashedUser) ToDataMap() map[string]any {
+	return map[string]any{
 		"id":       u.Username,
 		"username": u.Username,
 		"password": u.Password,
@@ -80,7 +80,7 @@ func (u *BasicHashedUser) ToDataMap() map[string]interface{} {
 	}
 }
 
-func (u *BasicHashedUser) FromDataMap(data map[string]interface{}) error {
+func (u *BasicHashedUser) FromDataMap(data map[string]any) error {
 	username, ok := data["username"].(string)
 	if !ok {
 		return errors.New("invalid username in user data")
@@ -109,12 +109,12 @@ func (u *BasicHashedUser) Save() error {
 		return nil
 	}
 
-	var result string
+	var result strings.Builder
 	for i, e := range err {
-		result += fmt.Sprintf("Error %d: %s\n", i, e.ToError())
+		fmt.Fprintf(&result, "Error %d: %s\n", i, e.ToError())
 	}
 
-	return fmt.Errorf("%s", result)
+	return fmt.Errorf("%s", result.String())
 }
 
 func InitAdminUserIfNotExists() error {
@@ -132,21 +132,21 @@ func InitAdminUserIfNotExists() error {
 	return CreateBasicUser(user)
 }
 
-func UserEntitySchema() map[string]interface{} {
-	return map[string]interface{}{
-		"id": map[string]interface{}{
+func UserEntitySchema() map[string]any {
+	return map[string]any{
+		"id": map[string]any{
 			"type":     "string",
 			"required": true,
 		},
-		"username": map[string]interface{}{
+		"username": map[string]any{
 			"type":     "string",
 			"required": true,
 		},
-		"password": map[string]interface{}{
+		"password": map[string]any{
 			"type":     "string",
 			"required": true,
 		},
-		"role": map[string]interface{}{
+		"role": map[string]any{
 			"type":     "string",
 			"required": true,
 		},
@@ -169,7 +169,7 @@ func InitBasicUsersStorage() error {
 	return nil
 }
 
-func GetBasicUserByUsername(username string) (map[string]interface{}, error) {
+func GetBasicUserByUsername(username string) (map[string]any, error) {
 	err := InitBasicUsersStorage()
 	if err != nil {
 		return nil, err
@@ -185,7 +185,7 @@ func GetBasicUserByUsername(username string) (map[string]interface{}, error) {
 	return u, nil
 }
 
-func ListBasicUsers() ([]map[string]interface{}, error) {
+func ListBasicUsers() ([]map[string]any, error) {
 	err := InitBasicUsersStorage()
 	if err != nil {
 		return nil, err
@@ -202,7 +202,7 @@ func ListBasicUsers() ([]map[string]interface{}, error) {
 		"",
 	)
 
-	result := make([]map[string]interface{}, 0, len(users))
+	result := make([]map[string]any, 0, len(users))
 	for _, u := range users {
 		delete(u, "password")
 		result = append(result, u)
@@ -391,5 +391,6 @@ var CheckBasicAuthentication = func(ctx *fasthttp.RequestCtx) bool {
 	password := parts[1]
 
 	_, ok := AuthenticateUser(username, password)
+
 	return ok
 }

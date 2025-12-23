@@ -123,6 +123,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 			ctx.Response.Header.Set("X-Elysian-Cache", "HIT")
 			ctx.SetStatusCode(fasthttp.StatusOK)
 			ctx.SetBody(cached)
+
 			return
 		}
 	}

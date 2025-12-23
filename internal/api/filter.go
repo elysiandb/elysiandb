@@ -9,8 +9,8 @@ import (
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
-func SearchMatchesEntity(entityData map[string]interface{}, pattern string) bool {
-	var stack []interface{}
+func SearchMatchesEntity(entityData map[string]any, pattern string) bool {
+	var stack []any
 	stack = append(stack, entityData)
 
 	for len(stack) > 0 {
@@ -19,11 +19,11 @@ func SearchMatchesEntity(entityData map[string]interface{}, pattern string) bool
 		stack = stack[:n]
 
 		switch v := cur.(type) {
-		case map[string]interface{}:
+		case map[string]any:
 			for _, val := range v {
 				stack = append(stack, val)
 			}
-		case []interface{}:
+		case []any:
 			stack = append(stack, v...)
 		case string:
 			if storage.MatchGlob(pattern, v) {
@@ -36,7 +36,7 @@ func SearchMatchesEntity(entityData map[string]interface{}, pattern string) bool
 }
 
 func FiltersMatchEntity(
-	entityData map[string]interface{},
+	entityData map[string]any,
 	filters map[string]map[string]string,
 ) bool {
 	if len(filters) == 0 {
@@ -88,11 +88,12 @@ func matchBoolean(value bool, ops map[string]string) bool {
 			}
 		}
 	}
+
 	return true
 }
 
-func matchArray(arr []interface{}, ops map[string]string) bool {
-	toStrings := func(a []interface{}) []string {
+func matchArray(arr []any, ops map[string]string) bool {
+	toStrings := func(a []any) []string {
 		out := make([]string, 0, len(a))
 		for _, v := range a {
 			switch s := v.(type) {
@@ -106,22 +107,27 @@ func matchArray(arr []interface{}, ops map[string]string) bool {
 				out = append(out, fmt.Sprintf("%v", s))
 			}
 		}
+
 		return out
 	}
+
 	inArray := func(arr []string, val string) bool {
 		for _, a := range arr {
 			if a == val {
 				return true
 			}
 		}
+
 		return false
 	}
+
 	arrStr := toStrings(arr)
 	for op, cmp := range ops {
 		values := []string{cmp}
 		if strings.Contains(cmp, ",") {
 			values = strings.Split(cmp, ",")
 		}
+
 		switch op {
 		case "contains":
 			if !inArray(arrStr, values[0]) {
@@ -145,6 +151,7 @@ func matchArray(arr []interface{}, ops map[string]string) bool {
 					break
 				}
 			}
+
 			if !found {
 				return false
 			}
@@ -152,15 +159,18 @@ func matchArray(arr []interface{}, ops map[string]string) bool {
 			if len(arrStr) != len(values) {
 				return false
 			}
+
 			matched := make(map[string]bool)
 			for _, v := range arrStr {
 				matched[v] = true
 			}
+
 			for _, v := range values {
 				if !matched[v] {
 					return false
 				}
 			}
+
 		case "none":
 			for _, v := range values {
 				if inArray(arrStr, v) {
@@ -169,6 +179,7 @@ func matchArray(arr []interface{}, ops map[string]string) bool {
 			}
 		}
 	}
+
 	return true
 }
 
@@ -217,6 +228,7 @@ func matchDate(value string, ops map[string]string) (bool, bool) {
 			}
 		}
 	}
+
 	return true, true
 }
 
@@ -233,6 +245,7 @@ func matchString(value string, ops map[string]string) bool {
 			}
 		}
 	}
+
 	return true
 }
 
@@ -250,6 +263,7 @@ func matchNumber(value float64, ops map[string]string) bool {
 		if err != nil {
 			return false
 		}
+
 		switch op {
 		case "eq":
 			if value != num {
@@ -277,6 +291,7 @@ func matchNumber(value float64, ops map[string]string) bool {
 			}
 		}
 	}
+
 	return true
 }
 
@@ -284,8 +299,10 @@ func parseDate(s string) (time.Time, bool, bool) {
 	if t, err := time.Parse(time.RFC3339, s); err == nil {
 		return t, true, false
 	}
+
 	if t, err := time.Parse("2006-01-02", s); err == nil {
 		return t, true, true
 	}
+
 	return time.Time{}, false, false
 }

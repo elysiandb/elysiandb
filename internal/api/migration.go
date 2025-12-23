@@ -33,6 +33,7 @@ func ParseMigrationQuery(s, entity string) []MigrationQuery {
 						Properties: props,
 					})
 				}
+
 				continue
 			}
 

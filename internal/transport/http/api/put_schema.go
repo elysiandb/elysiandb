@@ -16,17 +16,19 @@ func PutSchemaController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	var payload map[string]interface{}
+	var payload map[string]any
 	if err := json.Unmarshal(ctx.PostBody(), &payload); err != nil {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error":"invalid json"}`)
+
 		return
 	}
 
-	fieldsRaw, ok := payload["fields"].(map[string]interface{})
+	fieldsRaw, ok := payload["fields"].(map[string]any)
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error":"schema.fields must be an object"}`)
+
 		return
 	}
 

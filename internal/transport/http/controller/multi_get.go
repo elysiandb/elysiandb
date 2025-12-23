@@ -39,6 +39,7 @@ func MultiGetController(ctx *fasthttp.RequestCtx) {
 			keys = append(keys, p)
 		}
 	}
+
 	if len(keys) == 0 {
 		_, _ = ctx.Write([]byte("[]"))
 		return

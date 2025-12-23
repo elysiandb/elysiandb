@@ -47,7 +47,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if includesParam != "" {
-		list := []map[string]interface{}{data}
+		list := []map[string]any{data}
 		data = engine.ApplyIncludes(list, includesParam)[0]
 	}
 

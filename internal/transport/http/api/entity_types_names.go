@@ -12,7 +12,7 @@ func GetEntityTypesNamesController(ctx *fasthttp.RequestCtx) {
 
 	entityTypes := engine.ListPublicEntityTypes()
 
-	responseBytes, err := json.Marshal(map[string]interface{}{
+	responseBytes, err := json.Marshal(map[string]any{
 		"entities": entityTypes,
 	})
 	if err != nil {

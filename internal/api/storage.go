@@ -2,6 +2,8 @@ package api_storage
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -13,7 +15,7 @@ import (
 
 const CoreEntityTypePrefix = "_elysiandb_core_"
 
-func WriteEntity(entity string, data map[string]interface{}) []schema.ValidationError {
+func WriteEntity(entity string, data map[string]any) []schema.ValidationError {
 	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
 		errors := schema.ValidateEntity(entity, data, nil)
 		if len(errors) > 0 {
@@ -41,7 +43,7 @@ func WriteEntity(entity string, data map[string]interface{}) []schema.Validation
 	return []schema.ValidationError{}
 }
 
-func UpdateEntitySchema(entity string, fieldsRaw map[string]interface{}) map[string]interface{} {
+func UpdateEntitySchema(entity string, fieldsRaw map[string]any) map[string]any {
 	fields := schema.MapToFields(fieldsRaw)
 
 	entitySchema := schema.Entity{
@@ -90,7 +92,7 @@ func DeleteEntityType(entity string) error {
 	return nil
 }
 
-func persistEntity(entity string, data map[string]interface{}) {
+func persistEntity(entity string, data map[string]any) {
 	id, _ := data["id"].(string)
 	key := globals.ApiSingleEntityKey(entity, id)
 	old := ReadEntityById(entity, id)
@@ -109,14 +111,14 @@ func persistEntity(entity string, data map[string]interface{}) {
 	}
 }
 
-func updateSchemaIfNeeded(entity string, data map[string]interface{}) {
+func updateSchemaIfNeeded(entity string, data map[string]any) {
 	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
 		analyzed := schema.AnalyzeEntitySchema(entity, data)
 		WriteEntity(schema.SchemaEntity, analyzed)
 	}
 }
 
-func WriteListOfEntities(entity string, list []map[string]interface{}) [][]schema.ValidationError {
+func WriteListOfEntities(entity string, list []map[string]any) [][]schema.ValidationError {
 	errors := [][]schema.ValidationError{}
 	for _, data := range list {
 		errors = append(errors, WriteEntity(entity, data))
@@ -129,20 +131,15 @@ func AddEntityType(entity string) {
 	key := globals.ApiAllEntityTypesListKey()
 	data, _ := storage.GetByKey(key)
 	types := decodeIDs(data)
-	found := false
-	for _, t := range types {
-		if t == entity {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(types, entity)
+
 	if !found {
 		types = append(types, entity)
 		storage.PutKeyValue(key, encodeIDs(types))
 	}
 }
 
-func GetEntitySchema(entity string) map[string]interface{} {
+func GetEntitySchema(entity string) map[string]any {
 	schemaData := ReadEntityById(schema.SchemaEntity, entity)
 	if schemaData == nil {
 		return nil
@@ -180,7 +177,7 @@ func ListPublicEntityTypes() []string {
 	return publicEntityTypes
 }
 
-func ReadEntityById(entity, id string) map[string]interface{} {
+func ReadEntityById(entity, id string) map[string]any {
 	key := globals.ApiSingleEntityKey(entity, id)
 	data, _ := storage.GetJsonByKey(key)
 
@@ -281,15 +278,18 @@ func GetListOfIds(entity, sortField string, sortAscending bool) ([]byte, error) 
 		idIndexKey := globals.ApiEntityIndexIdKey(entity)
 		return storage.GetByKey(idIndexKey)
 	}
+
 	ensureFieldIndexFresh(entity, sortField)
 	if !IndexExistsForField(entity, sortField) {
 		return []byte{}, nil
 	}
+
 	if sortAscending {
 		return storage.GetByKey(
 			globals.ApiEntityIndexFieldSortAscKey(entity, sortField),
 		)
 	}
+
 	return storage.GetByKey(
 		globals.ApiEntityIndexFieldSortDescKey(entity, sortField),
 	)
@@ -314,6 +314,7 @@ func DeleteAllEntities(entity string) {
 			newTypes = append(newTypes, t)
 		}
 	}
+
 	storage.PutKeyValue(key, encodeIDs(newTypes))
 }
 
@@ -325,18 +326,16 @@ func DeleteAll() {
 	}
 }
 
-func UpdateEntityById(entity, id string, updated map[string]interface{}) map[string]interface{} {
+func UpdateEntityById(entity, id string, updated map[string]any) map[string]any {
 	existing := ReadEntityById(entity, id)
 	if existing == nil {
 		return nil
 	}
-	old := make(map[string]interface{}, len(existing))
-	for k, v := range existing {
-		old[k] = v
-	}
-	for k, v := range updated {
-		existing[k] = v
-	}
+
+	old := make(map[string]any, len(existing))
+	maps.Copy(old, existing)
+
+	maps.Copy(existing, updated)
 
 	if _, ok := existing["id"].(string); !ok || existing["id"] == "" {
 		existing["id"] = id
@@ -352,28 +351,31 @@ func UpdateEntityById(entity, id string, updated map[string]interface{}) map[str
 	persistEntity(entity, existing)
 	UpdateIndexesForEntity(entity, id, old, existing)
 	updateSchemaIfNeeded(entity, existing)
+
 	return existing
 }
 
-func UpdateListOfEntities(entity string, updates []map[string]interface{}) []map[string]interface{} {
-	results := make([]map[string]interface{}, 0, len(updates))
+func UpdateListOfEntities(entity string, updates []map[string]any) []map[string]any {
+	results := make([]map[string]any, 0, len(updates))
 	for _, upd := range updates {
 		id, ok := upd["id"].(string)
 		if !ok || id == "" {
 			continue
 		}
+
 		res := UpdateEntityById(entity, id, upd)
 		if res != nil {
 			results = append(results, res)
 		}
 	}
+
 	return results
 }
 
-func DumpAll() map[string]interface{} {
+func DumpAll() map[string]any {
 	entities := ListEntityTypes()
 
-	result := make(map[string]interface{})
+	result := make(map[string]any)
 	for _, entity := range entities {
 		if entity == schema.SchemaEntity {
 			continue
@@ -404,7 +406,7 @@ func CountAllEntities() int {
 	return counter
 }
 
-func ImportAll(data map[string][]map[string]interface{}) {
+func ImportAll(data map[string][]map[string]any) {
 	for entity, items := range data {
 		storage.DeleteByWildcardKey(globals.ApiEntityIndexPatternKey(entity))
 

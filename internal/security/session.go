@@ -66,6 +66,7 @@ func generateSessionID() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return hex.EncodeToString(b), nil
 }
 
@@ -78,8 +79,10 @@ func loadSessions() (*SessionsFile, error) {
 		if os.IsNotExist(err) {
 			return &SessionsFile{Sessions: []Session{}}, nil
 		}
+
 		return nil, err
 	}
+
 	defer file.Close()
 
 	var sf SessionsFile
@@ -99,9 +102,11 @@ func saveSessions(sf *SessionsFile) error {
 	if err != nil {
 		return err
 	}
+
 	defer file.Close()
 
 	enc := json.NewEncoder(file)
+
 	return enc.Encode(sf)
 }
 
@@ -118,6 +123,7 @@ func CreateSession(username string, role Role, ttl time.Duration) (*Session, err
 			active = append(active, s)
 		}
 	}
+
 	sf.Sessions = active
 
 	id, err := generateSessionID()
@@ -185,6 +191,7 @@ func DeleteSession(id string) error {
 			updated = append(updated, s)
 		}
 	}
+
 	sf.Sessions = updated
 
 	return saveSessions(sf)

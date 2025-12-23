@@ -44,6 +44,7 @@ func appendStoreRecoveryOp(op storeRecoveryOp) {
 		log.Error("Error opening store recovery log:", err)
 		return
 	}
+
 	defer f.Close()
 
 	enc := json.NewEncoder(f)
@@ -58,6 +59,7 @@ func LogStorePut(key string, value []byte) {
 	if !storeRecoveryActive {
 		return
 	}
+
 	appendStoreRecoveryOp(storeRecoveryOp{Op: "put", Key: key, Value: value})
 }
 
@@ -65,10 +67,12 @@ func LogStorePutWithTTL(key string, value []byte, ttl int) {
 	if !storeRecoveryActive {
 		return
 	}
+
 	var exp int
 	if ttl > 0 {
 		exp = int(time.Now().Unix()) + ttl
 	}
+
 	appendStoreRecoveryOp(storeRecoveryOp{Op: "put", Key: key, Value: value, TTL: exp})
 }
 
@@ -76,6 +80,7 @@ func LogStoreDelete(key string) {
 	if !storeRecoveryActive {
 		return
 	}
+
 	appendStoreRecoveryOp(storeRecoveryOp{Op: "del", Key: key})
 }
 
@@ -90,9 +95,12 @@ func ReplayStoreRecoveryLog(
 		if os.IsNotExist(err) {
 			return
 		}
+
 		log.Error("Error opening store recovery log for replay:", err)
+
 		return
 	}
+
 	defer f.Close()
 
 	now := int(time.Now().Unix())
@@ -102,11 +110,13 @@ func ReplayStoreRecoveryLog(
 		if line == "" {
 			continue
 		}
+
 		var op storeRecoveryOp
 		if err := json.Unmarshal([]byte(line), &op); err != nil {
 			log.Error("Error decoding store recovery log entry:", err)
 			continue
 		}
+
 		switch op.Op {
 		case "put":
 			if op.TTL > 0 && now >= op.TTL {
@@ -139,6 +149,7 @@ func checkStoreLogSize(path string) {
 	if err != nil {
 		return
 	}
+
 	if info.Size() >= globals.GetConfig().Store.CrashRecovery.MaxLogMB*1024*1024 {
 		SaveDBFunc()
 	}

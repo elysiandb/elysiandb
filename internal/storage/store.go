@@ -62,6 +62,7 @@ func (c *ExpirationContainer) put(ts int64, keys []string) {
 		b = &ExpirationBucket{}
 		c.Buckets[ts] = b
 	}
+
 	c.mu.Unlock()
 
 	b.mu.Lock()
@@ -72,9 +73,11 @@ func (c *ExpirationContainer) put(ts int64, keys []string) {
 	if c.index == nil {
 		c.index = make(map[string]int64)
 	}
+
 	for _, k := range keys {
 		c.index[k] = ts
 	}
+
 	c.saved.Store(false)
 	c.mu.Unlock()
 }
@@ -89,6 +92,7 @@ func (c *ExpirationContainer) ToMap() map[int64][]string {
 		v.mu.RUnlock()
 		result[k] = cp
 	}
+
 	c.mu.RUnlock()
 
 	return result
@@ -122,6 +126,7 @@ func (c *ExpirationContainer) del(key string) {
 				break
 			}
 		}
+
 		empty := len(b.Keys) == 0
 		b.mu.Unlock()
 
@@ -133,6 +138,7 @@ func (c *ExpirationContainer) del(key string) {
 			c.mu.Unlock()
 		}
 	}
+
 	c.saved.Store(false)
 }
 
@@ -164,7 +170,7 @@ func NewStore() *Store {
 		shardCount: n,
 	}
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		s.shards[i] = &shard{m: make(map[string][]byte)}
 	}
 
@@ -192,6 +198,7 @@ func (s *Store) reset() {
 		sh.m = make(map[string][]byte)
 		sh.mu.Unlock()
 	}
+
 	s.saved.Store(false)
 
 	if globals.GetConfig().Store.CrashRecovery.Enabled {
@@ -262,6 +269,7 @@ func (s *Store) FromMap(src map[string][]byte) {
 		sh.m[k] = buf
 		sh.mu.Unlock()
 	}
+
 	s.saved.Store(true)
 }
 

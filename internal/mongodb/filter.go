@@ -27,6 +27,7 @@ func GlobToRegex(glob string) string {
 	}
 
 	b.WriteString("$")
+
 	return b.String()
 }
 
