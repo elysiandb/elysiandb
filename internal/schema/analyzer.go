@@ -34,7 +34,7 @@ func (v *ValidationError) ToError() error {
 	return fmt.Errorf("Field '%s': %s", v.Field, v.Message)
 }
 
-func AnalyzeEntitySchema(entity string, data map[string]interface{}) map[string]interface{} {
+func AnalyzeEntitySchema(entity string, data map[string]any) map[string]any {
 	required := globals.GetConfig().Api.Schema.Strict
 	schema := Entity{
 		ID:     entity,
@@ -73,7 +73,7 @@ func analyzeFields(data map[string]interface{}, isRoot, required bool) map[strin
 	return fields
 }
 
-func DetectJSONType(v interface{}) string {
+func DetectJSONType(v any) string {
 	switch val := v.(type) {
 	case string:
 		return "string"
@@ -81,9 +81,9 @@ func DetectJSONType(v interface{}) string {
 		return "number"
 	case bool:
 		return "boolean"
-	case map[string]interface{}:
+	case map[string]any:
 		return "object"
-	case []interface{}:
+	case []any:
 		return "array"
 	default:
 		if val != nil {
@@ -93,7 +93,7 @@ func DetectJSONType(v interface{}) string {
 	}
 }
 
-func ValidateEntity(entity string, data map[string]interface{}, schemaData map[string]any) []ValidationError {
+func ValidateEntity(entity string, data map[string]any, schemaData map[string]any) []ValidationError {
 	var errors []ValidationError
 	s := LoadSchemaForEntity(entity, schemaData)
 	if s == nil {
@@ -184,7 +184,7 @@ func validateFieldsRecursive(fields map[string]Field, data map[string]interface{
 		}
 
 		if expected == "object" {
-			sub, ok := value.(map[string]interface{})
+			sub, ok := value.(map[string]any)
 			if !ok {
 				*errors = append(*errors, ValidationError{
 					Field:   fullName,
@@ -197,17 +197,19 @@ func validateFieldsRecursive(fields map[string]Field, data map[string]interface{
 		}
 
 		if expected == "array" {
-			arr, ok := value.([]interface{})
+			arr, ok := value.([]any)
 			if !ok {
 				*errors = append(*errors, ValidationError{
 					Field:   fullName,
 					Message: "expected array",
 				})
+
 				continue
 			}
+
 			if len(fieldDef.Fields) > 0 {
 				for i, item := range arr {
-					if obj, ok := item.(map[string]interface{}); ok {
+					if obj, ok := item.(map[string]any); ok {
 						validateFieldsRecursive(fieldDef.Fields, obj, fmt.Sprintf("%s[%d]", fullName, i), errors, strict)
 					}
 				}
@@ -231,17 +233,17 @@ func IsManualSchema(entity string, schemaData map[string]any) bool {
 	return ok
 }
 
-func SchemaEntityToStorableStructure(entity Entity) map[string]interface{} {
-	return map[string]interface{}{
+func SchemaEntityToStorableStructure(entity Entity) map[string]any {
+	return map[string]any{
 		"id":     entity.ID,
 		"fields": FieldsToMap(entity.Fields),
 	}
 }
 
-func FieldsToMap(fields map[string]Field) map[string]interface{} {
-	out := make(map[string]interface{})
+func FieldsToMap(fields map[string]Field) map[string]any {
+	out := make(map[string]any)
 	for _, v := range fields {
-		fieldMap := map[string]interface{}{
+		fieldMap := map[string]any{
 			"name":     v.Name,
 			"type":     v.Type,
 			"required": v.Required,
@@ -257,10 +259,10 @@ func FieldsToMap(fields map[string]Field) map[string]interface{} {
 	return out
 }
 
-func MapToFields(m map[string]interface{}) map[string]Field {
+func MapToFields(m map[string]any) map[string]Field {
 	fields := make(map[string]Field)
 	for k, v := range m {
-		if fieldMap, ok := v.(map[string]interface{}); ok {
+		if fieldMap, ok := v.(map[string]any); ok {
 			f := Field{Name: k}
 			if typeName, ok := fieldMap["type"].(string); ok {
 				f.Type = typeName
@@ -270,7 +272,7 @@ func MapToFields(m map[string]interface{}) map[string]Field {
 				f.Required = req
 			}
 
-			if subFields, ok := fieldMap["fields"].(map[string]interface{}); ok {
+			if subFields, ok := fieldMap["fields"].(map[string]any); ok {
 				f.Fields = MapToFields(subFields)
 			}
 
@@ -314,5 +316,6 @@ func normalizeAnyMap(m map[string]interface{}) map[string]any {
 			out[k] = v
 		}
 	}
+
 	return out
 }

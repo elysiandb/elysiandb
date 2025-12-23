@@ -59,6 +59,7 @@ func ToMongoValue(v any) any {
 		if tm, err := time.Parse(time.RFC3339, t); err == nil {
 			return tm
 		}
+
 		return t
 
 	case map[string]any:
@@ -66,6 +67,7 @@ func ToMongoValue(v any) any {
 		for k, v := range t {
 			m[k] = ToMongoValue(v)
 		}
+
 		return m
 
 	case []any:
@@ -73,6 +75,7 @@ func ToMongoValue(v any) any {
 		for _, v := range t {
 			arr = append(arr, ToMongoValue(v))
 		}
+
 		return arr
 
 	default:
@@ -87,6 +90,7 @@ func ToMongoDocument(data map[string]interface{}) bson.M {
 			if s, ok := v.(string); ok {
 				doc["_id"] = s
 			}
+
 			continue
 		}
 
@@ -99,6 +103,7 @@ func ToMongoDocument(data map[string]interface{}) bson.M {
 
 		doc[k] = v
 	}
+
 	return doc
 }
 
@@ -112,9 +117,12 @@ func FromMongoDocument(doc map[string]any) map[string]any {
 			case bson.ObjectID:
 				out["id"] = t.Hex()
 			}
+
 			continue
 		}
+
 		out[k] = NormalizeMongoValue(v)
 	}
+
 	return out
 }

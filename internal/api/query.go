@@ -58,6 +58,7 @@ func matchFilterNode(node query.FilterNode, entity map[string]any) bool {
 				return false
 			}
 		}
+
 		return true
 	}
 
@@ -67,6 +68,7 @@ func matchFilterNode(node query.FilterNode, entity map[string]any) bool {
 				return true
 			}
 		}
+
 		return false
 	}
 
@@ -127,12 +129,14 @@ func resolveRecursive(current any, parts []string) []any {
 		if !ok {
 			return nil
 		}
+
 		return resolveRecursive(next, parts[1:])
 	case []any:
 		var out []any
 		for _, item := range v {
 			out = append(out, resolveRecursive(item, parts)...)
 		}
+
 		return out
 	default:
 		return nil

@@ -13,7 +13,7 @@ type TxOperation struct {
 	Kind   string
 	Entity string
 	ID     string
-	Data   map[string]interface{}
+	Data   map[string]any
 }
 
 type Transaction struct {
@@ -31,18 +31,18 @@ func SetStorageImpl(s Storage) {
 }
 
 type Storage interface {
-	WriteEntity(entity string, data map[string]interface{}) []schema.ValidationError
-	UpdateEntityById(entity, id string, data map[string]interface{}) map[string]interface{}
+	WriteEntity(entity string, data map[string]any) []schema.ValidationError
+	UpdateEntityById(entity, id string, data map[string]any) map[string]any
 	DeleteEntityById(entity, id string)
 }
 
 type realStorage struct{}
 
-func (realStorage) WriteEntity(e string, d map[string]interface{}) []schema.ValidationError {
+func (realStorage) WriteEntity(e string, d map[string]any) []schema.ValidationError {
 	return engine.WriteEntity(e, d)
 }
 
-func (realStorage) UpdateEntityById(e, id string, d map[string]interface{}) map[string]interface{} {
+func (realStorage) UpdateEntityById(e, id string, d map[string]any) map[string]any {
 	return engine.UpdateEntityById(e, id, d)
 }
 
@@ -67,6 +67,7 @@ func BeginTransaction() *Transaction {
 		Ops:       []TxOperation{},
 		StartedAt: time.Now(),
 	}
+
 	TxManager.txs[txID] = tx
 
 	return tx

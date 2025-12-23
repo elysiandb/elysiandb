@@ -42,6 +42,7 @@ func appendJsonRecoveryOp(op recoveryOp) {
 		log.Error("Error opening recovery log:", err)
 		return
 	}
+
 	defer f.Close()
 
 	enc := json.NewEncoder(f)
@@ -52,10 +53,11 @@ func appendJsonRecoveryOp(op recoveryOp) {
 	checkJsonLogSize(path)
 }
 
-func LogJsonPut(key string, value map[string]interface{}) {
+func LogJsonPut(key string, value map[string]any) {
 	if !recoveryLogActive {
 		return
 	}
+
 	appendJsonRecoveryOp(recoveryOp{Op: "put", Key: key, Value: value})
 }
 
@@ -67,7 +69,7 @@ func LogJsonDelete(key string) {
 }
 
 func ReplayJsonRecoveryLog(
-	putFunc func(key string, value map[string]interface{}) error,
+	putFunc func(key string, value map[string]any) error,
 	deleteFunc func(key string),
 ) {
 	cfg := globals.GetConfig()
@@ -77,9 +79,12 @@ func ReplayJsonRecoveryLog(
 		if os.IsNotExist(err) {
 			return
 		}
+
 		log.Error("Error opening recovery log for replay:", err)
+
 		return
 	}
+
 	defer f.Close()
 
 	scanner := bufio.NewScanner(f)
@@ -88,11 +93,13 @@ func ReplayJsonRecoveryLog(
 		if line == "" {
 			continue
 		}
+
 		var op recoveryOp
 		if err := json.Unmarshal([]byte(line), &op); err != nil {
 			log.Error("Error decoding recovery log entry:", err)
 			continue
 		}
+
 		switch op.Op {
 		case "put":
 			_ = putFunc(op.Key, op.Value)
@@ -122,6 +129,7 @@ func checkJsonLogSize(path string) {
 	if err != nil {
 		return
 	}
+
 	if info.Size() >= globals.GetConfig().Store.CrashRecovery.MaxLogMB*1024*1024 {
 		SaveJsonDBFunc()
 	}

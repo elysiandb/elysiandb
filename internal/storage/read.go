@@ -71,20 +71,22 @@ func ReadExpirationsFromDB(fileName string) (map[int64][]string, error) {
 	return out, nil
 }
 
-func ReadJsonFromDB(fileName string) (map[string]map[string]interface{}, error) {
+func ReadJsonFromDB(fileName string) (map[string]map[string]any, error) {
 	cfg := globals.GetConfig()
 
 	file, err := os.Open(cfg.Store.Folder + "/" + fileName)
 	if err != nil {
 		return nil, err
 	}
+
 	defer file.Close()
 
-	data := make(map[string]map[string]interface{})
+	data := make(map[string]map[string]any)
 	bytes, err := io.ReadAll(file)
 	if err != nil {
 		return nil, err
 	}
+
 	if len(bytes) == 0 {
 		return data, nil
 	}

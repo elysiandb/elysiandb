@@ -26,20 +26,21 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, schemaData) {
-		var obj map[string]interface{}
+		var obj map[string]any
 		if json.Unmarshal(body, &obj) == nil {
 			if errs := schema.ValidateEntity(entity, obj, schemaData); len(errs) > 0 {
 				b, _ := json.Marshal(errs)
 				ctx.SetStatusCode(fasthttp.StatusBadRequest)
 				ctx.Response.Header.Set("Content-Type", "application/json")
 				ctx.SetBody(b)
+
 				return
 			}
 		}
 	}
 
 	if handleSingleUpdate(ctx, entity, id, body) {
-		finalizeUpdate(ctx, entity)
+		finalizeUpdate(entity)
 		return
 	}
 
@@ -59,7 +60,7 @@ func UpdateListController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, schemaData) {
-		var arr []map[string]interface{}
+		var arr []map[string]any
 		if json.Unmarshal(body, &arr) == nil {
 			for _, obj := range arr {
 				if errs := schema.ValidateEntity(entity, obj, schemaData); len(errs) > 0 {
@@ -67,6 +68,7 @@ func UpdateListController(ctx *fasthttp.RequestCtx) {
 					ctx.SetStatusCode(fasthttp.StatusBadRequest)
 					ctx.Response.Header.Set("Content-Type", "application/json")
 					ctx.SetBody(b)
+
 					return
 				}
 			}
@@ -74,7 +76,7 @@ func UpdateListController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if handleBatchUpdate(ctx, entity, body) {
-		finalizeUpdate(ctx, entity)
+		finalizeUpdate(entity)
 		return
 	}
 
@@ -82,7 +84,7 @@ func UpdateListController(ctx *fasthttp.RequestCtx) {
 }
 
 func handleSingleUpdate(ctx *fasthttp.RequestCtx, entity, id string, body []byte) bool {
-	var single map[string]interface{}
+	var single map[string]any
 	if err := json.Unmarshal(body, &single); err != nil || len(single) == 0 {
 		return false
 	}
@@ -103,7 +105,7 @@ func handleSingleUpdate(ctx *fasthttp.RequestCtx, entity, id string, body []byte
 }
 
 func handleBatchUpdate(ctx *fasthttp.RequestCtx, entity string, body []byte) bool {
-	var list []map[string]interface{}
+	var list []map[string]any
 	if err := json.Unmarshal(body, &list); err != nil || len(list) == 0 {
 		return false
 	}
@@ -118,6 +120,7 @@ func handleBatchUpdate(ctx *fasthttp.RequestCtx, entity string, body []byte) boo
 	data := engine.UpdateListOfEntities(entity, list)
 	response, _ := json.Marshal(data)
 	sendJSONResponse(ctx, response)
+
 	return true
 }
 
@@ -132,7 +135,7 @@ func sendBadRequest(ctx *fasthttp.RequestCtx) {
 	ctx.SetBodyString("Invalid JSON")
 }
 
-func finalizeUpdate(ctx *fasthttp.RequestCtx, entity string) {
+func finalizeUpdate(entity string) {
 	if globals.GetConfig().Api.Cache.Enabled {
 		cache.CacheStore.Purge(entity)
 	}

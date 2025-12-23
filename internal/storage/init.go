@@ -241,6 +241,7 @@ func CleanExpiratedKeys(index int64) {
 		expirationContainer.mu.RUnlock()
 		return
 	}
+
 	expirationContainer.mu.RUnlock()
 
 	bucket.mu.RLock()
@@ -264,6 +265,7 @@ func KeyHasExpired(key string) bool {
 	if !ok {
 		return false
 	}
+
 	return time.Now().Unix() >= expTs
 }
 
@@ -287,5 +289,6 @@ func hasTTL(key string) bool {
 	expirationContainer.mu.RLock()
 	_, ok := expirationContainer.index[key]
 	expirationContainer.mu.RUnlock()
+
 	return ok
 }

@@ -123,6 +123,7 @@ func ListEntitiesWithExpr(
 			},
 		})
 	}
+
 	if len(addFields) > 0 {
 		pipeline = append(pipeline, bson.D{{Key: "$addFields", Value: addFields}})
 	}
@@ -151,6 +152,7 @@ func ListEntitiesWithExpr(
 	if err != nil || cur == nil {
 		return []map[string]any{}
 	}
+
 	defer cur.Close(ctx)
 
 	out := make([]map[string]any, 0)
@@ -185,9 +187,11 @@ func BuildMongoFilterNode(node query.FilterNode) bson.M {
 				arr = append(arr, f)
 			}
 		}
+
 		if len(arr) == 1 {
 			return arr[0]
 		}
+
 		return bson.M{"$and": arr}
 	}
 
@@ -199,9 +203,11 @@ func BuildMongoFilterNode(node query.FilterNode) bson.M {
 				arr = append(arr, f)
 			}
 		}
+
 		if len(arr) == 1 {
 			return arr[0]
 		}
+
 		return bson.M{"$or": arr}
 	}
 
@@ -227,11 +233,13 @@ func BuildMongoEq(val string) bson.M {
 	if strings.Contains(val, "*") {
 		pattern := "^" + RegexpEscape(val) + "$"
 		pattern = strings.ReplaceAll(pattern, "\\*", ".*")
+
 		return bson.M{
 			"$regex":   pattern,
 			"$options": "i",
 		}
 	}
+
 	return bson.M{"$eq": val}
 }
 
@@ -242,8 +250,10 @@ func RegexpEscape(s string) string {
 		case '.', '+', '?', '(', ')', '[', ']', '{', '}', '^', '$', '|':
 			b.WriteRune('\\')
 		}
+
 		b.WriteRune(r)
 	}
+
 	return b.String()
 }
 
@@ -259,6 +269,7 @@ func BsonFindOptions(opts bson.D) options.Lister[options.FindOptions] {
 			o = o.SetLimit(int64(e.Value.(int)))
 		}
 	}
+
 	return o
 }
 
@@ -272,6 +283,7 @@ func BuildMongoExpr(node query.FilterNode) bson.M {
 		for _, n := range node.And {
 			clauses = append(clauses, BuildMongoExpr(n))
 		}
+
 		return bson.M{"$and": clauses}
 	}
 
@@ -280,6 +292,7 @@ func BuildMongoExpr(node query.FilterNode) bson.M {
 		for _, n := range node.Or {
 			clauses = append(clauses, BuildMongoExpr(n))
 		}
+
 		return bson.M{"$or": clauses}
 	}
 

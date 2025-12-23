@@ -37,6 +37,7 @@ func (s *StatsContainer) DecrementKeysCount() {
 		if v == 0 {
 			return
 		}
+
 		if s.keysCount.CompareAndSwap(v, v-1) {
 			return
 		}
@@ -49,6 +50,7 @@ func (s *StatsContainer) DecrementExpirationKeysCount() {
 		if v == 0 {
 			return
 		}
+
 		if s.expirationKeysCount.CompareAndSwap(v, v-1) {
 			return
 		}
@@ -86,6 +88,8 @@ func (s *StatsContainer) ToJson() string {
 		Version:             s.version,
 		EntitiesCount:       s.EntitiesCount,
 	}
+
 	b, _ := json.Marshal(dto)
+
 	return string(b)
 }

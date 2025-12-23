@@ -76,6 +76,7 @@ func writeExpirationsToFile(cfg *configuration.Config, fileName string, expirati
 		isSuccess = false
 		log.Error("Error opening file:", err)
 	}
+
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
@@ -106,6 +107,7 @@ func writeStoreToFile(cfg *configuration.Config, fileName string, store *Store) 
 		isSuccess = false
 		log.Error("Error opening file:", err)
 	}
+
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)

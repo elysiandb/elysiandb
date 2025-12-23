@@ -23,9 +23,11 @@ func GetEntityTypesController(ctx *fasthttp.RequestCtx) {
 
 		entitySchemas = append(entitySchemas, string(schemaBytes))
 	}
-	responseBytes, err := json.Marshal(map[string]interface{}{
+
+	responseBytes, err := json.Marshal(map[string]any{
 		"entities": entitySchemas,
 	})
+
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		ctx.SetBody([]byte(`{"error":"failed to marshal response"}`))

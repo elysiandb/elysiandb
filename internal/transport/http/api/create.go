@@ -27,9 +27,9 @@ func CreateController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, schemaData) {
-		var tmp interface{}
+		var tmp any
 		if json.Unmarshal(body, &tmp) == nil {
-			if obj, ok := tmp.(map[string]interface{}); ok {
+			if obj, ok := tmp.(map[string]any); ok {
 				if errs := schema.ValidateEntity(entity, obj, schemaData); len(errs) > 0 {
 					b, _ := json.Marshal(errs)
 					ctx.SetStatusCode(fasthttp.StatusBadRequest)
@@ -40,9 +40,9 @@ func CreateController(ctx *fasthttp.RequestCtx) {
 				}
 			}
 
-			if arr, ok := tmp.([]interface{}); ok {
+			if arr, ok := tmp.([]any); ok {
 				for _, it := range arr {
-					if obj, ok := it.(map[string]interface{}); ok {
+					if obj, ok := it.(map[string]any); ok {
 						if errs := schema.ValidateEntity(entity, obj, schemaData); len(errs) > 0 {
 							b, _ := json.Marshal(errs)
 							ctx.SetStatusCode(fasthttp.StatusBadRequest)
@@ -104,7 +104,7 @@ func handleSingleEntity(ctx *fasthttp.RequestCtx, entity string, body []byte) bo
 }
 
 func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool {
-	var list []map[string]interface{}
+	var list []map[string]any
 	if err := json.Unmarshal(body, &list); err != nil || len(list) == 0 {
 		return false
 	}

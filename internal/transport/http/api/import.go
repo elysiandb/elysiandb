@@ -10,7 +10,7 @@ import (
 func ImportController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 
-	var dump map[string][]map[string]interface{}
+	var dump map[string][]map[string]any
 	if err := json.Unmarshal(ctx.PostBody(), &dump); err != nil {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBody([]byte(`{"error":"invalid JSON dump"}`))

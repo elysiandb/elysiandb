@@ -15,6 +15,7 @@ func GetSchemaController(ctx *fasthttp.RequestCtx) {
 		ctx.SetStatusCode(fasthttp.StatusNotFound)
 		ctx.Response.Header.Set("Content-Type", "application/json")
 		ctx.SetBodyString(`{"error":"entity not found"}`)
+
 		return
 	}
 
@@ -23,6 +24,7 @@ func GetSchemaController(ctx *fasthttp.RequestCtx) {
 		ctx.SetStatusCode(fasthttp.StatusNotFound)
 		ctx.Response.Header.Set("Content-Type", "application/json")
 		ctx.SetBodyString(`{"error":"schema not found"}`)
+
 		return
 	}
 
@@ -32,6 +34,7 @@ func GetSchemaController(ctx *fasthttp.RequestCtx) {
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		ctx.SetBodyString(`{"error":"failed to marshal schema"}`)
+
 		return
 	}
 

@@ -94,8 +94,10 @@ func DeleteJsonByKey(key string) {
 	if js == nil {
 		return
 	}
+
 	_, existed := js.get(key)
 	js.del(key)
+
 	if cfg.Stats.Enabled && existed {
 		stat.Stats.DecrementKeysCount()
 	}
@@ -166,6 +168,7 @@ func (s *JsonStore) CountTotalKeys() uint64 {
 			c++
 			return true
 		})
+
 		total += c
 	}
 

@@ -51,6 +51,7 @@ func LoginController(ctx *fasthttp.RequestCtx) {
 		Username: user.Username,
 		Role:     user.Role,
 	}
+
 	b, _ := json.Marshal(resp)
 	ctx.SetContentType("application/json")
 	ctx.SetBody(b)
@@ -93,6 +94,7 @@ func MeController(ctx *fasthttp.RequestCtx) {
 		Username: session.Username,
 		Role:     session.Role,
 	}
+
 	b, _ := json.Marshal(resp)
 	ctx.SetContentType("application/json")
 	ctx.SetBody(b)

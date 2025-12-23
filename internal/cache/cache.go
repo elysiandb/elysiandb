@@ -113,6 +113,7 @@ func (s *cacheStore) SetById(entity, id string, value []byte) {
 		e = &cacheEntity{data: make(map[[32]byte]cacheItem), ids: make(map[string]cacheItem)}
 		s.entities[entity] = e
 	}
+
 	s.mu.Unlock()
 	exp := time.Now().Add(s.ttl).UnixNano()
 	e.mu.Lock()
