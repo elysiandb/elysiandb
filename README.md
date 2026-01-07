@@ -22,6 +22,8 @@ You send JSON. You get a fully functional backend.
 
 No ORM. No controllers to scaffold. No migrations to write. No schema to maintain unless you explicitly want one.
 
+Here is a related and explicative article https://dev.to/taymour/why-i-built-elysiandb-2f5i
+
 ## Storage Engine
 
 ElysianDB uses a **pluggable storage engine abstraction** that cleanly separates API logic from the underlying persistence layer.
