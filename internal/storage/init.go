@@ -86,8 +86,10 @@ func createFile(folder, file string) {
 		if err != nil {
 			log.Fatal("Error creating data file:", err)
 		}
-		file.WriteString("{}")
 		defer file.Close()
+		if _, err := file.WriteString("{}"); err != nil {
+			log.Fatal("Error writing to data file:", err)
+		}
 	}
 }
 
