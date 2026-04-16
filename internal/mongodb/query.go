@@ -1,10 +1,8 @@
 package mongodb
 
 import (
-	"context"
 	"strings"
 
-	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/query"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -44,49 +42,7 @@ func ListEntitiesWithExpr(
 	search string,
 	includesParam string,
 ) []map[string]any {
-	ctx := context.Background()
-
-	includeAll, paths := ParseIncludes(includesParam)
-	rootSpecs := BuildSpecsFromSample(entity, includeAll, paths)
-	leafPaths := ExtractLeafIncludePaths(paths)
-
-	needPostFilter := search != ""
-
-	queryLimit := limit
-	queryOffset := offset
-	if needPostFilter {
-		queryLimit = 0
-		queryOffset = 0
-	}
-
-	var out []map[string]any
-
-	if len(rootSpecs) == 0 {
-		out = FindEntitiesSimple(ctx, entity, expr, queryLimit, queryOffset, sortField, sortAscending)
-		ResolveLeafIncludes(out, includeAll, leafPaths)
-	} else {
-		pipeline := BuildAggregationPipeline(expr, queryLimit, queryOffset, sortField, sortAscending, rootSpecs)
-		out = ExecuteAggregation(ctx, entity, pipeline)
-		out = AddIncludeEntityTags(out, rootSpecs)
-		ResolveLeafIncludes(out, includeAll, leafPaths)
-	}
-
-	if search != "" {
-		filtered := make([]map[string]any, 0, len(out))
-		for _, e := range out {
-			if api_storage.SearchMatchesEntity(e, search) {
-				filtered = append(filtered, e)
-			}
-		}
-
-		out = filtered
-	}
-
-	if needPostFilter {
-		out = applyOffsetLimit(out, offset, limit)
-	}
-
-	return out
+	return listEntitiesCore(entity, limit, offset, sortField, sortAscending, expr, search, includesParam)
 }
 
 func BuildMongoFilterNode(node query.FilterNode) bson.M {

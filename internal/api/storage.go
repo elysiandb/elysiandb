@@ -194,12 +194,11 @@ func ListEntities(
 	search string,
 	includesParam string,
 ) []map[string]any {
-	idList, err := GetListOfIds(entity, sortField, sortAscending)
+	ids, err := GetListOfIds(entity, sortField, sortAscending)
 	if err != nil {
 		return []map[string]any{}
 	}
 
-	ids := decodeIDs(idList)
 	if len(ids) == 0 {
 		return []map[string]any{}
 	}
@@ -273,26 +272,29 @@ func applyOffsetLimit[T any](in []T, offset, limit int) []T {
 	return in[start:end]
 }
 
-func GetListOfIds(entity, sortField string, sortAscending bool) ([]byte, error) {
+func GetListOfIds(entity, sortField string, sortAscending bool) ([]string, error) {
 	if sortField == "" {
 		idIndexKey := globals.ApiEntityIndexIdKey(entity)
-		return storage.GetByKey(idIndexKey)
+		raw, err := storage.GetByKey(idIndexKey)
+		return decodeIDs(raw), err
 	}
 
 	ensureFieldIndexFresh(entity, sortField)
 	if !IndexExistsForField(entity, sortField) {
-		return []byte{}, nil
+		return nil, nil
 	}
 
 	if sortAscending {
-		return storage.GetByKey(
+		raw, err := storage.GetByKey(
 			globals.ApiEntityIndexFieldSortAscKey(entity, sortField),
 		)
+		return decodeIDs(raw), err
 	}
 
-	return storage.GetByKey(
+	raw, err := storage.GetByKey(
 		globals.ApiEntityIndexFieldSortDescKey(entity, sortField),
 	)
+	return decodeIDs(raw), err
 }
 
 func DeleteEntityById(entity, id string) {

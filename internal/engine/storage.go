@@ -249,7 +249,7 @@ func ApplyFiltersToList(
 	return nil
 }
 
-func GetListOfIds(entity, sortField string, sortAscending bool) ([]byte, error) {
+func GetListOfIds(entity, sortField string, sortAscending bool) ([]string, error) {
 	if IsEngineInternal() {
 		return api_storage.GetListOfIds(entity, sortField, sortAscending)
 	}

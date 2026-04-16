@@ -18,16 +18,28 @@ func ListEntities(
 	search string,
 	includesParam string,
 ) []map[string]any {
-	ctx := context.Background()
 	q := BuildMongoFilters(filters)
 
 	autoInc := api_storage.ExtractAutoIncludes(filters)
 	includesParam = api_storage.MergeIncludes(includesParam, autoInc)
 
+	return listEntitiesCore(entity, limit, offset, sortField, sortAscending, q, search, includesParam)
+}
+
+func listEntitiesCore(
+	entity string,
+	limit int,
+	offset int,
+	sortField string,
+	sortAscending bool,
+	expr bson.M,
+	search string,
+	includesParam string,
+) []map[string]any {
+	ctx := context.Background()
+
 	includeAll, paths := ParseIncludes(includesParam)
-
 	rootSpecs := BuildSpecsFromSample(entity, includeAll, paths)
-
 	leafPaths := ExtractLeafIncludePaths(paths)
 
 	needPostFilter := search != ""
@@ -42,18 +54,10 @@ func ListEntities(
 	var out []map[string]any
 
 	if len(rootSpecs) == 0 {
-		out = FindEntitiesSimple(ctx, entity, q, queryLimit, queryOffset, sortField, sortAscending)
+		out = FindEntitiesSimple(ctx, entity, expr, queryLimit, queryOffset, sortField, sortAscending)
 		ResolveLeafIncludes(out, includeAll, leafPaths)
 	} else {
-		pipeline := BuildAggregationPipeline(
-			q,
-			queryLimit,
-			queryOffset,
-			sortField,
-			sortAscending,
-			rootSpecs,
-		)
-
+		pipeline := BuildAggregationPipeline(expr, queryLimit, queryOffset, sortField, sortAscending, rootSpecs)
 		out = ExecuteAggregation(ctx, entity, pipeline)
 		out = AddIncludeEntityTags(out, rootSpecs)
 		ResolveLeafIncludes(out, includeAll, leafPaths)
