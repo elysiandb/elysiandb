@@ -353,8 +353,8 @@ func TestBuildMongoFiltersNeqDate(t *testing.T) {
 	}
 }
 
-func TestBuildMongoFilterNodeHandlesAllOps(t *testing.T) {
-	result := mongodb.BuildMongoFilterNode(query.FilterNode{
+func TestBuildMongoExprLeafAllOps(t *testing.T) {
+	result := mongodb.BuildMongoExpr(query.FilterNode{
 		Leaf: map[string]map[string]string{
 			"status": {"neq": "deleted"},
 			"age":    {"gte": "18"},

@@ -204,10 +204,6 @@ func TestParity_Pagination(t *testing.T) {
 func TestParity_Includes_Simple(t *testing.T) {
 	seedParityData(t)
 
-	orig := api_storage.ReadEntityByIdFunc
-	api_storage.ReadEntityByIdFunc = api_storage.ReadEntityById
-	defer func() { api_storage.ReadEntityByIdFunc = orig }()
-
 	result := api_storage.ListEntities("post", 0, 0, "", true, nil, "", "author")
 	if len(result) != 2 {
 		t.Fatalf("includes: expected 2, got %d", len(result))
@@ -228,10 +224,6 @@ func TestParity_Includes_Simple(t *testing.T) {
 func TestParity_Includes_All(t *testing.T) {
 	seedParityData(t)
 
-	orig := api_storage.ReadEntityByIdFunc
-	api_storage.ReadEntityByIdFunc = api_storage.ReadEntityById
-	defer func() { api_storage.ReadEntityByIdFunc = orig }()
-
 	result := api_storage.ListEntities("post", 0, 0, "", true, nil, "", "all")
 	if len(result) != 2 {
 		t.Fatalf("includes all: expected 2, got %d", len(result))
@@ -251,10 +243,6 @@ func TestParity_Includes_All(t *testing.T) {
 
 func TestParity_Includes_Nested(t *testing.T) {
 	seedParityData(t)
-
-	orig := api_storage.ReadEntityByIdFunc
-	api_storage.ReadEntityByIdFunc = api_storage.ReadEntityById
-	defer func() { api_storage.ReadEntityByIdFunc = orig }()
 
 	api_storage.UpdateEntityById("user", "u1", map[string]any{
 		"profile": map[string]any{"@entity": "profile", "id": "pr1"},

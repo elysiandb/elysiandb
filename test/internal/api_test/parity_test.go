@@ -167,10 +167,7 @@ func TestFiltersMatchEntityNestedField(t *testing.T) {
 }
 
 func TestApplyIncludesResolves(t *testing.T) {
-	orig := api_storage.ReadEntityByIdFunc
-	defer func() { api_storage.ReadEntityByIdFunc = orig }()
-
-	api_storage.ReadEntityByIdFunc = func(entity, id string) map[string]any {
+	readFn := func(entity, id string) map[string]any {
 		if entity == "user" && id == "u1" {
 			return map[string]any{"id": "u1", "name": "Alice"}
 		}
@@ -185,7 +182,7 @@ func TestApplyIncludesResolves(t *testing.T) {
 		},
 	}
 
-	result := api_storage.ApplyIncludes(data, "author")
+	result := api_storage.ApplyIncludes(data, "author", readFn)
 
 	author, ok := result[0]["author"].(map[string]any)
 	if !ok {
@@ -198,10 +195,7 @@ func TestApplyIncludesResolves(t *testing.T) {
 }
 
 func TestApplyIncludesAll(t *testing.T) {
-	orig := api_storage.ReadEntityByIdFunc
-	defer func() { api_storage.ReadEntityByIdFunc = orig }()
-
-	api_storage.ReadEntityByIdFunc = func(entity, id string) map[string]any {
+	readFn := func(entity, id string) map[string]any {
 		if entity == "user" && id == "u1" {
 			return map[string]any{"id": "u1", "name": "Alice"}
 		}
@@ -216,7 +210,7 @@ func TestApplyIncludesAll(t *testing.T) {
 		},
 	}
 
-	result := api_storage.ApplyIncludes(data, "all")
+	result := api_storage.ApplyIncludes(data, "all", readFn)
 
 	author, ok := result[0]["author"].(map[string]any)
 	if !ok {
@@ -229,10 +223,7 @@ func TestApplyIncludesAll(t *testing.T) {
 }
 
 func TestApplyIncludesNested(t *testing.T) {
-	orig := api_storage.ReadEntityByIdFunc
-	defer func() { api_storage.ReadEntityByIdFunc = orig }()
-
-	api_storage.ReadEntityByIdFunc = func(entity, id string) map[string]any {
+	readFn := func(entity, id string) map[string]any {
 		switch {
 		case entity == "user" && id == "u1":
 			return map[string]any{
@@ -254,7 +245,7 @@ func TestApplyIncludesNested(t *testing.T) {
 		},
 	}
 
-	result := api_storage.ApplyIncludes(data, "author.profile")
+	result := api_storage.ApplyIncludes(data, "author.profile", readFn)
 
 	author, ok := result[0]["author"].(map[string]any)
 	if !ok {

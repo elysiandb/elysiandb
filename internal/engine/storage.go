@@ -43,11 +43,11 @@ func FilterFields(data map[string]any, fields []string) map[string]any {
 
 func ApplyIncludes(data []map[string]interface{}, includesParam string) []map[string]interface{} {
 	if IsEngineInternal() {
-		return api_storage.ApplyIncludes(data, includesParam)
+		return api_storage.ApplyIncludes(data, includesParam, api_storage.ReadEntityById)
 	}
 
 	if IsEngineMongoDB() {
-		return mongodb.ApplyIncludes(data, includesParam)
+		return api_storage.ApplyIncludes(data, includesParam, mongodb.ReadEntityById)
 	}
 
 	ThrowErrorIfNotValidEngine()

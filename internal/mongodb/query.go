@@ -45,46 +45,6 @@ func ListEntitiesWithExpr(
 	return listEntitiesCore(entity, limit, offset, sortField, sortAscending, expr, search, includesParam)
 }
 
-func BuildMongoFilterNode(node query.FilterNode) bson.M {
-	if node.Leaf != nil {
-		return BuildMongoLeaf(node.Leaf)
-	}
-
-	if len(node.And) > 0 {
-		arr := make([]bson.M, 0, len(node.And))
-		for _, n := range node.And {
-			f := BuildMongoFilterNode(n)
-			if len(f) > 0 {
-				arr = append(arr, f)
-			}
-		}
-
-		if len(arr) == 1 {
-			return arr[0]
-		}
-
-		return bson.M{"$and": arr}
-	}
-
-	if len(node.Or) > 0 {
-		arr := make([]bson.M, 0, len(node.Or))
-		for _, n := range node.Or {
-			f := BuildMongoFilterNode(n)
-			if len(f) > 0 {
-				arr = append(arr, f)
-			}
-		}
-
-		if len(arr) == 1 {
-			return arr[0]
-		}
-
-		return bson.M{"$or": arr}
-	}
-
-	return bson.M{}
-}
-
 func BuildMongoLeaf(leaf map[string]map[string]string) bson.M {
 	return BuildMongoFilters(leaf)
 }

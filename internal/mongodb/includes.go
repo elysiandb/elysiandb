@@ -11,11 +11,7 @@ import (
 )
 
 func ApplyIncludes(data []map[string]interface{}, includesParam string) []map[string]interface{} {
-	orig := api_storage.ReadEntityByIdFunc
-	api_storage.ReadEntityByIdFunc = ReadEntityById
-	defer func() { api_storage.ReadEntityByIdFunc = orig }()
-
-	return api_storage.ApplyIncludes(data, includesParam)
+	return api_storage.ApplyIncludes(data, includesParam, ReadEntityById)
 }
 
 func ParseIncludes(includesParam string) (bool, [][]string) {

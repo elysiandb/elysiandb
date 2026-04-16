@@ -219,7 +219,7 @@ func ListEntities(
 	includesParam = MergeIncludes(includesParam, autoInc)
 
 	if includesParam != "" {
-		all = ApplyIncludes(all, includesParam)
+		all = ApplyIncludes(all, includesParam, ReadEntityById)
 	}
 
 	filtered := make([]map[string]any, 0, len(all))
