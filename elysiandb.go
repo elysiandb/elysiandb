@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 
 	"github.com/taymour/elysiandb/internal/boot"
 	"github.com/taymour/elysiandb/internal/cmd"
@@ -39,19 +38,19 @@ func main() {
 	boot.InitDB()
 	security.InitAdminUserIfNotExists()
 
-	args := os.Args
+	args := flag.Args()
 
-	if len(args) == 1 {
+	if len(args) == 0 {
 		cmd.StartServer()
 		return
 	}
 
 	handlers := cmd.GetHandlers()
 
-	if handler, ok := handlers[args[1]]; ok {
+	if handler, ok := handlers[args[0]]; ok {
 		handler()
 	} else {
-		fmt.Printf("%sUnknown command: %s%s\n", globals.Gold, args[1], globals.Reset)
+		fmt.Printf("%sUnknown command: %s%s\n", globals.Gold, args[0], globals.Reset)
 		printListOfCommands()
 	}
 }
