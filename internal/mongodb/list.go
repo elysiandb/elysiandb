@@ -3,6 +3,7 @@ package mongodb
 import (
 	"context"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/globals"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -20,36 +21,74 @@ func ListEntities(
 	ctx := context.Background()
 	q := BuildMongoFilters(filters)
 
+	autoInc := api_storage.ExtractAutoIncludes(filters)
+	includesParam = api_storage.MergeIncludes(includesParam, autoInc)
+
 	includeAll, paths := ParseIncludes(includesParam)
 
 	rootSpecs := BuildSpecsFromSample(entity, includeAll, paths)
 
 	leafPaths := ExtractLeafIncludePaths(paths)
 
-	if len(rootSpecs) == 0 {
-		out := FindEntitiesSimple(ctx, entity, q, limit, offset, sortField, sortAscending)
+	needPostFilter := search != ""
 
-		ResolveLeafIncludes(out, includeAll, leafPaths)
-
-		return out
+	queryLimit := limit
+	queryOffset := offset
+	if needPostFilter {
+		queryLimit = 0
+		queryOffset = 0
 	}
 
-	pipeline := BuildAggregationPipeline(
-		q,
-		limit,
-		offset,
-		sortField,
-		sortAscending,
-		rootSpecs,
-	)
+	var out []map[string]any
 
-	out := ExecuteAggregation(ctx, entity, pipeline)
+	if len(rootSpecs) == 0 {
+		out = FindEntitiesSimple(ctx, entity, q, queryLimit, queryOffset, sortField, sortAscending)
+		ResolveLeafIncludes(out, includeAll, leafPaths)
+	} else {
+		pipeline := BuildAggregationPipeline(
+			q,
+			queryLimit,
+			queryOffset,
+			sortField,
+			sortAscending,
+			rootSpecs,
+		)
 
-	out = AddIncludeEntityTags(out, rootSpecs)
+		out = ExecuteAggregation(ctx, entity, pipeline)
+		out = AddIncludeEntityTags(out, rootSpecs)
+		ResolveLeafIncludes(out, includeAll, leafPaths)
+	}
 
-	ResolveLeafIncludes(out, includeAll, leafPaths)
+	if search != "" {
+		filtered := make([]map[string]any, 0, len(out))
+		for _, e := range out {
+			if api_storage.SearchMatchesEntity(e, search) {
+				filtered = append(filtered, e)
+			}
+		}
+
+		out = filtered
+	}
+
+	if needPostFilter {
+		out = applyOffsetLimit(out, offset, limit)
+	}
 
 	return out
+}
+
+func applyOffsetLimit(in []map[string]any, offset, limit int) []map[string]any {
+	start := offset
+	if start > len(in) {
+		start = len(in)
+	}
+
+	end := len(in)
+	if limit > 0 && start+limit < end {
+		end = start + limit
+	}
+
+	return in[start:end]
 }
 
 func ExtractLeafIncludePaths(paths [][]string) [][]string {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/taymour/elysiandb/internal/globals"
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/query"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -48,127 +48,42 @@ func ListEntitiesWithExpr(
 
 	includeAll, paths := ParseIncludes(includesParam)
 	rootSpecs := BuildSpecsFromSample(entity, includeAll, paths)
+	leafPaths := ExtractLeafIncludePaths(paths)
 
-	leafPaths := make([][]string, 0)
-	for _, p := range paths {
-		if len(p) > 1 {
-			leafPaths = append(leafPaths, p)
-		}
+	needPostFilter := search != ""
+
+	queryLimit := limit
+	queryOffset := offset
+	if needPostFilter {
+		queryLimit = 0
+		queryOffset = 0
 	}
 
+	var out []map[string]any
+
 	if len(rootSpecs) == 0 {
-		opts := FindOptions(limit, offset, sortField, sortAscending)
+		out = FindEntitiesSimple(ctx, entity, expr, queryLimit, queryOffset, sortField, sortAscending)
+		ResolveLeafIncludes(out, includeAll, leafPaths)
+	} else {
+		pipeline := BuildAggregationPipeline(expr, queryLimit, queryOffset, sortField, sortAscending, rootSpecs)
+		out = ExecuteAggregation(ctx, entity, pipeline)
+		out = AddIncludeEntityTags(out, rootSpecs)
+		ResolveLeafIncludes(out, includeAll, leafPaths)
+	}
 
-		cur, err := globals.MongoDB.Collection(entity).Find(ctx, expr, opts)
-		if err != nil || cur == nil {
-			return []map[string]any{}
-		}
-		defer cur.Close(ctx)
-
-		out := make([]map[string]any, 0)
-		for cur.Next(ctx) {
-			var raw map[string]any
-			if cur.Decode(&raw) == nil {
-				out = append(out, NormalizeMongoDocument(raw))
+	if search != "" {
+		filtered := make([]map[string]any, 0, len(out))
+		for _, e := range out {
+			if api_storage.SearchMatchesEntity(e, search) {
+				filtered = append(filtered, e)
 			}
 		}
 
-		if includeAll {
-			ResolveIncludesAllRecursive(out, 8)
-		} else if len(leafPaths) > 0 {
-			ResolveIncludesPaths(out, leafPaths)
-		}
-
-		return out
+		out = filtered
 	}
 
-	pipeline := make([]bson.D, 0, 10+len(rootSpecs)*3)
-	pipeline = append(pipeline, bson.D{{Key: "$match", Value: expr}})
-
-	if sortField != "" {
-		dir := 1
-		if !sortAscending {
-			dir = -1
-		}
-		pipeline = append(pipeline, bson.D{{Key: "$sort", Value: bson.D{{Key: sortField, Value: dir}}}})
-	}
-	if offset > 0 {
-		pipeline = append(pipeline, bson.D{{Key: "$skip", Value: int64(offset)}})
-	}
-	if limit > 0 {
-		pipeline = append(pipeline, bson.D{{Key: "$limit", Value: int64(limit)}})
-	}
-
-	addFields := bson.D{}
-	for _, sp := range rootSpecs {
-		field := "$" + sp.Path[0]
-		addFields = append(addFields, bson.E{
-			Key: sp.Tmp,
-			Value: bson.D{
-				{Key: "$cond", Value: bson.D{
-					{Key: "if", Value: bson.D{{Key: "$isArray", Value: field}}},
-					{Key: "then", Value: bson.D{{Key: "$map", Value: bson.D{
-						{Key: "input", Value: field},
-						{Key: "as", Value: "r"},
-						{Key: "in", Value: bson.D{{Key: "$ifNull", Value: bson.A{
-							"$$r.id",
-							"$$r._id",
-						}}}},
-					}}}},
-					{Key: "else", Value: bson.D{{Key: "$ifNull", Value: bson.A{
-						field + ".id",
-						"$" + sp.Path[0] + "Id",
-					}}}},
-				}},
-			},
-		})
-	}
-
-	if len(addFields) > 0 {
-		pipeline = append(pipeline, bson.D{{Key: "$addFields", Value: addFields}})
-	}
-
-	project := bson.D{}
-	for _, sp := range rootSpecs {
-		project = append(project, bson.E{Key: sp.Tmp, Value: 0})
-	}
-
-	for _, sp := range rootSpecs {
-		pipeline = append(pipeline,
-			bson.D{{Key: "$lookup", Value: bson.M{
-				"from":         sp.From,
-				"localField":   sp.Tmp,
-				"foreignField": "_id",
-				"as":           sp.As,
-			}}},
-		)
-	}
-
-	if len(project) > 0 {
-		pipeline = append(pipeline, bson.D{{Key: "$project", Value: project}})
-	}
-
-	cur, err := globals.MongoDB.Collection(entity).Aggregate(ctx, pipeline)
-	if err != nil || cur == nil {
-		return []map[string]any{}
-	}
-
-	defer cur.Close(ctx)
-
-	out := make([]map[string]any, 0)
-	for cur.Next(ctx) {
-		var raw map[string]any
-		if cur.Decode(&raw) == nil {
-			out = append(out, NormalizeMongoDocument(raw))
-		}
-	}
-
-	out = AddIncludeEntityTags(out, rootSpecs)
-
-	if includeAll {
-		ResolveIncludesAllRecursive(out, 8)
-	} else if len(leafPaths) > 0 {
-		ResolveIncludesPaths(out, leafPaths)
+	if needPostFilter {
+		out = applyOffsetLimit(out, offset, limit)
 	}
 
 	return out
@@ -215,18 +130,7 @@ func BuildMongoFilterNode(node query.FilterNode) bson.M {
 }
 
 func BuildMongoLeaf(leaf map[string]map[string]string) bson.M {
-	out := bson.M{}
-
-	for field, ops := range leaf {
-		for op, val := range ops {
-			switch op {
-			case "eq":
-				out[field] = BuildMongoEq(val)
-			}
-		}
-	}
-
-	return out
+	return BuildMongoFilters(leaf)
 }
 
 func BuildMongoEq(val string) bson.M {
