@@ -3,15 +3,20 @@ package mongodb
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/schema"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
+
+var knownCollections sync.Map
 
 type IncludeSpec struct {
 	Path []string
@@ -32,14 +37,7 @@ func FilterFields(data map[string]any, fields []string) map[string]any {
 		return data
 	}
 
-	out := map[string]any{}
-	for _, f := range fields {
-		if v, ok := data[f]; ok {
-			out[f] = v
-		}
-	}
-
-	return out
+	return api_storage.FilterFields(data, fields)
 }
 
 func FindOptions(limit int, offset int, sortField string, sortAscending bool) options.Lister[options.FindOptions] {
@@ -185,12 +183,8 @@ func CreateEntityType(entity string) error {
 
 func DeleteEntityType(entity string) error {
 	ctx := context.Background()
-
-	if err := globals.MongoDB.Collection(entity).Drop(ctx); err != nil {
-		return err
-	}
-
-	return api_storage.DeleteEntityType(entity)
+	knownCollections.Delete(entity)
+	return globals.MongoDB.Collection(entity).Drop(ctx)
 }
 
 func WriteListOfEntities(entity string, list []map[string]interface{}) [][]schema.ValidationError {
@@ -210,7 +204,7 @@ func AddEntityType(entity string) {
 		_ = globals.MongoDB.CreateCollection(ctx, entity)
 	}
 
-	api_storage.AddEntityType(entity)
+	knownCollections.Store(entity, struct{}{})
 }
 
 func GetEntitySchema(entity string) map[string]interface{} {
@@ -218,15 +212,55 @@ func GetEntitySchema(entity string) map[string]interface{} {
 }
 
 func EntityTypeExists(entity string) bool {
-	return api_storage.EntityTypeExists(entity)
+	if _, ok := knownCollections.Load(entity); ok {
+		return true
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	names, err := globals.MongoDB.ListCollectionNames(ctx, bson.M{"name": entity})
+	if err != nil {
+		return false
+	}
+
+	if len(names) > 0 {
+		knownCollections.Store(entity, struct{}{})
+		return true
+	}
+
+	return false
 }
 
 func ListEntityTypes() []string {
-	return api_storage.ListEntityTypes()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	names, err := globals.MongoDB.ListCollectionNames(ctx, bson.M{})
+	if err != nil {
+		return nil
+	}
+
+	out := make([]string, 0, len(names))
+	for _, n := range names {
+		if !strings.HasPrefix(n, "system.") {
+			out = append(out, n)
+		}
+	}
+
+	return out
 }
 
 func ListPublicEntityTypes() []string {
-	return api_storage.ListPublicEntityTypes()
+	all := ListEntityTypes()
+	out := make([]string, 0, len(all))
+	for _, name := range all {
+		if !strings.HasPrefix(name, api_storage.CoreEntityTypePrefix) {
+			out = append(out, name)
+		}
+	}
+
+	return out
 }
 
 func ReadEntityById(entity, id string) map[string]any {
@@ -244,11 +278,39 @@ func ReadEntityById(entity, id string) map[string]any {
 }
 
 func ApplyFiltersToList(entities []map[string]any, filters map[string]map[string]string) []map[string]any {
-	return entities
+	return api_storage.ApplyFiltersToList(entities, filters)
 }
 
-func GetListOfIds(entity, sortField string, sortAscending bool) ([]byte, error) {
-	return api_storage.GetListOfIds(entity, sortField, sortAscending)
+func GetListOfIds(entity, sortField string, sortAscending bool) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	findOpts := options.Find().SetProjection(bson.M{"_id": 1})
+	if sortField != "" {
+		dir := 1
+		if !sortAscending {
+			dir = -1
+		}
+		findOpts = findOpts.SetSort(bson.D{{Key: sortField, Value: dir}})
+	}
+
+	cur, err := globals.MongoDB.Collection(entity).Find(ctx, bson.M{}, findOpts)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	var ids []string
+	for cur.Next(ctx) {
+		var doc struct {
+			ID string `bson:"_id"`
+		}
+		if cur.Decode(&doc) == nil && doc.ID != "" {
+			ids = append(ids, doc.ID)
+		}
+	}
+
+	return ids, nil
 }
 
 func DeleteEntityById(entity, id string) {
@@ -259,14 +321,12 @@ func DeleteEntityById(entity, id string) {
 func DeleteAllEntities(entity string) {
 	ctx := context.Background()
 	globals.MongoDB.Collection(entity).DeleteMany(ctx, bson.M{})
-	DeleteEntityType(entity)
 }
 
 func DeleteAll() {
 	for _, e := range ListEntityTypes() {
 		DeleteAllEntities(e)
 	}
-	api_storage.DeleteAll()
 }
 
 func UpdateEntityById(entity, id string, updated map[string]interface{}) map[string]interface{} {
@@ -311,9 +371,15 @@ func CountAllEntities() int {
 }
 
 func ImportAll(data map[string][]map[string]interface{}) {
-	for e, list := range data {
+	for entity, list := range data {
 		for _, d := range list {
-			WriteEntity(e, d)
+			if errs := WriteEntity(entity, d); len(errs) > 0 {
+				log.Error(fmt.Sprintf("Error importing entity %s: %+v", entity, errs))
+			}
 		}
+
+		log.Info(fmt.Sprintf("The entity '%s' has been imported", entity))
 	}
+
+	log.Info("All entities have been imported")
 }

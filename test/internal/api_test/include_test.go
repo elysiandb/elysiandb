@@ -47,10 +47,6 @@ func mockReadEntityById(entity, id string) map[string]interface{} {
 	return nil
 }
 
-func init() {
-	api_storage.ReadEntityByIdFunc = mockReadEntityById
-}
-
 func normalizeAuthors(raw interface{}) []map[string]interface{} {
 	if raw == nil {
 		return nil
@@ -82,7 +78,7 @@ func TestApplyIncludes_SimpleInclude(t *testing.T) {
 			},
 		},
 	}
-	result := api_storage.ApplyIncludes(data, "category")
+	result := api_storage.ApplyIncludes(data, "category", mockReadEntityById)
 	category, ok := result[0]["category"].(map[string]interface{})
 	if !ok || category["type"] != "gogo" || category["@entity"] != "category" {
 		t.Fatalf("unexpected category: %+v", category)
@@ -110,7 +106,7 @@ func TestApplyIncludes_MultipleIncludes(t *testing.T) {
 			},
 		},
 	}
-	result := api_storage.ApplyIncludes(data, "category,authors,authors.job")
+	result := api_storage.ApplyIncludes(data, "category,authors,authors.job", mockReadEntityById)
 	entity := result[0]
 	cat := entity["category"].(map[string]interface{})
 	if cat["type"] != "gogo" {
@@ -148,7 +144,7 @@ func TestApplyIncludes_AllMode(t *testing.T) {
 			},
 		},
 	}
-	result := api_storage.ApplyIncludes(data, "all")
+	result := api_storage.ApplyIncludes(data, "all", mockReadEntityById)
 	entity := result[0]
 	cat := entity["category"].(map[string]interface{})
 	if cat["type"] != "gogo" {
@@ -172,7 +168,7 @@ func TestApplyIncludes_EmptyInclude(t *testing.T) {
 	data := []map[string]interface{}{
 		{"id": "1", "name": "simple"},
 	}
-	result := api_storage.ApplyIncludes(data, "")
+	result := api_storage.ApplyIncludes(data, "", mockReadEntityById)
 	if !reflect.DeepEqual(result, data) {
 		t.Fatalf("expected unchanged data, got %+v", result)
 	}
@@ -189,7 +185,7 @@ func TestApplyIncludes_MissingRelations(t *testing.T) {
 			},
 		},
 	}
-	result := api_storage.ApplyIncludes(data, "unknown")
+	result := api_storage.ApplyIncludes(data, "unknown", mockReadEntityById)
 	val := result[0]["unknown"].(map[string]interface{})
 	if val["@entity"] != "missing" {
 		t.Fatalf("unexpected missing entity behavior: %+v", val)

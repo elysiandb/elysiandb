@@ -5,12 +5,13 @@ import (
 	"strings"
 	"time"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/globals"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func ApplyIncludes(data []map[string]interface{}, includesParam string) []map[string]interface{} {
-	return data
+	return api_storage.ApplyIncludes(data, includesParam, ReadEntityById)
 }
 
 func ParseIncludes(includesParam string) (bool, [][]string) {
@@ -85,7 +86,7 @@ func BuildSpecsFromSample(entity string, includeAll bool, paths [][]string) []In
 			continue
 		}
 
-		if len(p) != 1 {
+		if len(p) > 1 {
 			continue
 		}
 

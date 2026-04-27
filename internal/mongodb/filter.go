@@ -103,10 +103,10 @@ func BuildMongoFilters(filters map[string]map[string]string) bson.M {
 				q[field] = bson.M{"$lte": val}
 
 			case "contains":
-				q[field] = val
+				q[field] = raw
 
 			case "not_contains":
-				q[field] = bson.M{"$ne": val}
+				q[field] = bson.M{"$ne": raw}
 
 			case "any":
 				if arr, ok := ParseArrayValues(raw); ok {

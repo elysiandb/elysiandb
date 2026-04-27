@@ -2,13 +2,11 @@ package api_storage
 
 import "strings"
 
-var ReadEntityByIdFunc = ReadEntityById
-
-func ApplyIncludes(data []map[string]any, includesParam string) []map[string]any {
+func ApplyIncludes(data []map[string]any, includesParam string, readFn func(string, string) map[string]any) []map[string]any {
 	allMode := strings.TrimSpace(includesParam) == "all"
 	includeTree := buildIncludeTree(includesParam, allMode)
 	for _, entityData := range data {
-		applyIncludesRecursive(entityData, includeTree, allMode)
+		applyIncludesRecursive(entityData, includeTree, allMode, readFn)
 	}
 
 	return data
@@ -33,7 +31,7 @@ func buildIncludeTree(includesParam string, allMode bool) map[string][]string {
 	return includeTree
 }
 
-func applyIncludesRecursive(entityData map[string]any, tree map[string][]string, forceAll bool) {
+func applyIncludesRecursive(entityData map[string]any, tree map[string][]string, forceAll bool, readFn func(string, string) map[string]any) {
 	fields := collectIncludeFields(entityData, tree, forceAll)
 	for _, field := range fields {
 		val, ok := entityData[field]
@@ -43,18 +41,18 @@ func applyIncludesRecursive(entityData map[string]any, tree map[string][]string,
 
 		switch v := val.(type) {
 		case map[string]any:
-			entityData[field] = includeSingleEntity(v)
+			entityData[field] = includeSingleEntity(v, readFn)
 			next := buildNextTree(tree[field], forceAll)
 			if m, ok := entityData[field].(map[string]any); ok {
-				applyIncludesRecursive(m, next, forceAll)
+				applyIncludesRecursive(m, next, forceAll, readFn)
 			}
 		case []any:
 			newList := []map[string]any{}
 			for _, item := range v {
 				if m, ok := item.(map[string]any); ok {
-					m = includeSingleEntity(m)
+					m = includeSingleEntity(m, readFn)
 					next := buildNextTree(tree[field], forceAll)
-					applyIncludesRecursive(m, next, forceAll)
+					applyIncludesRecursive(m, next, forceAll, readFn)
 					newList = append(newList, m)
 				}
 			}
@@ -93,10 +91,10 @@ func collectIncludeFields(entityData map[string]any, tree map[string][]string, f
 	return fields
 }
 
-func includeSingleEntity(m map[string]any) map[string]any {
+func includeSingleEntity(m map[string]any, readFn func(string, string) map[string]any) map[string]any {
 	if ent, ok := m["@entity"].(string); ok {
 		if id, ok := m["id"].(string); ok && id != "" {
-			read := ReadEntityByIdFunc(ent, id)
+			read := readFn(ent, id)
 			if read != nil {
 				read["@entity"] = ent
 				return read
