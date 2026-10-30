@@ -14,12 +14,25 @@ import { useEntityTypes } from "../hooks/entity/useEntityTypes.js";
 import ACLTable from "../components/acl/ACLTable.jsx";
 import { useACL } from "../hooks/acl/useACL.js";
 import { useToast } from "../hooks/notification/useToast.js";
+import { useTranslation } from "../hooks/i18n/useTranslation.js";
+
+const PERMISSIONS = [
+    "read",
+    "create",
+    "update",
+    "delete",
+    "owning_read",
+    "owning_write",
+    "owning_update",
+    "owning_delete",
+];
 
 export default function ACLList() {
     const { list: users, loadAll: loadUsers, loading: loadingUsers } = useUsers();
     const { list: entities, loadAllNames: loadEntities, loading: loadingEntities } = useEntityTypes();
     const { updateACL, restoreACL } = useACL();
     const { show } = useToast();
+    const { t } = useTranslation();
 
     const [pending, setPending] = useState({});
     const [selectedUser, setSelectedUser] = useState(null);
@@ -65,11 +78,11 @@ export default function ACLList() {
                 <Col xs={3}>
                     <Card className="entity-sidebar">
                         <Card.Header className="text-warning fw-bold">
-                            Users
+                            {t("common.users")}
                         </Card.Header>
 
                         <Form.Control
-                            placeholder="Search user…"
+                            placeholder={t("common.searchUser")}
                             value={searchUser}
                             onChange={(e) => setSearchUser(e.target.value)}
                             className="user-sidebar-search"
@@ -102,7 +115,7 @@ export default function ACLList() {
                             <Row className="align-items-center mb-3">
                                 <Col>
                                     <Form.Control
-                                        placeholder="Search entity…"
+                                        placeholder={t("acl.searchEntity")}
                                         value={searchEntity}
                                         onChange={(e) => setSearchEntity(e.target.value)}
                                         className="entity-table-search"
@@ -120,7 +133,7 @@ export default function ACLList() {
 
                                                 show(
                                                     "success",
-                                                    `ACLs updated for "${selectedUser}" (${Object.keys(pending).length} entities)`
+                                                    t("acl.updated", { username: selectedUser, count: Object.keys(pending).length })
                                                 );
 
                                                 setPending({});
@@ -128,17 +141,17 @@ export default function ACLList() {
                                             } catch {
                                                 show(
                                                     "error",
-                                                    `Failed to update ACLs for "${selectedUser}"`
+                                                    t("acl.updateFailed", { username: selectedUser })
                                                 );
                                             }
                                         }}
                                     >
-                                        Update ACLs
+                                        {t("acl.update")}
                                     </Button>
                                     <Button
                                         variant="secondary"
                                         onClick={async () => {
-                                            if (!window.confirm(`Restore default permissions for "${selectedUser}" ?`)) {
+                                            if (!window.confirm(t("acl.confirmRestore", { username: selectedUser }))) {
                                                 return;
                                             }
 
@@ -149,7 +162,7 @@ export default function ACLList() {
 
                                                 show(
                                                     "success",
-                                                    `Default ACLs restored for "${selectedUser}"`
+                                                    t("acl.restored", { username: selectedUser })
                                                 );
 
                                                 setPending({});
@@ -157,12 +170,12 @@ export default function ACLList() {
                                             } catch {
                                                 show(
                                                     "error",
-                                                    `Failed to restore default ACLs for "${selectedUser}"`
+                                                    t("acl.restoreFailed", { username: selectedUser })
                                                 );
                                             }
                                         }}
                                     >
-                                        Restore defaults
+                                        {t("acl.restore")}
                                     </Button>
                                 </Col>
                             </Row>
@@ -178,42 +191,16 @@ export default function ACLList() {
 
                             <Card>
                                 <Card.Header className="text-warning fw-bold">
-                                    Permissions overview
+                                    {t("acl.overview")}
                                 </Card.Header>
                                 <Card.Body className="text-dim">
                                     <Row className="g-3">
-                                        <Col md={6}>
-                                            <strong className="text-info">read</strong>
-                                            <div>Allows reading all records of the entity.</div>
-                                        </Col>
-                                        <Col md={6}>
-                                            <strong className="text-info">create</strong>
-                                            <div>Allows creating new records in the entity.</div>
-                                        </Col>
-                                        <Col md={6}>
-                                            <strong className="text-info">update</strong>
-                                            <div>Allows updating any record of the entity.</div>
-                                        </Col>
-                                        <Col md={6}>
-                                            <strong className="text-info">delete</strong>
-                                            <div>Allows deleting any record of the entity.</div>
-                                        </Col>
-                                        <Col md={6}>
-                                            <strong className="text-info">owning_read</strong>
-                                            <div>Allows reading only records owned by the user.</div>
-                                        </Col>
-                                        <Col md={6}>
-                                            <strong className="text-info">owning_write</strong>
-                                            <div>Allows creating records owned by the user.</div>
-                                        </Col>
-                                        <Col md={6}>
-                                            <strong className="text-info">owning_update</strong>
-                                            <div>Allows updating only records owned by the user.</div>
-                                        </Col>
-                                        <Col md={6}>
-                                            <strong className="text-info">owning_delete</strong>
-                                            <div>Allows deleting only records owned by the user.</div>
-                                        </Col>
+                                        {PERMISSIONS.map(permission => (
+                                            <Col md={6} key={permission}>
+                                                <strong className="text-info">{permission}</strong>
+                                                <div>{t(`acl.permissions.${permission}`)}</div>
+                                            </Col>
+                                        ))}
                                     </Row>
                                 </Card.Body>
                             </Card>

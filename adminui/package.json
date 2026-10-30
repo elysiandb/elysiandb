@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "postbuild": "touch dist/.gitkeep",
-    "build:watch": "vite build --watch"
+    "build:watch": "vite build --watch",
+    "test": "vitest run"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -27,6 +28,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
@@ -34,6 +38,8 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
-    "vite": "^7.2.4"
+    "jsdom": "^29.1.1",
+    "vite": "^7.2.4",
+    "vitest": "^4.1.12"
   }
 }

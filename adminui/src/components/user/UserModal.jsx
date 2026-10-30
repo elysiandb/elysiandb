@@ -2,10 +2,12 @@ import { Button, Form, Modal } from "react-bootstrap";
 import { useEffect, useState } from "react";
 import { useUsers } from "../../hooks/user/useUsers.js";
 import {useToast} from "../../hooks/notification/useToast.js";
+import {useTranslation} from "../../hooks/i18n/useTranslation.js";
 
 export default function UserModal({ showModal, onHide, user, onSaved }) {
     const { show } = useToast();
     const { createUser, changeUserPassword } = useUsers();
+    const { t } = useTranslation();
 
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
@@ -35,7 +37,7 @@ export default function UserModal({ showModal, onHide, user, onSaved }) {
             }
 
             if (password === "") {
-                show("error", `Please enter a password.`);
+                show("error", t("users.passwordRequired"));
             } else {
                 onSaved();
                 onHide();
@@ -48,12 +50,12 @@ export default function UserModal({ showModal, onHide, user, onSaved }) {
     return (
         <Modal show={showModal} onHide={onHide} centered>
             <Modal.Header closeButton>
-                <Modal.Title>{user ? "Edit user" : "Create user"}</Modal.Title>
+                <Modal.Title>{user ? t("users.editTitle") : t("users.createTitle")}</Modal.Title>
             </Modal.Header>
             <Modal.Body>
                 <Form>
                     <Form.Group className="mb-3">
-                        <Form.Label>Username</Form.Label>
+                        <Form.Label>{t("common.username")}</Form.Label>
                         <Form.Control
                             value={username}
                             disabled={!!user}
@@ -62,7 +64,7 @@ export default function UserModal({ showModal, onHide, user, onSaved }) {
                     </Form.Group>
 
                     <Form.Group className="mb-3">
-                        <Form.Label>Password</Form.Label>
+                        <Form.Label>{t("common.password")}</Form.Label>
                         <Form.Control
                             type="password"
                             value={password}
@@ -72,7 +74,7 @@ export default function UserModal({ showModal, onHide, user, onSaved }) {
 
                     {!user && (
                         <Form.Group>
-                            <Form.Label>Role</Form.Label>
+                            <Form.Label>{t("common.role")}</Form.Label>
                             <Form.Select value={role} onChange={(e) => setRole(e.target.value)}>
                                 <option value="admin">admin</option>
                                 <option value="user">user</option>
@@ -83,10 +85,10 @@ export default function UserModal({ showModal, onHide, user, onSaved }) {
             </Modal.Body>
             <Modal.Footer>
                 <Button variant="secondary" onClick={onHide}>
-                    Cancel
+                    {t("common.cancel")}
                 </Button>
                 <Button onClick={handleSave} disabled={saving}>
-                    Save
+                    {t("common.save")}
                 </Button>
             </Modal.Footer>
         </Modal>

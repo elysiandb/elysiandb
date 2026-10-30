@@ -3,11 +3,13 @@ import { useEffect, useState } from "react";
 import { useEntityTypes } from "../../hooks/entity/useEntityTypes.js";
 import { useEntityTypeActions } from "../../hooks/entity/useEntityTypeActions.js";
 import FieldEditor from "./EntityFieldEditor.jsx";
+import { useTranslation } from "../../hooks/i18n/useTranslation.js";
 
 export default function EntityType({ entityType, onDropSuccess }) {
     const { loadOne, entityTypeData } = useEntityTypes();
     const { updateEntitySchema, dropEntityType, loading, error } = useEntityTypeActions();
     const [localData, setLocalData] = useState(null);
+    const { t } = useTranslation();
 
     const refresh = () => {
         loadOne(entityType);
@@ -50,7 +52,7 @@ export default function EntityType({ entityType, onDropSuccess }) {
     };
 
     const onDrop = async () => {
-        if (!confirm(`Drop entity type "${localData.id}" ?`)) return;
+        if (!confirm(t("schema.confirmDrop", { entity: localData.id }))) return;
 
         await dropEntityType(localData.id);
 
@@ -62,7 +64,7 @@ export default function EntityType({ entityType, onDropSuccess }) {
     return (
         <Card className="p-4">
             <h4 className="text-warning mb-4">
-                {localData.id} ({localData._manual ? "manual" : "auto-managed"})
+                {localData.id} ({localData._manual ? t("schema.manual") : t("schema.autoManaged")})
             </h4>
 
             {error && (
@@ -90,21 +92,21 @@ export default function EntityType({ entityType, onDropSuccess }) {
                                 });
                             }}
                         >
-                            + Add field
+                            {t("schema.addField")}
                         </Button>
                         <Button
                             variant="warning"
                             disabled={loading === localData.id}
                             onClick={onSave}
                         >
-                            {loading === localData.id ? "Updating..." : "Update schema"}
+                            {loading === localData.id ? t("common.updating") : t("schema.update")}
                         </Button>
                         <Button
                             variant="danger"
                             disabled={loading === localData.id}
                             onClick={onDrop}
                         >
-                            {loading === localData.id ? "Updating..." : "Drop Entity Type"}
+                            {loading === localData.id ? t("common.updating") : t("schema.drop")}
                         </Button>
                     </div>
                 </Col>

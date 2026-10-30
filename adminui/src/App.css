@@ -93,6 +93,10 @@ button.navbar-toggler {
     border-color: rgba(255,255,255,0.2) !important;
 }
 
+.navbar-toggler-icon {
+    filter: invert(1);
+}
+
 .navbar-hello {
     display: flex;
     align-items: center;
@@ -100,6 +104,42 @@ button.navbar-toggler {
     font-weight: 500;
     color: var(--text-dim);
     line-height: 1;
+    white-space: nowrap;
+}
+
+.navbar-account {
+    align-items: flex-start;
+}
+
+@media (max-width: 1199.98px) {
+    .navbar-account {
+        margin: 0.5rem 0 0.5rem 1rem;
+    }
+}
+
+.language-selector {
+    width: auto !important;
+    background-color: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    border-radius: 10px !important;
+    color: var(--text-main) !important;
+    padding-left: 12px !important;
+    padding-right: 34px !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg width='14' height='14' viewBox='0 0 20 20' fill='%23e6e6f0' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.516 7.548L10 12.032l4.484-4.484' stroke='%23e6e6f0' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 10px center !important;
+    background-size: 14px 14px !important;
+}
+
+.language-selector:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px rgba(247,214,74,0.25) !important;
+    outline: none !important;
+}
+
+.language-selector option {
+    background: var(--bg-section);
+    color: var(--text-main);
 }
 
 /* -----------------------------------

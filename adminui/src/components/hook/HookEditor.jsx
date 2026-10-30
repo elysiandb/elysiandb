@@ -1,10 +1,12 @@
 import { Card, Button, Form, Spinner, Alert } from "react-bootstrap";
 import { useEffect, useMemo, useState } from "react";
 import { Editor } from "@monaco-editor/react";
+import { useTranslation } from "../../hooks/i18n/useTranslation.js";
 
 export default function HookEditor({ hook, loading, onSave }) {
     const [optionsOpen, setOptionsOpen] = useState(false);
     const [form, setForm] = useState(null);
+    const { t } = useTranslation();
 
     useEffect(() => {
         if (!hook) return;
@@ -24,13 +26,13 @@ export default function HookEditor({ hook, loading, onSave }) {
     const error = useMemo(() => {
         if (!form?.script?.trim()) return null;
         if (form.event === "post_read" && !form.script.trim().startsWith("function postRead")) {
-            return "post_read hooks must start with: function postRead";
+            return t("hooks.mustStartWith", { event: "post_read", signature: "function postRead" });
         }
         if (form.event === "pre_read" && !form.script.trim().startsWith("function preRead")) {
-            return "pre_read hooks must start with: function preRead";
+            return t("hooks.mustStartWith", { event: "pre_read", signature: "function preRead" });
         }
         return null;
-    }, [form]);
+    }, [form, t]);
 
     if (loading || !form) {
         return (
@@ -54,22 +56,22 @@ export default function HookEditor({ hook, loading, onSave }) {
     return (
         <Card className="entity-sidebar">
             <Card.Header className="d-flex justify-content-between align-items-center">
-                <span className="text-warning fw-bold">Hook</span>
+                <span className="text-warning fw-bold">{t("hooks.title")}</span>
                 <Button variant="primary" onClick={save} disabled={!!error}>
-                    Save
+                    {t("common.save")}
                 </Button>
             </Card.Header>
 
             <Card.Body>
                 <Form>
                     <div className="d-flex justify-content-between align-items-center mb-2">
-                        <span className="fw-semibold">Options</span>
+                        <span className="fw-semibold">{t("hooks.options")}</span>
                         <Button
                             variant="outline-secondary"
                             size="sm"
                             onClick={() => setOptionsOpen(o => !o)}
                         >
-                            {optionsOpen ? "Hide" : "Show"}
+                            {optionsOpen ? t("common.hide") : t("common.show")}
                         </Button>
                     </div>
 
@@ -79,7 +81,7 @@ export default function HookEditor({ hook, loading, onSave }) {
                                 <Form.Check
                                     type="switch"
                                     id="hook-enabled"
-                                    label="Enabled"
+                                    label={t("common.enabled")}
                                     checked={form.enabled}
                                     onChange={e => update("enabled", e.target.checked)}
                                 />
@@ -89,14 +91,14 @@ export default function HookEditor({ hook, loading, onSave }) {
                                 <Form.Check
                                     type="switch"
                                     id="hook-bypass-acl"
-                                    label="Bypass ACL"
+                                    label={t("hooks.bypassAcl")}
                                     checked={form.bypass_acl}
                                     onChange={e => update("bypass_acl", e.target.checked)}
                                 />
                             </Form.Group>
 
                             <Form.Group className="mb-3">
-                                <Form.Label>Language</Form.Label>
+                                <Form.Label>{t("hooks.language")}</Form.Label>
                                 <Form.Select
                                     value={form.language}
                                     onChange={e => update("language", e.target.value)}
@@ -106,7 +108,7 @@ export default function HookEditor({ hook, loading, onSave }) {
                             </Form.Group>
 
                             <Form.Group className="mb-3">
-                                <Form.Label>Event</Form.Label>
+                                <Form.Label>{t("common.event")}</Form.Label>
                                 <Form.Select
                                     value={form.event}
                                     onChange={e => update("event", e.target.value)}
@@ -117,7 +119,7 @@ export default function HookEditor({ hook, loading, onSave }) {
                             </Form.Group>
 
                             <Form.Group className="mb-3">
-                                <Form.Label>Priority</Form.Label>
+                                <Form.Label>{t("hooks.priority")}</Form.Label>
                                 <Form.Control
                                     type="number"
                                     min={1}
@@ -128,7 +130,7 @@ export default function HookEditor({ hook, loading, onSave }) {
                             </Form.Group>
 
                             <Form.Group className="mb-3">
-                                <Form.Label>Name</Form.Label>
+                                <Form.Label>{t("common.name")}</Form.Label>
                                 <Form.Control
                                     type="text"
                                     value={form.name}
@@ -145,7 +147,7 @@ export default function HookEditor({ hook, loading, onSave }) {
                     )}
 
                     <Form.Group className="mt-3">
-                        <Form.Label>Script</Form.Label>
+                        <Form.Label>{t("hooks.script")}</Form.Label>
                         <div style={{ height: 260 }}>
                             <Editor
                                 language="javascript"

@@ -10,6 +10,13 @@ import UsersList from "./pages/UsersList.jsx";
 import ACLList from "./pages/ACLList.jsx";
 import HooksList from "./pages/HooksList.jsx";
 import EntitiesBrowser from "./pages/EntitiesBrowser.jsx";
+import {useTranslation} from "./hooks/i18n/useTranslation.js";
+
+function LoadingLabel() {
+    const { t } = useTranslation();
+
+    return <span className="visually-hidden">{t("common.loading")}</span>;
+}
 
 export default function App() {
 
@@ -19,7 +26,7 @@ export default function App() {
         return (
             <div className="mx-auto my-5" style={{ width: "min-content" }}>
                 <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
+                    <LoadingLabel />
                 </div>
             </div>
         );

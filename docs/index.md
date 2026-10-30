@@ -1377,6 +1377,16 @@ You will be prompted to log in with your configured credentials. The Admin UI pr
 
 ---
 
+## Languages
+
+The Admin UI is available in **English** and **French**.
+
+On the first visit, it follows the browser language and falls back to English when that language is not supported. The language can be changed at any time from the selector on the login page or in the navigation bar, and the choice is remembered by the browser.
+
+Translations live in `adminui/src/i18n/locales/`, with one JSON file per language. To add a language, add its file there, register it in `adminui/src/i18n/translate.js` and `adminui/src/i18n/languages.js`, then run the Admin UI tests, which check that every language defines exactly the same keys and placeholders as English.
+
+---
+
 ## Authentication Requirements
 
 The Admin UI only works when:
@@ -1401,6 +1411,12 @@ elysiandb server
 ```
 
 If you wish to work on the frontend separately, you can use the Vite dev server, but the Admin UI in production always uses the embedded build.
+
+Run the Admin UI tests with:
+
+```bash
+cd adminui && npm test
+```
 
 ---
 

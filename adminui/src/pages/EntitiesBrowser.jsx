@@ -1,10 +1,12 @@
 import { Card, Col, Container, ListGroup, Row, Spinner } from "react-bootstrap";
 import { useEffect, useMemo, useState } from "react";
 import { useEntityTypes } from "../hooks/entity/useEntityTypes.js";
+import { useTranslation } from "../hooks/i18n/useTranslation.js";
 import EntityDataList from "../components/entity/EntityDataList.jsx";
 
 export default function EntitiesBrowser() {
     const { list, loadAll, loading } = useEntityTypes();
+    const { t } = useTranslation();
 
     useEffect(() => {
         loadAll();
@@ -42,7 +44,7 @@ export default function EntitiesBrowser() {
                 <Col xs={3}>
                     <Card className="entity-sidebar">
                         <Card.Header className="text-warning fw-bold">
-                            Entities
+                            {t("common.entities")}
                         </Card.Header>
 
                         <ListGroup variant="flush">
