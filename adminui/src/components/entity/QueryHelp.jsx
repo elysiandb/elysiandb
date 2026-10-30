@@ -1,6 +1,8 @@
+import { useTranslation } from "../../hooks/i18n/useTranslation.js";
+
 const QUERY_HELP = [
     {
-        title: "Filters",
+        id: "filters",
         code: {
             filters: {
                 and: [
@@ -16,7 +18,7 @@ const QUERY_HELP = [
         }
     },
     {
-        title: "Sort",
+        id: "sort",
         code: {
             sorts: {
                 publishedAt: "desc"
@@ -24,7 +26,7 @@ const QUERY_HELP = [
         }
     },
     {
-        title: "Pagination",
+        id: "pagination",
         code: {
             offset: 0,
             limit: 50
@@ -33,11 +35,13 @@ const QUERY_HELP = [
 ];
 
 export default function QueryHelp() {
+    const { t } = useTranslation();
+
     return (
         <div className="query-help">
             {QUERY_HELP.map(section => (
-                <div key={section.title} className="query-help-section">
-                    <div className="query-help-title">{section.title}</div>
+                <div key={section.id} className="query-help-section">
+                    <div className="query-help-title">{t(`browse.help.${section.id}`)}</div>
                     <pre className="query-help-code">
                         {JSON.stringify(section.code, null, 2)}
                     </pre>

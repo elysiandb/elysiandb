@@ -1,0 +1,160 @@
+{
+    "common": {
+        "loading": "Chargement...",
+        "cancel": "Annuler",
+        "save": "Enregistrer",
+        "create": "Créer",
+        "delete": "Supprimer",
+        "show": "Afficher",
+        "hide": "Masquer",
+        "enabled": "Activé",
+        "disabled": "Désactivé",
+        "updating": "Mise à jour...",
+        "error": "Erreur : {message}",
+        "unknownError": "Erreur inconnue",
+        "username": "Nom d'utilisateur",
+        "password": "Mot de passe",
+        "role": "Rôle",
+        "actions": "Actions",
+        "name": "Nom",
+        "event": "Événement",
+        "entities": "Entités",
+        "users": "Utilisateurs",
+        "searchUser": "Rechercher un utilisateur…"
+    },
+    "language": {
+        "label": "Langue"
+    },
+    "login": {
+        "submit": "Se connecter"
+    },
+    "nav": {
+        "toggle": "Afficher la navigation",
+        "configuration": "Configuration",
+        "users": "Utilisateurs",
+        "acl": "ACL",
+        "schema": "Schéma",
+        "hooks": "Hooks",
+        "browse": "Explorer",
+        "hello": "Bonjour {username}",
+        "logout": "Déconnexion"
+    },
+    "home": {
+        "title": "Accueil"
+    },
+    "configuration": {
+        "entry": "{label} : {value}",
+        "sections": {
+            "store": "Stockage",
+            "server": "Serveur",
+            "logging": "Journalisation",
+            "security": "Sécurité",
+            "stats": "Statistiques",
+            "api": "API",
+            "adminUI": "Interface d'administration"
+        },
+        "fields": {
+            "folder": "Dossier",
+            "shards": "Shards",
+            "flushInterval": "Intervalle d'écriture",
+            "crashRecovery": "Reprise après incident",
+            "maxLogMB": "Taille max. du journal (Mo)",
+            "http": "HTTP",
+            "tcp": "TCP",
+            "host": "Hôte",
+            "port": "Port",
+            "authenticationEnabled": "Authentification activée",
+            "mode": "Mode",
+            "enabled": "Activé",
+            "indexWorkers": "Workers d'indexation",
+            "cache": "Cache",
+            "cleanupInterval": "Intervalle de nettoyage",
+            "schema": "Schéma",
+            "strict": "Strict"
+        }
+    },
+    "users": {
+        "create": "Créer un utilisateur",
+        "changePassword": "Changer le mot de passe",
+        "confirmDelete": "Supprimer l'utilisateur « {username} » ?",
+        "editTitle": "Modifier l'utilisateur",
+        "createTitle": "Créer un utilisateur",
+        "passwordRequired": "Veuillez saisir un mot de passe.",
+        "created": "Utilisateur créé avec succès",
+        "createFailed": "Échec de la création de l'utilisateur",
+        "passwordChanged": "Mot de passe de l'utilisateur modifié avec succès",
+        "passwordChangeFailed": "Échec de la modification du mot de passe de l'utilisateur",
+        "roleChanged": "Rôle de l'utilisateur modifié avec succès",
+        "roleChangeFailed": "Échec de la modification du rôle de l'utilisateur",
+        "deleted": "Utilisateur supprimé avec succès",
+        "deleteFailed": "Échec de la suppression de l'utilisateur"
+    },
+    "acl": {
+        "searchEntity": "Rechercher une entité…",
+        "update": "Mettre à jour les ACL",
+        "restore": "Restaurer les valeurs par défaut",
+        "confirmRestore": "Restaurer les permissions par défaut pour « {username} » ?",
+        "updated": "ACL mises à jour pour « {username} » (entités : {count})",
+        "updateFailed": "Échec de la mise à jour des ACL pour « {username} »",
+        "restored": "ACL par défaut restaurées pour « {username} »",
+        "restoreFailed": "Échec de la restauration des ACL par défaut pour « {username} »",
+        "overview": "Aperçu des permissions",
+        "permissions": {
+            "read": "Permet de lire tous les enregistrements de l'entité.",
+            "create": "Permet de créer de nouveaux enregistrements dans l'entité.",
+            "update": "Permet de modifier n'importe quel enregistrement de l'entité.",
+            "delete": "Permet de supprimer n'importe quel enregistrement de l'entité.",
+            "owning_read": "Permet de lire uniquement les enregistrements appartenant à l'utilisateur.",
+            "owning_write": "Permet de créer des enregistrements appartenant à l'utilisateur.",
+            "owning_update": "Permet de modifier uniquement les enregistrements appartenant à l'utilisateur.",
+            "owning_delete": "Permet de supprimer uniquement les enregistrements appartenant à l'utilisateur."
+        }
+    },
+    "schema": {
+        "createTitle": "Créer un type d'entité",
+        "namePlaceholder": "Nom de l'entité",
+        "manual": "manuel",
+        "autoManaged": "géré automatiquement",
+        "addField": "+ Ajouter un champ",
+        "update": "Mettre à jour le schéma",
+        "drop": "Supprimer le type d'entité",
+        "confirmDrop": "Supprimer le type d'entité « {entity} » ?",
+        "required": "requis",
+        "created": "Entité « {entity} » créée avec succès",
+        "createFailed": "Échec de la création de l'entité « {entity} »",
+        "dropped": "Entité « {entity} » supprimée",
+        "dropFailed": "Échec de la suppression de « {entity} »",
+        "updated": "Schéma mis à jour pour « {entity} »",
+        "updateFailed": "Échec de la mise à jour du schéma pour « {entity} »"
+    },
+    "hooks": {
+        "createTitle": "Créer un hook",
+        "off": "INACTIF",
+        "title": "Hook",
+        "options": "Options",
+        "bypassAcl": "Ignorer les ACL",
+        "language": "Langage",
+        "priority": "Priorité",
+        "script": "Script",
+        "mustStartWith": "Les hooks {event} doivent commencer par : {signature}",
+        "created": "Le hook « {name} » a été créé pour « {entity} »",
+        "createFailed": "Échec de la création d'un hook pour « {entity} »",
+        "saved": "Hook « {name} » enregistré",
+        "saveFailed": "Échec de l'enregistrement du hook"
+    },
+    "browse": {
+        "query": "Requête",
+        "search": "Rechercher",
+        "invalidQuery": "Requête JSON invalide",
+        "queryError": "Erreur lors de l'exécution de la requête",
+        "document": "Document",
+        "confirmDelete": "Supprimer l'entité « {id} » ?",
+        "deleted": "Entité « {id} » supprimée",
+        "deleteFailed": "Échec de la suppression de « {id} »",
+        "help": {
+            "filters": "Filtres",
+            "sort": "Tri",
+            "pagination": "Pagination"
+        }
+    }
+}

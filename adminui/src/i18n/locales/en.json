@@ -1,0 +1,160 @@
+{
+    "common": {
+        "loading": "Loading...",
+        "cancel": "Cancel",
+        "save": "Save",
+        "create": "Create",
+        "delete": "Delete",
+        "show": "Show",
+        "hide": "Hide",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "updating": "Updating...",
+        "error": "Error: {message}",
+        "unknownError": "Unknown error",
+        "username": "Username",
+        "password": "Password",
+        "role": "Role",
+        "actions": "Actions",
+        "name": "Name",
+        "event": "Event",
+        "entities": "Entities",
+        "users": "Users",
+        "searchUser": "Search user…"
+    },
+    "language": {
+        "label": "Language"
+    },
+    "login": {
+        "submit": "Log in"
+    },
+    "nav": {
+        "toggle": "Toggle navigation",
+        "configuration": "Configuration",
+        "users": "Users",
+        "acl": "ACL",
+        "schema": "Schema",
+        "hooks": "Hooks",
+        "browse": "Browse",
+        "hello": "Hello {username}",
+        "logout": "Logout"
+    },
+    "home": {
+        "title": "Home"
+    },
+    "configuration": {
+        "entry": "{label}: {value}",
+        "sections": {
+            "store": "Store",
+            "server": "Server",
+            "logging": "Logging",
+            "security": "Security",
+            "stats": "Stats",
+            "api": "API",
+            "adminUI": "Admin UI"
+        },
+        "fields": {
+            "folder": "Folder",
+            "shards": "Shards",
+            "flushInterval": "Flush Interval",
+            "crashRecovery": "Crash Recovery",
+            "maxLogMB": "MaxLogMB",
+            "http": "HTTP",
+            "tcp": "TCP",
+            "host": "Host",
+            "port": "Port",
+            "authenticationEnabled": "Authentication Enabled",
+            "mode": "Mode",
+            "enabled": "Enabled",
+            "indexWorkers": "Index Workers",
+            "cache": "Cache",
+            "cleanupInterval": "Cleanup Interval",
+            "schema": "Schema",
+            "strict": "Strict"
+        }
+    },
+    "users": {
+        "create": "Create a user",
+        "changePassword": "Change password",
+        "confirmDelete": "Delete user \"{username}\"?",
+        "editTitle": "Edit user",
+        "createTitle": "Create user",
+        "passwordRequired": "Please enter a password.",
+        "created": "User created successfully",
+        "createFailed": "Failed to create user",
+        "passwordChanged": "User's password successfully modified",
+        "passwordChangeFailed": "Failed to change user's password",
+        "roleChanged": "User's role successfully modified",
+        "roleChangeFailed": "Failed to change user's role",
+        "deleted": "User successfully deleted",
+        "deleteFailed": "Failed to delete user"
+    },
+    "acl": {
+        "searchEntity": "Search entity…",
+        "update": "Update ACLs",
+        "restore": "Restore defaults",
+        "confirmRestore": "Restore default permissions for \"{username}\"?",
+        "updated": "ACLs updated for \"{username}\" (entities: {count})",
+        "updateFailed": "Failed to update ACLs for \"{username}\"",
+        "restored": "Default ACLs restored for \"{username}\"",
+        "restoreFailed": "Failed to restore default ACLs for \"{username}\"",
+        "overview": "Permissions overview",
+        "permissions": {
+            "read": "Allows reading all records of the entity.",
+            "create": "Allows creating new records in the entity.",
+            "update": "Allows updating any record of the entity.",
+            "delete": "Allows deleting any record of the entity.",
+            "owning_read": "Allows reading only records owned by the user.",
+            "owning_write": "Allows creating records owned by the user.",
+            "owning_update": "Allows updating only records owned by the user.",
+            "owning_delete": "Allows deleting only records owned by the user."
+        }
+    },
+    "schema": {
+        "createTitle": "Create Entity Type",
+        "namePlaceholder": "Entity name",
+        "manual": "manual",
+        "autoManaged": "auto-managed",
+        "addField": "+ Add field",
+        "update": "Update schema",
+        "drop": "Drop Entity Type",
+        "confirmDrop": "Drop entity type \"{entity}\"?",
+        "required": "required",
+        "created": "Entity \"{entity}\" created successfully",
+        "createFailed": "Failed to create entity \"{entity}\"",
+        "dropped": "Entity \"{entity}\" deleted",
+        "dropFailed": "Failed to delete \"{entity}\"",
+        "updated": "Schema updated for \"{entity}\"",
+        "updateFailed": "Failed to update schema for \"{entity}\""
+    },
+    "hooks": {
+        "createTitle": "Create hook",
+        "off": "OFF",
+        "title": "Hook",
+        "options": "Options",
+        "bypassAcl": "Bypass ACL",
+        "language": "Language",
+        "priority": "Priority",
+        "script": "Script",
+        "mustStartWith": "{event} hooks must start with: {signature}",
+        "created": "The hook \"{name}\" was created for \"{entity}\"",
+        "createFailed": "Failed to create a hook for \"{entity}\"",
+        "saved": "Hook \"{name}\" saved",
+        "saveFailed": "Failed to save hook"
+    },
+    "browse": {
+        "query": "Query",
+        "search": "Search",
+        "invalidQuery": "Invalid JSON query",
+        "queryError": "Error while executing query",
+        "document": "Document",
+        "confirmDelete": "Delete entity \"{id}\"?",
+        "deleted": "Entity \"{id}\" deleted",
+        "deleteFailed": "Failed to delete \"{id}\"",
+        "help": {
+            "filters": "Filters",
+            "sort": "Sort",
+            "pagination": "Pagination"
+        }
+    }
+}

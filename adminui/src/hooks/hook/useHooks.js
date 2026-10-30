@@ -1,9 +1,11 @@
 import {useCallback, useState} from "react";
 import {apiFetch} from "../../utils/api";
 import {useToast} from "../notification/useToast.js";
+import {useTranslation} from "../i18n/useTranslation.js";
 
 export function useHooks() {
     const { show } = useToast();
+    const { t } = useTranslation();
     const [list, setList] = useState([]);
     const [hook, setHook] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -54,15 +56,15 @@ export function useHooks() {
                     enabled: false,
                 },
             });
-            show("success", `The hook "${name}" was created for "${entity}"`);
+            show("success", t("hooks.created", { name, entity }));
         } catch (err) {
-            setError(err?.message ?? "Unknown error");
-            show("error", `Failed to create a hook for "${entity}"`);
+            setError(err?.message ?? t("common.unknownError"));
+            show("error", t("hooks.createFailed", { entity }));
             throw err;
         } finally {
             setLoading(null);
         }
-    }, [show]);
+    }, [show, t]);
 
     const update = useCallback(async (hook) => {
         setLoading(true);
@@ -72,15 +74,15 @@ export function useHooks() {
                 method: "PUT",
                 json: hook,
             });
-            show("success", `Hook "${hook.name}" saved`);
+            show("success", t("hooks.saved", { name: hook.name }));
         } catch (err) {
-            setError(err?.message ?? "Unknown error");
-            show("error", "Failed to save hook");
+            setError(err?.message ?? t("common.unknownError"));
+            show("error", t("hooks.saveFailed"));
             throw err;
         } finally {
             setLoading(false);
         }
-    }, [show]);
+    }, [show, t]);
 
     const refreshSelected = useCallback(async (id, entity) => {
         setLoading(true);

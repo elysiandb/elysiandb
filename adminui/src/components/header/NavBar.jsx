@@ -1,18 +1,21 @@
 import { Button, Container, Nav, Navbar } from "react-bootstrap";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../hooks/account/useAuth.ts";
+import { useTranslation } from "../../hooks/i18n/useTranslation.js";
+import LanguageSelector from "../i18n/LanguageSelector.jsx";
 
 export default function NavBar() {
     const { logout, account } = useAuth();
+    const { t } = useTranslation();
 
     return (
-        <Navbar expand="lg" className="bg-body-tertiary">
+        <Navbar expand="xl" className="bg-body-tertiary">
             <div className="container-fluid">
                 <Navbar.Brand as={NavLink} to="/admin">
                     ElysianDB Admin
                 </Navbar.Brand>
 
-                <Navbar.Toggle aria-controls="basic-navbar-nav" />
+                <Navbar.Toggle aria-controls="basic-navbar-nav" label={t("nav.toggle")} />
                 <Navbar.Collapse id="basic-navbar-nav">
                     <Nav className="me-auto">
 
@@ -21,7 +24,7 @@ export default function NavBar() {
                             to="/admin/configuration"
                             end
                         >
-                            Configuration
+                            {t("nav.configuration")}
                         </Nav.Link>
 
                         <Nav.Link
@@ -29,7 +32,7 @@ export default function NavBar() {
                             to="/admin/users"
                             end
                         >
-                            Users
+                            {t("nav.users")}
                         </Nav.Link>
 
                         <Nav.Link
@@ -37,7 +40,7 @@ export default function NavBar() {
                             to="/admin/acl"
                             end
                         >
-                            ACL
+                            {t("nav.acl")}
                         </Nav.Link>
 
                         <Nav.Link
@@ -45,7 +48,7 @@ export default function NavBar() {
                             to="/admin/schema"
                             end
                         >
-                            Schema
+                            {t("nav.schema")}
                         </Nav.Link>
 
                         <Nav.Link
@@ -53,7 +56,7 @@ export default function NavBar() {
                             to="/admin/hooks"
                             end
                         >
-                            Hooks
+                            {t("nav.hooks")}
                         </Nav.Link>
 
                         <Nav.Link
@@ -61,16 +64,17 @@ export default function NavBar() {
                             to="/admin/browse"
                             end
                         >
-                            Browse
+                            {t("nav.browse")}
                         </Nav.Link>
 
                     </Nav>
-                </Navbar.Collapse>
 
-                <Nav className="align-items-center gap-3">
-                    <span className="navbar-hello">Hello {account?.username}</span>
-                    <Button onClick={logout}>Logout</Button>
-                </Nav>
+                    <Nav className="navbar-account align-items-xl-center gap-3">
+                        <LanguageSelector />
+                        <span className="navbar-hello">{t("nav.hello", { username: account?.username })}</span>
+                        <Button onClick={logout}>{t("nav.logout")}</Button>
+                    </Nav>
+                </Navbar.Collapse>
             </div>
         </Navbar>
     );
