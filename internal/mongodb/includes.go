@@ -24,10 +24,14 @@ type includeCache struct {
 }
 
 func ApplyIncludes(data []map[string]any, includesParam string) []map[string]any {
-	cache := &includeCache{docs: map[entityRef]map[string]any{}}
-	cache.prefetch(data, includesParam)
+	return ApplyIncludesWithGuard(data, includesParam, nil)
+}
 
-	return api_storage.ApplyIncludes(data, includesParam, cache.read)
+func ApplyIncludesWithGuard(data []map[string]any, includesParam string, guard api_storage.ReadGuard) []map[string]any {
+	cache := &includeCache{docs: map[entityRef]map[string]any{}}
+	cache.prefetch(data, includesParam, guard)
+
+	return api_storage.ApplyIncludes(data, includesParam, guard.Apply(cache.read))
 }
 
 func (c *includeCache) read(entity, id string) map[string]any {
@@ -41,7 +45,7 @@ func (c *includeCache) read(entity, id string) map[string]any {
 	return cloneDocument(doc)
 }
 
-func (c *includeCache) prefetch(data []map[string]any, includesParam string) {
+func (c *includeCache) prefetch(data []map[string]any, includesParam string, guard api_storage.ReadGuard) {
 	for round := 0; round < includePrefetchMaxRounds; round++ {
 		missing := map[string][]string{}
 		requested := map[entityRef]struct{}{}
@@ -65,7 +69,7 @@ func (c *includeCache) prefetch(data []map[string]any, includesParam string) {
 			dryRun[i] = maps.Clone(item)
 		}
 
-		api_storage.ApplyIncludes(dryRun, includesParam, probe)
+		api_storage.ApplyIncludes(dryRun, includesParam, guard.Apply(probe))
 
 		if len(missing) == 0 {
 			return

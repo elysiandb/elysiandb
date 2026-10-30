@@ -952,6 +952,15 @@ curl "http://localhost:8089/api/posts?includes=author,author.job&filter[author.j
 
 Using `includes=all` expands all linked entities recursively.
 
+#### Access Rules for Included Entities
+
+A linked entity is only expanded when the client could read it directly:
+
+* Links to core entity types (names starting with `_elysiandb_core_`, such as users, ACLs, hooks and schemas) are never expanded through the REST API, whatever the authentication mode.
+* In `user` authentication mode, a linked entity is only expanded when the ACL of the current user allows reading it (`read`, or `owning_read` on an entity they own).
+
+Otherwise the link is returned as stored, `{"@entity": "...", "id": "..."}`, at any depth. Filters on fields of a link that is not expanded behave as filters on a missing field, so they never reveal its content. The same rules apply to `query()` in hooks unless the hook has `bypass_acl` enabled.
+
 ---
 
 ## Authentication

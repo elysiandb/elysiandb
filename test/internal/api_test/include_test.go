@@ -192,6 +192,102 @@ func TestApplyIncludes_MissingRelations(t *testing.T) {
 	}
 }
 
+func guardedStoreReader(entity, id string) map[string]interface{} {
+	docs := map[string]map[string]interface{}{
+		"_elysiandb_core_user:admin": {"id": "admin", "password": "hash"},
+		"author:a1":                  {"id": "a1", "owner": "u", "job": map[string]interface{}{"@entity": "job", "id": "j1"}},
+		"author:a2":                  {"id": "a2", "owner": "x"},
+		"job:j1":                     {"id": "j1", "designation": "Worker"},
+	}
+
+	if v, ok := docs[entity+":"+id]; ok {
+		return v
+	}
+
+	return nil
+}
+
+func guardedPost() []map[string]interface{} {
+	return []map[string]interface{}{
+		{
+			"id":    "p1",
+			"admin": map[string]interface{}{"@entity": "_elysiandb_core_user", "id": "admin"},
+			"authors": []interface{}{
+				map[string]interface{}{"@entity": "author", "id": "a1"},
+				map[string]interface{}{"@entity": "author", "id": "a2"},
+			},
+		},
+	}
+}
+
+func TestPublicReadGuard_NeverExpandsCoreEntities(t *testing.T) {
+	guard := api_storage.PublicReadGuard(func(string, map[string]any) bool { return true })
+
+	for _, includes := range []string{"all", "admin", "admin,authors.job"} {
+		result := api_storage.ApplyIncludes(guardedPost(), includes, guard.Apply(guardedStoreReader))
+
+		want := map[string]interface{}{"@entity": "_elysiandb_core_user", "id": "admin"}
+		if !reflect.DeepEqual(result[0]["admin"], want) {
+			t.Fatalf("includes=%s: expected core reference to stay unexpanded, got %+v", includes, result[0]["admin"])
+		}
+	}
+
+	result := api_storage.ApplyIncludes(guardedPost(), "all", guard.Apply(guardedStoreReader))
+	authors := result[0]["authors"].([]map[string]interface{})
+	if authors[0]["job"].(map[string]interface{})["designation"] != "Worker" {
+		t.Fatalf("expected non-core references to be expanded, got %+v", authors)
+	}
+}
+
+func TestPublicReadGuard_DeniedEntitiesStayReferences(t *testing.T) {
+	var checked []string
+	guard := api_storage.PublicReadGuard(func(entity string, data map[string]any) bool {
+		checked = append(checked, entity+":"+data["id"].(string))
+		return entity != "job" && data["owner"] != "x"
+	})
+
+	result := api_storage.ApplyIncludes(guardedPost(), "authors.job", guard.Apply(guardedStoreReader))
+	authors := result[0]["authors"].([]map[string]interface{})
+
+	if authors[0]["owner"] != "u" {
+		t.Fatalf("expected readable author to be expanded, got %+v", authors[0])
+	}
+
+	wantJob := map[string]interface{}{"@entity": "job", "id": "j1"}
+	if !reflect.DeepEqual(authors[0]["job"], wantJob) {
+		t.Fatalf("expected denied job to stay a reference, got %+v", authors[0]["job"])
+	}
+
+	wantAuthor := map[string]interface{}{"@entity": "author", "id": "a2"}
+	if !reflect.DeepEqual(authors[1], wantAuthor) {
+		t.Fatalf("expected denied author to stay a reference, got %+v", authors[1])
+	}
+
+	if strings.Join(checked, ",") != "author:a1,job:j1,author:a2" {
+		t.Fatalf("expected the loaded documents to be checked, got %v", checked)
+	}
+}
+
+func TestPublicReadGuard_FiltersCannotSeeDeniedReferences(t *testing.T) {
+	guard := api_storage.PublicReadGuard(func(string, map[string]any) bool { return true })
+	result := api_storage.ApplyIncludes(guardedPost(), api_storage.ExtractAutoIncludes(map[string]map[string]string{
+		"admin.password": {"eq": "nope"},
+	}), guard.Apply(guardedStoreReader))
+
+	if !api_storage.FiltersMatchEntity(result[0], map[string]map[string]string{"admin.password": {"eq": "nope"}}) {
+		t.Fatalf("expected the filter to ignore the unexpanded core reference")
+	}
+}
+
+func TestReadGuard_NilKeepsReaderUnrestricted(t *testing.T) {
+	var guard api_storage.ReadGuard
+	result := api_storage.ApplyIncludes(guardedPost(), "all", guard.Apply(guardedStoreReader))
+
+	if result[0]["admin"].(map[string]interface{})["password"] != "hash" {
+		t.Fatalf("expected internal includes to keep reading every entity type, got %+v", result[0]["admin"])
+	}
+}
+
 func TestExtractAutoIncludes_Simple(t *testing.T) {
 	in := map[string]map[string]string{
 		"author.name": {"eq": "John"},

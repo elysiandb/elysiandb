@@ -41,13 +41,13 @@ func FilterFields(data map[string]any, fields []string) map[string]any {
 	return nil
 }
 
-func ApplyIncludes(data []map[string]interface{}, includesParam string) []map[string]interface{} {
+func ApplyIncludes(data []map[string]interface{}, includesParam string, guard api_storage.ReadGuard) []map[string]interface{} {
 	if IsEngineInternal() {
-		return api_storage.ApplyIncludes(data, includesParam, api_storage.ReadEntityById)
+		return api_storage.ApplyIncludes(data, includesParam, guard.Apply(api_storage.ReadEntityById))
 	}
 
 	if IsEngineMongoDB() {
-		return mongodb.ApplyIncludes(data, includesParam)
+		return mongodb.ApplyIncludesWithGuard(data, includesParam, guard)
 	}
 
 	ThrowErrorIfNotValidEngine()
@@ -225,6 +225,30 @@ func ListEntities(
 
 	if IsEngineMongoDB() {
 		return mongodb.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
+	}
+
+	ThrowErrorIfNotValidEngine()
+
+	return nil
+}
+
+func ListEntitiesWithGuard(
+	entity string,
+	limit int,
+	offset int,
+	sortField string,
+	sortAscending bool,
+	filters map[string]map[string]string,
+	search string,
+	includesParam string,
+	guard api_storage.ReadGuard,
+) []map[string]any {
+	if IsEngineInternal() {
+		return api_storage.ListEntitiesWithGuard(entity, limit, offset, sortField, sortAscending, filters, search, includesParam, guard)
+	}
+
+	if IsEngineMongoDB() {
+		return mongodb.ListEntitiesWithGuard(entity, limit, offset, sortField, sortAscending, filters, search, includesParam, guard)
 	}
 
 	ThrowErrorIfNotValidEngine()

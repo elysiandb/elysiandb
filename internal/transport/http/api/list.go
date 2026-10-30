@@ -57,7 +57,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
-	data := engine.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
+	data := engine.ListEntitiesWithGuard(entity, limit, offset, sortField, sortAscending, filters, search, includesParam, acl.ReadGuard())
 
 	data = acl.FilterListOfEntities(entity, data)
 

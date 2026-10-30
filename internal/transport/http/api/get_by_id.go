@@ -19,7 +19,9 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	fields := api_storage.ParseFieldsParam(fieldsParam)
 	includesParam := string(ctx.QueryArgs().Peek("includes"))
 
-	if !hook.EntityHasHooks(entity) && len(fields) == 0 && globals.GetConfig().Api.Cache.Enabled {
+	cacheable := !hook.EntityHasHooks(entity) && len(fields) == 0 && includesParam == "" && globals.GetConfig().Api.Cache.Enabled
+
+	if cacheable {
 		if v := cache.CacheStore.GetById(entity, id); v != nil {
 			ctx.Response.Header.Set("Content-Type", "application/json")
 			ctx.Response.Header.Set("X-Elysian-Cache", "HIT")
@@ -48,7 +50,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 
 	if includesParam != "" {
 		list := []map[string]any{data}
-		data = engine.ApplyIncludes(list, includesParam)[0]
+		data = engine.ApplyIncludes(list, includesParam, acl.ReadGuard())[0]
 	}
 
 	if len(fields) > 0 {
@@ -67,7 +69,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if globals.GetConfig().Api.Cache.Enabled {
+	if cacheable {
 		cache.CacheStore.SetById(entity, id, response)
 	}
 

@@ -3,6 +3,8 @@ package engines
 import (
 	"net/url"
 	"testing"
+
+	"github.com/taymour/elysiandb/internal/security"
 )
 
 func seedLibrary(s *session) {
@@ -188,6 +190,47 @@ func TestIncludesAndFields(t *testing.T) {
 		s.expectJSON(s.get("/api/doc/d1"), `{"id":"d1","meta":{"owner":{"@entity":"user","id":"u1"}},"tags":["a","b"]}`)
 		s.expectJSON(s.get("/api/doc/d1?includes=tags"), `{"id":"d1","meta":{"owner":{"@entity":"user","id":"u1"}},"tags":[]}`)
 		s.expectJSON(s.get("/api/doc/d1"), `{"id":"d1","meta":{"owner":{"@entity":"user","id":"u1"}},"tags":["a","b"]}`)
+	})
+}
+
+func TestIncludesNeverExpandCoreEntities(t *testing.T) {
+	runOnEngines(t, nil, func(s *session) {
+		seedLibrary(s)
+
+		s.expectStatus(s.post("/api/leak", map[string]any{
+			"id":     "l1",
+			"schema": map[string]any{"@entity": "_elysiandb_core_schema", "id": "post"},
+			"list":   []any{map[string]any{"@entity": "_elysiandb_core_schema", "id": "user"}, map[string]any{"@entity": "company", "id": "c1"}},
+		}), 200)
+
+		s.expectJSON(s.get("/api/leak/l1?includes=all"), `{"id":"l1",
+			"schema":{"@entity":"_elysiandb_core_schema","id":"post"},
+			"list":[{"@entity":"_elysiandb_core_schema","id":"user"},{"@entity":"company","id":"c1","name":"Acme","country":"FR"}]}`)
+		s.expectJSON(s.get("/api/leak/l1?includes=schema,list"), `{"id":"l1",
+			"schema":{"@entity":"_elysiandb_core_schema","id":"post"},
+			"list":[{"@entity":"_elysiandb_core_schema","id":"user"},{"@entity":"company","id":"c1","name":"Acme","country":"FR"}]}`)
+		s.expectJSON(s.get("/api/leak?includes=all"), `[{"id":"l1",
+			"schema":{"@entity":"_elysiandb_core_schema","id":"post"},
+			"list":[{"@entity":"_elysiandb_core_schema","id":"user"},{"@entity":"company","id":"c1","name":"Acme","country":"FR"}]}]`)
+
+		s.expectJSON(s.get("/api/leak?filter[schema.fields.title.type]=number"), `[{"id":"l1",
+			"schema":{"@entity":"_elysiandb_core_schema","id":"post"},
+			"list":[{"@entity":"_elysiandb_core_schema","id":"user"},{"@entity":"company","id":"c1"}]}]`)
+		s.expectIds(s.get("/api/leak?filter[schema.fields.title.type][neq]=string"), "l1")
+		s.expectIds(s.get("/api/leak?filter[schema.id]=post"), "l1")
+		s.expectIds(s.get("/api/leak?filter[schema.id]=user"))
+		s.expectCount(s.get("/api/leak?filter[schema.fields.title.type]=number&countOnly=true"), 1)
+
+		s.loginAs("admin", security.RoleAdmin)
+		s.expectStatus(s.post("/api/hook/leak", map[string]any{
+			"name":     "probe",
+			"event":    "post_read",
+			"language": "javascript",
+			"priority": 1,
+			"enabled":  true,
+			"script":   "function postRead(ctx) { var r = ctx.query('leak', {'schema.fields.title.type': {'eq': 'number'}}); ctx.entity.probe = r.length === 1 && r[0].schema.fields === undefined; return ctx.entity; }",
+		}), 200)
+		s.expectJSON(s.get("/api/leak/l1?fields=id,probe"), `{"id":"l1","probe":true}`)
 	})
 }
 

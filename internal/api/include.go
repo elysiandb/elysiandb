@@ -7,6 +7,33 @@ import (
 
 type EntityReader func(entity, id string) map[string]any
 
+type ReadGuard func(EntityReader) EntityReader
+
+func PublicReadGuard(canRead func(entity string, data map[string]any) bool) ReadGuard {
+	return func(read EntityReader) EntityReader {
+		return func(entity, id string) map[string]any {
+			if strings.HasPrefix(entity, CoreEntityTypePrefix) {
+				return nil
+			}
+
+			data := read(entity, id)
+			if data == nil || !canRead(entity, data) {
+				return nil
+			}
+
+			return data
+		}
+	}
+}
+
+func (g ReadGuard) Apply(read EntityReader) EntityReader {
+	if g == nil {
+		return read
+	}
+
+	return g(read)
+}
+
 type includedRef struct {
 	entity string
 	id     string

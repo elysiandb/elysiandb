@@ -268,3 +268,54 @@ func TestAllAllowedWhenAuthDisabled(t *testing.T) {
 		t.Fatalf("expected passthrough")
 	}
 }
+
+func guardedRead(entity, id string) map[string]any {
+	return map[string]any{"id": id, acl.UsernameField: id}
+}
+
+func TestReadGuard_AuthDisabledOnlyHidesCoreEntities(t *testing.T) {
+	setup(t, false)
+
+	read := acl.ReadGuard().Apply(guardedRead)
+
+	if read("doc", "x") == nil {
+		t.Fatalf("expected public entity to be readable")
+	}
+	if read(security.UserEntity, "admin") != nil {
+		t.Fatalf("expected core user to be hidden")
+	}
+	if read(acl.ACLEntity, "u::doc") != nil {
+		t.Fatalf("expected core acl to be hidden")
+	}
+}
+
+func TestReadGuard_UserModeFollowsReadPermissions(t *testing.T) {
+	setup(t, true)
+	security.SetCurrentUsername("u")
+
+	global := acl.NewPermissions()
+	global[acl.PermissionRead] = true
+	writeACL("u", "doc", global)
+
+	owning := acl.NewPermissions()
+	owning[acl.PermissionOwningRead] = true
+	writeACL("u", "note", owning)
+
+	read := acl.ReadGuard().Apply(guardedRead)
+
+	if read("doc", "x") == nil {
+		t.Fatalf("expected global read to allow any document")
+	}
+	if read("note", "u") == nil {
+		t.Fatalf("expected owning read to allow own document")
+	}
+	if read("note", "x") != nil {
+		t.Fatalf("expected owning read to deny others' documents")
+	}
+	if read("secret", "u") != nil {
+		t.Fatalf("expected missing ACL to deny")
+	}
+	if read(security.UserEntity, "u") != nil {
+		t.Fatalf("expected core user to be hidden")
+	}
+}

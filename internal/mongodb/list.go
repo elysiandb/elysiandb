@@ -42,6 +42,20 @@ func ListEntities(
 	search string,
 	includesParam string,
 ) []map[string]any {
+	return ListEntitiesWithGuard(entity, limit, offset, sortField, sortAscending, filters, search, includesParam, nil)
+}
+
+func ListEntitiesWithGuard(
+	entity string,
+	limit int,
+	offset int,
+	sortField string,
+	sortAscending bool,
+	filters map[string]map[string]string,
+	search string,
+	includesParam string,
+	guard api_storage.ReadGuard,
+) []map[string]any {
 	includesParam = api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
 	paginateFirst := len(filters) == 0
 
@@ -69,7 +83,7 @@ func ListEntities(
 	out := make([]map[string]any, 0)
 	scanEntities(req, func(batch []map[string]any) bool {
 		if includesParam != "" {
-			batch = ApplyIncludes(batch, includesParam)
+			batch = ApplyIncludesWithGuard(batch, includesParam, guard)
 		}
 
 		for _, e := range batch {

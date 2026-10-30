@@ -253,6 +253,77 @@ func TestUserModeACL(t *testing.T) {
 	})
 }
 
+func TestUserModeIncludesFollowACL(t *testing.T) {
+	userModeWithCache := func(c *configuration.Config) {
+		c.Security.Authentication = configuration.AuthenticationConfig{Enabled: true, Mode: "user"}
+		c.Api.Cache.Enabled = true
+	}
+
+	runOnEngines(t, userModeWithCache, func(s *session) {
+		s.loginAs("admin", security.RoleAdmin)
+		s.expectStatus(s.post("/api/security/user", map[string]any{"username": "alice", "password": "pw", "role": "user"}), 200)
+		s.expectStatus(s.post("/api/security/user", map[string]any{"username": "bob", "password": "pw", "role": "user"}), 200)
+		s.expectStatus(s.post("/api/secret", map[string]any{"id": "s0", "value": "admin-secret"}), 200)
+		s.expectStatus(s.post("/api/post", map[string]any{"id": "p0", "title": "admin post"}), 200)
+
+		s.loginAs("alice", security.RoleUser)
+		s.expectStatus(s.post("/api/secret", map[string]any{"id": "s1", "value": "alice-secret"}), 200)
+
+		s.loginAs("bob", security.RoleUser)
+		s.expectStatus(s.post("/api/secret", map[string]any{"id": "s2", "value": "bob-secret"}), 200)
+		s.expectStatus(s.post("/api/post", map[string]any{
+			"id":     "p1",
+			"stolen": map[string]any{"@entity": "secret", "id": "s1"},
+			"own":    map[string]any{"@entity": "secret", "id": "s2"},
+			"admin":  map[string]any{"@entity": "_elysiandb_core_user", "id": "admin"},
+			"acl":    []any{map[string]any{"@entity": "_elysiandb_core_acl", "id": "bob::secret"}},
+		}), 200)
+
+		s.loginAs("admin", security.RoleAdmin)
+		s.expectJSON(s.get("/api/post/p1?includes=all&fields=stolen.value,own.value,admin,acl"), `{
+			"stolen":{"value":"alice-secret"},"own":{"value":"bob-secret"},
+			"admin":{"@entity":"_elysiandb_core_user","id":"admin"},
+			"acl":[{"@entity":"_elysiandb_core_acl","id":"bob::secret"}]}`)
+		s.expectJSON(s.get("/api/post/p1?includes=stolen&fields=stolen.value"), `{"stolen":{"value":"alice-secret"}}`)
+		s.expectJSON(s.get("/api/post/p1?includes=stolen"), `{"id":"p1","_elysiandb_core_username":"bob",
+			"stolen":{"@entity":"secret","id":"s1","value":"alice-secret","_elysiandb_core_username":"alice"},
+			"own":{"@entity":"secret","id":"s2"},"admin":{"@entity":"_elysiandb_core_user","id":"admin"},
+			"acl":[{"@entity":"_elysiandb_core_acl","id":"bob::secret"}]}`)
+
+		s.loginAs("bob", security.RoleUser)
+		s.expectJSON(s.get("/api/post/p1"), `{"id":"p1","_elysiandb_core_username":"bob",
+			"stolen":{"@entity":"secret","id":"s1"},"own":{"@entity":"secret","id":"s2"},
+			"admin":{"@entity":"_elysiandb_core_user","id":"admin"},
+			"acl":[{"@entity":"_elysiandb_core_acl","id":"bob::secret"}]}`)
+		s.expectStatus(s.get("/api/secret/s1"), 403)
+		s.expectJSON(s.get("/api/post/p1?includes=all&fields=stolen,own.value,admin,acl"), `{
+			"stolen":{"@entity":"secret","id":"s1"},"own":{"value":"bob-secret"},
+			"admin":{"@entity":"_elysiandb_core_user","id":"admin"},
+			"acl":[{"@entity":"_elysiandb_core_acl","id":"bob::secret"}]}`)
+		s.expectJSON(s.get("/api/post/p1?includes=stolen&fields=stolen"), `{"stolen":{"@entity":"secret","id":"s1"}}`)
+		s.expectJSON(s.get("/api/post/p1?fields=stolen"), `{"stolen":{"@entity":"secret","id":"s1"}}`)
+		s.expectJSON(s.get("/api/post?includes=all&fields=id,stolen,own.value,admin"), `[{"id":"p1",
+			"stolen":{"@entity":"secret","id":"s1"},"own":{"value":"bob-secret"},
+			"admin":{"@entity":"_elysiandb_core_user","id":"admin"}}]`)
+
+		s.expectJSON(s.get("/api/post?filter[stolen.value]=wrong&fields=id,stolen"), `[{"id":"p1","stolen":{"@entity":"secret","id":"s1"}}]`)
+		s.expectIds(s.get("/api/post?filter[stolen.value][neq]=alice-secret"), "p1")
+		s.expectIds(s.get("/api/post?filter[admin.role]=nobody"), "p1")
+		s.expectIds(s.get("/api/post?filter[own.value]=wrong"))
+		s.expectIds(s.get("/api/post?filter[own.value]=bob-secret"), "p1")
+		s.expectIds(s.get("/api/post?filter[stolen.id]=s2"))
+
+		s.loginAs("admin", security.RoleAdmin)
+		s.expectStatus(s.put("/api/acl/bob/secret", map[string]any{"permissions": map[string]any{"read": true}}), 200)
+
+		s.loginAs("bob", security.RoleUser)
+		s.expectJSON(s.get("/api/post/p1?includes=stolen,admin&fields=stolen.value,admin"), `{
+			"stolen":{"value":"alice-secret"},"admin":{"@entity":"_elysiandb_core_user","id":"admin"}}`)
+		s.expectIds(s.get("/api/post?filter[stolen.value]=wrong"))
+		s.expectIds(s.get("/api/post?filter[stolen.value]=alice-secret"), "p1")
+	})
+}
+
 func TestHooks(t *testing.T) {
 	runOnEngines(t, nil, func(s *session) {
 		seedLibrary(s)

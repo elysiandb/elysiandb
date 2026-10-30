@@ -195,6 +195,20 @@ func ListEntities(
 	search string,
 	includesParam string,
 ) []map[string]any {
+	return ListEntitiesWithGuard(entity, limit, offset, sortField, sortAscending, filters, search, includesParam, nil)
+}
+
+func ListEntitiesWithGuard(
+	entity string,
+	limit int,
+	offset int,
+	sortField string,
+	sortAscending bool,
+	filters map[string]map[string]string,
+	search string,
+	includesParam string,
+	guard ReadGuard,
+) []map[string]any {
 	idList, err := GetListOfIds(entity, sortField, sortAscending)
 	if err != nil {
 		return []map[string]any{}
@@ -221,7 +235,7 @@ func ListEntities(
 	includesParam = MergeIncludes(includesParam, autoInc)
 
 	if includesParam != "" {
-		all = ApplyIncludes(all, includesParam, ReadEntityById)
+		all = ApplyIncludes(all, includesParam, guard.Apply(ReadEntityById))
 	}
 
 	filtered := make([]map[string]any, 0, len(all))

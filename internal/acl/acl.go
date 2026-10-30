@@ -1,6 +1,7 @@
 package acl
 
 import (
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/security"
 )
 
@@ -99,7 +100,30 @@ func CanReadEntity(entity string, data map[string]any) bool {
 	}
 
 	username := security.GetCurrentUsername()
-	acl := GetACLEntityForUsername(entity, username)
+
+	return canRead(GetACLEntityForUsername(entity, username), username, data)
+}
+
+func ReadGuard() api_storage.ReadGuard {
+	if !security.UserAuthenticationIsEnabled() {
+		return api_storage.PublicReadGuard(func(string, map[string]any) bool { return true })
+	}
+
+	username := security.GetCurrentUsername()
+	acls := map[string]*ACL{}
+
+	return api_storage.PublicReadGuard(func(entity string, data map[string]any) bool {
+		acl, ok := acls[entity]
+		if !ok {
+			acl = GetACLEntityForUsername(entity, username)
+			acls[entity] = acl
+		}
+
+		return canRead(acl, username, data)
+	})
+}
+
+func canRead(acl *ACL, username string, data map[string]any) bool {
 	if acl == nil {
 		return false
 	}
