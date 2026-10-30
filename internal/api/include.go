@@ -1,14 +1,23 @@
 package api_storage
 
-import "strings"
+import (
+	"maps"
+	"strings"
+)
 
-var ReadEntityByIdFunc = ReadEntityById
+type EntityReader func(entity, id string) map[string]any
 
-func ApplyIncludes(data []map[string]any, includesParam string) []map[string]any {
+type includedRef struct {
+	entity string
+	id     string
+}
+
+func ApplyIncludes(data []map[string]any, includesParam string, read EntityReader) []map[string]any {
 	allMode := strings.TrimSpace(includesParam) == "all"
 	includeTree := buildIncludeTree(includesParam, allMode)
+	expanding := map[includedRef]struct{}{}
 	for _, entityData := range data {
-		applyIncludesRecursive(entityData, includeTree, allMode)
+		applyIncludesRecursive(entityData, includeTree, allMode, read, expanding)
 	}
 
 	return data
@@ -33,7 +42,13 @@ func buildIncludeTree(includesParam string, allMode bool) map[string][]string {
 	return includeTree
 }
 
-func applyIncludesRecursive(entityData map[string]any, tree map[string][]string, forceAll bool) {
+func applyIncludesRecursive(
+	entityData map[string]any,
+	tree map[string][]string,
+	forceAll bool,
+	read EntityReader,
+	expanding map[includedRef]struct{},
+) {
 	fields := collectIncludeFields(entityData, tree, forceAll)
 	for _, field := range fields {
 		val, ok := entityData[field]
@@ -43,25 +58,42 @@ func applyIncludesRecursive(entityData map[string]any, tree map[string][]string,
 
 		switch v := val.(type) {
 		case map[string]any:
-			entityData[field] = includeSingleEntity(v)
 			next := buildNextTree(tree[field], forceAll)
-			if m, ok := entityData[field].(map[string]any); ok {
-				applyIncludesRecursive(m, next, forceAll)
-			}
+			entityData[field] = includeEntity(v, next, forceAll, read, expanding)
 		case []any:
 			newList := []map[string]any{}
 			for _, item := range v {
 				if m, ok := item.(map[string]any); ok {
-					m = includeSingleEntity(m)
 					next := buildNextTree(tree[field], forceAll)
-					applyIncludesRecursive(m, next, forceAll)
-					newList = append(newList, m)
+					newList = append(newList, includeEntity(m, next, forceAll, read, expanding))
 				}
 			}
 
 			entityData[field] = newList
 		}
 	}
+}
+
+func includeEntity(
+	m map[string]any,
+	next map[string][]string,
+	forceAll bool,
+	read EntityReader,
+	expanding map[includedRef]struct{},
+) map[string]any {
+	included, ref, ok := includeSingleEntity(m, forceAll, read, expanding)
+	if !ok {
+		included = maps.Clone(m)
+		applyIncludesRecursive(included, next, forceAll, read, expanding)
+
+		return included
+	}
+
+	expanding[ref] = struct{}{}
+	applyIncludesRecursive(included, next, forceAll, read, expanding)
+	delete(expanding, ref)
+
+	return included
 }
 
 func collectIncludeFields(entityData map[string]any, tree map[string][]string, forceAll bool) []string {
@@ -93,18 +125,35 @@ func collectIncludeFields(entityData map[string]any, tree map[string][]string, f
 	return fields
 }
 
-func includeSingleEntity(m map[string]any) map[string]any {
-	if ent, ok := m["@entity"].(string); ok {
-		if id, ok := m["id"].(string); ok && id != "" {
-			read := ReadEntityByIdFunc(ent, id)
-			if read != nil {
-				read["@entity"] = ent
-				return read
-			}
-		}
+func includeSingleEntity(
+	m map[string]any,
+	forceAll bool,
+	read EntityReader,
+	expanding map[includedRef]struct{},
+) (map[string]any, includedRef, bool) {
+	ent, ok := m["@entity"].(string)
+	if !ok {
+		return m, includedRef{}, false
 	}
 
-	return m
+	id, ok := m["id"].(string)
+	if !ok || id == "" {
+		return m, includedRef{}, false
+	}
+
+	ref := includedRef{entity: ent, id: id}
+	if _, cyclic := expanding[ref]; cyclic && forceAll {
+		return m, includedRef{}, false
+	}
+
+	loaded := read(ent, id)
+	if loaded == nil {
+		return m, includedRef{}, false
+	}
+
+	loaded["@entity"] = ent
+
+	return loaded, ref, true
 }
 
 func buildNextTree(subs []string, forceAll bool) map[string][]string {

@@ -5,7 +5,6 @@ import (
 
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
-	"github.com/taymour/elysiandb/internal/mongodb"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/transaction"
 	"github.com/valyala/fasthttp"
@@ -45,13 +44,7 @@ func UpdateTransactionController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
-		var schemaData map[string]any
-
-		if engine.IsEngineMongoDB() {
-			schemaData = mongodb.GetEntitySchema(entity)
-		} else {
-			schemaData = nil
-		}
+		schemaData := engine.GetEntitySchema(entity)
 
 		errors := schema.ValidateEntity(entity, merged, schemaData)
 		if len(errors) > 0 {

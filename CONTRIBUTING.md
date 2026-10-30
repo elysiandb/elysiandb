@@ -51,6 +51,15 @@ Please open an issue first so we can discuss it together.
    ```bash
    make test
    ```
+
+   Tests that exercise the MongoDB engine need a MongoDB server (4.4 or newer). Without one they are skipped locally, while CI always runs them:
+
+   ```bash
+   docker run -d --name elysiandb-test-mongo -p 27017:27017 mongo:7
+   ELYSIANDB_TEST_MONGODB_URI=mongodb://localhost:27017 make test
+   ```
+
+   Each test uses its own throwaway database and drops it afterwards.
 5. Bench (optional): see README (k6 for HTTP, built‑in TCP bench).
 
 ---
@@ -59,6 +68,7 @@ Please open an issue first so we can discuss it together.
 
 * Prefer **e2e tests** for the HTTP API first; TCP tests welcome too.
 * Keep tests **deterministic**; reset state via `POST /reset` where needed.
+* Behavior visible through the REST API must be identical for both engines: add scenarios to `test/e2e/engines`, which replays each one against `internal` and `mongodb` and compares every response.
 * Run with `-race` and ensure no data races are introduced.
 
 ---

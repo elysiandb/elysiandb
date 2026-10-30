@@ -197,6 +197,24 @@ engine:
 
 Switching between `internal` and `mongodb` **does not require any API or payload changes**.
 
+##### What MongoDB stores
+
+When `mongodb` is selected, MongoDB is the only place where API data lives:
+
+* Every entity type is a collection of the `elysiandb` database, including the core types used for users, ACLs, hooks and schemas. The list of entity types is read from the collections, in alphabetical order.
+* Documents are stored as they were sent. Strings, timestamps included, are kept as strings, so a document reads back exactly as it was written.
+* The internal document store, its indexes and its crash recovery log are not loaded. Losing the local store folder does not lose any API data, entity type or schema.
+
+The KV store (`/kv`, `/save`, `/reset`) and the TCP interface are independent of the engine. They keep using the built-in store and its folder in both modes.
+
+MongoDB 4.4 or newer is required.
+
+##### Same results as the internal engine
+
+Filters, full-text search, includes, field selection, the Query API, hooks, ACLs, schemas, transactions, import/export and migrations behave exactly as with the `internal` engine. MongoDB narrows down the candidate documents, sorts and paginates them, and ElysianDB then applies the same matching rules as the internal engine, so both engines return the same documents in the same order.
+
+Documents written by earlier versions of the MongoDB engine may hold top-level timestamps as BSON dates. They are still returned as RFC 3339 strings and are compared and sorted chronologically with the timestamps stored as strings.
+
 ---
 
 ### Design Goals
@@ -219,6 +237,7 @@ This design allows ElysianDB to scale from an embedded, single-binary backend to
 * Engine selection is evaluated at startup
 * Switching engines may require data migration
 * All engines share the same query model, schema rules, ACLs, and hooks
+* The KV store and the TCP interface always use the built-in store
 
 
 ---
@@ -383,6 +402,14 @@ Sorting is applied **before** offset and limit.
 ```
 
 Indexes are created lazily when a sort field is first used.
+
+Values are ordered the same way by both engines:
+
+* Missing and `null` values come first in ascending order and last in descending order. An empty array comes before them.
+* Values of different types are ordered by type: numbers, strings, objects, arrays, booleans, then dates. Strings in the RFC 3339 or `YYYY-MM-DD` format are compared as dates, to the millisecond.
+* An array is sorted by its smallest element in ascending order and by its largest element in descending order.
+* Objects are equal to each other, and a nested path that goes through an array or a non-object value counts as missing.
+* Entities with equal values are ordered by `id`.
 
 ---
 

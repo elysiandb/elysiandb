@@ -8,7 +8,6 @@ import (
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
-	"github.com/taymour/elysiandb/internal/mongodb"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
@@ -18,13 +17,7 @@ func CreateController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 	body := ctx.PostBody()
 
-	var schemaData map[string]any
-
-	if engine.IsEngineMongoDB() {
-		schemaData = mongodb.GetEntitySchema(entity)
-	} else {
-		schemaData = nil
-	}
+	schemaData := engine.GetEntitySchema(entity)
 
 	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, schemaData) {
 		var tmp any

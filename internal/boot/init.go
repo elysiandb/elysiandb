@@ -19,11 +19,15 @@ func InitDB() {
 	}
 
 	storage.LoadDB()
-	storage.LoadJsonDB()
+	if engine.IsEngineInternal() {
+		storage.LoadJsonDB()
+	}
 
 	if cfg.Store.CrashRecovery.Enabled {
-		recovery.ReplayJsonRecoveryLog(storage.PutJsonValue, storage.DeleteJsonByKey)
-		recovery.ActivateJsonRecoveryLog(storage.WriteJsonDB)
+		if engine.IsEngineInternal() {
+			recovery.ReplayJsonRecoveryLog(storage.PutJsonValue, storage.DeleteJsonByKey)
+			recovery.ActivateJsonRecoveryLog(storage.WriteJsonDB)
+		}
 
 		recovery.ReplayStoreRecoveryLog(storage.PutKeyValueWithTTL, storage.DeleteByKey)
 		recovery.ActivateStoreRecoveryLog(storage.WriteStoreDB)
@@ -31,13 +35,13 @@ func InitDB() {
 
 	BootSaver()
 	BootExpirationHandler()
-	BootLazyIndexRebuilder()
 
 	if engine.IsEngineMongoDB() {
 		fmt.Printf("%sStorage engine: %s%s\n", globals.Gold, "MongoDB", globals.Reset)
 		InitMongoDBConnection()
 	} else if engine.IsEngineInternal() {
 		fmt.Printf("%sStorage engine: %s%s\n", globals.Gold, "Internal", globals.Reset)
+		BootLazyIndexRebuilder()
 	} else {
 		panic("Unsupported engine: " + cfg.Engine.Name)
 	}

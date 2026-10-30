@@ -12,12 +12,14 @@ import (
 
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/mongodb"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/crypto/bcrypt"
 )
 
 const (
 	KeyFilename          = "users.key"
+	UsersKeySetting      = "users_key"
 	SessionsFilename     = "sessions.json"
 	UserEntity           = "_elysiandb_core_user"
 	DefaultAdminUsername = "admin"
@@ -304,6 +306,10 @@ func GenerateKey() (string, error) {
 }
 
 func CreateKeyFileOrGetKey() (string, error) {
+	if engine.IsEngineMongoDB() {
+		return mongodb.GetOrCreateSetting(UsersKeySetting, readKeyFileOrGenerateKey)
+	}
+
 	cfg := globals.GetConfig()
 	path := fmt.Sprintf("%s/%s", cfg.Store.Folder, KeyFilename)
 
@@ -393,4 +399,24 @@ var CheckBasicAuthentication = func(ctx *fasthttp.RequestCtx) bool {
 	_, ok := AuthenticateUser(username, password)
 
 	return ok
+}
+
+func readKeyFileOrGenerateKey() (string, error) {
+	path := fmt.Sprintf("%s/%s", globals.GetConfig().Store.Folder, KeyFilename)
+
+	file, err := os.Open(path)
+	if os.IsNotExist(err) {
+		return GenerateKey()
+	}
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	var key string
+	if _, err := fmt.Fscanf(file, "%s", &key); err != nil || key == "" {
+		return GenerateKey()
+	}
+
+	return key, nil
 }

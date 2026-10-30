@@ -11,12 +11,6 @@ import (
 func MigrateController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 
-	if !engine.IsEngineInternal() {
-		ctx.SetStatusCode(fasthttp.StatusNotImplemented)
-		ctx.SetBodyString(`{"error" : "Only the ElysianDB engine is supported for migrations."}`)
-		return
-	}
-
 	entity := ctx.UserValue("entity").(string)
 
 	if !engine.EntityTypeExists(entity) {
@@ -34,7 +28,7 @@ func MigrateController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if err := api_storage.ExecuteMigrations(migrationQueries); err != nil {
+	if err := engine.ExecuteMigrations(migrationQueries); err != nil {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(fmt.Sprintf(`{"error" : "Migration failed: %s"}`, err.Error()))
 		return

@@ -9,6 +9,8 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
+var MongoDatabaseName = "elysiandb"
+
 func InitMongoDBConnection() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -23,5 +25,5 @@ func InitMongoDBConnection() {
 	}
 
 	globals.MongoClient = client
-	globals.MongoDB = client.Database("elysiandb")
+	globals.MongoDB = client.Database(MongoDatabaseName)
 }

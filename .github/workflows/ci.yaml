@@ -8,12 +8,27 @@ on:
 
 jobs:
   test:
-    name: Go tests
+    name: Go tests (MongoDB ${{ matrix.mongodb-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         go-version: ["1.24.x"]
+        mongodb-version: ["4.4", "7.0"]
+
+    services:
+      mongodb:
+        image: mongo:${{ matrix.mongodb-version }}
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' || mongo --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      ELYSIANDB_TEST_MONGODB_URI: mongodb://localhost:27017
 
     steps:
       - name: Checkout

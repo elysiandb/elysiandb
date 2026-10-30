@@ -2,110 +2,32 @@ package mongodb
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/schema"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-type IncludeSpec struct {
-	Path []string
-	From string
-	As   string
-	Tmp  string
-}
-
-type RefLoc struct {
-	ParentMap map[string]any
-	Key       string
-	ParentArr []any
-	Idx       int
-}
-
 func FilterFields(data map[string]any, fields []string) map[string]any {
-	if len(fields) == 0 {
-		return data
-	}
-
-	out := map[string]any{}
-	for _, f := range fields {
-		if v, ok := data[f]; ok {
-			out[f] = v
-		}
-	}
-
-	return out
+	return api_storage.FilterFields(data, fields)
 }
 
-func FindOptions(limit int, offset int, sortField string, sortAscending bool) options.Lister[options.FindOptions] {
-	opts := options.Find()
-
-	if limit > 0 {
-		opts = opts.SetLimit(int64(limit))
-	}
-	if offset > 0 {
-		opts = opts.SetSkip(int64(offset))
-	}
-	if sortField != "" {
-		dir := 1
-		if !sortAscending {
-			dir = -1
-		}
-		opts = opts.SetSort(bson.D{{Key: sortField, Value: dir}})
+func WriteEntity(entity string, data map[string]any) []schema.ValidationError {
+	if IsReservedCollection(entity) {
+		return []schema.ValidationError{{Message: fmt.Sprintf("entity type '%s' is reserved", entity)}}
 	}
 
-	return opts
-}
-
-func ResolveIncludesAllRecursive(items []map[string]any, maxDepth int) {
-	if len(items) == 0 || maxDepth <= 0 {
-		return
-	}
-
-	for depth := 0; depth < maxDepth; depth++ {
-		refs := make([]struct {
-			Loc    RefLoc
-			Entity string
-			Id     string
-		}, 0)
-
-		for _, it := range items {
-			CollectAllRefMaps(it, &refs)
-		}
-
-		if len(refs) == 0 {
-			return
-		}
-
-		byEntity := map[string]map[string]struct{}{}
-		for _, r := range refs {
-			m, ok := byEntity[r.Entity]
-			if !ok {
-				m = map[string]struct{}{}
-				byEntity[r.Entity] = m
-			}
-			m[r.Id] = struct{}{}
-		}
-
-		loaded := map[string]map[string]map[string]any{}
-		for ent, set := range byEntity {
-			ids := make([]string, 0, len(set))
-			for id := range set {
-				ids = append(ids, id)
-			}
-			loaded[ent] = LoadDocsByIds(ent, ids)
-		}
-
-		ApplyLoadedRefs(refs, loaded)
-	}
-}
-
-func WriteEntity(entity string, data map[string]interface{}) []schema.ValidationError {
 	schemaData := GetEntitySchema(entity)
 	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
 		errors := schema.ValidateEntity(entity, data, schemaData)
@@ -114,33 +36,13 @@ func WriteEntity(entity string, data map[string]interface{}) []schema.Validation
 		}
 	}
 
-	if !EntityTypeExists(entity) {
-		AddEntityType(entity)
-	}
-
 	if _, ok := data["id"].(string); !ok || data["id"] == "" {
 		data["id"] = uuid.New().String()
 	}
 
-	subs := api_storage.ExtractSubEntities(entity, data)
-	for _, sub := range subs {
-		subEntity := sub["@entity"].(string)
-		delete(sub, "@entity")
-		WriteEntity(subEntity, sub)
-	}
+	writeSubEntities(entity, data)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	doc := ToMongoDocument(data)
-
-	_, err := globals.MongoDB.Collection(entity).ReplaceOne(
-		ctx,
-		bson.M{"_id": doc["_id"]},
-		doc,
-		options.Replace().SetUpsert(true),
-	)
-	if err != nil {
+	if err := persistEntity(entity, data); err != nil {
 		return []schema.ValidationError{{Message: err.Error()}}
 	}
 
@@ -151,14 +53,37 @@ func WriteEntity(entity string, data map[string]interface{}) []schema.Validation
 	return []schema.ValidationError{}
 }
 
-func UpdateSchemaIfNeeded(entity string, data map[string]interface{}) {
+func writeSubEntities(entity string, data map[string]any) {
+	for _, sub := range api_storage.ExtractSubEntities(entity, data) {
+		subEntity := sub["@entity"].(string)
+		delete(sub, "@entity")
+		WriteEntity(subEntity, sub)
+	}
+}
+
+func persistEntity(entity string, data map[string]any) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	doc := ToMongoDocument(data)
+	_, err := globals.MongoDB.Collection(entity).ReplaceOne(
+		ctx,
+		bson.M{"_id": doc["_id"]},
+		doc,
+		options.Replace().SetUpsert(true),
+	)
+
+	return err
+}
+
+func UpdateSchemaIfNeeded(entity string, data map[string]any) {
 	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
 		analyzed := schema.AnalyzeEntitySchema(entity, data)
 		WriteEntity(schema.SchemaEntity, analyzed)
 	}
 }
 
-func UpdateEntitySchema(entity string, fieldsRaw map[string]interface{}) map[string]interface{} {
+func UpdateEntitySchema(entity string, fieldsRaw map[string]any) map[string]any {
 	fields := schema.MapToFields(fieldsRaw)
 
 	entitySchema := schema.Entity{
@@ -175,61 +100,110 @@ func UpdateEntitySchema(entity string, fieldsRaw map[string]interface{}) map[str
 }
 
 func CreateEntityType(entity string) error {
+	if IsReservedCollection(entity) {
+		return fmt.Errorf("entity type '%s' is reserved", entity)
+	}
+
 	if EntityTypeExists(entity) {
 		return fmt.Errorf("entity type '%s' already exists", entity)
 	}
 
-	AddEntityType(entity)
-	return nil
+	return createCollection(entity)
 }
 
 func DeleteEntityType(entity string) error {
-	ctx := context.Background()
-
-	if err := globals.MongoDB.Collection(entity).Drop(ctx); err != nil {
-		return err
+	if !EntityTypeExists(entity) {
+		return fmt.Errorf("entity type '%s' does not exist", entity)
 	}
 
-	return api_storage.DeleteEntityType(entity)
+	return globals.MongoDB.Collection(entity).Drop(context.Background())
 }
 
-func WriteListOfEntities(entity string, list []map[string]interface{}) [][]schema.ValidationError {
+func WriteListOfEntities(entity string, list []map[string]any) [][]schema.ValidationError {
 	out := make([][]schema.ValidationError, 0, len(list))
 	for _, d := range list {
 		out = append(out, WriteEntity(entity, d))
 	}
+
 	return out
 }
 
 func AddEntityType(entity string) {
+	if !IsReservedCollection(entity) && !EntityTypeExists(entity) {
+		_ = createCollection(entity)
+	}
+}
+
+func createCollection(entity string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	names, _ := globals.MongoDB.ListCollectionNames(ctx, bson.M{"name": entity})
-	if len(names) == 0 {
-		_ = globals.MongoDB.CreateCollection(ctx, entity)
+	err := globals.MongoDB.CreateCollection(ctx, entity)
+
+	var cmdErr mongo.CommandError
+	if errors.As(err, &cmdErr) && cmdErr.Name == "NamespaceExists" {
+		return nil
 	}
 
-	api_storage.AddEntityType(entity)
+	return err
 }
 
-func GetEntitySchema(entity string) map[string]interface{} {
+func GetEntitySchema(entity string) map[string]any {
 	return ReadEntityById(schema.SchemaEntity, entity)
 }
 
 func EntityTypeExists(entity string) bool {
-	return api_storage.EntityTypeExists(entity)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if IsReservedCollection(entity) {
+		return false
+	}
+
+	names, err := globals.MongoDB.ListCollectionNames(ctx, bson.M{"name": entity, "type": "collection"})
+
+	return err == nil && len(names) > 0
 }
 
 func ListEntityTypes() []string {
-	return api_storage.ListEntityTypes()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	names, err := globals.MongoDB.ListCollectionNames(ctx, bson.M{"type": "collection"})
+	if err != nil {
+		return []string{}
+	}
+
+	types := make([]string, 0, len(names))
+	for _, name := range names {
+		if !strings.HasPrefix(name, "system.") && name != SettingsCollection {
+			types = append(types, name)
+		}
+	}
+
+	slices.Sort(types)
+
+	return types
 }
 
 func ListPublicEntityTypes() []string {
-	return api_storage.ListPublicEntityTypes()
+	all := ListEntityTypes()
+
+	public := make([]string, 0, len(all))
+	for _, entityType := range all {
+		if !strings.HasPrefix(entityType, api_storage.CoreEntityTypePrefix) {
+			public = append(public, entityType)
+		}
+	}
+
+	return public
 }
 
 func ReadEntityById(entity, id string) map[string]any {
+	if IsReservedCollection(entity) {
+		return nil
+	}
+
 	ctx := context.Background()
 
 	raw := map[string]any{}
@@ -244,76 +218,125 @@ func ReadEntityById(entity, id string) map[string]any {
 }
 
 func ApplyFiltersToList(entities []map[string]any, filters map[string]map[string]string) []map[string]any {
-	return entities
-}
-
-func GetListOfIds(entity, sortField string, sortAscending bool) ([]byte, error) {
-	return api_storage.GetListOfIds(entity, sortField, sortAscending)
+	return api_storage.ApplyFiltersToList(entities, filters)
 }
 
 func DeleteEntityById(entity, id string) {
+	if IsReservedCollection(entity) {
+		return
+	}
+
 	ctx := context.Background()
-	globals.MongoDB.Collection(entity).DeleteOne(ctx, bson.M{"_id": id})
+	_, _ = globals.MongoDB.Collection(entity).DeleteOne(ctx, bson.M{"_id": id})
 }
 
 func DeleteAllEntities(entity string) {
-	ctx := context.Background()
-	globals.MongoDB.Collection(entity).DeleteMany(ctx, bson.M{})
-	DeleteEntityType(entity)
+	if IsReservedCollection(entity) {
+		return
+	}
+
+	_ = globals.MongoDB.Collection(entity).Drop(context.Background())
 }
 
 func DeleteAll() {
-	for _, e := range ListEntityTypes() {
-		DeleteAllEntities(e)
+	for _, entity := range ListEntityTypes() {
+		DeleteAllEntities(entity)
 	}
-	api_storage.DeleteAll()
 }
 
-func UpdateEntityById(entity, id string, updated map[string]interface{}) map[string]interface{} {
-	ctx := context.Background()
-	update := ToMongoDocument(updated)
-	globals.MongoDB.Collection(entity).UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": update})
-	return ReadEntityById(entity, id)
+func UpdateEntityById(entity, id string, updated map[string]any) map[string]any {
+	existing := ReadEntityById(entity, id)
+	if existing == nil {
+		return nil
+	}
+
+	maps.Copy(existing, updated)
+
+	if _, ok := existing["id"].(string); !ok || existing["id"] == "" {
+		existing["id"] = id
+	}
+
+	writeSubEntities(entity, existing)
+
+	if err := persistEntity(entity, existing); err != nil {
+		log.Error(fmt.Sprintf("Error updating entity %s/%s: %v", entity, id, err))
+	}
+
+	if !schema.IsManualSchema(entity, GetEntitySchema(entity)) || !globals.GetConfig().Api.Schema.Strict {
+		UpdateSchemaIfNeeded(entity, existing)
+	}
+
+	return existing
 }
 
-func UpdateListOfEntities(entity string, updates []map[string]interface{}) []map[string]interface{} {
-	out := make([]map[string]interface{}, 0, len(updates))
-	for _, u := range updates {
-		if id, ok := u["id"].(string); ok {
-			out = append(out, UpdateEntityById(entity, id, u))
+func UpdateListOfEntities(entity string, updates []map[string]any) []map[string]any {
+	results := make([]map[string]any, 0, len(updates))
+	for _, upd := range updates {
+		id, ok := upd["id"].(string)
+		if !ok || id == "" {
+			continue
+		}
+
+		if res := UpdateEntityById(entity, id, upd); res != nil {
+			results = append(results, res)
 		}
 	}
-	return out
+
+	return results
 }
 
-func DumpAll() map[string]interface{} {
-	out := map[string]interface{}{}
-	for _, e := range ListEntityTypes() {
-		out[e] = ListEntities(e, 0, 0, "", true, nil, "", "")
+func DumpAll() map[string]any {
+	out := map[string]any{}
+	for _, entity := range ListEntityTypes() {
+		if entity == schema.SchemaEntity {
+			continue
+		}
+
+		out[entity] = ListEntities(entity, 0, 0, "", true, nil, "", "")
 	}
+
 	return out
 }
 
 func EntityExists(entity, id string) bool {
+	if IsReservedCollection(entity) {
+		return false
+	}
+
 	ctx := context.Background()
-	n, _ := globals.MongoDB.Collection(entity).CountDocuments(ctx, bson.M{"_id": id})
+	n, _ := globals.MongoDB.Collection(entity).CountDocuments(ctx, bson.M{"_id": id}, options.Count().SetLimit(1))
+
 	return n > 0
 }
 
 func CountAllEntities() int {
 	total := 0
-	for _, e := range ListEntityTypes() {
-		ctx := context.Background()
-		n, _ := globals.MongoDB.Collection(e).CountDocuments(ctx, bson.M{})
+	for _, entity := range ListEntityTypes() {
+		if entity == schema.SchemaEntity {
+			continue
+		}
+
+		n, _ := globals.MongoDB.Collection(entity).CountDocuments(context.Background(), bson.M{})
 		total += int(n)
 	}
+
 	return total
 }
 
-func ImportAll(data map[string][]map[string]interface{}) {
-	for e, list := range data {
-		for _, d := range list {
-			WriteEntity(e, d)
+func ImportAll(data map[string][]map[string]any) {
+	for entity, items := range data {
+		for _, item := range items {
+			if errs := WriteEntity(entity, item); len(errs) > 0 {
+				log.Error(fmt.Sprintf("Error importing entity %s: %+v", entity, errs))
+			}
 		}
+
+		log.Info(fmt.Sprintf("The entity '%s' has been imported", entity))
 	}
+
+	log.Info("All entities have been imported")
+}
+
+func ExecuteMigrations(migrationQueries []api_storage.MigrationQuery) error {
+	return api_storage.ApplyMigrations(migrationQueries, ListEntities, ReadEntityById, ApplyIncludes, UpdateEntityById)
 }

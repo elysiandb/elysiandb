@@ -12,6 +12,13 @@ func ExtractSubEntities(entity string, data map[string]any) []map[string]any {
 			subs = append(subs, handleMapSubEntity(entity, k, val, data)...)
 		case []any:
 			subs = append(subs, handleArraySubEntities(entity, k, val, data)...)
+		case []map[string]any:
+			items := make([]any, len(val))
+			for i, item := range val {
+				items[i] = item
+			}
+
+			subs = append(subs, handleArraySubEntities(entity, k, items, data)...)
 		}
 	}
 
@@ -65,9 +72,13 @@ func handleArraySubEntities(entity, key string, arr []any, data map[string]any) 
 
 func processArrayItem(entity string, m map[string]any, subs []map[string]any) (any, []map[string]any) {
 	if subEntityName, ok := m["@entity"].(string); ok && subEntityName != "" {
-		id, _ := extractIDAndCheckFields(m)
-		sub := buildSubEntity(subEntityName, id, m)
+		id, realFields := extractIDAndCheckFields(m)
 		link := map[string]any{"@entity": subEntityName, "id": id}
+		if !realFields && id != "" {
+			return link, subs
+		}
+
+		sub := buildSubEntity(subEntityName, id, m)
 		deeper := ExtractSubEntities(subEntityName, sub)
 		if len(deeper) > 0 {
 			subs = append(subs, deeper...)
