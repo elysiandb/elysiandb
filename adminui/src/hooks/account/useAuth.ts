@@ -37,7 +37,8 @@ export function useAuth() {
     }, []);
 
     const logout = useCallback(() => {
-        apiFetch("/api/security/logout", { method: "GET" })
+        apiFetch("/api/security/logout", { method: "POST" })
+            .catch(() => undefined)
             .finally(() => setAccount(null));
     }, []);
 
