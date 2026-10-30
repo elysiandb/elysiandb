@@ -3,12 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useUsers } from "../hooks/user/useUsers.js";
 import UserLine from "../components/user/UserLine.jsx";
 import UserModal from "../components/user/UserModal.jsx";
+import { useTranslation } from "../hooks/i18n/useTranslation.js";
 
 export default function UsersList() {
     const { list, loadAll, loading, deleteUser, changeUserRole } = useUsers();
     const [showModal, setShowModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [search, setSearch] = useState("");
+    const { t } = useTranslation();
 
     useEffect(() => {
         loadAll();
@@ -25,7 +27,7 @@ export default function UsersList() {
     };
 
     const handleDelete = async (username) => {
-        if (!window.confirm(`Delete user "${username}" ?`)) return;
+        if (!window.confirm(t("users.confirmDelete", { username }))) return;
         await deleteUser(username);
         loadAll();
     };
@@ -54,11 +56,11 @@ export default function UsersList() {
             <Row className="align-items-center mb-3">
                 <div className="d-flex justify-content-between align-items-center w-100">
                     <Button size="sm" onClick={openCreate}>
-                        Create a user
+                        {t("users.create")}
                     </Button>
 
                     <Form.Control
-                        placeholder="Search user…"
+                        placeholder={t("common.searchUser")}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="users-search-input"
@@ -70,9 +72,9 @@ export default function UsersList() {
                 <Table className="users-table align-middle">
                     <thead>
                     <tr>
-                        <th>Username</th>
-                        <th>Role</th>
-                        <th>Actions</th>
+                        <th>{t("common.username")}</th>
+                        <th>{t("common.role")}</th>
+                        <th>{t("common.actions")}</th>
                     </tr>
                     </thead>
                     <tbody>

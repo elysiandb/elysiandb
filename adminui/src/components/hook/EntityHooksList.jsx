@@ -2,6 +2,7 @@ import { Card, ListGroup, Spinner, Button, Modal, Form, Row, Col } from "react-b
 import { useEffect, useMemo, useState } from "react";
 import { useHooks } from "../../hooks/hook/useHooks.js";
 import HookEditor from "./HookEditor.jsx";
+import { useTranslation } from "../../hooks/i18n/useTranslation.js";
 
 const EVENTS = ["pre_read", "post_read"];
 
@@ -15,6 +16,7 @@ export default function EntityHooksList({ entity, onSelect }) {
         create,
         update,
     } = useHooks();
+    const { t } = useTranslation();
 
     const [selectedId, setSelectedId] = useState(null);
     const [showModal, setShowModal] = useState(false);
@@ -113,7 +115,7 @@ export default function EntityHooksList({ entity, onSelect }) {
                                             </span>
                                             {h.enabled === false && (
                                                 <span className="badge rounded-pill text-bg-secondary">
-                                                    OFF
+                                                    {t("hooks.off")}
                                                 </span>
                                             )}
                                         </ListGroup.Item>
@@ -137,13 +139,13 @@ export default function EntityHooksList({ entity, onSelect }) {
 
             <Modal show={showModal} onHide={closeModal} centered>
                 <Modal.Header closeButton>
-                    <Modal.Title>Create hook</Modal.Title>
+                    <Modal.Title>{t("hooks.createTitle")}</Modal.Title>
                 </Modal.Header>
 
                 <Modal.Body>
                     <Form>
                         <Form.Group className="mb-3">
-                            <Form.Label>Event</Form.Label>
+                            <Form.Label>{t("common.event")}</Form.Label>
                             <Form.Select
                                 value={event}
                                 onChange={e => setEvent(e.target.value)}
@@ -154,7 +156,7 @@ export default function EntityHooksList({ entity, onSelect }) {
                         </Form.Group>
 
                         <Form.Group>
-                            <Form.Label>Name</Form.Label>
+                            <Form.Label>{t("common.name")}</Form.Label>
                             <Form.Control
                                 type="text"
                                 value={name}
@@ -166,10 +168,10 @@ export default function EntityHooksList({ entity, onSelect }) {
 
                 <Modal.Footer>
                     <Button variant="secondary" onClick={closeModal}>
-                        Cancel
+                        {t("common.cancel")}
                     </Button>
                     <Button variant="primary" onClick={handleCreate}>
-                        Save
+                        {t("common.save")}
                     </Button>
                 </Modal.Footer>
             </Modal>

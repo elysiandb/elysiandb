@@ -1,9 +1,11 @@
 import { Button, Form } from "react-bootstrap";
 import { useState } from "react";
+import { useTranslation } from "../../hooks/i18n/useTranslation.js";
 
 export default function UserLine({ user, onChangePassword, onDeleted, onChangeRole }) {
     const [role, setRole] = useState(user.role);
     const [pending, setPending] = useState(false);
+    const { t } = useTranslation();
 
     const handleChange = async (e) => {
         const nextRole = e.target.value;
@@ -37,14 +39,14 @@ export default function UserLine({ user, onChangePassword, onDeleted, onChangeRo
             </td>
             <td className="table-actions">
                 <Button size="sm" onClick={() => onChangePassword(user)}>
-                    Change password
+                    {t("users.changePassword")}
                 </Button>
                 <Button
                     size="sm"
                     variant="danger"
                     onClick={onDeleted}
                 >
-                    Delete
+                    {t("common.delete")}
                 </Button>
             </td>
         </tr>

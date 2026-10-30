@@ -3,11 +3,13 @@ import { useEffect, useState } from "react";
 import { useEntities } from "../../hooks/entity/useEntities.js";
 import JsonView from "../json/JsonView.jsx";
 import QueryHelp from "./QueryHelp.jsx";
+import { useTranslation } from "../../hooks/i18n/useTranslation.js";
 
 export default function EntityDataList({ entity }) {
     const { list, loadAll, loading, error, dropEntity } = useEntities();
     const [queryText, setQueryText] = useState("");
     const [queryOpen, setQueryOpen] = useState(false);
+    const { t } = useTranslation();
 
     useEffect(() => {
         if (!entity) return;
@@ -22,12 +24,12 @@ export default function EntityDataList({ entity }) {
         try {
             loadAll(JSON.parse(queryText));
         } catch {
-            alert("Invalid JSON query");
+            alert(t("browse.invalidQuery"));
         }
     };
 
     const onDelete = async (id) => {
-        if (!confirm(`Delete entity "${id}" ?`)) return;
+        if (!confirm(t("browse.confirmDelete", { id }))) return;
         await dropEntity(entity, id);
         runQuery();
     };
@@ -43,7 +45,7 @@ export default function EntityDataList({ entity }) {
                     className="query-header"
                     onClick={() => setQueryOpen(v => !v)}
                 >
-                    <span className="query-title">Query</span>
+                    <span className="query-title">{t("browse.query")}</span>
                     <span className="query-chevron">
                         {queryOpen ? "▾" : "▸"}
                     </span>
@@ -67,7 +69,7 @@ export default function EntityDataList({ entity }) {
                                         onClick={runQuery}
                                         disabled={loading}
                                     >
-                                        Search
+                                        {t("browse.search")}
                                     </Button>
                                 </div>
                             </div>
@@ -85,7 +87,7 @@ export default function EntityDataList({ entity }) {
 
                 {error && (
                     <div className="text-danger mb-3">
-                        Error while executing query
+                        {t("browse.queryError")}
                     </div>
                 )}
 
@@ -94,7 +96,7 @@ export default function EntityDataList({ entity }) {
                         {list.map((doc, i) => (
                             <Card key={doc.id ?? i} className="entity-document mb-3">
                                 <Card.Header className="d-flex justify-content-between align-items-center fw-bold">
-                                    <span>{doc.id ?? "Document"}</span>
+                                    <span>{doc.id ?? t("browse.document")}</span>
                                     {doc.id && (
                                         <Button
                                             size="sm"
@@ -102,7 +104,7 @@ export default function EntityDataList({ entity }) {
                                             onClick={() => onDelete(doc.id)}
                                             disabled={loading === doc.id}
                                         >
-                                            Delete
+                                            {t("common.delete")}
                                         </Button>
                                     )}
                                 </Card.Header>

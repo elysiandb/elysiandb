@@ -1,9 +1,11 @@
 import {useCallback, useState} from "react";
 import {apiFetch} from "../../utils/api";
 import {useToast} from "../notification/useToast.js";
+import {useTranslation} from "../i18n/useTranslation.js";
 
 export function useUsers() {
     const { show } = useToast();
+    const { t } = useTranslation();
     const [list, setList] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -30,15 +32,15 @@ export function useUsers() {
                 method: "POST",
                 json: user,
             });
-            show("success", `User created successfully`);
+            show("success", t("users.created"));
         } catch (err) {
-            setError(err?.message ?? "Unknown error");
-            show("error", `Failed to create user`);
+            setError(err?.message ?? t("common.unknownError"));
+            show("error", t("users.createFailed"));
             throw err;
         } finally {
             setLoading(null);
         }
-    }, [show]);
+    }, [show, t]);
 
     const changeUserPassword = useCallback(async (username, password) => {
         setLoading(true);
@@ -48,15 +50,15 @@ export function useUsers() {
                 method: "PUT",
                 json: {password: password},
             });
-            show("success", `User's paswword successfully modified`);
+            show("success", t("users.passwordChanged"));
         } catch (err) {
-            setError(err?.message ?? "Unknown error");
-            show("error", `Failed to change user's password`);
+            setError(err?.message ?? t("common.unknownError"));
+            show("error", t("users.passwordChangeFailed"));
             throw err;
         } finally {
             setLoading(null);
         }
-    }, [show]);
+    }, [show, t]);
 
     const changeUserRole = useCallback(async (username, role) => {
         setLoading(true);
@@ -66,15 +68,15 @@ export function useUsers() {
                 method: "PUT",
                 json: {role: role},
             });
-            show("success", `User's role successfully modified`);
+            show("success", t("users.roleChanged"));
         } catch (err) {
-            setError(err?.message ?? "Unknown error");
-            show("error", `Failed to change user's role`);
+            setError(err?.message ?? t("common.unknownError"));
+            show("error", t("users.roleChangeFailed"));
             throw err;
         } finally {
             setLoading(null);
         }
-    }, [show]);
+    }, [show, t]);
 
     const deleteUser = useCallback(async (username, password) => {
         setLoading(true);
@@ -84,15 +86,15 @@ export function useUsers() {
                 method: "DELETE",
                 json: {password: password},
             });
-            show("success", `User paswword successfully deleted`);
+            show("success", t("users.deleted"));
         } catch (err) {
-            setError(err?.message ?? "Unknown error");
-            show("error", `Failed to delete user`);
+            setError(err?.message ?? t("common.unknownError"));
+            show("error", t("users.deleteFailed"));
             throw err;
         } finally {
             setLoading(null);
         }
-    }, [show]);
+    }, [show, t]);
 
     return { list, loading, error, loadAll, deleteUser, createUser, changeUserPassword, changeUserRole };
 }

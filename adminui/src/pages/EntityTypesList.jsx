@@ -12,10 +12,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useEntityTypes } from "../hooks/entity/useEntityTypes.js";
 import EntityTypes from "../components/entity/EntityType.jsx";
 import {useEntityTypeActions} from "../hooks/entity/useEntityTypeActions.js";
+import {useTranslation} from "../hooks/i18n/useTranslation.js";
 
 export default function EntityTypesList() {
     const { list, loadAll, loading } = useEntityTypes();
     const { createEntityType } = useEntityTypeActions();
+    const { t } = useTranslation();
 
     const [showModal, setShowModal] = useState(false);
     const [newEntityName, setNewEntityName] = useState("");
@@ -85,7 +87,7 @@ export default function EntityTypesList() {
                 <Col xs={3}>
                     <Card className="entity-sidebar">
                         <Card.Header className="text-warning fw-bold">
-                            Entities
+                            {t("common.entities")}
                             <Button
                                 variant="primary"
                                 className="create-entity-type-button"
@@ -125,22 +127,22 @@ export default function EntityTypesList() {
 
             <Modal show={showModal} onHide={closeModal} centered>
                 <Modal.Header closeButton>
-                    <Modal.Title>Create Entity Type</Modal.Title>
+                    <Modal.Title>{t("schema.createTitle")}</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     <Form.Control
                         type="text"
-                        placeholder="Entity name"
+                        placeholder={t("schema.namePlaceholder")}
                         value={newEntityName}
                         onChange={(e) => setNewEntityName(e.target.value)}
                     />
                 </Modal.Body>
                 <Modal.Footer>
                     <Button variant="secondary" onClick={closeModal}>
-                        Cancel
+                        {t("common.cancel")}
                     </Button>
                     <Button variant="primary" onClick={handleCreate}>
-                        Create
+                        {t("common.create")}
                     </Button>
                 </Modal.Footer>
             </Modal>

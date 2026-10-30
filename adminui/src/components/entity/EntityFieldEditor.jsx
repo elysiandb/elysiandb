@@ -1,8 +1,11 @@
 // EntityFieldEditor.jsx
 import {Button, Form} from "react-bootstrap";
 import FieldEditor from "./EntityFieldEditor.jsx";
+import {useTranslation} from "../../hooks/i18n/useTranslation.js";
 
 export default function EntityFieldEditor({ fieldKey, field, onChange, depth }) {
+    const { t } = useTranslation();
+
     const update = (patch) => {
         onChange(fieldKey, { ...field, ...patch });
     };
@@ -62,7 +65,7 @@ export default function EntityFieldEditor({ fieldKey, field, onChange, depth }) 
                 <Form.Check
                     className="entity-field-required"
                     type="checkbox"
-                    label="required"
+                    label={t("schema.required")}
                     checked={field.required}
                     onChange={(e) => update({ required: e.target.checked })}
                 />
