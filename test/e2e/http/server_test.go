@@ -16,16 +16,20 @@ import (
 func startTestServer(t *testing.T) (*fasthttp.Client, func()) {
 	t.Helper()
 
-	tmp := t.TempDir()
-	cfg := &configuration.Config{
+	return startTestServerWithConfig(t, &configuration.Config{
 		Store: configuration.StoreConfig{
-			Folder: tmp,
+			Folder: t.TempDir(),
 			Shards: 8,
 		},
 		Stats: configuration.StatsConfig{
 			Enabled: true,
 		},
-	}
+	})
+}
+
+func startTestServerWithConfig(t *testing.T, cfg *configuration.Config) (*fasthttp.Client, func()) {
+	t.Helper()
+
 	globals.SetConfig(cfg)
 	storage.LoadDB()
 	storage.LoadJsonDB()

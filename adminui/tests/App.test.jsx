@@ -55,6 +55,21 @@ describe("App", () => {
         expect(screen.getByRole("columnheader", { name: "Nom d'utilisateur" })).toBeInTheDocument();
         expect(requestsTo(fetchMock, "GET", "/api/security/user")).toHaveLength(1);
     });
+
+    it("ends the session and shows the login page on logout", async () => {
+        const user = userEvent.setup();
+        const fetchMock = mockApi({
+            "POST /api/security/logout": () => new Response(null, { status: 204 }),
+        });
+        window.history.pushState({}, "", "/admin");
+        renderApp("en");
+
+        await user.click(screen.getByRole("button", { name: "Logout" }));
+
+        expect(await screen.findByRole("button", { name: "Log in" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Logout" })).not.toBeInTheDocument();
+        expect(requestsTo(fetchMock, "POST", "/api/security/logout")).toHaveLength(1);
+    });
 });
 
 describe("Home", () => {

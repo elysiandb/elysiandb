@@ -146,6 +146,10 @@ func TestLogoutController(t *testing.T) {
 		t.Fatalf("expected 204")
 	}
 
+	if session, _ := security.GetSession(s.ID); session != nil {
+		t.Fatalf("expected session to be deleted")
+	}
+
 	sc := ctx.Response.Header.Peek("Set-Cookie")
 	if sc == nil {
 		t.Fatalf("Set-Cookie missing")
