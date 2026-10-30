@@ -51,12 +51,41 @@ func ParseMigrationQuery(s, entity string) []MigrationQuery {
 	return out
 }
 
+type EntityLister func(
+	entity string,
+	limit int,
+	offset int,
+	sortField string,
+	sortAscending bool,
+	filters map[string]map[string]string,
+	search string,
+	includesParam string,
+) []map[string]any
+
+type EntityUpdater func(entity, id string, updated map[string]any) map[string]any
+
+type EntitiesIncluder func(data []map[string]any, includesParam string) []map[string]any
+
 func ExecuteMigrations(migrationQueries []MigrationQuery) error {
+	return ApplyMigrations(migrationQueries, ListEntities, ReadEntityById, includeFromStorage, UpdateEntityById)
+}
+
+func includeFromStorage(data []map[string]any, includesParam string) []map[string]any {
+	return ApplyIncludes(data, includesParam, ReadEntityById)
+}
+
+func ApplyMigrations(
+	migrationQueries []MigrationQuery,
+	list EntityLister,
+	read EntityReader,
+	include EntitiesIncluder,
+	update EntityUpdater,
+) error {
 	for _, query := range migrationQueries {
 		switch query.Action {
 		case ACTION_SET:
 			log.Info("Executing migration set action on entity:", query.Entity)
-			executeMigrationSetAction(query.Entity, query.Properties)
+			executeMigrationSetAction(query.Entity, query.Properties, list, read, include, update)
 		default:
 			return fmt.Errorf("unsupported action: %s", query.Action)
 		}
@@ -65,17 +94,18 @@ func ExecuteMigrations(migrationQueries []MigrationQuery) error {
 	return nil
 }
 
-func executeMigrationSetAction(entity string, properties map[string]any) error {
-	entities := ListEntities(entity, 0, 0, "", true, map[string]map[string]string{}, "", "all")
-
-	for _, ent := range entities {
-		for key, value := range properties {
-			SetNestedField(ent, key, value)
-		}
-
-		id, _ := ent["id"].(string)
+func executeMigrationSetAction(
+	entity string,
+	properties map[string]any,
+	list EntityLister,
+	read EntityReader,
+	include EntitiesIncluder,
+	update EntityUpdater,
+) error {
+	for _, listed := range list(entity, 0, 0, "", true, map[string]map[string]string{}, "", "") {
+		id, _ := listed["id"].(string)
 		if id == "" {
-			if v, ok := ent["_id"].(string); ok {
+			if v, ok := listed["_id"].(string); ok {
 				id = v
 			}
 		}
@@ -84,7 +114,17 @@ func executeMigrationSetAction(entity string, properties map[string]any) error {
 			return fmt.Errorf("missing id")
 		}
 
-		UpdateEntityById(entity, id, ent)
+		ent := read(entity, id)
+		if ent == nil {
+			continue
+		}
+
+		ent = include([]map[string]any{ent}, "all")[0]
+		for key, value := range properties {
+			SetNestedField(ent, key, value)
+		}
+
+		update(entity, id, ent)
 	}
 
 	return nil

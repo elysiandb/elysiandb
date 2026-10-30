@@ -6,7 +6,6 @@ import (
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/schema"
-	"github.com/taymour/elysiandb/internal/storage"
 )
 
 func patchLoadSchema(mock *schema.Entity) func() {
@@ -15,17 +14,8 @@ func patchLoadSchema(mock *schema.Entity) func() {
 	return func() { schema.LoadSchemaForEntity = orig }
 }
 
-func patchGetJsonByKey(m map[string]interface{}, err error) func() {
-	orig := storage.GetJsonByKey
-	storage.GetJsonByKey = func(key string) (map[string]interface{}, error) { return m, err }
-	return func() { storage.GetJsonByKey = orig }
-}
-
-func patchManualFlag(val bool) func() {
-	if val {
-		return patchGetJsonByKey(map[string]interface{}{"_manual": true}, nil)
-	}
-	return patchGetJsonByKey(map[string]interface{}{}, nil)
+func manualSchemaData() map[string]any {
+	return map[string]any{"_manual": true}
 }
 
 func patchStrict(val bool) func() {
@@ -158,8 +148,6 @@ func TestValidateEntity_Strict_NewFieldRejected(t *testing.T) {
 
 	restore1 := patchLoadSchema(mockSchema)
 	defer restore1()
-	restore2 := patchManualFlag(true)
-	defer restore2()
 	restore3 := patchStrict(true)
 	defer restore3()
 
@@ -168,7 +156,7 @@ func TestValidateEntity_Strict_NewFieldRejected(t *testing.T) {
 		"age":  30,
 	}
 
-	errs := schema.ValidateEntity("users", data, nil)
+	errs := schema.ValidateEntity("users", data, manualSchemaData())
 	if len(errs) != 1 {
 		t.Fatalf("expected 1 error")
 	}
@@ -185,8 +173,6 @@ func TestValidateEntity_Strict_RequiredMissing(t *testing.T) {
 
 	restore1 := patchLoadSchema(mockSchema)
 	defer restore1()
-	restore2 := patchManualFlag(true)
-	defer restore2()
 	restore3 := patchStrict(true)
 	defer restore3()
 
@@ -194,7 +180,7 @@ func TestValidateEntity_Strict_RequiredMissing(t *testing.T) {
 		"name": "Alice",
 	}
 
-	errs := schema.ValidateEntity("users", data, nil)
+	errs := schema.ValidateEntity("users", data, manualSchemaData())
 	if len(errs) != 1 {
 		t.Fatalf("expected 1 error missing required=age")
 	}
@@ -218,8 +204,6 @@ func TestValidateEntity_Strict_DeepNewFieldRejected(t *testing.T) {
 
 	restore1 := patchLoadSchema(mockSchema)
 	defer restore1()
-	restore2 := patchManualFlag(true)
-	defer restore2()
 	restore3 := patchStrict(true)
 	defer restore3()
 
@@ -234,7 +218,7 @@ func TestValidateEntity_Strict_DeepNewFieldRejected(t *testing.T) {
 		},
 	}
 
-	errs := schema.ValidateEntity("books", data, nil)
+	errs := schema.ValidateEntity("books", data, manualSchemaData())
 	if len(errs) != 2 {
 		t.Fatalf("expected 2 errors")
 	}
@@ -270,19 +254,17 @@ func TestValidateEntity_NoSchema(t *testing.T) {
 }
 
 func TestIsManualSchema_NoFlag(t *testing.T) {
-	restore := patchManualFlag(false)
-	defer restore()
-
 	if schema.IsManualSchema("unknown", nil) {
-		t.Fatalf("expected false")
+		t.Fatalf("expected false without schema data")
+	}
+
+	if schema.IsManualSchema("unknown", map[string]any{"fields": map[string]any{}}) {
+		t.Fatalf("expected false without manual flag")
 	}
 }
 
 func TestIsManualSchema_YesFlag(t *testing.T) {
-	restore := patchManualFlag(true)
-	defer restore()
-
-	if !schema.IsManualSchema("e", nil) {
+	if !schema.IsManualSchema("e", manualSchemaData()) {
 		t.Fatalf("expected true")
 	}
 }
@@ -420,8 +402,6 @@ func TestValidateEntity_ArrayMissingRequired(t *testing.T) {
 	defer restore1()
 	restore2 := patchStrict(true)
 	defer restore2()
-	restore3 := patchManualFlag(true)
-	defer restore3()
 
 	data := map[string]interface{}{
 		"arr": []interface{}{
@@ -429,7 +409,7 @@ func TestValidateEntity_ArrayMissingRequired(t *testing.T) {
 		},
 	}
 
-	errs := schema.ValidateEntity("test", data, nil)
+	errs := schema.ValidateEntity("test", data, manualSchemaData())
 	if len(errs) != 1 {
 		t.Fatalf("expected missing required error")
 	}
@@ -494,9 +474,6 @@ func TestMapToFields_NameOverride(t *testing.T) {
 }
 
 func TestLoadSchemaForEntity_NoData(t *testing.T) {
-	restore := patchGetJsonByKey(nil, nil)
-	defer restore()
-
 	res := schema.LoadSchemaForEntity("x", nil)
 	if res == nil {
 		return
@@ -505,7 +482,7 @@ func TestLoadSchemaForEntity_NoData(t *testing.T) {
 }
 
 func TestLoadSchemaForEntity_WithData(t *testing.T) {
-	restore := patchGetJsonByKey(map[string]any{
+	res := schema.LoadSchemaForEntity("x", map[string]any{
 		"fields": map[string]any{
 			"a": map[string]any{
 				"name":     "a",
@@ -513,10 +490,7 @@ func TestLoadSchemaForEntity_WithData(t *testing.T) {
 				"required": true,
 			},
 		},
-	}, nil)
-	defer restore()
-
-	res := schema.LoadSchemaForEntity("x", nil)
+	})
 	if res == nil {
 		t.Fatalf("expected schema")
 	}

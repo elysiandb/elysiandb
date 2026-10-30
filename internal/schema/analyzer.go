@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/taymour/elysiandb/internal/globals"
-	"github.com/taymour/elysiandb/internal/storage"
 )
 
 const SchemaEntity = "_elysiandb_core_schema"
@@ -220,11 +219,6 @@ func validateFieldsRecursive(fields map[string]Field, data map[string]interface{
 
 func IsManualSchema(entity string, schemaData map[string]any) bool {
 	if schemaData == nil {
-		key := globals.ApiSingleEntityKey(SchemaEntity, entity)
-		schemaData, _ = storage.GetJsonByKey(key)
-	}
-
-	if schemaData == nil {
 		return false
 	}
 
@@ -290,12 +284,7 @@ func MapToFields(m map[string]any) map[string]Field {
 
 func loadSchemaForEntity(entity string, schemaData map[string]any) *Entity {
 	if schemaData == nil {
-		key := globals.ApiSingleEntityKey(SchemaEntity, entity)
-		raw, _ := storage.GetJsonByKey(key)
-		if raw == nil {
-			return nil
-		}
-		schemaData = normalizeAnyMap(raw)
+		return nil
 	}
 
 	schema := &Entity{ID: entity}
@@ -305,17 +294,4 @@ func loadSchemaForEntity(entity string, schemaData map[string]any) *Entity {
 	}
 
 	return schema
-}
-
-func normalizeAnyMap(m map[string]interface{}) map[string]any {
-	out := make(map[string]any, len(m))
-	for k, v := range m {
-		if sub, ok := v.(map[string]interface{}); ok {
-			out[k] = normalizeAnyMap(sub)
-		} else {
-			out[k] = v
-		}
-	}
-
-	return out
 }

@@ -43,7 +43,7 @@ func FilterFields(data map[string]any, fields []string) map[string]any {
 
 func ApplyIncludes(data []map[string]interface{}, includesParam string) []map[string]interface{} {
 	if IsEngineInternal() {
-		return api_storage.ApplyIncludes(data, includesParam)
+		return api_storage.ApplyIncludes(data, includesParam, api_storage.ReadEntityById)
 	}
 
 	if IsEngineMongoDB() {
@@ -249,20 +249,6 @@ func ApplyFiltersToList(
 	return nil
 }
 
-func GetListOfIds(entity, sortField string, sortAscending bool) ([]byte, error) {
-	if IsEngineInternal() {
-		return api_storage.GetListOfIds(entity, sortField, sortAscending)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.GetListOfIds(entity, sortField, sortAscending)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil, nil
-}
-
 func DeleteEntityById(entity, id string) {
 	if IsEngineInternal() {
 		api_storage.DeleteEntityById(entity, id)
@@ -389,6 +375,20 @@ func ImportAll(data map[string][]map[string]interface{}) {
 	ThrowErrorIfNotValidEngine()
 }
 
+func ExecuteMigrations(migrationQueries []api_storage.MigrationQuery) error {
+	if IsEngineInternal() {
+		return api_storage.ExecuteMigrations(migrationQueries)
+	}
+
+	if IsEngineMongoDB() {
+		return mongodb.ExecuteMigrations(migrationQueries)
+	}
+
+	ThrowErrorIfNotValidEngine()
+
+	return nil
+}
+
 func IsEngineInternal() bool {
 	return globals.GetEngine() == EngineInternal
 }
@@ -399,5 +399,5 @@ func IsEngineMongoDB() bool {
 
 func ThrowErrorIfNotValidEngine() {
 	engine := globals.GetConfig().Engine.Name
-	panic("Invalid storage engine: " + engine + ". Only '" + EngineInternal + "' is supported.")
+	panic("Invalid storage engine: " + engine + ". Only '" + EngineInternal + "' and '" + EngineMongoDB + "' are supported.")
 }

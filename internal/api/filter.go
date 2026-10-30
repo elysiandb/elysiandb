@@ -189,11 +189,14 @@ func matchDate(value string, ops map[string]string) (bool, bool) {
 		return false, false
 	}
 
-	for op, cmp := range ops {
-		tCmp, ok2, dateOnly2 := parseDate(cmp)
-		if !ok2 {
+	for _, cmp := range ops {
+		if !IsDate(cmp) {
 			return false, false
 		}
+	}
+
+	for op, cmp := range ops {
+		tCmp, _, dateOnly2 := parseDate(cmp)
 
 		tv, tc := tVal, tCmp
 		if dateOnly1 || dateOnly2 {
@@ -293,6 +296,12 @@ func matchNumber(value float64, ops map[string]string) bool {
 	}
 
 	return true
+}
+
+func IsDate(s string) bool {
+	_, ok, _ := parseDate(s)
+
+	return ok
 }
 
 func parseDate(s string) (time.Time, bool, bool) {

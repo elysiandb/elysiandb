@@ -16,8 +16,9 @@ import (
 const CoreEntityTypePrefix = "_elysiandb_core_"
 
 func WriteEntity(entity string, data map[string]any) []schema.ValidationError {
+	schemaData := GetEntitySchema(entity)
 	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
-		errors := schema.ValidateEntity(entity, data, nil)
+		errors := schema.ValidateEntity(entity, data, schemaData)
 		if len(errors) > 0 {
 			return errors
 		}
@@ -36,7 +37,7 @@ func WriteEntity(entity string, data map[string]any) []schema.ValidationError {
 
 	persistEntity(entity, data)
 
-	if !schema.IsManualSchema(entity, nil) || !globals.GetConfig().Api.Schema.Strict {
+	if !schema.IsManualSchema(entity, schemaData) || !globals.GetConfig().Api.Schema.Strict {
 		updateSchemaIfNeeded(entity, data)
 	}
 
@@ -220,7 +221,7 @@ func ListEntities(
 	includesParam = MergeIncludes(includesParam, autoInc)
 
 	if includesParam != "" {
-		all = ApplyIncludes(all, includesParam)
+		all = ApplyIncludes(all, includesParam, ReadEntityById)
 	}
 
 	filtered := make([]map[string]any, 0, len(all))
@@ -260,10 +261,7 @@ func ApplyFiltersToList(
 }
 
 func applyOffsetLimit[T any](in []T, offset, limit int) []T {
-	start := offset
-	if start > len(in) {
-		start = len(in)
-	}
+	start := max(0, min(offset, len(in)))
 
 	end := len(in)
 	if limit > 0 && start+limit < end {
@@ -350,7 +348,10 @@ func UpdateEntityById(entity, id string, updated map[string]any) map[string]any 
 
 	persistEntity(entity, existing)
 	UpdateIndexesForEntity(entity, id, old, existing)
-	updateSchemaIfNeeded(entity, existing)
+
+	if !schema.IsManualSchema(entity, GetEntitySchema(entity)) || !globals.GetConfig().Api.Schema.Strict {
+		updateSchemaIfNeeded(entity, existing)
+	}
 
 	return existing
 }
