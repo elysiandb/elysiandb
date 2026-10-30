@@ -25,6 +25,10 @@ func SearchMatchesEntity(entityData map[string]any, pattern string) bool {
 			}
 		case []any:
 			stack = append(stack, v...)
+		case []map[string]any:
+			for _, item := range v {
+				stack = append(stack, item)
+			}
 		case string:
 			if storage.MatchGlob(pattern, v) {
 				return true
@@ -33,6 +37,14 @@ func SearchMatchesEntity(entityData map[string]any, pattern string) bool {
 	}
 
 	return false
+}
+
+func ListEntryMatches(entityData map[string]any, filters map[string]map[string]string, search string) bool {
+	if !FiltersMatchEntity(entityData, filters) {
+		return false
+	}
+
+	return search == "" || SearchMatchesEntity(entityData, search)
 }
 
 func FiltersMatchEntity(

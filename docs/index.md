@@ -900,6 +900,18 @@ This mechanism also works recursively and supports **arrays of sub-entities**, a
 | `any`          | Array includes any listed value        |
 | `none`         | Array excludes all listed values       |
 
+### Full-text Search
+
+`search` takes a glob pattern, with the same case-insensitive `*` semantics as the `eq` filter. An entity matches when at least one string value anywhere in it matches the pattern: top-level fields, nested objects, arrays, and the entities expanded by `includes`, whether a single entity or a list of entities.
+
+```bash
+curl "http://localhost:8089/api/articles?search=*elysian*&filter[status][eq]=published&sort[title]=asc&limit=10&offset=20"
+```
+
+* `search` and `filter[...]` are combined: an entity is returned only if it matches the search **and** every filter.
+* The search runs after `includes` are expanded, including the ones added automatically by filters on sub-entity fields such as `filter[author.name][eq]=Alice`.
+* `sort` is applied to the matching entities, then `offset` and `limit`. `?search=go*&limit=10` returns the first ten matching entities, not the matches among the first ten entities.
+
 ### Includes and Nested Filters
 
 ElysianDB supports **relationship expansion** via the `includes` query parameter. It allows loading linked entities directly within query results.

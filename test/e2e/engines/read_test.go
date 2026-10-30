@@ -102,15 +102,31 @@ func TestFiltersOperatorsAndSearch(t *testing.T) {
 			{"search=2024-01-15*", []string{"p1", "p2"}},
 			{"search=nothing", []string{}},
 			{"search=*&limit=2", []string{"p1", "p2"}},
-			{"search=zig&limit=2", []string{}},
+			{"search=*&limit=2&offset=1", []string{"p2", "p3"}},
+			{"search=zig&limit=2", []string{"p5"}},
+			{"search=*go*&limit=1&offset=1", []string{"p3"}},
+			{"search=*go*&offset=5", []string{}},
 			{"search=zig&filter[views][eq]=80", []string{"p5"}},
+			{"search=zig&filter[views][neq]=80", []string{}},
+			{"search=*go*&filter[views][gt]=200", []string{"p3"}},
+			{"search=*&filter[views][eq]=80", []string{"p2", "p4", "p5"}},
+			{"search=*&filter[views][eq]=80&limit=1&offset=2", []string{"p5"}},
+			{"search=*&sort[views]=desc&limit=2&offset=1", []string{"p1", "p2"}},
+			{"search=*bob*&filter[author.name][eq]=bob", []string{"p3"}},
 			{"search=*alice*&includes=author", []string{"p1"}},
-			{"search=*globex*&includes=all", []string{"p3"}},
+			{"search=*globex*&includes=all", []string{"p1", "p3"}},
+			{"search=*globex*&includes=author.company", []string{"p3"}},
+			{"search=*charlie*&includes=reviewers", []string{"p1"}},
+			{"search=*berlin*&includes=reviewers", []string{"p1"}},
+			{"search=*charlie*&includes=all&sort[views]=asc", []string{"p2", "p1"}},
+			{"search=*charlie*&includes=all&filter[published][eq]=true", []string{"p1"}},
 		}
 
 		for _, c := range searches {
 			s.expectIds(s.get("/api/post?"+c.query), c.ids...)
 		}
+
+		s.expectCount(s.get("/api/post?search=*&filter[views][eq]=80&countOnly=true"), 3)
 	})
 }
 

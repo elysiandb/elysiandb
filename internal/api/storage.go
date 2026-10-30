@@ -205,7 +205,8 @@ func ListEntities(
 		return []map[string]any{}
 	}
 
-	if len(filters) == 0 {
+	paginateFirst := len(filters) == 0 && search == ""
+	if paginateFirst {
 		ids = applyOffsetLimit(ids, offset, limit)
 	}
 
@@ -226,16 +227,12 @@ func ListEntities(
 
 	filtered := make([]map[string]any, 0, len(all))
 	for _, e := range all {
-		if search == "" && FiltersMatchEntity(e, filters) {
-			filtered = append(filtered, e)
-		}
-
-		if search != "" && SearchMatchesEntity(e, search) {
+		if ListEntryMatches(e, filters, search) {
 			filtered = append(filtered, e)
 		}
 	}
 
-	if len(filters) > 0 {
+	if !paginateFirst {
 		return applyOffsetLimit(filtered, offset, limit)
 	}
 

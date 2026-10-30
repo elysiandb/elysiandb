@@ -330,6 +330,8 @@ var sortableFields = []string{"", "", "title", "score", "published", "created", 
 
 var includeParams = []string{"", "", "", "author", "author.company", "authors", "all", "author,authors", "author.friend", "author.company,authors"}
 
+var searchPatterns = []string{"*li*", "go", "*a*", "2024*", "*z", "zeta", "c1", "*", "a3", "*ob*", "charlie"}
+
 func TestEnginesListParity(t *testing.T) {
 	internal, mongo := setupEngines(t)
 	r := rand.New(rand.NewSource(20261030))
@@ -345,8 +347,8 @@ func TestEnginesListParity(t *testing.T) {
 			filters = randomFilters(r)
 		}
 		search := ""
-		if r.Intn(6) == 0 {
-			search = pick(r, []string{"*li*", "go", "*a*", "2024*", "*z", "zeta", "c1", "*"})
+		if r.Intn(3) == 0 {
+			search = pick(r, searchPatterns)
 		}
 		includes := pick(r, includeParams)
 
@@ -355,6 +357,47 @@ func TestEnginesListParity(t *testing.T) {
 		if want != got {
 			t.Fatalf("list mismatch #%d limit=%d offset=%d sort=%q asc=%v filters=%v search=%q includes=%q\ninternal: %s\nmongodb:  %s",
 				i, limit, offset, sortField, asc, filters, search, includes, want, got)
+		}
+	}
+}
+
+func TestEnginesListSearchCombinesFiltersThenPaginates(t *testing.T) {
+	internal, mongo := setupEngines(t)
+	r := rand.New(rand.NewSource(424242))
+	writeDataset([]engineUnderTest{internal, mongo}, seedDataset(r))
+
+	for i := 0; i < 400; i++ {
+		limit := pick(r, []int{0, 1, 2, 3, 7})
+		offset := pick(r, []int{0, 0, 1, 4, 30})
+		sortField := pick(r, sortableFields)
+		asc := r.Intn(2) == 0
+		filters := map[string]map[string]string{}
+		if r.Intn(3) != 0 {
+			filters = randomFilters(r)
+		}
+		search := pick(r, searchPatterns)
+		includes := pick(r, includeParams)
+
+		for _, e := range []engineUnderTest{internal, mongo} {
+			matching := make([]map[string]any, 0)
+			for _, doc := range e.list("post", 0, 0, sortField, asc, filters, "", includes) {
+				if api_storage.SearchMatchesEntity(doc, search) {
+					matching = append(matching, doc)
+				}
+			}
+
+			start := min(offset, len(matching))
+			end := len(matching)
+			if limit > 0 {
+				end = min(start+limit, end)
+			}
+
+			want := asJSON(t, matching[start:end])
+			got := asJSON(t, e.list("post", limit, offset, sortField, asc, filters, search, includes))
+			if want != got {
+				t.Fatalf("%s search mismatch #%d limit=%d offset=%d sort=%q asc=%v filters=%v search=%q includes=%q\nwant: %s\ngot:  %s",
+					e.name, i, limit, offset, sortField, asc, filters, search, includes, want, got)
+			}
 		}
 	}
 }

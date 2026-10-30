@@ -43,17 +43,13 @@ func ListEntities(
 	includesParam string,
 ) []map[string]any {
 	includesParam = api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
-	paginateFirst := len(filters) == 0
+	paginateFirst := len(filters) == 0 && search == ""
 
 	req := scanRequest{
 		entity:        entity,
-		filter:        bson.M{},
+		filter:        BuildListPrefilter(filters, includesParam == ""),
 		sortField:     sortField,
 		sortAscending: sortAscending,
-	}
-
-	if search == "" {
-		req.filter = BuildListPrefilter(filters, includesParam == "")
 	}
 
 	if paginateFirst {
@@ -73,11 +69,7 @@ func ListEntities(
 		}
 
 		for _, e := range batch {
-			if search == "" && api_storage.FiltersMatchEntity(e, filters) {
-				out = append(out, e)
-			}
-
-			if search != "" && api_storage.SearchMatchesEntity(e, search) {
+			if api_storage.ListEntryMatches(e, filters, search) {
 				out = append(out, e)
 			}
 		}

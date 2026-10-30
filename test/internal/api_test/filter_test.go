@@ -80,6 +80,49 @@ func TestSearchMatchesEntityNoStringValues(t *testing.T) {
 	}
 }
 
+func TestSearchMatchesEntityIncludedList(t *testing.T) {
+	entity := map[string]any{
+		"title": "Post",
+		"authors": []map[string]any{
+			{"name": "Bob"},
+			{"name": "Alice", "address": map[string]any{"city": "Paris"}},
+		},
+	}
+	if !api_storage.SearchMatchesEntity(entity, "ali*") {
+		t.Fatalf("expected match inside included list")
+	}
+	if !api_storage.SearchMatchesEntity(entity, "par*") {
+		t.Fatalf("expected match nested inside included list")
+	}
+	if api_storage.SearchMatchesEntity(entity, "lon*") {
+		t.Fatalf("expected no match")
+	}
+}
+
+func TestListEntryMatchesCombinesFiltersAndSearch(t *testing.T) {
+	entity := map[string]any{"title": "Go patterns", "views": float64(120)}
+
+	cases := []struct {
+		filters map[string]map[string]string
+		search  string
+		want    bool
+	}{
+		{nil, "", true},
+		{nil, "go*", true},
+		{nil, "rust*", false},
+		{map[string]map[string]string{"views": {"gt": "100"}}, "", true},
+		{map[string]map[string]string{"views": {"gt": "100"}}, "go*", true},
+		{map[string]map[string]string{"views": {"gt": "100"}}, "rust*", false},
+		{map[string]map[string]string{"views": {"lt": "100"}}, "go*", false},
+	}
+
+	for _, c := range cases {
+		if got := api_storage.ListEntryMatches(entity, c.filters, c.search); got != c.want {
+			t.Fatalf("filters=%v search=%q: expected %v, got %v", c.filters, c.search, c.want, got)
+		}
+	}
+}
+
 func TestGetNestedValue(t *testing.T) {
 	data := map[string]interface{}{
 		"user": map[string]interface{}{
