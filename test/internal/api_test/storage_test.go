@@ -823,3 +823,39 @@ func TestWriteEntity_SkipSchemaUpdatesForManualStrict(t *testing.T) {
 		t.Fatalf("manual schema must exist")
 	}
 }
+
+func TestWriteEntityRejectsCoreSubEntities(t *testing.T) {
+	initTestStore(t)
+
+	errs := api_storage.WriteEntity("post", map[string]any{
+		"id":     "p1",
+		"author": map[string]any{"@entity": "author", "id": "a1", "name": "A"},
+		"owner":  map[string]any{"@entity": "_elysiandb_core_user", "id": "admin", "role": "user"},
+	})
+	if len(errs) != 1 {
+		t.Fatalf("expected one validation error, got %v", errs)
+	}
+
+	for _, ref := range [][2]string{{"post", "p1"}, {"author", "a1"}, {"_elysiandb_core_user", "admin"}} {
+		if api_storage.ReadEntityById(ref[0], ref[1]) != nil {
+			t.Fatalf("%s/%s must not be written", ref[0], ref[1])
+		}
+	}
+
+	api_storage.WriteEntity("_elysiandb_core_user", map[string]any{"id": "admin", "role": "admin"})
+	if errs := api_storage.WriteEntity("post", map[string]any{"id": "p2", "owner": map[string]any{"@entity": "_elysiandb_core_user", "id": "admin"}}); len(errs) != 0 {
+		t.Fatalf("expected a core reference to be accepted, got %v", errs)
+	}
+
+	if api_storage.UpdateEntityById("post", "p2", map[string]any{"owner": map[string]any{"@entity": "_elysiandb_core_user", "id": "admin", "role": "user"}}) != nil {
+		t.Fatalf("expected the update to be rejected")
+	}
+
+	if role := api_storage.ReadEntityById("_elysiandb_core_user", "admin")["role"]; role != "admin" {
+		t.Fatalf("expected the core entity to be untouched, got role %v", role)
+	}
+
+	if owner := api_storage.ReadEntityById("post", "p2")["owner"]; !reflect.DeepEqual(owner, map[string]any{"@entity": "_elysiandb_core_user", "id": "admin"}) {
+		t.Fatalf("expected the post to be untouched, got %v", owner)
+	}
+}

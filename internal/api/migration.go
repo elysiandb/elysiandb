@@ -120,6 +120,7 @@ func executeMigrationSetAction(
 		}
 
 		ent = include([]map[string]any{ent}, "all")[0]
+		ReferenceCoreSubEntities(ent)
 		for key, value := range properties {
 			SetNestedField(ent, key, value)
 		}

@@ -28,6 +28,10 @@ func WriteEntity(entity string, data map[string]any) []schema.ValidationError {
 		return []schema.ValidationError{{Message: fmt.Sprintf("entity type '%s' is reserved", entity)}}
 	}
 
+	if err := api_storage.RejectCoreSubEntities(data); err != nil {
+		return []schema.ValidationError{{Message: err.Error()}}
+	}
+
 	schemaData := GetEntitySchema(entity)
 	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
 		errors := schema.ValidateEntity(entity, data, schemaData)
@@ -254,6 +258,10 @@ func UpdateEntityById(entity, id string, updated map[string]any) map[string]any 
 
 	if _, ok := existing["id"].(string); !ok || existing["id"] == "" {
 		existing["id"] = id
+	}
+
+	if api_storage.RejectCoreSubEntities(existing) != nil {
+		return nil
 	}
 
 	writeSubEntities(entity, existing)

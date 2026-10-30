@@ -3,6 +3,7 @@ package api_transaction
 import (
 	"encoding/json"
 
+	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/schema"
@@ -53,6 +54,12 @@ func UpdateTransactionController(ctx *fasthttp.RequestCtx) {
 
 			return
 		}
+	}
+
+	if err := acl.CheckSubEntityWrites(payload); err != nil {
+		sendSubEntityError(ctx, err)
+
+		return
 	}
 
 	op := transaction.TxOperation{

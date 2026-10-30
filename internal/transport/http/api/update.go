@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 
 	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/cache"
@@ -83,6 +84,11 @@ func handleSingleUpdate(ctx *fasthttp.RequestCtx, entity, id string, body []byte
 		return false
 	}
 
+	if err := acl.CheckSubEntityWrites(single); err != nil {
+		sendSubEntityError(ctx, err)
+		return true
+	}
+
 	data := engine.UpdateEntityById(entity, id, single)
 
 	response, _ := json.Marshal(data)
@@ -104,6 +110,13 @@ func handleBatchUpdate(ctx *fasthttp.RequestCtx, entity string, body []byte) boo
 		return false
 	}
 
+	for _, item := range list {
+		if err := acl.CheckSubEntityWrites(item); err != nil {
+			sendSubEntityError(ctx, err)
+			return true
+		}
+	}
+
 	data := engine.UpdateListOfEntities(entity, list)
 	response, _ := json.Marshal(data)
 	sendJSONResponse(ctx, response)
@@ -120,6 +133,21 @@ func sendJSONResponse(ctx *fasthttp.RequestCtx, response []byte) {
 func sendBadRequest(ctx *fasthttp.RequestCtx) {
 	ctx.SetStatusCode(fasthttp.StatusBadRequest)
 	ctx.SetBodyString("Invalid JSON")
+}
+
+func sendSubEntityError(ctx *fasthttp.RequestCtx, err error) {
+	ctx.Response.Header.Set("Content-Type", "application/json")
+
+	if errors.Is(err, acl.ErrSubEntityForbidden) {
+		ctx.SetStatusCode(fasthttp.StatusForbidden)
+		ctx.SetBodyString(`{"error":"forbidden"}`)
+
+		return
+	}
+
+	response, _ := json.Marshal(map[string]string{"error": err.Error()})
+	ctx.SetStatusCode(fasthttp.StatusBadRequest)
+	ctx.SetBody(response)
 }
 
 func finalizeUpdate(entity string) {

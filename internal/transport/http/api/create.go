@@ -79,6 +79,11 @@ func handleSingleEntity(ctx *fasthttp.RequestCtx, entity string, body []byte) bo
 		data[acl.UsernameField] = security.GetCurrentUsername()
 	}
 
+	if err := acl.CheckSubEntityWrites(data); err != nil {
+		sendSubEntityError(ctx, err)
+		return true
+	}
+
 	errors := engine.WriteEntity(entity, data)
 	if len(errors) > 0 {
 		response, _ := json.Marshal(errors)
@@ -110,6 +115,11 @@ func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool
 
 		if security.UserAuthenticationIsEnabled() {
 			list[i][acl.UsernameField] = security.GetCurrentUsername()
+		}
+
+		if err := acl.CheckSubEntityWrites(list[i]); err != nil {
+			sendSubEntityError(ctx, err)
+			return true
 		}
 	}
 

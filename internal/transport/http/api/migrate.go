@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 
+	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/valyala/fasthttp"
@@ -26,6 +27,13 @@ func MigrateController(ctx *fasthttp.RequestCtx) {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error" : "No valid migration queries found in the request body."}`)
 		return
+	}
+
+	for _, query := range migrationQueries {
+		if err := acl.CheckSubEntityWrites(query.Properties); err != nil {
+			sendSubEntityError(ctx, err)
+			return
+		}
 	}
 
 	if err := engine.ExecuteMigrations(migrationQueries); err != nil {

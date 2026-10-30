@@ -875,6 +875,11 @@ ElysianDB automatically assigns IDs when missing and replaces nested objects wit
 
 This mechanism also works recursively and supports **arrays of sub-entities**, allowing a document to include multiple nested or shared linked entities.
 
+#### Rules for Sub-Entities
+
+* Core entity types (names starting with `_elysiandb_core_`, such as users, ACLs, hooks and schemas) can only be referenced. A sub-entity of a core type is accepted when it contains nothing but `@entity` and `id` (or `@id`). If it contains any other field, the request is rejected with `400 Bad Request` and nothing is written. This applies to create, update, transaction and migration requests, whatever the authentication mode. A migration never writes a core entity through a link either: a document for which it would is left unchanged.
+* In `user` authentication mode, a sub-entity with fields is only written when the ACL of the current user allows it. Updating an existing entity requires `update`, or `owning_update` on an entity they own. Creating one requires `create` or `owning_write`, unless its entity type does not exist yet. Otherwise the request is rejected with `403 Forbidden` and nothing is written. A created sub-entity is owned by the current user and an updated one keeps its owner, whatever `_elysiandb_core_username` the payload contains. References need no permission.
+
 ### Query Parameters
 
 * `countOnly` — If true, returns only the count
@@ -1316,6 +1321,8 @@ _core_username
   * otherwise allowed only if `owning_delete` and ownership matches
 
 For list queries, results are automatically filtered to only include readable documents.
+
+Sub-entities written through a nested payload follow the same rules, see [Rules for Sub-Entities](#rules-for-sub-entities).
 
 ---
 

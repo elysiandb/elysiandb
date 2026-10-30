@@ -1,6 +1,7 @@
 package acl_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/taymour/elysiandb/internal/acl"
@@ -266,5 +267,116 @@ func TestAllAllowedWhenAuthDisabled(t *testing.T) {
 	out := acl.FilterListOfEntities("x", data)
 	if len(out) != 1 {
 		t.Fatalf("expected passthrough")
+	}
+}
+
+func TestCheckSubEntityWrites_RejectsCoreTypesWhenAuthDisabled(t *testing.T) {
+	setup(t, false)
+
+	err := acl.CheckSubEntityWrites(map[string]any{"x": map[string]any{"@entity": acl.ACLEntity, "id": "u::doc", "permissions": map[string]any{}}})
+	if !errors.Is(err, api_storage.ErrCoreSubEntity) {
+		t.Fatalf("expected ErrCoreSubEntity, got %v", err)
+	}
+
+	sub := map[string]any{"@entity": "doc", "id": "d1", "text": "x"}
+	if err := acl.CheckSubEntityWrites(map[string]any{"x": sub, "ref": map[string]any{"@entity": acl.ACLEntity, "id": "u::doc"}}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if _, ok := sub[acl.UsernameField]; ok {
+		t.Fatalf("expected no owner without user authentication")
+	}
+}
+
+func TestCheckSubEntityWrites_CreateNeedsCreateOrOwningWrite(t *testing.T) {
+	setup(t, true)
+	security.SetCurrentUsername("u")
+	api_storage.WriteEntity("doc", map[string]any{"id": "existing"})
+
+	writeACL("u", "doc", acl.NewPermissions())
+	err := acl.CheckSubEntityWrites(map[string]any{"x": map[string]any{"@entity": "doc", "id": "d1", "text": "x"}})
+	if !errors.Is(err, acl.ErrSubEntityForbidden) {
+		t.Fatalf("expected ErrSubEntityForbidden, got %v", err)
+	}
+
+	for _, p := range []acl.Permission{acl.PermissionCreate, acl.PermissionOwningWrite} {
+		perms := acl.NewPermissions()
+		perms[p] = true
+		writeACL("u", "doc", perms)
+
+		sub := map[string]any{"@entity": "doc", "id": "d1", "text": "x", acl.UsernameField: "other"}
+		if err := acl.CheckSubEntityWrites(map[string]any{"x": []any{sub}}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if sub[acl.UsernameField] != "u" {
+			t.Fatalf("expected the sub-entity to be owned by u, got %v", sub[acl.UsernameField])
+		}
+	}
+}
+
+func TestCheckSubEntityWrites_UpdateFollowsStoredOwner(t *testing.T) {
+	setup(t, true)
+	security.SetCurrentUsername("u")
+	api_storage.WriteEntity("doc", map[string]any{"id": "mine", acl.UsernameField: "u"})
+	api_storage.WriteEntity("doc", map[string]any{"id": "theirs", acl.UsernameField: "other"})
+	api_storage.WriteEntity("doc", map[string]any{"id": "orphan"})
+
+	perms := acl.NewPermissions()
+	perms[acl.PermissionOwningUpdate] = true
+	writeACL("u", "doc", perms)
+
+	mine := map[string]any{"@entity": "doc", "id": "mine", "text": "x", acl.UsernameField: "other"}
+	if err := acl.CheckSubEntityWrites(map[string]any{"x": mine}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mine[acl.UsernameField] != "u" {
+		t.Fatalf("expected the stored owner to be kept, got %v", mine[acl.UsernameField])
+	}
+
+	theirs := map[string]any{"@entity": "doc", "id": "theirs", "text": "x", acl.UsernameField: "u"}
+	if err := acl.CheckSubEntityWrites(map[string]any{"x": theirs}); !errors.Is(err, acl.ErrSubEntityForbidden) {
+		t.Fatalf("expected ErrSubEntityForbidden, got %v", err)
+	}
+
+	perms[acl.PermissionUpdate] = true
+	writeACL("u", "doc", perms)
+
+	if err := acl.CheckSubEntityWrites(map[string]any{"x": theirs}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if theirs[acl.UsernameField] != "other" {
+		t.Fatalf("expected the stored owner to be kept, got %v", theirs[acl.UsernameField])
+	}
+
+	orphan := map[string]any{"@entity": "doc", "@id": "orphan", "text": "x", acl.UsernameField: "u"}
+	if err := acl.CheckSubEntityWrites(map[string]any{"x": orphan}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := orphan[acl.UsernameField]; ok {
+		t.Fatalf("expected no owner on a document stored without one")
+	}
+}
+
+func TestCheckSubEntityWrites_UserMode(t *testing.T) {
+	setup(t, true)
+	security.SetCurrentUsername("u")
+
+	err := acl.CheckSubEntityWrites(map[string]any{"x": map[string]any{"@entity": security.UserEntity, "id": "admin", "role": "admin"}})
+	if !errors.Is(err, api_storage.ErrCoreSubEntity) {
+		t.Fatalf("expected ErrCoreSubEntity, got %v", err)
+	}
+
+	writeACL("u", "doc", acl.NewPermissions())
+	if err := acl.CheckSubEntityWrites(map[string]any{"x": map[string]any{"@entity": "doc", "id": "d1"}}); err != nil {
+		t.Fatalf("expected a reference to need no permission, got %v", err)
+	}
+
+	sub := map[string]any{"@entity": "newtype", "label": "x"}
+	if err := acl.CheckSubEntityWrites(map[string]any{"x": sub}); err != nil {
+		t.Fatalf("expected a sub-entity of a new type to be created, got %v", err)
+	}
+	if sub[acl.UsernameField] != "u" {
+		t.Fatalf("expected the sub-entity to be owned by u, got %v", sub[acl.UsernameField])
 	}
 }
