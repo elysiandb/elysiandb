@@ -122,8 +122,8 @@ func updateSchemaIfNeeded(entity string, data map[string]any) {
 		return
 	}
 
-	analyzed := schema.AnalyzeEntitySchema(entity, data)
-	WriteEntity(schema.SchemaEntity, analyzed)
+	merged := schema.MergeAnalyzedSchema(entity, GetEntitySchema(entity), data)
+	WriteEntity(schema.SchemaEntity, merged)
 }
 
 func WriteListOfEntities(entity string, list []map[string]any) [][]schema.ValidationError {

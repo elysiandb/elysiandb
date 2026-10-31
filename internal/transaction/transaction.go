@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/schema"
 )
@@ -36,7 +37,32 @@ type Storage interface {
 	DeleteEntityById(entity, id string)
 }
 
+type Preflighter interface {
+	Preflight(ops []TxOperation) error
+}
+
 type realStorage struct{}
+
+func (realStorage) Preflight(ops []TxOperation) error {
+	simulation := api_storage.NewWriteSimulation(engine.GetEntitySchema, engine.ReadEntityById)
+
+	for _, op := range ops {
+		switch op.Kind {
+		case "write":
+			if errs := simulation.Write(op.Entity, op.Data); len(errs) > 0 {
+				return errors.New("validation error")
+			}
+		case "update":
+			if !simulation.Update(op.Entity, op.ID, op.Data) {
+				return errors.New("update failed")
+			}
+		case "delete":
+			simulation.Delete(op.Entity, op.ID)
+		}
+	}
+
+	return nil
+}
 
 func (realStorage) WriteEntity(e string, d map[string]any) []schema.ValidationError {
 	return engine.WriteEntity(e, d)
@@ -51,6 +77,8 @@ func (realStorage) DeleteEntityById(e, id string) {
 }
 
 var storageImpl Storage = realStorage{}
+
+var commitMu sync.Mutex
 
 var TxManager = struct {
 	mu  sync.Mutex
@@ -114,6 +142,15 @@ func CommitTransaction(txID string) error {
 
 	delete(TxManager.txs, txID)
 	TxManager.mu.Unlock()
+
+	commitMu.Lock()
+	defer commitMu.Unlock()
+
+	if preflighter, ok := storageImpl.(Preflighter); ok {
+		if err := preflighter.Preflight(tx.Ops); err != nil {
+			return err
+		}
+	}
 
 	for _, op := range tx.Ops {
 		switch op.Kind {
