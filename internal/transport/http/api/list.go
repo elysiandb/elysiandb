@@ -28,7 +28,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 
 	currentUser := ""
 	if security.UserAuthenticationIsEnabled() {
-		currentUser = security.GetCurrentUsername()
+		currentUser = security.GetCurrentUsername(ctx)
 	}
 
 	var hash []byte
@@ -68,11 +68,11 @@ func ListController(ctx *fasthttp.RequestCtx) {
 		data = engine.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
 	}
 
-	data = acl.FilterListOfEntities(entity, data)
+	data = acl.FilterListOfEntities(currentUser, entity, data)
 
 	if preReadHooks {
 		for i, item := range data {
-			data[i] = hook.ApplyPreReadHooksForEntity(entity, item)
+			data[i] = hook.ApplyPreReadHooksForEntity(currentUser, entity, item)
 		}
 
 		data = engine.ApplyFiltersToList(data, filters)
@@ -80,7 +80,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 
 	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(entity) {
 		for i, item := range data {
-			data[i] = hook.ApplyPostReadHooksForEntity(entity, item)
+			data[i] = hook.ApplyPostReadHooksForEntity(currentUser, entity, item)
 		}
 	}
 

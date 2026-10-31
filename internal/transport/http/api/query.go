@@ -106,7 +106,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 
 	currentUser := ""
 	if security.UserAuthenticationIsEnabled() {
-		currentUser = security.GetCurrentUsername()
+		currentUser = security.GetCurrentUsername(ctx)
 	}
 
 	var hash []byte
@@ -148,11 +148,11 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	data = acl.FilterListOfEntities(payload.Entity, data)
+	data = acl.FilterListOfEntities(currentUser, payload.Entity, data)
 
 	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPreReadHooks(payload.Entity) {
 		for i, item := range data {
-			data[i] = hook.ApplyPreReadHooksForEntity(payload.Entity, item)
+			data[i] = hook.ApplyPreReadHooksForEntity(currentUser, payload.Entity, item)
 		}
 
 		data = api_storage.ApplyQueryFilter(data, filter)
@@ -160,7 +160,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 
 	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(payload.Entity) {
 		for i, item := range data {
-			data[i] = hook.ApplyPostReadHooksForEntity(payload.Entity, item)
+			data[i] = hook.ApplyPostReadHooksForEntity(currentUser, payload.Entity, item)
 		}
 	}
 

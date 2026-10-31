@@ -77,13 +77,19 @@ func handleSingleEntity(ctx *fasthttp.RequestCtx, entity string, body []byte) bo
 		return false
 	}
 
+	username := security.GetCurrentUsername(ctx)
+	if !acl.CanWriteEntity(username, entity, data) {
+		sendForbidden(ctx)
+		return true
+	}
+
 	id, hasId := data["id"].(string)
 	if !hasId || id == "" {
 		data["id"] = uuid.New().String()
 	}
 
 	if security.UserAuthenticationIsEnabled() {
-		data[acl.UsernameField] = security.GetCurrentUsername()
+		data[acl.UsernameField] = username
 	}
 
 	errors := engine.WriteEntity(entity, data)
@@ -109,6 +115,12 @@ func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool
 		return false
 	}
 
+	username := security.GetCurrentUsername(ctx)
+	if !acl.CanWriteListOfEntities(username, entity, list) {
+		sendForbidden(ctx)
+		return true
+	}
+
 	for i := range list {
 		id, hasId := list[i]["id"].(string)
 		if !hasId || id == "" {
@@ -116,7 +128,7 @@ func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool
 		}
 
 		if security.UserAuthenticationIsEnabled() {
-			list[i][acl.UsernameField] = security.GetCurrentUsername()
+			list[i][acl.UsernameField] = username
 		}
 	}
 
@@ -144,6 +156,12 @@ func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool
 	ctx.SetBody(response)
 
 	return true
+}
+
+func sendForbidden(ctx *fasthttp.RequestCtx) {
+	ctx.Response.Header.Set("Content-Type", "application/json")
+	ctx.SetStatusCode(fasthttp.StatusForbidden)
+	ctx.SetBodyString(`{"error":"forbidden"}`)
 }
 
 func finalizeCreate(entity string) {

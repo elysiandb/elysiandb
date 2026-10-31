@@ -5,6 +5,7 @@ import (
 
 	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/engine"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
 
@@ -13,7 +14,7 @@ func CountController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 
 	data := engine.ListEntities(entity, 0, 0, "", true, nil, "", "")
-	data = acl.FilterListOfEntities(entity, data)
+	data = acl.FilterListOfEntities(security.GetCurrentUsername(ctx), entity, data)
 
 	count := int64(len(data))
 

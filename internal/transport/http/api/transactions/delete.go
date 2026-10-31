@@ -1,6 +1,9 @@
 package api_transaction
 
 import (
+	"github.com/taymour/elysiandb/internal/acl"
+	"github.com/taymour/elysiandb/internal/engine"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/transaction"
 	"github.com/valyala/fasthttp"
 )
@@ -11,6 +14,13 @@ func DeleteTransactionController(ctx *fasthttp.RequestCtx) {
 	txID := ctx.UserValue("txId").(string)
 	entity := ctx.UserValue("entity").(string)
 	id := ctx.UserValue("id").(string)
+
+	if !acl.CanDeleteEntity(security.GetCurrentUsername(ctx), entity, engine.ReadEntityById(entity, id)) {
+		ctx.SetStatusCode(fasthttp.StatusForbidden)
+		ctx.SetBodyString(`{"error":"forbidden"}`)
+
+		return
+	}
 
 	op := transaction.TxOperation{
 		Kind:   "delete",

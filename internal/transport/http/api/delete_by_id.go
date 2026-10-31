@@ -5,6 +5,7 @@ import (
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
 
@@ -18,7 +19,7 @@ func DeleteByIdController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if !acl.CanDeleteEntity(entity, data) {
+	if !acl.CanDeleteEntity(security.GetCurrentUsername(ctx), entity, data) {
 		ctx.SetStatusCode(fasthttp.StatusForbidden)
 		return
 	}

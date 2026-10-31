@@ -1,29 +1,73 @@
 package acl
 
 import (
+	"strings"
+
+	"github.com/taymour/elysiandb/internal/engine"
+	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/security"
 )
 
-func CanCreateEntity(entity string) bool {
+func CanCreateEntity(username, entity string) bool {
 	if !security.UserAuthenticationIsEnabled() {
 		return true
 	}
 
-	username := security.GetCurrentUsername()
 	acl := GetACLEntityForUsername(entity, username)
 	if acl == nil {
-		return false
+		return canCreateNewEntityType(username, entity)
 	}
 
 	return acl.Can(PermissionCreate)
 }
 
-func CanDeleteEntity(entity string, data map[string]any) bool {
+func canCreateNewEntityType(username, entity string) bool {
+	if strings.HasPrefix(entity, globals.CoreFieldsPrefix) || engine.EntityTypeExists(entity) {
+		return false
+	}
+
+	user, err := security.GetBasicUserByUsername(username)
+	if err != nil {
+		return false
+	}
+
+	role, _ := user["role"].(string)
+
+	return DefaultPermissionsForRole(security.Role(role))[PermissionCreate]
+}
+
+func CanWriteEntity(username, entity string, data map[string]any) bool {
+	return CanWriteListOfEntities(username, entity, []map[string]any{data})
+}
+
+func CanWriteListOfEntities(username, entity string, list []map[string]any) bool {
 	if !security.UserAuthenticationIsEnabled() {
 		return true
 	}
 
-	username := security.GetCurrentUsername()
+	if !CanCreateEntity(username, entity) {
+		return false
+	}
+
+	for _, item := range list {
+		id, ok := item["id"].(string)
+		if !ok || id == "" || !engine.EntityExists(entity, id) {
+			continue
+		}
+
+		if !CanUpdateEntity(username, entity, id, item) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func CanDeleteEntity(username, entity string, data map[string]any) bool {
+	if !security.UserAuthenticationIsEnabled() {
+		return true
+	}
+
 	acl := GetACLEntityForUsername(entity, username)
 	if acl == nil {
 		return false
@@ -41,12 +85,11 @@ func CanDeleteEntity(entity string, data map[string]any) bool {
 	return acl.Can(PermissionOwningDelete) && dataUsername == username
 }
 
-func CanUpdateEntity(entity string, data map[string]any) bool {
+func CanUpdateEntity(username, entity, id string, updates map[string]any) bool {
 	if !security.UserAuthenticationIsEnabled() {
 		return true
 	}
 
-	username := security.GetCurrentUsername()
 	acl := GetACLEntityForUsername(entity, username)
 	if acl == nil {
 		return false
@@ -56,20 +99,14 @@ func CanUpdateEntity(entity string, data map[string]any) bool {
 		return true
 	}
 
-	dataUsername, ok := data[UsernameField].(string)
-	if !ok || dataUsername == "" {
-		return false
-	}
-
-	return acl.Can(PermissionOwningUpdate) && dataUsername == username
+	return canOwningUpdate(acl, entity, id, username, updates)
 }
 
-func CanUpdateListOfEntities(entity string, data []map[string]any) bool {
+func CanUpdateListOfEntities(username, entity string, updates []map[string]any) bool {
 	if !security.UserAuthenticationIsEnabled() {
 		return true
 	}
 
-	username := security.GetCurrentUsername()
 	acl := GetACLEntityForUsername(entity, username)
 	if acl == nil {
 		return false
@@ -79,13 +116,13 @@ func CanUpdateListOfEntities(entity string, data []map[string]any) bool {
 		return true
 	}
 
-	for _, item := range data {
-		dataUsername, ok := item[UsernameField].(string)
-		if !ok || dataUsername == "" {
+	for _, item := range updates {
+		id, ok := item["id"].(string)
+		if !ok || id == "" {
 			return false
 		}
 
-		if !acl.Can(PermissionOwningUpdate) || dataUsername != username {
+		if !canOwningUpdate(acl, entity, id, username, item) {
 			return false
 		}
 	}
@@ -93,12 +130,27 @@ func CanUpdateListOfEntities(entity string, data []map[string]any) bool {
 	return true
 }
 
-func CanReadEntity(entity string, data map[string]any) bool {
+func canOwningUpdate(acl *ACL, entity, id, username string, updates map[string]any) bool {
+	if !acl.Can(PermissionOwningUpdate) {
+		return false
+	}
+
+	existing := engine.ReadEntityById(entity, id)
+	owner, ok := existing[UsernameField].(string)
+	if !ok || owner == "" || owner != username {
+		return false
+	}
+
+	newOwner, changesOwner := updates[UsernameField]
+
+	return !changesOwner || newOwner == username
+}
+
+func CanReadEntity(username, entity string, data map[string]any) bool {
 	if !security.UserAuthenticationIsEnabled() {
 		return true
 	}
 
-	username := security.GetCurrentUsername()
 	acl := GetACLEntityForUsername(entity, username)
 	if acl == nil {
 		return false
@@ -116,12 +168,11 @@ func CanReadEntity(entity string, data map[string]any) bool {
 	return acl.Can(PermissionOwningRead) && dataUsername == username
 }
 
-func FilterListOfEntities(entity string, data []map[string]any) []map[string]any {
+func FilterListOfEntities(username, entity string, data []map[string]any) []map[string]any {
 	if !security.UserAuthenticationIsEnabled() {
 		return data
 	}
 
-	username := security.GetCurrentUsername()
 	acl := GetACLEntityForUsername(entity, username)
 	if acl == nil {
 		return []map[string]any{}

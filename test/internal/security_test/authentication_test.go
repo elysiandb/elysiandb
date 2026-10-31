@@ -254,3 +254,67 @@ func TestUserAuthenticationIsEnabled(t *testing.T) {
 		t.Fatalf("user auth should be disabled")
 	}
 }
+
+func TestAuthenticateAdmin_UserMode(t *testing.T) {
+	cfg := &configuration.Config{}
+	cfg.Security.Authentication.Enabled = true
+	cfg.Security.Authentication.Mode = "user"
+	globals.SetConfig(cfg)
+
+	role := security.RoleUser
+	orig := security.UserAuth
+	security.UserAuth = func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
+			ctx.SetUserValue("role", role)
+			next(ctx)
+		}
+	}
+	defer func() { security.UserAuth = orig }()
+
+	called := false
+	handler := security.AuthenticateAdmin(func(ctx *fasthttp.RequestCtx) {
+		called = true
+	})
+
+	ctx := &fasthttp.RequestCtx{}
+	handler(ctx)
+
+	if called || ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403 for a regular user, got %d", ctx.Response.StatusCode())
+	}
+
+	role = security.RoleAdmin
+	ctx = &fasthttp.RequestCtx{}
+	handler(ctx)
+
+	if !called {
+		t.Fatalf("handler should be called for an admin")
+	}
+}
+
+func TestAuthenticateAdmin_OtherModes(t *testing.T) {
+	origBasic := security.CheckBasicAuthentication
+	security.CheckBasicAuthentication = func(c *fasthttp.RequestCtx) bool { return true }
+	defer func() { security.CheckBasicAuthentication = origBasic }()
+
+	for _, mode := range []string{"", "basic", "token"} {
+		cfg := &configuration.Config{}
+		cfg.Security.Authentication.Enabled = mode != ""
+		cfg.Security.Authentication.Mode = mode
+		cfg.Security.Authentication.Token = "secret123"
+		globals.SetConfig(cfg)
+
+		called := false
+		handler := security.AuthenticateAdmin(func(ctx *fasthttp.RequestCtx) {
+			called = true
+		})
+
+		ctx := &fasthttp.RequestCtx{}
+		ctx.Request.Header.Set("Authorization", "Bearer secret123")
+		handler(ctx)
+
+		if !called {
+			t.Fatalf("handler should be called in mode %q", mode)
+		}
+	}
+}

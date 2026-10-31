@@ -50,3 +50,17 @@ func Authenticate(requestHandler fasthttp.RequestHandler) fasthttp.RequestHandle
 		requestHandler(ctx)
 	}
 }
+
+func AuthenticateAdmin(requestHandler fasthttp.RequestHandler) fasthttp.RequestHandler {
+	return Authenticate(func(ctx *fasthttp.RequestCtx) {
+		if UserAuthenticationIsEnabled() && ctx.UserValue("role") != RoleAdmin {
+			ctx.Response.Header.Set("Content-Type", "application/json")
+			ctx.SetStatusCode(fasthttp.StatusForbidden)
+			ctx.SetBodyString(`{"error":"admin role required"}`)
+
+			return
+		}
+
+		requestHandler(ctx)
+	})
+}

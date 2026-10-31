@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
@@ -43,6 +44,13 @@ func newCtx(method, uri, body string) *fasthttp.RequestCtx {
 	}
 	ctx := &fasthttp.RequestCtx{}
 	ctx.Init(req, nil, nil)
+	return ctx
+}
+
+func newUserCtx(username, method, uri, body string) *fasthttp.RequestCtx {
+	ctx := newCtx(method, uri, body)
+	ctx.SetUserValue("username", username)
+
 	return ctx
 }
 
@@ -235,10 +243,11 @@ func TestCreate_StrictManualSchemaWithUserAuthentication(t *testing.T) {
 	cfg.Security.Authentication.Mode = "user"
 	globals.SetConfig(cfg)
 
-	security.SetCurrentUsername("admin")
-	defer security.SetCurrentUsername("")
+	if err := security.InitAdminUserIfNotExists(); err != nil {
+		t.Fatalf("admin user creation failed: %v", err)
+	}
 
-	ctx := newCtx("POST", "/api/oeuvre/create", `{"fields":{"titre":{"type":"string","required":true},"annee":{"type":"number","required":false}}}`)
+	ctx := newUserCtx(security.DefaultAdminUsername, "POST", "/api/oeuvre/create", `{"fields":{"titre":{"type":"string","required":true},"annee":{"type":"number","required":false}}}`)
 	ctx.SetUserValue("entity", "oeuvre")
 	api_controller.CreateTypeController(ctx)
 
@@ -246,7 +255,7 @@ func TestCreate_StrictManualSchemaWithUserAuthentication(t *testing.T) {
 		t.Fatalf("expected 200 on type creation, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
 	}
 
-	ctx = newCtx("POST", "/api/oeuvre", `{"titre":"Alien","annee":1979}`)
+	ctx = newUserCtx(security.DefaultAdminUsername, "POST", "/api/oeuvre", `{"titre":"Alien","annee":1979}`)
 	ctx.SetUserValue("entity", "oeuvre")
 	api_controller.CreateController(ctx)
 
@@ -260,7 +269,7 @@ func TestCreate_StrictManualSchemaWithUserAuthentication(t *testing.T) {
 		t.Fatalf("expected owner admin, got %v", obj[acl.UsernameField])
 	}
 
-	ctx = newCtx("POST", "/api/oeuvre", `[{"titre":"Alien"},{"titre":"Aliens","annee":1986}]`)
+	ctx = newUserCtx(security.DefaultAdminUsername, "POST", "/api/oeuvre", `[{"titre":"Alien"},{"titre":"Aliens","annee":1986}]`)
 	ctx.SetUserValue("entity", "oeuvre")
 	api_controller.CreateController(ctx)
 
@@ -268,7 +277,7 @@ func TestCreate_StrictManualSchemaWithUserAuthentication(t *testing.T) {
 		t.Fatalf("expected 200 on list creation, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
 	}
 
-	ctx = newCtx("POST", "/api/oeuvre", `{"titre":"X","note":9}`)
+	ctx = newUserCtx(security.DefaultAdminUsername, "POST", "/api/oeuvre", `{"titre":"X","note":9}`)
 	ctx.SetUserValue("entity", "oeuvre")
 	api_controller.CreateController(ctx)
 
@@ -290,11 +299,8 @@ func TestUpdate_StrictManualSchemaWithUserAuthenticationKeepsSchema(t *testing.T
 		t.Fatalf("admin user creation failed: %v", err)
 	}
 
-	security.SetCurrentUsername(security.DefaultAdminUsername)
-	defer security.SetCurrentUsername("")
-
 	assertManualSchema := func(step string) {
-		ctx := newCtx("GET", "/api/oeuvre/schema", "")
+		ctx := newUserCtx(security.DefaultAdminUsername, "GET", "/api/oeuvre/schema", "")
 		ctx.SetUserValue("entity", "oeuvre")
 		api_controller.GetSchemaController(ctx)
 
@@ -312,11 +318,11 @@ func TestUpdate_StrictManualSchemaWithUserAuthenticationKeepsSchema(t *testing.T
 		}
 	}
 
-	ctx := newCtx("POST", "/api/oeuvre/create", `{"fields":{"titre":{"type":"string","required":true},"annee":{"type":"number","required":false}}}`)
+	ctx := newUserCtx(security.DefaultAdminUsername, "POST", "/api/oeuvre/create", `{"fields":{"titre":{"type":"string","required":true},"annee":{"type":"number","required":false}}}`)
 	ctx.SetUserValue("entity", "oeuvre")
 	api_controller.CreateTypeController(ctx)
 
-	ctx = newCtx("POST", "/api/oeuvre", `{"id":"o1","titre":"Alien","annee":1979}`)
+	ctx = newUserCtx(security.DefaultAdminUsername, "POST", "/api/oeuvre", `{"id":"o1","titre":"Alien","annee":1979}`)
 	ctx.SetUserValue("entity", "oeuvre")
 	api_controller.CreateController(ctx)
 
@@ -324,7 +330,7 @@ func TestUpdate_StrictManualSchemaWithUserAuthenticationKeepsSchema(t *testing.T
 		t.Fatalf("expected 200 on create, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
 	}
 
-	ctx = newCtx("PUT", "/api/oeuvre/o1", `{"titre":"Alien","annee":1980}`)
+	ctx = newUserCtx(security.DefaultAdminUsername, "PUT", "/api/oeuvre/o1", `{"titre":"Alien","annee":1980}`)
 	ctx.SetUserValue("entity", "oeuvre")
 	ctx.SetUserValue("id", "o1")
 	api_controller.UpdateByIdController(ctx)
@@ -335,14 +341,14 @@ func TestUpdate_StrictManualSchemaWithUserAuthenticationKeepsSchema(t *testing.T
 
 	assertManualSchema("PUT")
 
-	ctx = newCtx("POST", "/api/tx/begin", "")
+	ctx = newUserCtx(security.DefaultAdminUsername, "POST", "/api/tx/begin", "")
 	api_transaction.BeginTransactionController(ctx)
 
 	var begin map[string]string
 	json.Unmarshal(ctx.Response.Body(), &begin)
 	txID := begin["transaction_id"]
 
-	ctx = newCtx("PUT", "/api/tx/"+txID+"/entity/oeuvre/o1", `{"annee":1990}`)
+	ctx = newUserCtx(security.DefaultAdminUsername, "PUT", "/api/tx/"+txID+"/entity/oeuvre/o1", `{"annee":1990}`)
 	ctx.SetUserValue("txId", txID)
 	ctx.SetUserValue("entity", "oeuvre")
 	ctx.SetUserValue("id", "o1")
@@ -352,7 +358,7 @@ func TestUpdate_StrictManualSchemaWithUserAuthenticationKeepsSchema(t *testing.T
 		t.Fatalf("expected 200 on transactional update, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
 	}
 
-	ctx = newCtx("POST", "/api/tx/"+txID+"/commit", "")
+	ctx = newUserCtx(security.DefaultAdminUsername, "POST", "/api/tx/"+txID+"/commit", "")
 	ctx.SetUserValue("txId", txID)
 	api_transaction.CommitTransactionController(ctx)
 
@@ -367,7 +373,7 @@ func TestUpdate_StrictManualSchemaWithUserAuthenticationKeepsSchema(t *testing.T
 		t.Fatalf("expected updated document owned by admin, got %v", stored)
 	}
 
-	ctx = newCtx("POST", "/api/oeuvre", `{"titre":"Y","note":9}`)
+	ctx = newUserCtx(security.DefaultAdminUsername, "POST", "/api/oeuvre", `{"titre":"Y","note":9}`)
 	ctx.SetUserValue("entity", "oeuvre")
 	api_controller.CreateController(ctx)
 
@@ -375,7 +381,7 @@ func TestUpdate_StrictManualSchemaWithUserAuthenticationKeepsSchema(t *testing.T
 		t.Fatalf("expected 400 for undeclared field after updates, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
 	}
 
-	ctx = newCtx("POST", "/api/oeuvre", `{"annee":2000}`)
+	ctx = newUserCtx(security.DefaultAdminUsername, "POST", "/api/oeuvre", `{"annee":2000}`)
 	ctx.SetUserValue("entity", "oeuvre")
 	api_controller.CreateController(ctx)
 
@@ -1007,5 +1013,396 @@ func TestQueryPayload_HashDeterministic(t *testing.T) {
 
 	if h1 != h2 {
 		t.Fatalf("hash must be stable, got %s vs %s", h1, h2)
+	}
+}
+
+func setupOwnership(t *testing.T) {
+	setup(t)
+
+	cfg := globals.GetConfig()
+	cfg.Security.Authentication.Enabled = true
+	cfg.Security.Authentication.Mode = "user"
+
+	for _, username := range []string{"alice", "bob"} {
+		perms := acl.NewPermissions()
+		perms[acl.PermissionCreate] = true
+		perms[acl.PermissionOwningRead] = true
+		perms[acl.PermissionOwningUpdate] = true
+		a := acl.ACL{Username: username, Entity: "notes", Permissions: perms}
+		api_storage.WriteEntity(acl.ACLEntity, a.ToDataMap())
+	}
+}
+
+func createNotesAs(username, body string) *fasthttp.RequestCtx {
+	ctx := newUserCtx(username, "POST", "/api/notes", body)
+	ctx.SetUserValue("entity", "notes")
+	api_controller.CreateController(ctx)
+
+	return ctx
+}
+
+func createNoteAs(t *testing.T, username, body string) string {
+	ctx := createNotesAs(username, body)
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("create failed: %d", ctx.Response.StatusCode())
+	}
+
+	var obj map[string]any
+	json.Unmarshal(ctx.Response.Body(), &obj)
+
+	return obj["id"].(string)
+}
+
+func updateNoteAs(username, id, body string) *fasthttp.RequestCtx {
+	ctx := newUserCtx(username, "PUT", "/api/notes/"+id, body)
+	ctx.SetUserValue("entity", "notes")
+	ctx.SetUserValue("id", id)
+	api_controller.UpdateByIdController(ctx)
+
+	return ctx
+}
+
+func updateNotesAs(username, body string) *fasthttp.RequestCtx {
+	ctx := newUserCtx(username, "PUT", "/api/notes", body)
+	ctx.SetUserValue("entity", "notes")
+	api_controller.UpdateListController(ctx)
+
+	return ctx
+}
+
+func assertNote(t *testing.T, id, owner, title string) {
+	t.Helper()
+
+	stored := api_storage.ReadEntityById("notes", id)
+	if stored == nil {
+		t.Fatalf("note %s not found", id)
+	}
+
+	if stored[acl.UsernameField] != owner || stored["title"] != title {
+		t.Fatalf("unexpected note %s: %v", id, stored)
+	}
+}
+
+func TestUpdateById_OwningUpdateRejectsOtherUsersEntity(t *testing.T) {
+	setupOwnership(t)
+
+	id := createNoteAs(t, "alice", `{"title":"alice"}`)
+
+	ctx := updateNoteAs("bob", id, `{"title":"bob","`+acl.UsernameField+`":"bob"}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+
+	ctx = updateNoteAs("bob", id, `{"title":"bob"}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+
+	assertNote(t, id, "alice", "alice")
+}
+
+func TestUpdateById_OwnerCanUpdateWithoutUsernameField(t *testing.T) {
+	setupOwnership(t)
+
+	id := createNoteAs(t, "alice", `{"title":"alice"}`)
+
+	ctx := updateNoteAs("alice", id, `{"title":"v2"}`)
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	assertNote(t, id, "alice", "v2")
+}
+
+func TestUpdateById_OwningUpdateCannotChangeOwner(t *testing.T) {
+	setupOwnership(t)
+
+	id := createNoteAs(t, "alice", `{"title":"alice"}`)
+
+	ctx := updateNoteAs("alice", id, `{"title":"v2","`+acl.UsernameField+`":"bob"}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+
+	assertNote(t, id, "alice", "alice")
+}
+
+func TestUpdateById_IdInPayloadDoesNotRedirectWrite(t *testing.T) {
+	setupOwnership(t)
+
+	aliceID := createNoteAs(t, "alice", `{"title":"alice"}`)
+	bobID := createNoteAs(t, "bob", `{"title":"bob"}`)
+
+	ctx := updateNoteAs("bob", bobID, `{"id":"`+aliceID+`","title":"bob v2","`+acl.UsernameField+`":"bob"}`)
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	assertNote(t, aliceID, "alice", "alice")
+	assertNote(t, bobID, "bob", "bob v2")
+}
+
+func TestUpdateList_OwningUpdateRejectsOtherUsersEntity(t *testing.T) {
+	setupOwnership(t)
+
+	aliceID := createNoteAs(t, "alice", `{"title":"alice"}`)
+	bobID := createNoteAs(t, "bob", `{"title":"bob"}`)
+
+	ctx := updateNotesAs("bob", `[{"id":"`+bobID+`","title":"bob v2"},{"id":"`+aliceID+`","title":"bob","`+acl.UsernameField+`":"bob"}]`)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+
+	assertNote(t, aliceID, "alice", "alice")
+	assertNote(t, bobID, "bob", "bob")
+}
+
+func TestUpdateList_OwnerCanUpdateWithoutUsernameField(t *testing.T) {
+	setupOwnership(t)
+
+	id := createNoteAs(t, "alice", `{"title":"alice"}`)
+
+	ctx := updateNotesAs("alice", `[{"id":"`+id+`","title":"v2"}]`)
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	assertNote(t, id, "alice", "v2")
+}
+
+func newSessionCtx(t *testing.T, username, method, uri, body string) *fasthttp.RequestCtx {
+	session, err := security.CreateSession(username, security.RoleUser, time.Hour)
+	if err != nil {
+		t.Fatalf("session creation failed: %v", err)
+	}
+
+	ctx := newCtx(method, uri, body)
+	ctx.Request.Header.SetCookie(security.SessionCookieName, session.ID)
+
+	return ctx
+}
+
+func runDuringConcurrentLogin(first *fasthttp.RequestCtx, handler fasthttp.RequestHandler, second *fasthttp.RequestCtx) {
+	firstAuthenticated := make(chan struct{})
+	secondAuthenticated := make(chan struct{})
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		security.UserAuth(func(ctx *fasthttp.RequestCtx) {
+			close(firstAuthenticated)
+			<-secondAuthenticated
+			handler(ctx)
+		})(first)
+	}()
+
+	<-firstAuthenticated
+
+	security.UserAuth(func(ctx *fasthttp.RequestCtx) {
+		close(secondAuthenticated)
+	})(second)
+
+	<-done
+}
+
+func TestCreate_OwnerComesFromOwnRequestDuringConcurrentLogin(t *testing.T) {
+	setupOwnership(t)
+
+	aliceCtx := newSessionCtx(t, "alice", "POST", "/api/notes", `{"title":"alice"}`)
+	aliceCtx.SetUserValue("entity", "notes")
+	bobCtx := newSessionCtx(t, "bob", "GET", "/api/notes", "")
+
+	runDuringConcurrentLogin(aliceCtx, api_controller.CreateController, bobCtx)
+
+	if aliceCtx.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", aliceCtx.Response.StatusCode())
+	}
+
+	var obj map[string]any
+	json.Unmarshal(aliceCtx.Response.Body(), &obj)
+	if obj[acl.UsernameField] != "alice" {
+		t.Fatalf("expected owner alice, got %v", obj[acl.UsernameField])
+	}
+}
+
+func TestUpdateById_ACLUsesOwnRequestUserDuringConcurrentLogin(t *testing.T) {
+	setupOwnership(t)
+
+	api_storage.WriteEntity("notes", map[string]any{
+		"id":              "n1",
+		"title":           "alice",
+		acl.UsernameField: "alice",
+	})
+
+	bobCtx := newSessionCtx(t, "bob", "PUT", "/api/notes/n1", `{"title":"bob"}`)
+	bobCtx.SetUserValue("entity", "notes")
+	bobCtx.SetUserValue("id", "n1")
+	aliceCtx := newSessionCtx(t, "alice", "GET", "/api/notes", "")
+
+	runDuringConcurrentLogin(bobCtx, api_controller.UpdateByIdController, aliceCtx)
+
+	if bobCtx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", bobCtx.Response.StatusCode())
+	}
+
+	assertNote(t, "n1", "alice", "alice")
+}
+
+func TestCreate_ExistingIdOfOtherUserIsForbidden(t *testing.T) {
+	setupOwnership(t)
+
+	id := createNoteAs(t, "alice", `{"title":"alice"}`)
+
+	ctx := createNotesAs("bob", `{"id":"`+id+`","title":"bob"}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+
+	ctx = createNotesAs("bob", `[{"title":"bob new"},{"id":"`+id+`","title":"bob"}]`)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403 on list, got %d", ctx.Response.StatusCode())
+	}
+
+	assertNote(t, id, "alice", "alice")
+
+	if n := len(api_storage.ListEntities("notes", 0, 0, "", true, nil, "", "")); n != 1 {
+		t.Fatalf("expected 1 note, got %d", n)
+	}
+}
+
+func TestCreate_OwnerCanRewriteOwnEntity(t *testing.T) {
+	setupOwnership(t)
+
+	id := createNoteAs(t, "alice", `{"title":"alice"}`)
+
+	ctx := createNotesAs("alice", `{"id":"`+id+`","title":"v2"}`)
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	assertNote(t, id, "alice", "v2")
+}
+
+func TestCreate_RequiresCreatePermission(t *testing.T) {
+	setupOwnership(t)
+
+	perms := acl.NewPermissions()
+	perms[acl.PermissionOwningRead] = true
+	perms[acl.PermissionOwningUpdate] = true
+	a := acl.ACL{Username: "carol", Entity: "notes", Permissions: perms}
+	api_storage.WriteEntity(acl.ACLEntity, a.ToDataMap())
+
+	ctx := createNotesAs("carol", `{"title":"carol"}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+
+	ctx = createNotesAs("carol", `[{"title":"carol"}]`)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403 on list, got %d", ctx.Response.StatusCode())
+	}
+
+	if n := len(api_storage.ListEntities("notes", 0, 0, "", true, nil, "", "")); n != 0 {
+		t.Fatalf("expected no note, got %d", n)
+	}
+}
+
+func TestCreate_CoreEntityIsForbidden(t *testing.T) {
+	setupOwnership(t)
+
+	ctx := newUserCtx("bob", "POST", "/api/"+acl.ACLEntity, `{"id":"bob::notes","username":"bob","entity":"notes","permissions":{"update":true}}`)
+	ctx.SetUserValue("entity", acl.ACLEntity)
+	api_controller.CreateController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+
+	if acl.GetACLEntityForUsername("notes", "bob").Can(acl.PermissionUpdate) {
+		t.Fatal("acl was modified")
+	}
+}
+
+func TestCreate_NewEntityTypeUsesRoleDefaults(t *testing.T) {
+	setupOwnership(t)
+
+	if err := security.InitAdminUserIfNotExists(); err != nil {
+		t.Fatalf("admin user creation failed: %v", err)
+	}
+
+	err := security.CreateBasicUser(&security.BasicUser{Username: "carol", Password: "pw", Role: security.RoleUser})
+	if err != nil {
+		t.Fatalf("user creation failed: %v", err)
+	}
+
+	ctx := newUserCtx("carol", "POST", "/api/fresh", `{"title":"carol"}`)
+	ctx.SetUserValue("entity", "fresh")
+	api_controller.CreateController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403 for regular user, got %d", ctx.Response.StatusCode())
+	}
+
+	ctx = newUserCtx(security.DefaultAdminUsername, "POST", "/api/fresh", `{"title":"admin"}`)
+	ctx.SetUserValue("entity", "fresh")
+	api_controller.CreateController(ctx)
+
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200 for admin, got %d", ctx.Response.StatusCode())
+	}
+}
+
+func getNoteAs(username, id string) *fasthttp.RequestCtx {
+	ctx := newUserCtx(username, "GET", "/api/notes/"+id, "")
+	ctx.SetUserValue("entity", "notes")
+	ctx.SetUserValue("id", id)
+	api_controller.GetByIdController(ctx)
+
+	return ctx
+}
+
+func TestGetById_CacheHitChecksReadACL(t *testing.T) {
+	setupOwnership(t)
+	globals.GetConfig().Api.Cache.Enabled = true
+
+	id := createNoteAs(t, "alice", `{"title":"alice"}`)
+
+	for _, want := range []string{"MISS", "HIT"} {
+		ctx := getNoteAs("alice", id)
+		got := string(ctx.Response.Header.Peek("X-Elysian-Cache"))
+		if ctx.Response.StatusCode() != 200 || got != want {
+			t.Fatalf("expected 200 %s for owner, got %d %s", want, ctx.Response.StatusCode(), got)
+		}
+	}
+
+	ctx := getNoteAs("bob", id)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+}
+
+func TestGetById_FilteredResponseIsNotCached(t *testing.T) {
+	setup(t)
+	globals.GetConfig().Api.Cache.Enabled = true
+
+	ctx := newCtx("POST", "/api/books", `{"id":"b1","title":"Dune","author":"Herbert"}`)
+	ctx.SetUserValue("entity", "books")
+	api_controller.CreateController(ctx)
+
+	ctx = newCtx("GET", "/api/books/b1?fields=title", "")
+	ctx.SetUserValue("entity", "books")
+	ctx.SetUserValue("id", "b1")
+	api_controller.GetByIdController(ctx)
+
+	ctx = newCtx("GET", "/api/books/b1", "")
+	ctx.SetUserValue("entity", "books")
+	ctx.SetUserValue("id", "b1")
+	api_controller.GetByIdController(ctx)
+
+	var obj map[string]any
+	json.Unmarshal(ctx.Response.Body(), &obj)
+	if obj["author"] != "Herbert" {
+		t.Fatalf("expected full document, got %s", ctx.Response.Body())
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/mongodb"
 	"github.com/taymour/elysiandb/internal/schema"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
 
@@ -89,11 +90,11 @@ func handleSingleUpdate(ctx *fasthttp.RequestCtx, entity, id string, body []byte
 		return false
 	}
 
-	if !acl.CanUpdateEntity(entity, single) {
+	if !acl.CanUpdateEntity(security.GetCurrentUsername(ctx), entity, id, single) {
 		ctx.SetStatusCode(fasthttp.StatusForbidden)
 		ctx.SetBody([]byte(`{"error":"forbidden"}`))
 
-		return false
+		return true
 	}
 
 	data := engine.UpdateEntityById(entity, id, single)
@@ -110,11 +111,11 @@ func handleBatchUpdate(ctx *fasthttp.RequestCtx, entity string, body []byte) boo
 		return false
 	}
 
-	if !acl.CanUpdateListOfEntities(entity, list) {
+	if !acl.CanUpdateListOfEntities(security.GetCurrentUsername(ctx), entity, list) {
 		ctx.SetStatusCode(fasthttp.StatusForbidden)
 		ctx.SetBody([]byte(`{"error":"forbidden"}`))
 
-		return false
+		return true
 	}
 
 	data := engine.UpdateListOfEntities(entity, list)

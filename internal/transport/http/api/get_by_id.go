@@ -9,18 +9,22 @@ import (
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/hook"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
 
 func GetByIdController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 	id := ctx.UserValue("id").(string)
+	username := security.GetCurrentUsername(ctx)
 	fieldsParam := string(ctx.QueryArgs().Peek("fields"))
 	fields := api_storage.ParseFieldsParam(fieldsParam)
 	includesParam := string(ctx.QueryArgs().Peek("includes"))
 
-	if !hook.EntityHasHooks(entity) && len(fields) == 0 && globals.GetConfig().Api.Cache.Enabled {
-		if v := cache.CacheStore.GetById(entity, id); v != nil {
+	cacheable := globals.GetConfig().Api.Cache.Enabled && !hook.EntityHasHooks(entity) && len(fields) == 0 && includesParam == ""
+
+	if cacheable {
+		if v := cache.CacheStore.GetById(entity, id); v != nil && canReadCachedEntity(username, entity, v) {
 			ctx.Response.Header.Set("Content-Type", "application/json")
 			ctx.Response.Header.Set("X-Elysian-Cache", "HIT")
 			ctx.SetStatusCode(fasthttp.StatusOK)
@@ -38,7 +42,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if !acl.CanReadEntity(entity, data) {
+	if !acl.CanReadEntity(username, entity, data) {
 		ctx.SetStatusCode(fasthttp.StatusForbidden)
 		ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
 		ctx.SetBodyString("Access denied")
@@ -56,7 +60,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(entity) {
-		data = hook.ApplyPostReadHooksForEntity(entity, data)
+		data = hook.ApplyPostReadHooksForEntity(username, entity, data)
 	}
 
 	response, err := json.Marshal(data)
@@ -67,7 +71,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if globals.GetConfig().Api.Cache.Enabled {
+	if cacheable {
 		cache.CacheStore.SetById(entity, id, response)
 	}
 
@@ -75,4 +79,17 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
+}
+
+func canReadCachedEntity(username, entity string, cached []byte) bool {
+	if !security.UserAuthenticationIsEnabled() {
+		return true
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(cached, &data); err != nil {
+		return false
+	}
+
+	return acl.CanReadEntity(username, entity, data)
 }
