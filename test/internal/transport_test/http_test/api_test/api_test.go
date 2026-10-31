@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/storage"
 	api_controller "github.com/taymour/elysiandb/internal/transport/http/api"
 	"github.com/valyala/fasthttp"
@@ -802,4 +804,159 @@ func TestQueryPayload_HashDeterministic(t *testing.T) {
 	if h1 != h2 {
 		t.Fatalf("hash must be stable, got %s vs %s", h1, h2)
 	}
+}
+
+func setupOwnership(t *testing.T) {
+	setup(t)
+
+	cfg := globals.GetConfig()
+	cfg.Security.Authentication.Enabled = true
+	cfg.Security.Authentication.Mode = "user"
+	t.Cleanup(func() { security.SetCurrentUsername("") })
+
+	for _, username := range []string{"alice", "bob"} {
+		perms := acl.NewPermissions()
+		perms[acl.PermissionOwningRead] = true
+		perms[acl.PermissionOwningUpdate] = true
+		a := acl.ACL{Username: username, Entity: "notes", Permissions: perms}
+		api_storage.WriteEntity(acl.ACLEntity, a.ToDataMap())
+	}
+}
+
+func createNoteAs(t *testing.T, username, body string) string {
+	security.SetCurrentUsername(username)
+
+	ctx := newCtx("POST", "/api/notes", body)
+	ctx.SetUserValue("entity", "notes")
+	api_controller.CreateController(ctx)
+
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("create failed: %d", ctx.Response.StatusCode())
+	}
+
+	var obj map[string]any
+	json.Unmarshal(ctx.Response.Body(), &obj)
+
+	return obj["id"].(string)
+}
+
+func updateNoteAs(username, id, body string) *fasthttp.RequestCtx {
+	security.SetCurrentUsername(username)
+
+	ctx := newCtx("PUT", "/api/notes/"+id, body)
+	ctx.SetUserValue("entity", "notes")
+	ctx.SetUserValue("id", id)
+	api_controller.UpdateByIdController(ctx)
+
+	return ctx
+}
+
+func updateNotesAs(username, body string) *fasthttp.RequestCtx {
+	security.SetCurrentUsername(username)
+
+	ctx := newCtx("PUT", "/api/notes", body)
+	ctx.SetUserValue("entity", "notes")
+	api_controller.UpdateListController(ctx)
+
+	return ctx
+}
+
+func assertNote(t *testing.T, id, owner, title string) {
+	t.Helper()
+
+	stored := api_storage.ReadEntityById("notes", id)
+	if stored == nil {
+		t.Fatalf("note %s not found", id)
+	}
+
+	if stored[acl.UsernameField] != owner || stored["title"] != title {
+		t.Fatalf("unexpected note %s: %v", id, stored)
+	}
+}
+
+func TestUpdateById_OwningUpdateRejectsOtherUsersEntity(t *testing.T) {
+	setupOwnership(t)
+
+	id := createNoteAs(t, "alice", `{"title":"alice"}`)
+
+	ctx := updateNoteAs("bob", id, `{"title":"bob","`+acl.UsernameField+`":"bob"}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+
+	ctx = updateNoteAs("bob", id, `{"title":"bob"}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+
+	assertNote(t, id, "alice", "alice")
+}
+
+func TestUpdateById_OwnerCanUpdateWithoutUsernameField(t *testing.T) {
+	setupOwnership(t)
+
+	id := createNoteAs(t, "alice", `{"title":"alice"}`)
+
+	ctx := updateNoteAs("alice", id, `{"title":"v2"}`)
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	assertNote(t, id, "alice", "v2")
+}
+
+func TestUpdateById_OwningUpdateCannotChangeOwner(t *testing.T) {
+	setupOwnership(t)
+
+	id := createNoteAs(t, "alice", `{"title":"alice"}`)
+
+	ctx := updateNoteAs("alice", id, `{"title":"v2","`+acl.UsernameField+`":"bob"}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+
+	assertNote(t, id, "alice", "alice")
+}
+
+func TestUpdateById_IdInPayloadDoesNotRedirectWrite(t *testing.T) {
+	setupOwnership(t)
+
+	aliceID := createNoteAs(t, "alice", `{"title":"alice"}`)
+	bobID := createNoteAs(t, "bob", `{"title":"bob"}`)
+
+	ctx := updateNoteAs("bob", bobID, `{"id":"`+aliceID+`","title":"bob v2","`+acl.UsernameField+`":"bob"}`)
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	assertNote(t, aliceID, "alice", "alice")
+	assertNote(t, bobID, "bob", "bob v2")
+}
+
+func TestUpdateList_OwningUpdateRejectsOtherUsersEntity(t *testing.T) {
+	setupOwnership(t)
+
+	aliceID := createNoteAs(t, "alice", `{"title":"alice"}`)
+	bobID := createNoteAs(t, "bob", `{"title":"bob"}`)
+
+	ctx := updateNotesAs("bob", `[{"id":"`+bobID+`","title":"bob v2"},{"id":"`+aliceID+`","title":"bob","`+acl.UsernameField+`":"bob"}]`)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+
+	assertNote(t, aliceID, "alice", "alice")
+	assertNote(t, bobID, "bob", "bob")
+}
+
+func TestUpdateList_OwnerCanUpdateWithoutUsernameField(t *testing.T) {
+	setupOwnership(t)
+
+	id := createNoteAs(t, "alice", `{"title":"alice"}`)
+
+	ctx := updateNotesAs("alice", `[{"id":"`+id+`","title":"v2"}]`)
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	assertNote(t, id, "alice", "v2")
 }

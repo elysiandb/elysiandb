@@ -89,11 +89,11 @@ func handleSingleUpdate(ctx *fasthttp.RequestCtx, entity, id string, body []byte
 		return false
 	}
 
-	if !acl.CanUpdateEntity(entity, single) {
+	if !acl.CanUpdateEntity(entity, id, single) {
 		ctx.SetStatusCode(fasthttp.StatusForbidden)
 		ctx.SetBody([]byte(`{"error":"forbidden"}`))
 
-		return false
+		return true
 	}
 
 	data := engine.UpdateEntityById(entity, id, single)
@@ -114,7 +114,7 @@ func handleBatchUpdate(ctx *fasthttp.RequestCtx, entity string, body []byte) boo
 		ctx.SetStatusCode(fasthttp.StatusForbidden)
 		ctx.SetBody([]byte(`{"error":"forbidden"}`))
 
-		return false
+		return true
 	}
 
 	data := engine.UpdateListOfEntities(entity, list)

@@ -1,6 +1,7 @@
 package acl
 
 import (
+	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/security"
 )
 
@@ -41,7 +42,7 @@ func CanDeleteEntity(entity string, data map[string]any) bool {
 	return acl.Can(PermissionOwningDelete) && dataUsername == username
 }
 
-func CanUpdateEntity(entity string, data map[string]any) bool {
+func CanUpdateEntity(entity, id string, updates map[string]any) bool {
 	if !security.UserAuthenticationIsEnabled() {
 		return true
 	}
@@ -56,15 +57,10 @@ func CanUpdateEntity(entity string, data map[string]any) bool {
 		return true
 	}
 
-	dataUsername, ok := data[UsernameField].(string)
-	if !ok || dataUsername == "" {
-		return false
-	}
-
-	return acl.Can(PermissionOwningUpdate) && dataUsername == username
+	return canOwningUpdate(acl, entity, id, username, updates)
 }
 
-func CanUpdateListOfEntities(entity string, data []map[string]any) bool {
+func CanUpdateListOfEntities(entity string, updates []map[string]any) bool {
 	if !security.UserAuthenticationIsEnabled() {
 		return true
 	}
@@ -79,18 +75,34 @@ func CanUpdateListOfEntities(entity string, data []map[string]any) bool {
 		return true
 	}
 
-	for _, item := range data {
-		dataUsername, ok := item[UsernameField].(string)
-		if !ok || dataUsername == "" {
+	for _, item := range updates {
+		id, ok := item["id"].(string)
+		if !ok || id == "" {
 			return false
 		}
 
-		if !acl.Can(PermissionOwningUpdate) || dataUsername != username {
+		if !canOwningUpdate(acl, entity, id, username, item) {
 			return false
 		}
 	}
 
 	return true
+}
+
+func canOwningUpdate(acl *ACL, entity, id, username string, updates map[string]any) bool {
+	if !acl.Can(PermissionOwningUpdate) {
+		return false
+	}
+
+	existing := engine.ReadEntityById(entity, id)
+	owner, ok := existing[UsernameField].(string)
+	if !ok || owner == "" || owner != username {
+		return false
+	}
+
+	newOwner, changesOwner := updates[UsernameField]
+
+	return !changesOwner || newOwner == username
 }
 
 func CanReadEntity(entity string, data map[string]any) bool {

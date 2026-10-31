@@ -3,6 +3,7 @@ package api_transaction
 import (
 	"encoding/json"
 
+	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/mongodb"
@@ -31,6 +32,13 @@ func UpdateTransactionController(ctx *fasthttp.RequestCtx) {
 	if existing == nil {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error":"entity not found"}`)
+
+		return
+	}
+
+	if !acl.CanUpdateEntity(entity, id, payload) {
+		ctx.SetStatusCode(fasthttp.StatusForbidden)
+		ctx.SetBodyString(`{"error":"forbidden"}`)
 
 		return
 	}

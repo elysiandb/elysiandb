@@ -33,6 +33,13 @@ func writeACL(username, entity string, perms map[acl.Permission]bool) {
 	api_storage.WriteEntity(acl.ACLEntity, a.ToDataMap())
 }
 
+func writeDoc(entity, id, owner string) {
+	api_storage.WriteEntity(entity, map[string]any{
+		"id":              id,
+		acl.UsernameField: owner,
+	})
+}
+
 func TestCanCreateEntity_DefaultDeny(t *testing.T) {
 	setup(t, true)
 	security.SetCurrentUsername("u")
@@ -95,8 +102,13 @@ func TestCanUpdateEntity_Global(t *testing.T) {
 	perms := acl.NewPermissions()
 	perms[acl.PermissionUpdate] = true
 	writeACL("u", "doc", perms)
+	writeDoc("doc", "1", "x")
 
-	if !acl.CanUpdateEntity("doc", map[string]any{acl.UsernameField: "x"}) {
+	if !acl.CanUpdateEntity("doc", "1", map[string]any{"a": 1}) {
+		t.Fatalf("expected true")
+	}
+
+	if !acl.CanUpdateEntity("doc", "1", map[string]any{acl.UsernameField: "u"}) {
 		t.Fatalf("expected true")
 	}
 }
@@ -108,12 +120,63 @@ func TestCanUpdateEntity_Owning(t *testing.T) {
 	perms := acl.NewPermissions()
 	perms[acl.PermissionOwningUpdate] = true
 	writeACL("u", "doc", perms)
+	writeDoc("doc", "mine", "u")
+	writeDoc("doc", "other", "x")
 
-	if !acl.CanUpdateEntity("doc", map[string]any{acl.UsernameField: "u"}) {
+	if !acl.CanUpdateEntity("doc", "mine", map[string]any{"a": 1}) {
 		t.Fatalf("expected true")
 	}
 
-	if acl.CanUpdateEntity("doc", map[string]any{acl.UsernameField: "x"}) {
+	if !acl.CanUpdateEntity("doc", "mine", map[string]any{acl.UsernameField: "u"}) {
+		t.Fatalf("expected true")
+	}
+
+	if acl.CanUpdateEntity("doc", "other", map[string]any{"a": 1}) {
+		t.Fatalf("expected false")
+	}
+}
+
+func TestCanUpdateEntity_OwningUsesStoredOwner(t *testing.T) {
+	setup(t, true)
+	security.SetCurrentUsername("u")
+
+	perms := acl.NewPermissions()
+	perms[acl.PermissionOwningUpdate] = true
+	writeACL("u", "doc", perms)
+	writeDoc("doc", "other", "x")
+
+	if acl.CanUpdateEntity("doc", "other", map[string]any{acl.UsernameField: "u"}) {
+		t.Fatalf("expected false")
+	}
+}
+
+func TestCanUpdateEntity_OwningCannotChangeOwner(t *testing.T) {
+	setup(t, true)
+	security.SetCurrentUsername("u")
+
+	perms := acl.NewPermissions()
+	perms[acl.PermissionOwningUpdate] = true
+	writeACL("u", "doc", perms)
+	writeDoc("doc", "mine", "u")
+
+	if acl.CanUpdateEntity("doc", "mine", map[string]any{acl.UsernameField: "x"}) {
+		t.Fatalf("expected false")
+	}
+
+	if acl.CanUpdateEntity("doc", "mine", map[string]any{acl.UsernameField: nil}) {
+		t.Fatalf("expected false")
+	}
+}
+
+func TestCanUpdateEntity_OwningMissingEntity(t *testing.T) {
+	setup(t, true)
+	security.SetCurrentUsername("u")
+
+	perms := acl.NewPermissions()
+	perms[acl.PermissionOwningUpdate] = true
+	writeACL("u", "doc", perms)
+
+	if acl.CanUpdateEntity("doc", "missing", map[string]any{acl.UsernameField: "u"}) {
 		t.Fatalf("expected false")
 	}
 }
@@ -155,10 +218,12 @@ func TestCanUpdateListOfEntities_Global(t *testing.T) {
 	perms := acl.NewPermissions()
 	perms[acl.PermissionUpdate] = true
 	writeACL("u", "doc", perms)
+	writeDoc("doc", "1", "x")
+	writeDoc("doc", "2", "y")
 
 	ok := acl.CanUpdateListOfEntities("doc", []map[string]any{
-		{acl.UsernameField: "x"},
-		{acl.UsernameField: "y"},
+		{"id": "1", "a": 1},
+		{"id": "2", "a": 2},
 	})
 	if !ok {
 		t.Fatalf("expected true")
@@ -172,18 +237,73 @@ func TestCanUpdateListOfEntities_Owning(t *testing.T) {
 	perms := acl.NewPermissions()
 	perms[acl.PermissionOwningUpdate] = true
 	writeACL("u", "doc", perms)
+	writeDoc("doc", "1", "u")
+	writeDoc("doc", "2", "u")
+	writeDoc("doc", "3", "x")
 
 	ok := acl.CanUpdateListOfEntities("doc", []map[string]any{
-		{acl.UsernameField: "u"},
-		{acl.UsernameField: "u"},
+		{"id": "1", "a": 1},
+		{"id": "2", acl.UsernameField: "u"},
 	})
 	if !ok {
 		t.Fatalf("expected true")
 	}
 
 	ok = acl.CanUpdateListOfEntities("doc", []map[string]any{
+		{"id": "1", "a": 1},
+		{"id": "3", "a": 1},
+	})
+	if ok {
+		t.Fatalf("expected false")
+	}
+}
+
+func TestCanUpdateListOfEntities_OwningUsesStoredOwner(t *testing.T) {
+	setup(t, true)
+	security.SetCurrentUsername("u")
+
+	perms := acl.NewPermissions()
+	perms[acl.PermissionOwningUpdate] = true
+	writeACL("u", "doc", perms)
+	writeDoc("doc", "1", "u")
+	writeDoc("doc", "2", "x")
+
+	ok := acl.CanUpdateListOfEntities("doc", []map[string]any{
+		{"id": "1", acl.UsernameField: "u"},
+		{"id": "2", acl.UsernameField: "u"},
+	})
+	if ok {
+		t.Fatalf("expected false")
+	}
+}
+
+func TestCanUpdateListOfEntities_OwningCannotChangeOwner(t *testing.T) {
+	setup(t, true)
+	security.SetCurrentUsername("u")
+
+	perms := acl.NewPermissions()
+	perms[acl.PermissionOwningUpdate] = true
+	writeACL("u", "doc", perms)
+	writeDoc("doc", "1", "u")
+
+	ok := acl.CanUpdateListOfEntities("doc", []map[string]any{
+		{"id": "1", acl.UsernameField: "x"},
+	})
+	if ok {
+		t.Fatalf("expected false")
+	}
+}
+
+func TestCanUpdateListOfEntities_OwningRequiresId(t *testing.T) {
+	setup(t, true)
+	security.SetCurrentUsername("u")
+
+	perms := acl.NewPermissions()
+	perms[acl.PermissionOwningUpdate] = true
+	writeACL("u", "doc", perms)
+
+	ok := acl.CanUpdateListOfEntities("doc", []map[string]any{
 		{acl.UsernameField: "u"},
-		{acl.UsernameField: "x"},
 	})
 	if ok {
 		t.Fatalf("expected false")
@@ -255,7 +375,7 @@ func TestAllAllowedWhenAuthDisabled(t *testing.T) {
 	if !acl.CanReadEntity("x", map[string]any{}) {
 		t.Fatalf("expected true")
 	}
-	if !acl.CanUpdateEntity("x", map[string]any{}) {
+	if !acl.CanUpdateEntity("x", "1", map[string]any{}) {
 		t.Fatalf("expected true")
 	}
 	if !acl.CanDeleteEntity("x", map[string]any{}) {
