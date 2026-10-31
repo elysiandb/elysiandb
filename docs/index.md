@@ -166,6 +166,11 @@ The same applies to nested objects: a create, update or transactional write whos
 
 `PUT /api/<entity>/<id>` and `PUT /api/<entity>` merge the body into the stored document: fields absent from the body keep their stored value. To unset a field, send it with `null`; the field is then stored as `null`, which filters treat like a missing field.
 
+An update never creates a document. The target is checked before schema validation and ACLs:
+
+* `PUT /api/<entity>/<id>` on a missing document returns `404 {"error":"entity not found"}`.
+* `PUT /api/<entity>` returns `404` with the ids that do not exist, and applies none of the updates: `{"error":"entity not found","ids":["nope"]}`.
+
 ### Creating a List of Documents
 
 `POST /api/<entity>` with a JSON array validates every item before writing any of them. If one item is invalid, nothing is written and the response is `400` with one list of errors per item, in the same order as the request (`[]` for valid items):
@@ -940,7 +945,7 @@ This mechanism also works recursively and supports **arrays of sub-entities**, a
 * `countOnly` — If true, returns only the count
 * `limit` — Max number of items to return
 * `offset` — Number of items to skip
-* `search` — Case-insensitive search in every string value of the document, nested values included (see Search below)
+* `search` — Case-insensitive search in the string values of the document, nested values included (see Search below)
 * `sort[field]=asc|desc` — Sort results (builds index automatically) and works with nested fields or entities
 * `filter[field][op]=value` — Filter results by field
 * `fields=title,slug` — Return only selected fields
@@ -952,6 +957,8 @@ Filters, `search` and pagination combine: the documents that match every filter 
 
 * `search=zebra` matches documents where any string value contains `zebra`, whatever the case (`Zebra crossing` matches).
 * If the value contains `*`, it is a glob matched against whole string values: `search=Zeb*` matches values that start with `Zeb`, `search=*ing` values that end with `ing`.
+* Only the content of the document is searched. `id` keys (including the `id` of a reference), `@entity` markers and core fields such as the owner field `_elysiandb_core_username` are skipped, at any depth. Use `filter[id][eq]=...` to look up a document by id.
+* Documents expanded with `includes` are searched too, with the same rules: `search=scott&includes=directors` matches a film whose included director is named `Ridley Scott`, while `search=scott` alone does not match a reference such as `{"@entity":"director","id":"ridley-scott"}`.
 
 ### Filtering Operators
 

@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/engine"
@@ -23,6 +24,12 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	stored := engine.ReadEntityById(entity, id)
+	if stored == nil {
+		sendEntityNotFound(ctx, nil)
+		return
+	}
+
 	var schemaData map[string]any
 
 	if engine.IsEngineMongoDB() {
@@ -34,7 +41,7 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, schemaData) {
 		var obj map[string]any
 		if json.Unmarshal(body, &obj) == nil {
-			if errs := schema.ValidateEntityUpdate(entity, engine.ReadEntityById(entity, id), obj, schemaData); len(errs) > 0 {
+			if errs := schema.ValidateEntityUpdate(entity, stored, obj, schemaData); len(errs) > 0 {
 				b, _ := json.Marshal(errs)
 				ctx.SetStatusCode(fasthttp.StatusBadRequest)
 				ctx.Response.Header.Set("Content-Type", "application/json")
@@ -63,6 +70,18 @@ func UpdateListController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	var list []map[string]any
+	if err := json.Unmarshal(body, &list); err != nil || len(list) == 0 {
+		sendBadRequest(ctx)
+		return
+	}
+
+	stored, missing := readEntitiesToUpdate(entity, list)
+	if len(missing) > 0 {
+		sendEntityNotFound(ctx, missing)
+		return
+	}
+
 	var schemaData map[string]any
 
 	if engine.IsEngineMongoDB() {
@@ -72,28 +91,43 @@ func UpdateListController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, schemaData) {
-		var arr []map[string]any
-		if json.Unmarshal(body, &arr) == nil {
-			for _, obj := range arr {
-				id, _ := obj["id"].(string)
-				if errs := schema.ValidateEntityUpdate(entity, engine.ReadEntityById(entity, id), obj, schemaData); len(errs) > 0 {
-					b, _ := json.Marshal(errs)
-					ctx.SetStatusCode(fasthttp.StatusBadRequest)
-					ctx.Response.Header.Set("Content-Type", "application/json")
-					ctx.SetBody(b)
+		for _, obj := range list {
+			id, _ := obj["id"].(string)
+			if errs := schema.ValidateEntityUpdate(entity, stored[id], obj, schemaData); len(errs) > 0 {
+				b, _ := json.Marshal(errs)
+				ctx.SetStatusCode(fasthttp.StatusBadRequest)
+				ctx.Response.Header.Set("Content-Type", "application/json")
+				ctx.SetBody(b)
 
-					return
-				}
+				return
 			}
 		}
 	}
 
-	if handleBatchUpdate(ctx, entity, body) {
-		purgeCache(entity, nestedTypes)
-		return
+	handleBatchUpdate(ctx, entity, list)
+	purgeCache(entity, nestedTypes)
+}
+
+func readEntitiesToUpdate(entity string, list []map[string]any) (map[string]map[string]any, []string) {
+	stored := make(map[string]map[string]any, len(list))
+	missing := make([]string, 0)
+
+	for _, obj := range list {
+		id, ok := obj["id"].(string)
+		if !ok || id == "" || stored[id] != nil || slices.Contains(missing, id) {
+			continue
+		}
+
+		data := engine.ReadEntityById(entity, id)
+		if data == nil {
+			missing = append(missing, id)
+			continue
+		}
+
+		stored[id] = data
 	}
 
-	sendBadRequest(ctx)
+	return stored, missing
 }
 
 func handleSingleUpdate(ctx *fasthttp.RequestCtx, entity, id string, body []byte) bool {
@@ -117,24 +151,29 @@ func handleSingleUpdate(ctx *fasthttp.RequestCtx, entity, id string, body []byte
 	return true
 }
 
-func handleBatchUpdate(ctx *fasthttp.RequestCtx, entity string, body []byte) bool {
-	var list []map[string]any
-	if err := json.Unmarshal(body, &list); err != nil || len(list) == 0 {
-		return false
-	}
-
+func handleBatchUpdate(ctx *fasthttp.RequestCtx, entity string, list []map[string]any) {
 	if !acl.CanUpdateListOfEntities(security.GetCurrentUsername(ctx), entity, list) {
 		ctx.SetStatusCode(fasthttp.StatusForbidden)
 		ctx.SetBody([]byte(`{"error":"forbidden"}`))
 
-		return true
+		return
 	}
 
 	data := engine.UpdateListOfEntities(entity, list)
 	response, _ := json.Marshal(data)
 	sendJSONResponse(ctx, response)
+}
 
-	return true
+func sendEntityNotFound(ctx *fasthttp.RequestCtx, ids []string) {
+	body := map[string]any{"error": "entity not found"}
+	if ids != nil {
+		body["ids"] = ids
+	}
+
+	response, _ := json.Marshal(body)
+	ctx.Response.Header.Set("Content-Type", "application/json")
+	ctx.SetStatusCode(fasthttp.StatusNotFound)
+	ctx.SetBody(response)
 }
 
 func sendJSONResponse(ctx *fasthttp.RequestCtx, response []byte) {
