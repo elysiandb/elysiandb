@@ -60,7 +60,7 @@ jobs:
           go tool cover -func=coverage.out | tail
 
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: coverage.out
           flags: unittests
