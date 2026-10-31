@@ -240,6 +240,33 @@ func TestValidateEntity_Strict_DeepNewFieldRejected(t *testing.T) {
 	}
 }
 
+func TestValidateEntity_Strict_CoreFieldsAllowed(t *testing.T) {
+	mockSchema := &schema.Entity{
+		ID: "oeuvre",
+		Fields: map[string]schema.Field{
+			"titre": {Name: "titre", Type: "string", Required: true},
+		},
+	}
+
+	restore1 := patchLoadSchema(mockSchema)
+	defer restore1()
+	restore2 := patchManualFlag(true)
+	defer restore2()
+	restore3 := patchStrict(true)
+	defer restore3()
+
+	data := map[string]interface{}{
+		"id":                       "1",
+		"titre":                    "Alien",
+		"_elysiandb_core_username": "admin",
+	}
+
+	errs := schema.ValidateEntity("oeuvre", data, nil)
+	if len(errs) != 0 {
+		t.Fatalf("expected no errors, got %v", errs)
+	}
+}
+
 func TestValidateEntity_TypeMismatch(t *testing.T) {
 	mockSchema := &schema.Entity{
 		ID: "u",
