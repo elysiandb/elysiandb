@@ -2,10 +2,14 @@ package adminui_test
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
+	"net"
+	"strings"
 	"testing"
 	"time"
 
+	embeddedui "github.com/taymour/elysiandb/adminui"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/security"
@@ -269,5 +273,48 @@ func TestMeController_OK(t *testing.T) {
 	}
 	if m["role"] != string(security.RoleAdmin) {
 		t.Fatalf("wrong role")
+	}
+}
+
+type tlsConn struct {
+	net.Conn
+}
+
+func (tlsConn) Handshake() error                     { return nil }
+func (tlsConn) ConnectionState() tls.ConnectionState { return tls.ConnectionState{} }
+
+func TestLoginController_SecureCookieOverTLS(t *testing.T) {
+	setup(t)
+	u := &security.BasicUser{Username: "admin", Password: "pass", Role: security.RoleAdmin}
+	security.CreateBasicUser(u)
+
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+
+	req := fasthttp.AcquireRequest()
+	req.Header.SetMethod("POST")
+	req.SetRequestURI("/api/security/login")
+	req.SetBodyString(`{"username":"admin","password":"pass"}`)
+
+	ctx := &fasthttp.RequestCtx{}
+	ctx.Init2(tlsConn{Conn: server}, nil, false)
+	req.CopyTo(&ctx.Request)
+
+	adminui.LoginController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	if !strings.Contains(strings.ToLower(string(ctx.Response.Header.PeekCookie(security.SessionCookieName))), "secure") {
+		t.Fatalf("expected a Secure cookie over TLS, got %q", ctx.Response.Header.PeekCookie(security.SessionCookieName))
+	}
+}
+
+func TestIsBuiltMatchesEmbeddedAssets(t *testing.T) {
+	_, err := embeddedui.UI.ReadFile("dist/index.html")
+	if adminui.IsBuilt() != (err == nil) {
+		t.Fatalf("IsBuilt must report whether dist/index.html is embedded")
 	}
 }

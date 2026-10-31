@@ -62,10 +62,6 @@ func CreateHook(hook *Hook) error {
 }
 
 func UpdateHook(hook *Hook) error {
-	if !engine.EntityExists(HookEntity, hook.ID) {
-		return fmt.Errorf("the hook '%s' does not exist", hook.Name)
-	}
-
 	if hook.Script == "" {
 		hook.Script = defaultScriptForEvent(hook.Event)
 	}
@@ -75,7 +71,7 @@ func UpdateHook(hook *Hook) error {
 	}
 
 	if engine.UpdateEntityById(HookEntity, hook.ID, hook.ToDataMap()) == nil {
-		return fmt.Errorf("an error occured while updating the hook '%s'", hook.ID)
+		return fmt.Errorf("the hook '%s' does not exist", hook.Name)
 	}
 
 	return nil

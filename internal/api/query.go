@@ -5,15 +5,7 @@ import (
 )
 
 func ExecuteQuery(q query.Query) ([]map[string]any, error) {
-	sorts := q.OrderedSorts()
-
-	sortField := ""
-	sortAsc := true
-
-	if len(sorts) > 0 {
-		sortField = sorts[0].Field
-		sortAsc = sorts[0].Ascending
-	}
+	sortField, sortAsc := q.PrimarySort()
 
 	data := ListEntities(
 		q.Entity,
@@ -26,7 +18,7 @@ func ExecuteQuery(q query.Query) ([]map[string]any, error) {
 		"",
 	)
 
-	if len(sorts) > 1 {
+	if sorts := q.OrderedSorts(); len(sorts) > 1 {
 		SortEntities(data, sorts)
 	}
 

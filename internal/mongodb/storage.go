@@ -154,8 +154,7 @@ func WriteEntity(entity string, data map[string]interface{}) []schema.Validation
 
 func UpdateSchemaIfNeeded(entity string, data map[string]interface{}) {
 	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
-		merged := schema.MergeAnalyzedSchema(entity, GetEntitySchema(entity), data)
-		WriteEntity(schema.SchemaEntity, merged)
+		WriteEntity(schema.SchemaEntity, schema.MergeAnalyzedSchema(entity, GetEntitySchema(entity), data))
 	}
 }
 

@@ -320,10 +320,7 @@ func isLastAdmin(username string) bool {
 		return false
 	}
 
-	users, err := ListBasicUsers()
-	if err != nil {
-		return true
-	}
+	users, _ := ListBasicUsers()
 
 	admins := 0
 	for _, user := range users {

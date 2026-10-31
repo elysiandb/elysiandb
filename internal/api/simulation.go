@@ -130,10 +130,6 @@ func simulationKey(entity, id string) string {
 }
 
 func deepCopyMap(in map[string]any) map[string]any {
-	if in == nil {
-		return nil
-	}
-
 	out := make(map[string]any, len(in))
 	for k, v := range in {
 		out[k] = deepCopyValue(v)
@@ -175,10 +171,6 @@ func NestedEntityTypes(data any) []string {
 				walk(child)
 			}
 		case []any:
-			for _, child := range t {
-				walk(child)
-			}
-		case []map[string]any:
 			for _, child := range t {
 				walk(child)
 			}

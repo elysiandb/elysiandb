@@ -661,3 +661,24 @@ func TestUpdateHookRestoresDefaultScriptAndRejectsInvalidHooks(t *testing.T) {
 		t.Fatalf("a refused update must not be stored, got %+v", stored)
 	}
 }
+
+func TestUpdateHookRejectsUnknownHooksAndEvents(t *testing.T) {
+	setup(t, true)
+	hook.InitHooks()
+
+	missing := &hook.Hook{ID: "missing", Name: "m", Entity: "toto", Event: hook.HookEventPostRead, Language: "javascript", Script: "function postRead(ctx) {}"}
+	if err := hook.UpdateHook(missing); err == nil || !strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("expected an unknown hook to be refused, got %v", err)
+	}
+
+	h := &hook.Hook{Entity: "toto", Name: "h", Event: hook.HookEventPostRead, Language: "javascript"}
+	if err := hook.CreateHook(h); err != nil {
+		t.Fatal(err)
+	}
+
+	h.Event = "on_write"
+	h.Script = ""
+	if err := hook.UpdateHook(h); err == nil || !strings.Contains(err.Error(), "'script'") {
+		t.Fatalf("expected an empty script without default to be refused, got %v", err)
+	}
+}

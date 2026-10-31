@@ -9,9 +9,7 @@ import (
 	"github.com/taymour/elysiandb/internal/boot"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
-	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/storage"
-	http_adminui "github.com/taymour/elysiandb/internal/transport/http/adminui"
 )
 
 func StartServer() {
@@ -68,10 +66,6 @@ func StartServer() {
 			cfg.Server.TCP.Port,
 			globals.Reset,
 		)
-	}
-
-	if cfg.AdminUI.Enabled && !http_adminui.IsBuilt() {
-		log.DirectWarn("The Admin UI is enabled but its assets are missing from this binary: build it with `make build-admin` before `go build`")
 	}
 
 	if cfg.AdminUI.Enabled {

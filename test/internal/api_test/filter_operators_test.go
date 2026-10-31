@@ -23,6 +23,7 @@ func TestFiltersMatchEntityStringComparisons(t *testing.T) {
 		{"lt", "b", false},
 		{"lt", "c", true},
 		{"lte", "banana", true},
+		{"lte", "apple", false},
 		{"gt", "apple", true},
 		{"gt", "zzz", false},
 		{"gte", "banana", true},

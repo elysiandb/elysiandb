@@ -110,21 +110,8 @@ func saveSessions(sf *SessionsFile) error {
 	path := fmt.Sprintf("%s/%s", cfg.Store.Folder, SessionsFilename)
 	tmpPath := path + ".tmp"
 
-	file, err := os.OpenFile(tmpPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
-	if err != nil {
-		return err
-	}
-
-	if err := json.NewEncoder(file).Encode(sf); err != nil {
-		file.Close()
-		os.Remove(tmpPath)
-
-		return err
-	}
-
-	if err := file.Close(); err != nil {
-		os.Remove(tmpPath)
-
+	data, _ := json.Marshal(sf)
+	if err := os.WriteFile(tmpPath, append(data, '\n'), 0o644); err != nil {
 		return err
 	}
 
@@ -194,7 +181,7 @@ func GetSession(id string) (*Session, error) {
 	}
 
 	if hasExpired {
-		_ = removeExpiredSessions()
+		removeExpiredSessions()
 	}
 
 	if found == nil {
@@ -204,30 +191,22 @@ func GetSession(id string) (*Session, error) {
 	return found, nil
 }
 
-func removeExpiredSessions() error {
+func removeExpiredSessions() {
 	sessionsMu.Lock()
 	defer sessionsMu.Unlock()
 
-	sf, err := loadSessions()
-	if err != nil {
-		return err
-	}
-
-	now := time.Now().Unix()
-	active := make([]Session, 0, len(sf.Sessions))
-	for _, s := range sf.Sessions {
-		if s.ExpiresAt > now {
-			active = append(active, s)
+	if sf, err := loadSessions(); err == nil {
+		now := time.Now().Unix()
+		active := make([]Session, 0, len(sf.Sessions))
+		for _, s := range sf.Sessions {
+			if s.ExpiresAt > now {
+				active = append(active, s)
+			}
 		}
+
+		sf.Sessions = active
+		_ = saveSessions(sf)
 	}
-
-	if len(active) == len(sf.Sessions) {
-		return nil
-	}
-
-	sf.Sessions = active
-
-	return saveSessions(sf)
 }
 
 func DeleteSession(id string) error {

@@ -25,6 +25,15 @@ type Sort struct {
 	Ascending bool
 }
 
+func (q Query) PrimarySort() (string, bool) {
+	sorts := q.OrderedSorts()
+	if len(sorts) == 0 {
+		return "", true
+	}
+
+	return sorts[0].Field, sorts[0].Ascending
+}
+
 func (q Query) OrderedSorts() []Sort {
 	fields := make([]string, 0, len(q.Sorts))
 	seen := make(map[string]bool, len(q.Sorts))

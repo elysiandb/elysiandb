@@ -2,8 +2,11 @@ package security_test
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -213,5 +216,38 @@ func TestDeleteBasicUserProtectsDefaultAndLastAdmin(t *testing.T) {
 
 	if err := security.ChangeUserRole("ghost", "user"); !errors.Is(err, security.ErrUserNotFound) || err.Error() != "user 'ghost' not found" {
 		t.Fatalf("expected a not found error, got %v", err)
+	}
+}
+
+func TestGetSessionRemovesOnlyExpiredSessions(t *testing.T) {
+	dir := setup(t)
+
+	now := time.Now().Unix()
+	writeSessions(t, dir, security.SessionsFile{Sessions: []security.Session{
+		{ID: "old", Username: "a", Role: security.RoleAdmin, ExpiresAt: now - 10},
+		{ID: "live", Username: "b", Role: security.RoleAdmin, ExpiresAt: now + 3600},
+	}})
+
+	s, err := security.GetSession("live")
+	if err != nil || s == nil || s.Username != "b" {
+		t.Fatalf("expected the live session, got %v %v", s, err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(dir, security.SessionsFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var sf security.SessionsFile
+	if err := json.Unmarshal(raw, &sf); err != nil {
+		t.Fatalf("expected a valid sessions file, got %q: %v", raw, err)
+	}
+
+	if len(sf.Sessions) != 1 || sf.Sessions[0].ID != "live" {
+		t.Fatalf("expected only the live session to remain, got %+v", sf.Sessions)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, security.SessionsFilename+".tmp")); !os.IsNotExist(err) {
+		t.Fatalf("expected no temporary file to be left, got %v", err)
 	}
 }

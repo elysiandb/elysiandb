@@ -135,13 +135,11 @@ func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool
 		}
 	}
 
-	if validationErrors, ok := simulateListWrite(entity, list); !ok {
-		sendListValidationErrors(ctx, validationErrors)
-
-		return true
+	validationErrors, valid := simulateListWrite(entity, list)
+	if valid {
+		validationErrors = engine.WriteListOfEntities(entity, list)
 	}
 
-	validationErrors := engine.WriteListOfEntities(entity, list)
 	if hasValidationErrors(validationErrors) {
 		sendListValidationErrors(ctx, validationErrors)
 

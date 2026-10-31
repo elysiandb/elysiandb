@@ -197,6 +197,22 @@ func TestValidateEntityUpdate_ValidatesTheMergedDocument(t *testing.T) {
 		t.Fatalf("expected stored fields the update does not touch to be ignored, got %v", errs)
 	}
 
+	nested := manualSchema(map[string]any{
+		"title":  map[string]any{"type": "string", "required": true},
+		"author": map[string]any{"type": "object", "fields": map[string]any{"name": map[string]any{"type": "string", "required": true}}},
+		"tags":   map[string]any{"type": "array", "fields": map[string]any{"label": map[string]any{"type": "string"}}},
+	})
+	stored := map[string]any{"id": "f4", "title": "C", "tags": []any{map[string]any{"label": 1.0}}}
+
+	errs := schema.ValidateEntityUpdate("film", stored, map[string]any{"author": map[string]any{"name": 5.0}}, nested)
+	if len(errs) != 1 || errs[0].Field != "author.name" {
+		t.Fatalf("expected the nested error of an updated field, got %v", errs)
+	}
+
+	if errs := schema.ValidateEntityUpdate("film", stored, map[string]any{"title": "D"}, nested); len(errs) != 0 {
+		t.Fatalf("expected nested errors of untouched fields to be ignored, got %v", errs)
+	}
+
 	if errs := schema.ValidateEntityUpdate("film", nil, map[string]any{"year": 1.0}, s); len(errs) != 1 || errs[0].Field != "title" {
 		t.Fatalf("expected the body alone to be validated without a stored document, got %v", errs)
 	}

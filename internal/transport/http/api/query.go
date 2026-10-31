@@ -40,53 +40,31 @@ func (q *QueryPayload) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		Sorts json.RawMessage `json:"sorts"`
 	}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-
-	order, err := objectKeysInOrder(raw.Sorts)
-	if err != nil {
-		return err
-	}
+	_ = json.Unmarshal(data, &raw)
 
 	*q = QueryPayload(payload)
-	q.SortOrder = order
+	q.SortOrder = objectKeysInOrder(raw.Sorts)
 
 	return nil
 }
 
-func objectKeysInOrder(raw json.RawMessage) ([]string, error) {
-	if len(raw) == 0 {
-		return nil, nil
-	}
-
+func objectKeysInOrder(raw json.RawMessage) []string {
 	dec := json.NewDecoder(bytes.NewReader(raw))
-	token, err := dec.Token()
-	if err != nil {
-		return nil, err
-	}
-
-	if delim, ok := token.(json.Delim); !ok || delim != '{' {
-		return nil, nil
+	if token, err := dec.Token(); err != nil || token != json.Delim('{') {
+		return nil
 	}
 
 	var keys []string
 	for dec.More() {
-		token, err := dec.Token()
-		if err != nil {
-			return nil, err
-		}
-
+		token, _ := dec.Token()
 		key, _ := token.(string)
 		keys = append(keys, key)
 
 		var value json.RawMessage
-		if err := dec.Decode(&value); err != nil {
-			return nil, err
-		}
+		_ = dec.Decode(&value)
 	}
 
-	return keys, nil
+	return keys
 }
 
 func (q *QueryPayload) Hash() []byte {
@@ -233,7 +211,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 
 	data, err := engine.ExecuteQuery(q)
 	if err != nil {
-		sendQueryError(ctx, fasthttp.StatusInternalServerError, err)
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		return
 	}
 
@@ -282,7 +260,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 
 	responseBody, err := json.Marshal(data)
 	if err != nil {
-		sendQueryError(ctx, fasthttp.StatusInternalServerError, err)
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		return
 	}
 

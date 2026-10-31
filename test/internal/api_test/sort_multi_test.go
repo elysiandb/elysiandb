@@ -136,3 +136,64 @@ func TestOrderedSorts(t *testing.T) {
 		t.Fatalf("expected no sort, got %v", got)
 	}
 }
+
+func TestSortEntitiesTiesMissingValuesAndOtherTypes(t *testing.T) {
+	data := []map[string]any{
+		{"id": "x", "k": 2.0},
+		{"id": "y", "k": 1.0},
+		{"id": "z", "v": 1.0, "k": 1.0},
+		{"id": "same1", "v": 1.0, "k": 1.0},
+	}
+
+	api_storage.SortEntities(data, []query.Sort{{Field: "v", Ascending: true}, {Field: "k", Ascending: true}})
+	if got := idsOf(data); !reflect.DeepEqual(got, []string{"z", "same1", "y", "x"}) {
+		t.Fatalf("expected ties to keep their order and missing values to sort by the next key, got %v", got)
+	}
+
+	flags := []map[string]any{
+		{"id": "t", "flag": true},
+		{"id": "f", "flag": false},
+		{"id": "t2", "flag": true},
+	}
+	api_storage.SortEntities(flags, []query.Sort{{Field: "flag", Ascending: true}, {Field: "id", Ascending: false}})
+	if got := idsOf(flags); !reflect.DeepEqual(got, []string{"f", "t2", "t"}) {
+		t.Fatalf("expected false before true, got %v", got)
+	}
+
+	values := []map[string]any{
+		{"id": "obj", "v": map[string]any{"a": 1.0}},
+		{"id": "arr", "v": []any{1.0}},
+		{"id": "bool", "v": false},
+	}
+	api_storage.SortEntities(values, []query.Sort{{Field: "v", Ascending: true}, {Field: "id", Ascending: true}})
+	if got := idsOf(values); !reflect.DeepEqual(got, []string{"bool", "arr", "obj"}) {
+		t.Fatalf("expected objects and arrays after scalar values, got %v", got)
+	}
+}
+
+func TestSortEntitiesGoNumberTypes(t *testing.T) {
+	data := []map[string]any{
+		{"id": "i64", "n": int64(5)},
+		{"id": "f32", "n": float32(1.5)},
+		{"id": "i32", "n": int32(3)},
+		{"id": "int", "n": 2},
+		{"id": "f64", "n": 4.0},
+	}
+
+	api_storage.SortEntities(data, []query.Sort{{Field: "n", Ascending: true}, {Field: "id", Ascending: true}})
+	if got := idsOf(data); !reflect.DeepEqual(got, []string{"f32", "int", "i32", "f64", "i64"}) {
+		t.Fatalf("expected numeric order across Go number types, got %v", got)
+	}
+}
+
+func TestPrimarySort(t *testing.T) {
+	field, ascending := query.Query{Sorts: map[string]string{"year": "desc", "title": "asc"}, SortOrder: []string{"year", "title"}}.PrimarySort()
+	if field != "year" || ascending {
+		t.Fatalf("expected year desc, got %s %v", field, ascending)
+	}
+
+	field, ascending = query.Query{}.PrimarySort()
+	if field != "" || !ascending {
+		t.Fatalf("expected no sort, got %s %v", field, ascending)
+	}
+}

@@ -142,6 +142,12 @@ func TestConfigToJsonRedactsSecrets(t *testing.T) {
 		t.Fatalf("expected empty values to stay empty, got %s", empty)
 	}
 
+	invalid := &cfgpkg.Config{}
+	invalid.Engine.URI = "mongodb://user:pa%zzss@localhost:27017/elysiandb"
+	if out := invalid.ToJson(); strings.Contains(out, "pa%zzss") || !strings.Contains(out, `"URI":"***"`) {
+		t.Fatalf("expected an unparsable URI to be fully redacted, got %s", out)
+	}
+
 	noPassword := &cfgpkg.Config{}
 	noPassword.Engine.URI = "mongodb://localhost:27017/elysiandb"
 	if !strings.Contains(noPassword.ToJson(), "mongodb://localhost:27017/elysiandb") {

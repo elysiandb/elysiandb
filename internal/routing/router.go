@@ -3,6 +3,7 @@ package routing
 import (
 	"github.com/fasthttp/router"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/security"
 	http_adminui "github.com/taymour/elysiandb/internal/transport/http/adminui"
 	"github.com/taymour/elysiandb/internal/transport/http/api"
@@ -92,6 +93,10 @@ func RegisterRoutes(r *router.Router) {
 
 	// Admin UI
 	if globals.GetConfig().AdminUI.Enabled {
+		if !http_adminui.IsBuilt() {
+			log.DirectWarn("The Admin UI is enabled but its assets are missing from this binary: build it with `make build-admin` before `go build`")
+		}
+
 		r.GET("/admin/{filepath:*}", http_adminui.AdminUIHandler)
 	}
 }
