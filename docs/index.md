@@ -1590,7 +1590,10 @@ This guarantees hook correctness at the cost of caching for affected entities on
 
 ### API Endpoints (Admin Only)
 
-All hook management endpoints require **admin privileges**.
+All hook management endpoints require **admin privileges**:
+
+* In `user` mode, requests must include the session cookie of an admin user (obtained via `POST /api/security/login`)
+* In `token` mode, requests must include the instance token (`Authorization: Bearer <token>`)
 
 | Method | Endpoint             | Description              |
 | ------ | -------------------- | ------------------------ |

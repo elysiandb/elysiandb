@@ -52,6 +52,10 @@ func CurrentSession(ctx *fasthttp.RequestCtx) (*Session, error) {
 }
 
 func CurrentUserIsAdmin(ctx *fasthttp.RequestCtx) bool {
+	if TokenAuthenticationIsEnabled() {
+		return CheckTokenAuthentication(ctx)
+	}
+
 	currentSession, err := CurrentSession(ctx)
 	if err != nil || currentSession == nil {
 		return false

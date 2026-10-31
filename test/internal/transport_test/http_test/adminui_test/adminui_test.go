@@ -100,6 +100,76 @@ func TestAdminAuth_OK(t *testing.T) {
 	}
 }
 
+func setupTokenMode(t *testing.T) {
+	setup(t)
+	cfg := globals.GetConfig()
+	cfg.Security.Authentication.Enabled = true
+	cfg.Security.Authentication.Mode = "token"
+	cfg.Security.Authentication.Token = "secret-token"
+}
+
+func TestAdminAuth_TokenMode_NoToken(t *testing.T) {
+	setupTokenMode(t)
+	called := false
+	h := adminui.AdminAuth(func(ctx *fasthttp.RequestCtx) { called = true })
+	ctx := newCtx("GET", "/api/hook/book", "")
+	h(ctx)
+	if ctx.Response.StatusCode() != fasthttp.StatusUnauthorized {
+		t.Fatalf("expected 401")
+	}
+	if called {
+		t.Fatalf("should not call next")
+	}
+}
+
+func TestAdminAuth_TokenMode_InvalidToken(t *testing.T) {
+	setupTokenMode(t)
+	called := false
+	h := adminui.AdminAuth(func(ctx *fasthttp.RequestCtx) { called = true })
+	ctx := newCtx("GET", "/api/hook/book", "")
+	ctx.Request.Header.Set("Authorization", "Bearer wrong-token")
+	h(ctx)
+	if ctx.Response.StatusCode() != fasthttp.StatusUnauthorized {
+		t.Fatalf("expected 401")
+	}
+	if called {
+		t.Fatalf("should not call next")
+	}
+}
+
+func TestAdminAuth_TokenMode_SessionCookieIsNotEnough(t *testing.T) {
+	setupTokenMode(t)
+	u := &security.BasicUser{Username: "a", Password: "x", Role: security.RoleAdmin}
+	security.CreateBasicUser(u)
+	s, _ := security.CreateSession("a", security.RoleAdmin, time.Hour)
+	called := false
+	h := adminui.AdminAuth(func(ctx *fasthttp.RequestCtx) { called = true })
+	ctx := newCtx("GET", "/api/hook/book", "")
+	ctx.Request.Header.SetCookie(security.SessionCookieName, s.ID)
+	h(ctx)
+	if ctx.Response.StatusCode() != fasthttp.StatusUnauthorized {
+		t.Fatalf("expected 401")
+	}
+	if called {
+		t.Fatalf("should not call next")
+	}
+}
+
+func TestAdminAuth_TokenMode_OK(t *testing.T) {
+	setupTokenMode(t)
+	called := false
+	h := adminui.AdminAuth(func(ctx *fasthttp.RequestCtx) { called = true })
+	ctx := newCtx("GET", "/api/hook/book", "")
+	ctx.Request.Header.Set("Authorization", "Bearer secret-token")
+	h(ctx)
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("unexpected status %d", ctx.Response.StatusCode())
+	}
+	if !called {
+		t.Fatalf("expected next to be called")
+	}
+}
+
 func TestLoginController_InvalidJSON(t *testing.T) {
 	setup(t)
 	ctx := newCtx("POST", "/login", `{invalid`)
