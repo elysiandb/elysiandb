@@ -127,6 +127,7 @@ func main() {
 	payloadLen := flag.Int("payload", 16, "SET value size (bytes)")
 	warmup := flag.Bool("warmup", true, "Pre-fill the DB with SETs")
 	showLive := flag.Bool("live", true, "Show a live summary every second")
+	flag.StringVar(&authCredentials, "auth", "", "Credentials sent with AUTH on each connection: '<token>' or '<username> <password>'")
 	flag.Parse()
 
 	mrand.Seed(time.Now().UnixNano())
@@ -508,6 +509,8 @@ END:
 
 // --- helpers ---------------------------------------------------------
 
+var authCredentials string
+
 func dial(addr string) (*net.TCPConn, error) {
 	taddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
@@ -522,7 +525,34 @@ func dial(addr string) (*net.TCPConn, error) {
 	_ = conn.SetKeepAlivePeriod(2 * time.Minute)
 	_ = conn.SetReadBuffer(256 << 10)
 	_ = conn.SetWriteBuffer(256 << 10)
+	if authCredentials != "" {
+		if err := authenticate(conn); err != nil {
+			conn.Close()
+			return nil, err
+		}
+	}
 	return conn, nil
+}
+
+func authenticate(conn *net.TCPConn) error {
+	if _, err := conn.Write([]byte("AUTH " + authCredentials + "\n")); err != nil {
+		return err
+	}
+	var reply []byte
+	b := make([]byte, 1)
+	for {
+		if _, err := conn.Read(b); err != nil {
+			return err
+		}
+		if b[0] == '\n' {
+			break
+		}
+		reply = append(reply, b[0])
+	}
+	if strings.TrimSpace(string(reply)) != "OK" {
+		return fmt.Errorf("AUTH failed: %s", reply)
+	}
+	return nil
 }
 
 func durStr(d time.Duration) string {

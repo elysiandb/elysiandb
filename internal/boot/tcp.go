@@ -54,6 +54,7 @@ func handleConnection(c net.Conn) {
 
 	r := bufio.NewReaderSize(c, 128<<10)
 	w := bufio.NewWriterSize(c, 128<<10)
+	session := tcprouting.NewSession()
 
 	for {
 		line, err := r.ReadSlice('\n')
@@ -64,7 +65,7 @@ func handleConnection(c net.Conn) {
 			return
 		}
 
-		resp := tcprouting.RouteLine(line, c)
+		resp := tcprouting.RouteLine(line, c, session)
 
 		if len(resp) > 0 {
 			if _, err := w.Write(resp); err != nil {
