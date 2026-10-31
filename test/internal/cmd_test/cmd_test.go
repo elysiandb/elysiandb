@@ -553,3 +553,36 @@ func TestResetAll_WithForceDeletesFolder(t *testing.T) {
 		t.Fatalf("expected directory to be removed, got: %v", err)
 	}
 }
+
+func TestDeleteUser_DefaultAdminIsKept(t *testing.T) {
+	cfg := &configuration.Config{
+		Security: configuration.SecurityConfig{
+			Authentication: configuration.AuthenticationConfig{
+				Enabled: true,
+				Mode:    "user",
+			},
+		},
+	}
+	initCmdStore(t, cfg)
+
+	if err := security.CreateBasicUser(&security.BasicUser{Username: security.DefaultAdminUsername, Password: "x", Role: security.RoleAdmin}); err != nil {
+		t.Fatalf("failed to create admin: %v", err)
+	}
+
+	restoreIn := mockStdin("admin\n")
+	defer restoreIn()
+
+	buf, restore := captureCmdOutput()
+	defer restore()
+
+	cmd.DeleteUser()
+
+	clean := stripANSI(buf.Bytes())
+	if !bytes.Contains(clean, []byte("was not deleted")) || bytes.Contains(clean, []byte("deleted successfully")) {
+		t.Fatalf("expected the deletion to be refused, got: %s", string(clean))
+	}
+
+	if _, err := security.GetBasicUserByUsername(security.DefaultAdminUsername); err != nil {
+		t.Fatalf("the default admin must still exist: %v", err)
+	}
+}

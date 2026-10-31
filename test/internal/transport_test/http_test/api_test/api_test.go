@@ -1499,3 +1499,34 @@ func TestQueryController_ReturnsJSONErrors(t *testing.T) {
 	}
 }
 
+func TestQueryController_RejectsCoreEntities(t *testing.T) {
+	setup(t)
+
+	ctx := newCtx("POST", "/api/query", `{"entity":"_elysiandb_core_user"}`)
+	api_controller.QueryController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+}
+
+func TestRejectCoreEntity(t *testing.T) {
+	called := false
+	h := api_controller.RejectCoreEntity(func(ctx *fasthttp.RequestCtx) { called = true })
+
+	ctx := newCtx("GET", "/api/_elysiandb_core_acl", "")
+	ctx.SetUserValue("entity", "_elysiandb_core_acl")
+	h(ctx)
+
+	if called || ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected core entities to be rejected")
+	}
+
+	ctx = newCtx("GET", "/api/books", "")
+	ctx.SetUserValue("entity", "books")
+	h(ctx)
+
+	if !called {
+		t.Fatalf("expected public entities to pass")
+	}
+}

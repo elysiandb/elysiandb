@@ -172,6 +172,11 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	if engine.IsCoreEntityType(payload.Entity) {
+		sendCoreEntityForbidden(ctx)
+		return
+	}
+
 	if payload.Filters == nil {
 		payload.Filters = map[string]any{}
 	}

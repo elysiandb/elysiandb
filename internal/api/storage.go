@@ -171,13 +171,17 @@ func ListEntityTypes() []string {
 	return decodeIDs(data)
 }
 
+func IsCoreEntityType(entity string) bool {
+	return strings.HasPrefix(entity, CoreEntityTypePrefix)
+}
+
 func ListPublicEntityTypes() []string {
 	data, _ := storage.GetByKey(globals.ApiAllEntityTypesListKey())
 	allEntityTypes := decodeIDs(data)
 
 	publicEntityTypes := make([]string, 0, len(allEntityTypes))
 	for _, entityType := range allEntityTypes {
-		if !strings.HasPrefix(entityType, CoreEntityTypePrefix) {
+		if !IsCoreEntityType(entityType) {
 			publicEntityTypes = append(publicEntityTypes, entityType)
 		}
 	}

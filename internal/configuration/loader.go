@@ -3,6 +3,7 @@ package configuration
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 
 	"github.com/taymour/elysiandb/internal/log"
@@ -33,9 +34,14 @@ type LogConfig struct {
 }
 
 type ServerConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Host    string `yaml:"host"`
-	Port    int    `yaml:"port"`
+	Enabled bool       `yaml:"enabled"`
+	Host    string     `yaml:"host"`
+	Port    int        `yaml:"port"`
+	CORS    CORSConfig `yaml:"cors"`
+}
+
+type CORSConfig struct {
+	AllowedOrigins []string `yaml:"allowedOrigins"`
 }
 
 type CrashRecoveryConfig struct {
@@ -95,8 +101,16 @@ type Config struct {
 	Engine   EngineConfig   `yaml:"engine"`
 }
 
+const RedactedValue = "***"
+
 func (c *Config) ToJson() string {
 	copyConfig := *c
+	if copyConfig.Security.Authentication.Token != "" {
+		copyConfig.Security.Authentication.Token = RedactedValue
+	}
+
+	copyConfig.Engine.URI = redactURIPassword(copyConfig.Engine.URI)
+
 	data, err := json.Marshal(copyConfig)
 	if err != nil {
 		log.Fatal("error:", err)
@@ -104,6 +118,19 @@ func (c *Config) ToJson() string {
 	}
 
 	return string(data)
+}
+
+func redactURIPassword(uri string) string {
+	if uri == "" {
+		return uri
+	}
+
+	parsed, err := url.Parse(uri)
+	if err != nil {
+		return RedactedValue
+	}
+
+	return parsed.Redacted()
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -118,6 +145,10 @@ func LoadConfig(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		log.Fatal("error:", err)
 		return nil, err
+	}
+
+	if err := yaml.UnmarshalStrict(data, &Config{}); err != nil {
+		log.DirectWarn("Some configuration keys are not recognized and are ignored: ", err)
 	}
 
 	if cfg.Security.Authentication.Enabled && cfg.Security.Authentication.Mode == "token" {

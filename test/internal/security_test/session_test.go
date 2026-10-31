@@ -28,6 +28,12 @@ func setupTempStore(t *testing.T) string {
 	return dir
 }
 
+func enableUserMode() {
+	cfg := globals.GetConfig()
+	cfg.Security.Authentication.Enabled = true
+	cfg.Security.Authentication.Mode = "user"
+}
+
 func writeSessions(t *testing.T, dir string, sf security.SessionsFile) {
 	t.Helper()
 	b, _ := json.Marshal(sf)
@@ -214,6 +220,7 @@ func TestCurrentUserIsAdmin(t *testing.T) {
 
 func TestCurrentUserIsAdmin_False(t *testing.T) {
 	setupTempStore(t)
+	enableUserMode()
 
 	s, _ := security.CreateSession("user", security.RoleUser, time.Second)
 	req := fasthttp.AcquireRequest()
@@ -296,6 +303,7 @@ func TestCurrentUserCanManageUser_Admin(t *testing.T) {
 
 func TestCurrentUserCanManageUser_Self(t *testing.T) {
 	setupTempStore(t)
+	enableUserMode()
 
 	s, _ := security.CreateSession("bob", security.RoleUser, time.Second)
 	req := fasthttp.AcquireRequest()

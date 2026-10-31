@@ -1,6 +1,8 @@
 package http_security
 
 import (
+	"encoding/json"
+
 	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
@@ -15,7 +17,13 @@ func DeleteUserByUsernameController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	security.DeleteBasicUser(username)
+	if err := security.DeleteBasicUser(username); err != nil {
+		ctx.SetStatusCode(userErrorStatus(err))
+		body, _ := json.Marshal(map[string]string{"error": err.Error()})
+		ctx.SetBody(body)
+		return
+	}
+
 	acl.DeleteUserACls(username)
 	ctx.SetStatusCode(fasthttp.StatusOK)
 }
