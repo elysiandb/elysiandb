@@ -1,3 +1,12 @@
+FROM --platform=$BUILDPLATFORM node:22-alpine AS adminui
+WORKDIR /src/adminui
+
+COPY adminui/package.json adminui/package-lock.json ./
+RUN npm ci
+
+COPY adminui/ ./
+RUN npm run build
+
 FROM golang:1.24-alpine AS builder
 WORKDIR /src
 
@@ -5,11 +14,15 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+COPY --from=adminui /src/adminui/dist ./adminui/dist
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
-    go build -trimpath -ldflags="-s -w" -o /out/elysiandb .
+    go build -trimpath \
+    -ldflags="-s -w -X github.com/taymour/elysiandb/internal/globals.VERSION=${VERSION}" \
+    -o /out/elysiandb .
 
 FROM alpine:3.20
 

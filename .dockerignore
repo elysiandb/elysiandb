@@ -12,3 +12,6 @@ elysiandb.expiration.json
 /build
 /bin
 /vendor
+.claude
+adminui/node_modules
+adminui/dist

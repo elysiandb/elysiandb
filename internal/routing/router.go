@@ -15,7 +15,7 @@ import (
 )
 
 func RegisterRoutes(r *router.Router) {
-	r.GET("/health", Version(security.Authenticate(controller.HealthController)))
+	r.GET("/health", Version(controller.HealthController))
 
 	r.GET("/kv/mget", Version(security.AuthenticateAdmin(controller.MultiGetController)))
 	r.GET("/kv/{key}", Version(security.AuthenticateAdmin(controller.GetKeyController)))
