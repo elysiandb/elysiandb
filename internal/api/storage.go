@@ -16,7 +16,11 @@ import (
 const CoreEntityTypePrefix = "_elysiandb_core_"
 
 func WriteEntity(entity string, data map[string]any) []schema.ValidationError {
-	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
+	return writeEntity(entity, data, true)
+}
+
+func writeEntity(entity string, data map[string]any, checkInferredSchema bool) []schema.ValidationError {
+	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity && (checkInferredSchema || schema.IsManualSchema(entity, nil)) {
 		errors := schema.ValidateEntity(entity, data, nil)
 		if len(errors) > 0 {
 			return errors
@@ -41,7 +45,7 @@ func writeSubEntities(entity string, data map[string]any) {
 		subEntity := sub["@entity"].(string)
 		delete(sub, "@entity")
 		id, _ := sub["id"].(string)
-		WriteEntity(subEntity, MergeWithExisting(sub, ReadEntityById(subEntity, id)))
+		writeEntity(subEntity, MergeWithExisting(sub, ReadEntityById(subEntity, id)), false)
 	}
 }
 
@@ -330,6 +334,10 @@ func DeleteEntityById(entity, id string) {
 }
 
 func DeleteAllEntities(entity string) {
+	if !schema.IsManualSchema(entity, nil) {
+		DeleteEntityById(schema.SchemaEntity, entity)
+	}
+
 	prefix := globals.ApiEntitiesAllKey(entity)
 	storage.DeleteJsonByPrefix(prefix)
 	RemoveEntityIndexes(entity)
@@ -431,7 +439,7 @@ func ImportAll(data map[string][]map[string]any) {
 		storage.DeleteByWildcardKey(globals.ApiEntityIndexPatternKey(entity))
 
 		for _, item := range items {
-			if errs := WriteEntity(entity, item); len(errs) > 0 {
+			if errs := writeEntity(entity, item, false); len(errs) > 0 {
 				log.Error(fmt.Sprintf("Error importing entity %s: %+v", entity, errs))
 			}
 		}

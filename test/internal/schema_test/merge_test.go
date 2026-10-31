@@ -36,14 +36,14 @@ func fieldOf(t *testing.T, storable map[string]any, path ...string) map[string]a
 	return current
 }
 
-func TestMergeAnalyzedSchema_KeepsExistingFieldsAndTypes(t *testing.T) {
+func TestMergeAnalyzedSchema_KeepsAbsentFieldsAndTakesTheLatestTypes(t *testing.T) {
 	setSchemaConfig(false)
 
 	existing := schema.AnalyzeEntitySchema("inf", map[string]any{"a": "x", "b": 1.0})
 	merged := schema.MergeAnalyzedSchema("inf", existing, map[string]any{"a": 5.0, "c": true})
 
-	if got := fieldOf(t, merged, "a")["type"]; got != "string" {
-		t.Fatalf("expected the existing type of a to be kept, got %v", got)
+	if got := fieldOf(t, merged, "a")["type"]; got != "number" {
+		t.Fatalf("expected a to take the type of the latest write, got %v", got)
 	}
 
 	if got := fieldOf(t, merged, "b")["type"]; got != "number" {
@@ -60,6 +60,13 @@ func TestMergeAnalyzedSchema_KeepsExistingFieldsAndTypes(t *testing.T) {
 
 	if _, ok := merged["_manual"]; ok {
 		t.Fatalf("an inferred schema must stay inferred")
+	}
+
+	manual := map[string]any{"id": "m", "_manual": true, "fields": map[string]any{
+		"title": map[string]any{"name": "title", "type": "string", "required": true},
+	}}
+	if field := fieldOf(t, schema.MergeAnalyzedSchema("m", manual, map[string]any{"title": 1.0}), "title"); field["type"] != "number" || field["required"] != true {
+		t.Fatalf("expected a type change to keep the required flag, got %v", field)
 	}
 }
 

@@ -79,11 +79,15 @@ func mergeFields(existing, incoming map[string]Field) map[string]Field {
 	for name, field := range incoming {
 		current, ok := merged[name]
 		switch {
-		case !ok || current.Type == "unknown":
+		case !ok:
 			merged[name] = field
+		case field.Type == "unknown":
 		case current.Type == field.Type && (field.Type == "object" || field.Type == "array"):
 			current.Fields = mergeFields(current.Fields, field.Fields)
 			merged[name] = current
+		default:
+			field.Required = current.Required
+			merged[name] = field
 		}
 	}
 

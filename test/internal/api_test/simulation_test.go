@@ -121,3 +121,24 @@ func TestNestedEntityTypes(t *testing.T) {
 		t.Fatalf("expected no nested types, got %v", got)
 	}
 }
+
+func TestWriteSimulation_SubEntitiesFollowTheStorageRules(t *testing.T) {
+	initTestStore(t)
+	enableSchema(false)
+	api_storage.WriteEntity("author", map[string]any{"id": "x", "age": 30.0})
+
+	data := map[string]any{"id": "b", "author": map[string]any{"@entity": "author", "id": "z", "age": "thirty"}}
+	if errs := newSimulation().Write("book", data); len(errs) != 0 {
+		t.Fatalf("expected the parent write to pass, got %v", errs)
+	}
+
+	sim := newSimulation()
+	sim.Write("book", data)
+	if !sim.Update("author", "z", map[string]any{"name": "Z"}) {
+		t.Fatalf("expected the nested author to be written despite its inferred type")
+	}
+
+	if errs := newSimulation().Write("author", map[string]any{"id": "w", "age": "thirty"}); len(errs) != 1 {
+		t.Fatalf("expected a direct write to be checked against the inferred schema, got %v", errs)
+	}
+}

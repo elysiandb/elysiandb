@@ -27,7 +27,11 @@ func NewWriteSimulation(
 }
 
 func (s *WriteSimulation) Write(entity string, data map[string]any) []schema.ValidationError {
-	if errs := s.validate(entity, data); len(errs) > 0 {
+	return s.write(entity, data, true)
+}
+
+func (s *WriteSimulation) write(entity string, data map[string]any, checkInferredSchema bool) []schema.ValidationError {
+	if errs := s.validate(entity, data, checkInferredSchema); len(errs) > 0 {
 		return errs
 	}
 
@@ -76,7 +80,7 @@ func (s *WriteSimulation) writeSubEntities(entity string, doc map[string]any) {
 		subEntity := sub["@entity"].(string)
 		delete(sub, "@entity")
 		id, _ := sub["id"].(string)
-		s.Write(subEntity, MergeWithExisting(sub, s.Read(subEntity, id)))
+		s.write(subEntity, MergeWithExisting(sub, s.Read(subEntity, id)), false)
 	}
 }
 
@@ -97,13 +101,13 @@ func (s *WriteSimulation) store(entity string, doc map[string]any) {
 	s.schemas[entity] = schema.MergeAnalyzedSchema(entity, current, doc)
 }
 
-func (s *WriteSimulation) validate(entity string, data map[string]any) []schema.ValidationError {
+func (s *WriteSimulation) validate(entity string, data map[string]any, checkInferredSchema bool) []schema.ValidationError {
 	if !s.schemaApplies(entity) {
 		return nil
 	}
 
 	current := s.schema(entity)
-	if current == nil {
+	if current == nil || !checkInferredSchema && !schema.IsManualSchema(entity, current) {
 		return nil
 	}
 
