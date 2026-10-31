@@ -18,6 +18,8 @@ func setup(t *testing.T) {
 	cfg := &configuration.Config{}
 	cfg.Store.Folder = t.TempDir()
 	cfg.Store.Shards = 4
+	cfg.Security.Authentication.Enabled = true
+	cfg.Security.Authentication.Mode = "user"
 	globals.SetConfig(cfg)
 	storage.LoadDB()
 	storage.LoadJsonDB()

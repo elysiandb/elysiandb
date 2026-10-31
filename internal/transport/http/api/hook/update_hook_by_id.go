@@ -22,19 +22,31 @@ func UpdateHookByIdController(ctx *fasthttp.RequestCtx) {
 
 	var hookData map[string]any
 	err := json.Unmarshal(ctx.PostBody(), &hookData)
-	if err != nil {
+	if err != nil || hookData == nil {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error":"invalid request body"}`)
 
 		return
 	}
 
-	hookData["id"] = id
+	hookEntity, err := hook.GetHookById(id)
+	if err != nil {
+		ctx.SetStatusCode(fasthttp.StatusNotFound)
+		ctx.SetBodyString(`{"error":"hook not found"}`)
 
-	hookEntity := &hook.Hook{}
+		return
+	}
+
+	hookData["id"] = id
 	hookEntity.FromDataMap(hookData)
 
-	hook.UpdateHook(hookEntity)
+	if err := hook.UpdateHook(hookEntity); err != nil {
+		response, _ := json.Marshal(map[string]string{"error": err.Error()})
+		ctx.SetStatusCode(fasthttp.StatusBadRequest)
+		ctx.SetBody(response)
+
+		return
+	}
 
 	response, err := json.Marshal(hookEntity)
 	if err != nil {

@@ -50,12 +50,7 @@ func CreateHook(hook *Hook) error {
 	}
 
 	if hook.Script == "" {
-		switch hook.Event {
-		case HookEventPreRead:
-			hook.Script = GetDefaultHookScriptJSForPreRead()
-		case HookEventPostRead:
-			hook.Script = GetDefaultHookScriptJSForPostRead()
-		}
+		hook.Script = defaultScriptForEvent(hook.Event)
 	}
 
 	err := engine.WriteEntity(HookEntity, hook.ToDataMap())
@@ -71,12 +66,30 @@ func UpdateHook(hook *Hook) error {
 		return fmt.Errorf("the hook '%s' does not exist", hook.Name)
 	}
 
-	err := engine.UpdateEntityById(HookEntity, hook.ID, hook.ToDataMap())
-	if err != nil {
-		return fmt.Errorf("an error occured while updating the hook: %v", err)
+	if hook.Script == "" {
+		hook.Script = defaultScriptForEvent(hook.Event)
+	}
+
+	if err := hook.Validate(); err != nil {
+		return err
+	}
+
+	if engine.UpdateEntityById(HookEntity, hook.ID, hook.ToDataMap()) == nil {
+		return fmt.Errorf("an error occured while updating the hook '%s'", hook.ID)
 	}
 
 	return nil
+}
+
+func defaultScriptForEvent(event string) string {
+	switch event {
+	case HookEventPreRead:
+		return GetDefaultHookScriptJSForPreRead()
+	case HookEventPostRead:
+		return GetDefaultHookScriptJSForPostRead()
+	}
+
+	return ""
 }
 
 func DeleteHook(hookId string) error {
