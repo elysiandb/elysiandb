@@ -222,6 +222,57 @@ func TestCurrentUserIsAdmin_False(t *testing.T) {
 	}
 }
 
+func setupTokenMode(t *testing.T) {
+	setupTempStore(t)
+	cfg := globals.GetConfig()
+	cfg.Security.Authentication.Enabled = true
+	cfg.Security.Authentication.Mode = "token"
+	cfg.Security.Authentication.Token = "secret-token"
+}
+
+func TestCurrentUserIsAdmin_TokenMode_ValidToken(t *testing.T) {
+	setupTokenMode(t)
+
+	req := fasthttp.AcquireRequest()
+	req.Header.Set("Authorization", "Bearer secret-token")
+
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	if !security.CurrentUserIsAdmin(&ctx) {
+		t.Fatalf("expected admin")
+	}
+}
+
+func TestCurrentUserIsAdmin_TokenMode_InvalidToken(t *testing.T) {
+	setupTokenMode(t)
+
+	req := fasthttp.AcquireRequest()
+	req.Header.Set("Authorization", "Bearer wrong-token")
+
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	if security.CurrentUserIsAdmin(&ctx) {
+		t.Fatalf("expected non admin")
+	}
+}
+
+func TestCurrentUserIsAdmin_TokenMode_SessionCookieIsNotEnough(t *testing.T) {
+	setupTokenMode(t)
+
+	s, _ := security.CreateSession("admin", security.RoleAdmin, time.Second)
+	req := fasthttp.AcquireRequest()
+	req.Header.SetCookie(security.SessionCookieName, s.ID)
+
+	var ctx fasthttp.RequestCtx
+	ctx.Init(req, nil, nil)
+
+	if security.CurrentUserIsAdmin(&ctx) {
+		t.Fatalf("expected non admin")
+	}
+}
+
 func TestCurrentUserCanManageUser_Admin(t *testing.T) {
 	setupTempStore(t)
 
