@@ -244,7 +244,7 @@ func ReadEntityById(entity, id string) map[string]any {
 }
 
 func ApplyFiltersToList(entities []map[string]any, filters map[string]map[string]string) []map[string]any {
-	return entities
+	return api_storage.ApplyFiltersToList(entities, filters)
 }
 
 func GetListOfIds(entity, sortField string, sortAscending bool) ([]byte, error) {

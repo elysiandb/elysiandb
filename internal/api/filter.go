@@ -39,35 +39,17 @@ func FiltersMatchEntity(
 	entityData map[string]any,
 	filters map[string]map[string]string,
 ) bool {
-	if len(filters) == 0 {
-		return true
-	}
+	return matchLeafStrict(entityData, filters)
+}
 
+func StoredFiltersMatchEntity(
+	entityData map[string]any,
+	filters map[string]map[string]string,
+) bool {
 	for field, ops := range filters {
-		val, ok := GetNestedValue(entityData, field)
-		if !ok {
-			continue
-		}
-
-		switch v := val.(type) {
-		case string:
-			if !matchStringOrDate(v, ops) {
-				return false
-			}
-		case float64:
-			if !matchNumber(v, ops) {
-				return false
-			}
-		case []interface{}:
-			if !matchArray(v, ops) {
-				return false
-			}
-		case bool:
-			if !matchBoolean(v, ops) {
-				return false
-			}
-		default:
-			continue
+		values := resolveValues(entityData, field)
+		if len(values) > 0 && !matchAnyValue(values, ops) {
+			return false
 		}
 	}
 

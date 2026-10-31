@@ -77,25 +77,22 @@ func matchFilterNode(node query.FilterNode, entity map[string]any) bool {
 
 func matchLeafStrict(entity map[string]any, filters map[string]map[string]string) bool {
 	for field, ops := range filters {
-		values := resolveValues(entity, field)
-		if len(values) == 0 {
-			return false
-		}
-
-		matched := false
-		for _, val := range values {
-			if matchValue(val, ops) {
-				matched = true
-				break
-			}
-		}
-
-		if !matched {
+		if !matchAnyValue(resolveValues(entity, field), ops) {
 			return false
 		}
 	}
 
 	return true
+}
+
+func matchAnyValue(values []any, ops map[string]string) bool {
+	for _, val := range values {
+		if matchValue(val, ops) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func matchValue(val any, ops map[string]string) bool {
@@ -104,6 +101,12 @@ func matchValue(val any, ops map[string]string) bool {
 		return matchStringOrDate(v, ops)
 	case float64:
 		return matchNumber(v, ops)
+	case int:
+		return matchNumber(float64(v), ops)
+	case int32:
+		return matchNumber(float64(v), ops)
+	case int64:
+		return matchNumber(float64(v), ops)
 	case []any:
 		return matchArray(v, ops)
 	case bool:
@@ -132,6 +135,13 @@ func resolveRecursive(current any, parts []string) []any {
 
 		return resolveRecursive(next, parts[1:])
 	case []any:
+		var out []any
+		for _, item := range v {
+			out = append(out, resolveRecursive(item, parts)...)
+		}
+
+		return out
+	case []map[string]any:
 		var out []any
 		for _, item := range v {
 			out = append(out, resolveRecursive(item, parts)...)
