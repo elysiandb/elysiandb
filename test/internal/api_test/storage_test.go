@@ -950,3 +950,40 @@ func TestWriteEntity_SkipSchemaUpdatesForManualStrict(t *testing.T) {
 		t.Fatalf("manual schema must exist")
 	}
 }
+
+func TestWriteEntity_ArrayPureReferenceKeepsTarget(t *testing.T) {
+	initTestStore(t)
+
+	api_storage.WriteEntity("movie", map[string]interface{}{
+		"id":     "m1",
+		"title":  "Blade Runner",
+		"year":   float64(1982),
+		"rating": float64(8),
+	})
+
+	api_storage.WriteEntity("boxset", map[string]interface{}{
+		"id":    "b1",
+		"label": "Box set",
+		"items": []interface{}{
+			map[string]interface{}{"@entity": "movie", "id": "m1"},
+		},
+	})
+
+	got := api_storage.ReadEntityById("movie", "m1")
+	if got == nil {
+		t.Fatalf("referenced movie must still exist")
+	}
+	if got["title"] != "Blade Runner" || got["year"] != float64(1982) || got["rating"] != float64(8) {
+		t.Fatalf("referenced movie must keep its fields, got %v", got)
+	}
+
+	box := api_storage.ReadEntityById("boxset", "b1")
+	items, ok := box["items"].([]interface{})
+	if !ok || len(items) != 1 {
+		t.Fatalf("expected one item link, got %v", box["items"])
+	}
+	link := items[0].(map[string]interface{})
+	if link["@entity"] != "movie" || link["id"] != "m1" {
+		t.Fatalf("unexpected item link: %v", link)
+	}
+}

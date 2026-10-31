@@ -65,9 +65,13 @@ func handleArraySubEntities(entity, key string, arr []any, data map[string]any) 
 
 func processArrayItem(entity string, m map[string]any, subs []map[string]any) (any, []map[string]any) {
 	if subEntityName, ok := m["@entity"].(string); ok && subEntityName != "" {
-		id, _ := extractIDAndCheckFields(m)
-		sub := buildSubEntity(subEntityName, id, m)
+		id, realFields := extractIDAndCheckFields(m)
 		link := map[string]any{"@entity": subEntityName, "id": id}
+		if !realFields && id != "" {
+			return link, subs
+		}
+
+		sub := buildSubEntity(subEntityName, id, m)
 		deeper := ExtractSubEntities(subEntityName, sub)
 		if len(deeper) > 0 {
 			subs = append(subs, deeper...)

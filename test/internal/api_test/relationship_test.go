@@ -139,3 +139,32 @@ func TestExtractSubEntitiesArray(t *testing.T) {
 		}
 	}
 }
+
+func TestExtractSubEntitiesArrayPureReference(t *testing.T) {
+	data := map[string]interface{}{
+		"label": "Box set",
+		"items": []interface{}{
+			map[string]interface{}{"@entity": "movie", "id": "m1"},
+			map[string]interface{}{"@entity": "movie", "@id": "m2"},
+			map[string]interface{}{"@entity": "movie", "id": "m3", "title": "Alien"},
+		},
+	}
+	subs := api_storage.ExtractSubEntities("boxset", data)
+	if len(subs) != 1 {
+		t.Fatalf("expected only the reference with fields to be extracted, got %d subs: %v", len(subs), subs)
+	}
+	if subs[0]["id"] != "m3" || subs[0]["title"] != "Alien" {
+		t.Fatalf("unexpected sub entity: %v", subs[0])
+	}
+	arr := data["items"].([]interface{})
+	expected := []string{"m1", "m2", "m3"}
+	if len(arr) != len(expected) {
+		t.Fatalf("expected %d links, got %d", len(expected), len(arr))
+	}
+	for i, a := range arr {
+		m := a.(map[string]interface{})
+		if !reflect.DeepEqual(m, map[string]interface{}{"@entity": "movie", "id": expected[i]}) {
+			t.Fatalf("unexpected link at %d: %v", i, m)
+		}
+	}
+}
