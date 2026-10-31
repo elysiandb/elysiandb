@@ -21,8 +21,10 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	fields := api_storage.ParseFieldsParam(fieldsParam)
 	includesParam := string(ctx.QueryArgs().Peek("includes"))
 
-	if !hook.EntityHasHooks(entity) && len(fields) == 0 && globals.GetConfig().Api.Cache.Enabled {
-		if v := cache.CacheStore.GetById(entity, id); v != nil {
+	cacheable := globals.GetConfig().Api.Cache.Enabled && !hook.EntityHasHooks(entity) && len(fields) == 0 && includesParam == ""
+
+	if cacheable {
+		if v := cache.CacheStore.GetById(entity, id); v != nil && canReadCachedEntity(username, entity, v) {
 			ctx.Response.Header.Set("Content-Type", "application/json")
 			ctx.Response.Header.Set("X-Elysian-Cache", "HIT")
 			ctx.SetStatusCode(fasthttp.StatusOK)
@@ -69,7 +71,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if globals.GetConfig().Api.Cache.Enabled {
+	if cacheable {
 		cache.CacheStore.SetById(entity, id, response)
 	}
 
@@ -77,4 +79,17 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
+}
+
+func canReadCachedEntity(username, entity string, cached []byte) bool {
+	if !security.UserAuthenticationIsEnabled() {
+		return true
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(cached, &data); err != nil {
+		return false
+	}
+
+	return acl.CanReadEntity(username, entity, data)
 }

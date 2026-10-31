@@ -1352,3 +1352,57 @@ func TestCreate_NewEntityTypeUsesRoleDefaults(t *testing.T) {
 		t.Fatalf("expected 200 for admin, got %d", ctx.Response.StatusCode())
 	}
 }
+
+func getNoteAs(username, id string) *fasthttp.RequestCtx {
+	ctx := newUserCtx(username, "GET", "/api/notes/"+id, "")
+	ctx.SetUserValue("entity", "notes")
+	ctx.SetUserValue("id", id)
+	api_controller.GetByIdController(ctx)
+
+	return ctx
+}
+
+func TestGetById_CacheHitChecksReadACL(t *testing.T) {
+	setupOwnership(t)
+	globals.GetConfig().Api.Cache.Enabled = true
+
+	id := createNoteAs(t, "alice", `{"title":"alice"}`)
+
+	for _, want := range []string{"MISS", "HIT"} {
+		ctx := getNoteAs("alice", id)
+		got := string(ctx.Response.Header.Peek("X-Elysian-Cache"))
+		if ctx.Response.StatusCode() != 200 || got != want {
+			t.Fatalf("expected 200 %s for owner, got %d %s", want, ctx.Response.StatusCode(), got)
+		}
+	}
+
+	ctx := getNoteAs("bob", id)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+}
+
+func TestGetById_FilteredResponseIsNotCached(t *testing.T) {
+	setup(t)
+	globals.GetConfig().Api.Cache.Enabled = true
+
+	ctx := newCtx("POST", "/api/books", `{"id":"b1","title":"Dune","author":"Herbert"}`)
+	ctx.SetUserValue("entity", "books")
+	api_controller.CreateController(ctx)
+
+	ctx = newCtx("GET", "/api/books/b1?fields=title", "")
+	ctx.SetUserValue("entity", "books")
+	ctx.SetUserValue("id", "b1")
+	api_controller.GetByIdController(ctx)
+
+	ctx = newCtx("GET", "/api/books/b1", "")
+	ctx.SetUserValue("entity", "books")
+	ctx.SetUserValue("id", "b1")
+	api_controller.GetByIdController(ctx)
+
+	var obj map[string]any
+	json.Unmarshal(ctx.Response.Body(), &obj)
+	if obj["author"] != "Herbert" {
+		t.Fatalf("expected full document, got %s", ctx.Response.Body())
+	}
+}
