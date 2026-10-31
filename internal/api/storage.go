@@ -35,10 +35,7 @@ func WriteEntity(entity string, data map[string]any) []schema.ValidationError {
 	}
 
 	persistEntity(entity, data)
-
-	if !schema.IsManualSchema(entity, nil) || !globals.GetConfig().Api.Schema.Strict {
-		updateSchemaIfNeeded(entity, data)
-	}
+	updateSchemaIfNeeded(entity, data)
 
 	return []schema.ValidationError{}
 }
@@ -112,10 +109,16 @@ func persistEntity(entity string, data map[string]any) {
 }
 
 func updateSchemaIfNeeded(entity string, data map[string]any) {
-	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
-		analyzed := schema.AnalyzeEntitySchema(entity, data)
-		WriteEntity(schema.SchemaEntity, analyzed)
+	if !globals.GetConfig().Api.Schema.Enabled || entity == schema.SchemaEntity {
+		return
 	}
+
+	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, nil) {
+		return
+	}
+
+	analyzed := schema.AnalyzeEntitySchema(entity, data)
+	WriteEntity(schema.SchemaEntity, analyzed)
 }
 
 func WriteListOfEntities(entity string, list []map[string]any) [][]schema.ValidationError {
