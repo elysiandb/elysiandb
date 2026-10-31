@@ -60,10 +60,11 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	preReadHooks := globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPreReadHooks(entity)
 
 	var data []map[string]any
-	if preReadHooks && len(filters) > 0 {
+	paginateAfterHooks := preReadHooks && len(filters) > 0
+	if paginateAfterHooks {
 		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
 		data = engine.ListEntities(entity, 0, 0, sortField, sortAscending, nil, search, includes)
-		data = api_storage.ApplyStoredFiltersToList(data, filters, offset, limit)
+		data = api_storage.ApplyStoredFiltersToList(data, filters, 0, 0)
 	} else {
 		data = engine.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
 	}
@@ -76,6 +77,10 @@ func ListController(ctx *fasthttp.RequestCtx) {
 		}
 
 		data = engine.ApplyFiltersToList(data, filters)
+	}
+
+	if paginateAfterHooks {
+		data = api_storage.Paginate(data, offset, limit)
 	}
 
 	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(entity) {

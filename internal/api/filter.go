@@ -9,7 +9,17 @@ import (
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
-func SearchMatchesEntity(entityData map[string]any, pattern string) bool {
+func SearchPattern(search string) string {
+	if strings.Contains(search, "*") {
+		return search
+	}
+
+	return "*" + search + "*"
+}
+
+func SearchMatchesEntity(entityData map[string]any, search string) bool {
+	pattern := SearchPattern(search)
+
 	var stack []any
 	stack = append(stack, entityData)
 
@@ -68,6 +78,8 @@ func matchBoolean(value bool, ops map[string]string) bool {
 			if value == b {
 				return false
 			}
+		default:
+			return false
 		}
 	}
 
@@ -105,18 +117,15 @@ func matchArray(arr []any, ops map[string]string) bool {
 
 	arrStr := toStrings(arr)
 	for op, cmp := range ops {
-		values := []string{cmp}
-		if strings.Contains(cmp, ",") {
-			values = strings.Split(cmp, ",")
-		}
+		values := strings.Split(cmp, ",")
 
 		switch op {
 		case "contains":
-			if !inArray(arrStr, values[0]) {
+			if !inArray(arrStr, cmp) {
 				return false
 			}
 		case "not_contains":
-			if inArray(arrStr, values[0]) {
+			if inArray(arrStr, cmp) {
 				return false
 			}
 		case "all":
@@ -159,31 +168,57 @@ func matchArray(arr []any, ops map[string]string) bool {
 					return false
 				}
 			}
+		default:
+			return false
 		}
 	}
 
 	return true
 }
 
+func isComparisonOperator(op string) bool {
+	switch op {
+	case "eq", "neq", "lt", "lte", "gt", "gte":
+		return true
+	default:
+		return false
+	}
+}
+
 func matchDate(value string, ops map[string]string) (bool, bool) {
-	tVal, ok1, dateOnly1 := parseDate(value)
-	if !ok1 {
+	tVal, ok, dateOnlyVal := parseDate(value)
+	if !ok {
 		return false, false
 	}
 
+	type dateComparison struct {
+		op       string
+		value    time.Time
+		dateOnly bool
+	}
+
+	comparisons := make([]dateComparison, 0, len(ops))
 	for op, cmp := range ops {
-		tCmp, ok2, dateOnly2 := parseDate(cmp)
-		if !ok2 {
+		if !isComparisonOperator(op) {
 			return false, false
 		}
 
-		tv, tc := tVal, tCmp
-		if dateOnly1 || dateOnly2 {
+		tCmp, ok, dateOnlyCmp := parseDate(cmp)
+		if !ok {
+			return false, false
+		}
+
+		comparisons = append(comparisons, dateComparison{op: op, value: tCmp, dateOnly: dateOnlyCmp})
+	}
+
+	for _, c := range comparisons {
+		tv, tc := tVal, c.value
+		if dateOnlyVal || c.dateOnly {
 			tv = tv.Truncate(24 * time.Hour)
 			tc = tc.Truncate(24 * time.Hour)
 		}
 
-		switch op {
+		switch c.op {
 		case "eq":
 			if !tv.Equal(tc) {
 				return true, false
@@ -193,19 +228,19 @@ func matchDate(value string, ops map[string]string) (bool, bool) {
 				return true, false
 			}
 		case "lt":
-			if !(tv.Before(tc)) {
+			if !tv.Before(tc) {
 				return true, false
 			}
 		case "lte":
-			if !tv.Before(tc) && !tv.Equal(tc) {
+			if tv.After(tc) {
 				return true, false
 			}
 		case "gt":
-			if !(tv.After(tc)) {
+			if !tv.After(tc) {
 				return true, false
 			}
 		case "gte":
-			if !tv.After(tc) && !tv.Equal(tc) {
+			if tv.Before(tc) {
 				return true, false
 			}
 		}
@@ -225,6 +260,32 @@ func matchString(value string, ops map[string]string) bool {
 			if storage.MatchGlob(cmp, value) {
 				return false
 			}
+		case "lt":
+			if !(value < cmp) {
+				return false
+			}
+		case "lte":
+			if !(value <= cmp) {
+				return false
+			}
+		case "gt":
+			if !(value > cmp) {
+				return false
+			}
+		case "gte":
+			if !(value >= cmp) {
+				return false
+			}
+		case "contains":
+			if !strings.Contains(strings.ToLower(value), strings.ToLower(cmp)) {
+				return false
+			}
+		case "not_contains":
+			if strings.Contains(strings.ToLower(value), strings.ToLower(cmp)) {
+				return false
+			}
+		default:
+			return false
 		}
 	}
 
@@ -271,6 +332,8 @@ func matchNumber(value float64, ops map[string]string) bool {
 			if !(value >= num) {
 				return false
 			}
+		default:
+			return false
 		}
 	}
 

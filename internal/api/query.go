@@ -1,23 +1,18 @@
 package api_storage
 
 import (
-	"strings"
-
 	"github.com/taymour/elysiandb/internal/query"
 )
 
 func ExecuteQuery(q query.Query) ([]map[string]any, error) {
+	sorts := q.OrderedSorts()
+
 	sortField := ""
 	sortAsc := true
 
-	if len(q.Sorts) > 0 {
-		for field, dir := range q.Sorts {
-			sortField = field
-			if strings.ToLower(dir) == "desc" {
-				sortAsc = false
-			}
-			break
-		}
+	if len(sorts) > 0 {
+		sortField = sorts[0].Field
+		sortAsc = sorts[0].Ascending
 	}
 
 	data := ListEntities(
@@ -30,6 +25,10 @@ func ExecuteQuery(q query.Query) ([]map[string]any, error) {
 		"",
 		"",
 	)
+
+	if len(sorts) > 1 {
+		SortEntities(data, sorts)
+	}
 
 	filtered := ApplyQueryFilter(data, q.Filter)
 
