@@ -19,6 +19,12 @@ func CreateController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 	body := ctx.PostBody()
 
+	nestedTypes := nestedEntityTypesInBody(body)
+	if referencesCoreEntity(nestedTypes) {
+		sendCoreEntityForbidden(ctx)
+		return
+	}
+
 	var schemaData map[string]any
 
 	if engine.IsEngineMongoDB() {
@@ -57,8 +63,6 @@ func CreateController(ctx *fasthttp.RequestCtx) {
 			}
 		}
 	}
-
-	nestedTypes := nestedEntityTypesInBody(body)
 
 	if handleSingleEntity(ctx, entity, body) {
 		finalizeCreate(entity, nestedTypes)

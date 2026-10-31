@@ -1,6 +1,7 @@
 package api
 
 import (
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/valyala/fasthttp"
 )
@@ -17,6 +18,26 @@ func RejectCoreEntity(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 
 		next(ctx)
 	}
+}
+
+func referencesCoreEntity(entityTypes []string) bool {
+	for _, entityType := range entityTypes {
+		if engine.IsCoreEntityType(entityType) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func RejectCoreEntityReferences(ctx *fasthttp.RequestCtx, payload any) bool {
+	if !referencesCoreEntity(api_storage.NestedEntityTypes(payload)) {
+		return false
+	}
+
+	sendCoreEntityForbidden(ctx)
+
+	return true
 }
 
 func sendCoreEntityForbidden(ctx *fasthttp.RequestCtx) {

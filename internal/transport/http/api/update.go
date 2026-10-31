@@ -17,6 +17,12 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 	id := ctx.UserValue("id").(string)
 	body := ctx.PostBody()
 
+	nestedTypes := nestedEntityTypesInBody(body)
+	if referencesCoreEntity(nestedTypes) {
+		sendCoreEntityForbidden(ctx)
+		return
+	}
+
 	var schemaData map[string]any
 
 	if engine.IsEngineMongoDB() {
@@ -40,7 +46,7 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if handleSingleUpdate(ctx, entity, id, body) {
-		purgeCache(entity, nestedEntityTypesInBody(body))
+		purgeCache(entity, nestedTypes)
 		return
 	}
 
@@ -50,6 +56,12 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 func UpdateListController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 	body := ctx.PostBody()
+
+	nestedTypes := nestedEntityTypesInBody(body)
+	if referencesCoreEntity(nestedTypes) {
+		sendCoreEntityForbidden(ctx)
+		return
+	}
 
 	var schemaData map[string]any
 
@@ -77,7 +89,7 @@ func UpdateListController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if handleBatchUpdate(ctx, entity, body) {
-		purgeCache(entity, nestedEntityTypesInBody(body))
+		purgeCache(entity, nestedTypes)
 		return
 	}
 

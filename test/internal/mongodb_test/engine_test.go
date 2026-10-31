@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,5 +111,29 @@ func TestMongoDBInferredSchemaIsExtended(t *testing.T) {
 
 	if errs := mongodb.WriteEntity(entity, map[string]any{"id": "i3", "a": 5.0}); len(errs) == 0 {
 		t.Fatalf("expected a type change on an existing field to be rejected")
+	}
+}
+
+func TestMongoDBIncludesDoNotResolveCoreEntities(t *testing.T) {
+	entity := connectMongoDB(t)
+	t.Cleanup(func() {
+		_, _ = globals.MongoDB.Collection("_elysiandb_core_user").DeleteOne(context.Background(), bson.M{"_id": entity + "-admin"})
+	})
+
+	if errs := mongodb.WriteEntity("_elysiandb_core_user", map[string]any{"id": entity + "-admin", "username": "admin", "password": "hash", "role": "admin"}); len(errs) > 0 {
+		t.Fatalf("write user: %v", errs)
+	}
+
+	link := map[string]any{"@entity": "_elysiandb_core_user", "id": entity + "-admin"}
+	if errs := mongodb.WriteEntity(entity, map[string]any{"id": "l1", "u": link}); len(errs) > 0 {
+		t.Fatalf("write: %v", errs)
+	}
+
+	for _, includes := range []string{"u", "all", "_elysiandb_core_users"} {
+		out := mongodb.ListEntities(entity, 0, 0, "", true, nil, "", includes)
+		raw := fmt.Sprintf("%v", out)
+		if len(out) != 1 || strings.Contains(raw, "hash") || strings.Contains(raw, "role") {
+			t.Fatalf("includes=%s resolved a core entity: %v", includes, out)
+		}
 	}
 }
