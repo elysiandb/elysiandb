@@ -1595,13 +1595,13 @@ All hook management endpoints require **admin privileges**:
 * In `user` mode, requests must include the session cookie of an admin user (obtained via `POST /api/security/login`)
 * In `token` mode, requests must include the instance token (`Authorization: Bearer <token>`)
 
-| Method | Endpoint             | Description              |
-| ------ | -------------------- | ------------------------ |
-| GET    | `/api/hook/{entity}` | List hooks for an entity |
-| GET    | `/api/hook/id/{id}`  | Retrieve a hook by ID    |
-| POST   | `/api/hook/{entity}` | Create a new hook        |
-| PUT    | `/api/hook/id/{id}`  | Update an existing hook  |
-| DELETE | `/api/hook/id/{id}`  | Delete a hook            |
+| Method | Endpoint                  | Description              |
+| ------ | ------------------------- | ------------------------ |
+| GET    | `/api/hook/{entity}`      | List hooks for an entity |
+| GET    | `/api/hook/id/{id}`       | Retrieve a hook by ID    |
+| POST   | `/api/hook/{entity}`      | Create a new hook        |
+| PUT    | `/api/hook/id/{id}`       | Update an existing hook  |
+| DELETE | `/api/hook/{entity}/{id}` | Delete a hook            |
 
 ---
 
