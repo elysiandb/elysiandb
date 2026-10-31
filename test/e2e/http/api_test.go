@@ -335,6 +335,56 @@ func TestSearchMatchesBeforePaginationAndCombinesWithFilters(t *testing.T) {
 	}
 }
 
+func TestSearchIgnoresOwnerMarkersAndIds(t *testing.T) {
+	s := startAdminSession(t, nil)
+
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/movie", `{"id":"m1","title":"Alien"}`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/director", `{"id":"ridley-scott","name":"Ridley Scott"}`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/film", `{"id":"f1","title":"Blade Runner","directors":[{"@entity":"director","id":"ridley-scott"}]}`)
+
+	for _, path := range []string{"/api/movie?search=admin", "/api/film?search=scott", "/api/film?search=director", "/api/movie?search=m1", "/api/film?search=admin&includes=directors"} {
+		if ids := s.mustDo(fasthttp.StatusOK, "GET", path, "").ids(t); len(ids) != 0 {
+			t.Fatalf("GET %s: expected no match, got %v", path, ids)
+		}
+	}
+
+	for path, want := range map[string]string{"/api/movie?search=ali": "m1", "/api/film?search=runner": "f1", "/api/film?search=scott&includes=directors": "f1"} {
+		if ids := s.mustDo(fasthttp.StatusOK, "GET", path, "").ids(t); !reflect.DeepEqual(ids, []string{want}) {
+			t.Fatalf("GET %s: expected [%s], got %v", path, want, ids)
+		}
+	}
+}
+
+func TestUpdateOnMissingDocumentIsNotFound(t *testing.T) {
+	s := startAdminSession(t, nil)
+
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/book/create", `{"fields":{"title":{"type":"string","required":true},"year":{"type":"number","required":false}}}`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/book", `{"id":"b1","title":"Dune","year":1965}`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/movie", `{"id":"m1","title":"Alien"}`)
+
+	for path, body := range map[string]string{"/api/book/nope": `{"year":2000}`, "/api/movie/nope": `{"title":"x"}`} {
+		if resp := s.mustDo(fasthttp.StatusNotFound, "PUT", path, body); string(resp.body) != `{"error":"entity not found"}` {
+			t.Fatalf("PUT %s: expected an entity not found error, got %s", path, resp.body)
+		}
+	}
+
+	resp := s.mustDo(fasthttp.StatusNotFound, "PUT", "/api/movie", `[{"id":"m1","title":"Alien (1979)"},{"id":"nope","title":"x"}]`).object(t)
+	if !reflect.DeepEqual(resp["ids"], []any{"nope"}) {
+		t.Fatalf("expected the missing ids to be listed, got %v", resp)
+	}
+
+	if got := s.mustDo(fasthttp.StatusOK, "GET", "/api/movie/m1", "").object(t)["title"]; got != "Alien" {
+		t.Fatalf("a batch with a missing id must not apply any update, got title %v", got)
+	}
+
+	if body := s.mustDo(fasthttp.StatusOK, "GET", "/api/movie/count", "").body; string(body) != `{"count":1}` {
+		t.Fatalf("expected no document to be created, got %s", body)
+	}
+
+	s.mustDo(fasthttp.StatusOK, "PUT", "/api/book/b1", `{"year":2000}`)
+	s.mustDo(fasthttp.StatusOK, "PUT", "/api/movie", `[{"id":"m1","title":"Alien (1979)"}]`)
+}
+
 func TestQueryMultiFieldSortsAreOrderedAndDeterministic(t *testing.T) {
 	s := startAdminSession(t, nil)
 
