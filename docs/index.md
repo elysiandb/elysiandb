@@ -1592,13 +1592,13 @@ This guarantees hook correctness at the cost of caching for affected entities on
 
 All hook management endpoints require **admin privileges**.
 
-| Method | Endpoint             | Description              |
-| ------ | -------------------- | ------------------------ |
-| GET    | `/api/hook/{entity}` | List hooks for an entity |
-| GET    | `/api/hook/id/{id}`  | Retrieve a hook by ID    |
-| POST   | `/api/hook/{entity}` | Create a new hook        |
-| PUT    | `/api/hook/id/{id}`  | Update an existing hook  |
-| DELETE | `/api/hook/id/{id}`  | Delete a hook            |
+| Method | Endpoint                  | Description              |
+| ------ | ------------------------- | ------------------------ |
+| GET    | `/api/hook/{entity}`      | List hooks for an entity |
+| GET    | `/api/hook/id/{id}`       | Retrieve a hook by ID    |
+| POST   | `/api/hook/{entity}`      | Create a new hook        |
+| PUT    | `/api/hook/id/{id}`       | Update an existing hook  |
+| DELETE | `/api/hook/{entity}/{id}` | Delete a hook            |
 
 ---
 

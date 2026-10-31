@@ -31,7 +31,7 @@ func CreateHookForEntityController(ctx *fasthttp.RequestCtx) {
 
 	hookData.Entity = entity
 
-	err = hook.CreateHook(hookData)
+	err = hook.CreateHook(&hookData)
 	if err != nil {
 
 		fmt.Printf("Error %v\n", err)

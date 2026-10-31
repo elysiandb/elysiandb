@@ -40,7 +40,7 @@ func GetPreReadHooksForEntity(entity string) []Hook {
 	return preReadHooks
 }
 
-func CreateHook(hook Hook) error {
+func CreateHook(hook *Hook) error {
 	if hook.ID == "" {
 		hook.ID = uuid.New().String()
 	}

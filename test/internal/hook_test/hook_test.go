@@ -245,7 +245,7 @@ func TestCreateUpdateDeleteGetHookAndQueries(t *testing.T) {
 		Script:    "",
 	}
 
-	if err := hook.CreateHook(h); err != nil {
+	if err := hook.CreateHook(&h); err != nil {
 		t.Fatalf("create hook: %v", err)
 	}
 
@@ -324,7 +324,7 @@ func TestCreateHookDuplicateID(t *testing.T) {
 		Priority: 1,
 	}
 
-	if err := hook.CreateHook(h1); err != nil {
+	if err := hook.CreateHook(&h1); err != nil {
 		t.Fatalf("create hook: %v", err)
 	}
 
@@ -339,7 +339,7 @@ func TestCreateHookDuplicateID(t *testing.T) {
 		Priority: 2,
 	}
 
-	if err := hook.CreateHook(h2); err == nil {
+	if err := hook.CreateHook(&h2); err == nil {
 		t.Fatalf("expected error for duplicate id")
 	}
 }
@@ -349,7 +349,7 @@ func TestGetPostReadHooksForEntityFiltersEvent(t *testing.T) {
 
 	hook.InitHooks()
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "toto",
 		Name:     "a",
 		Event:    hook.HookEventPostRead,
@@ -359,7 +359,7 @@ func TestGetPostReadHooksForEntityFiltersEvent(t *testing.T) {
 		Priority: 1,
 	})
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "toto",
 		Name:     "b",
 		Event:    "other_event",
@@ -383,7 +383,7 @@ func TestApplyPostReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.
 
 	hook.InitHooks()
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "toto",
 		Name:     "high",
 		Event:    hook.HookEventPostRead,
@@ -393,7 +393,7 @@ func TestApplyPostReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.
 		Priority: 10,
 	})
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "toto",
 		Name:     "low",
 		Event:    hook.HookEventPostRead,
@@ -403,7 +403,7 @@ func TestApplyPostReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.
 		Priority: 1,
 	})
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "toto",
 		Name:     "disabled",
 		Event:    hook.HookEventPostRead,
@@ -413,7 +413,7 @@ func TestApplyPostReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.
 		Priority: 100,
 	})
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "toto",
 		Name:     "broken",
 		Event:    hook.HookEventPostRead,
@@ -441,7 +441,7 @@ func TestGetPreReadHooksForEntityFiltersEvent(t *testing.T) {
 
 	hook.InitHooks()
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "toto",
 		Name:     "a",
 		Event:    hook.HookEventPreRead,
@@ -451,7 +451,7 @@ func TestGetPreReadHooksForEntityFiltersEvent(t *testing.T) {
 		Priority: 1,
 	})
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "toto",
 		Name:     "b",
 		Event:    hook.HookEventPostRead,
@@ -475,7 +475,7 @@ func TestApplyPreReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.T
 
 	hook.InitHooks()
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "toto",
 		Name:     "high",
 		Event:    hook.HookEventPreRead,
@@ -485,7 +485,7 @@ func TestApplyPreReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.T
 		Priority: 10,
 	})
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "toto",
 		Name:     "low",
 		Event:    hook.HookEventPreRead,
@@ -495,7 +495,7 @@ func TestApplyPreReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.T
 		Priority: 1,
 	})
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "toto",
 		Name:     "disabled",
 		Event:    hook.HookEventPreRead,
@@ -505,7 +505,7 @@ func TestApplyPreReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.T
 		Priority: 100,
 	})
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "toto",
 		Name:     "broken",
 		Event:    hook.HookEventPreRead,

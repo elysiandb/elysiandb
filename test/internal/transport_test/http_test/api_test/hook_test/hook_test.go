@@ -69,7 +69,7 @@ func userCtx(method string, body []byte) *fasthttp.RequestCtx {
 func TestGetHooksForEntity_OK(t *testing.T) {
 	setupHookTest(t)
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "doc",
 		Name:     "h1",
 		Event:    hook.HookEventPostRead,
@@ -125,6 +125,28 @@ func TestCreateHookForEntity_OK(t *testing.T) {
 	if ctx.Response.StatusCode() != fasthttp.StatusOK {
 		t.Fatalf("expected 200")
 	}
+
+	var created hook.Hook
+	if err := json.Unmarshal(ctx.Response.Body(), &created); err != nil {
+		t.Fatalf("invalid response body: %v", err)
+	}
+
+	if created.ID == "" {
+		t.Fatalf("expected non-empty id in response")
+	}
+
+	list, _ := hook.GetHooksForEntity("doc")
+	if len(list) != 1 {
+		t.Fatalf("expected 1 stored hook, got %d", len(list))
+	}
+
+	if list[0].ID != created.ID {
+		t.Fatalf("expected response id %q to match stored id %q", created.ID, list[0].ID)
+	}
+
+	if created.Script != list[0].Script {
+		t.Fatalf("expected response script to match stored script")
+	}
 }
 
 func TestCreateHookForEntity_InvalidJSON(t *testing.T) {
@@ -163,7 +185,7 @@ func TestGetHookById_OK(t *testing.T) {
 		Language: "javascript",
 		Enabled:  true,
 	}
-	_ = hook.CreateHook(h)
+	_ = hook.CreateHook(&h)
 
 	list, _ := hook.GetHooksForEntity("doc")
 	id := list[0].ID
@@ -207,7 +229,7 @@ func TestGetHookById_Forbidden(t *testing.T) {
 func TestUpdateHookById_OK(t *testing.T) {
 	setupHookTest(t)
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "doc",
 		Name:     "h1",
 		Event:    hook.HookEventPostRead,
@@ -261,7 +283,7 @@ func TestUpdateHookById_Forbidden(t *testing.T) {
 func TestDeleteHookById_OK(t *testing.T) {
 	setupHookTest(t)
 
-	_ = hook.CreateHook(hook.Hook{
+	_ = hook.CreateHook(&hook.Hook{
 		Entity:   "doc",
 		Name:     "h1",
 		Event:    hook.HookEventPostRead,
