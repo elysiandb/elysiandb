@@ -2,12 +2,15 @@ package e2e
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/valyala/fasthttp"
@@ -679,4 +682,169 @@ func sortedCopy(in []string) []string {
 	sort.Strings(out)
 
 	return out
+}
+
+func withoutStrictSchema(cfg *configuration.Config) {
+	cfg.Api.Schema.Strict = false
+}
+
+func TestUnvalidatedWritesKeepTheInferredSchemaInStep(t *testing.T) {
+	s := startAdminSession(t, withoutStrictSchema)
+
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/p", `{"id":"a","n":"x"}`)
+	s.mustDo(fasthttp.StatusOK, "PUT", "/api/p/a", `{"n":5}`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/p", `{"id":"b","n":6}`)
+
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/items", `{"id":"a","status":"active"}`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/items/migrate", `[{"set":[{"status":1}]}]`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/items", `{"id":"b","status":2}`)
+
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/author", `{"id":"x","age":30}`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/book", `{"id":"b","author":{"@entity":"author","id":"z","age":"thirty"}}`)
+	if got := s.mustDo(fasthttp.StatusOK, "GET", "/api/author/z", "").object(t)["age"]; got != "thirty" {
+		t.Fatalf("expected the nested author to be stored, got %v", got)
+	}
+
+	s.mustDo(fasthttp.StatusBadRequest, "POST", "/api/author", `{"id":"w","age":5}`)
+}
+
+func TestImportKeepsDocumentsWithMixedTypes(t *testing.T) {
+	s := startAdminSession(t, withoutStrictSchema)
+
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/p", `{"id":"a","n":"x"}`)
+	s.mustDo(fasthttp.StatusOK, "PUT", "/api/p/a", `{"n":5}`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/p", `{"id":"b","n":6}`)
+
+	dump := s.mustDo(fasthttp.StatusOK, "GET", "/api/export", "").object(t)
+	body, _ := json.Marshal(map[string]any{"p": dump["p"]})
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/import", string(body))
+	if ids := sortedCopy(s.mustDo(fasthttp.StatusOK, "GET", "/api/p", "").ids(t)); !reflect.DeepEqual(ids, []string{"a", "b"}) {
+		t.Fatalf("expected an export/import round trip to keep every document, got %v", ids)
+	}
+
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/import", `{"mixed":[{"id":"m1","v":"x"},{"id":"m2","w":1},{"id":"m3","v":2}]}`)
+	if ids := sortedCopy(s.mustDo(fasthttp.StatusOK, "GET", "/api/mixed", "").ids(t)); !reflect.DeepEqual(ids, []string{"m1", "m2", "m3"}) {
+		t.Fatalf("expected the import to keep documents with mixed types, got %v", ids)
+	}
+
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/strictimp/create", `{"fields":{"title":{"type":"string","required":true}}}`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/import", `{"strictimp":[{"id":"s1","title":"ok"},{"id":"s2","title":5}]}`)
+	if ids := s.mustDo(fasthttp.StatusOK, "GET", "/api/strictimp", "").ids(t); !reflect.DeepEqual(ids, []string{"s1"}) {
+		t.Fatalf("expected manual schemas to keep validating imports, got %v", ids)
+	}
+}
+
+func TestDestroyResetsTheInferredSchemaOnly(t *testing.T) {
+	s := startAdminSession(t, withoutStrictSchema)
+
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/sz", `{"id":"1","size":"big"}`)
+	s.mustDo(fasthttp.StatusNoContent, "DELETE", "/api/sz", "")
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/sz", `{"id":"2","color":"red"}`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/sz", `{"id":"3","size":4}`)
+
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/man/create", `{"fields":{"title":{"type":"string","required":true}}}`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/man", `{"id":"1","title":"x"}`)
+	s.mustDo(fasthttp.StatusNoContent, "DELETE", "/api/man", "")
+	s.mustDo(fasthttp.StatusBadRequest, "POST", "/api/man", `{"id":"2","title":5}`)
+}
+
+func TestNestedCoreEntityReferencesAreRejected(t *testing.T) {
+	for name, configure := range map[string]func(cfg *configuration.Config){
+		"disabled": func(cfg *configuration.Config) { cfg.Security.Authentication.Enabled = false },
+		"user":     nil,
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := startAPIServer(t, configure)
+			if configure == nil {
+				s.login("admin", "admin")
+			}
+
+			hookRef := `{"@entity":"_elysiandb_core_hook","name":"h","entity":"posts","event":"pre_read","language":"javascript","enabled":true,"script":"function preRead(ctx){ctx.entity.pwn=1}"}`
+			userRef := `{"@entity":"_elysiandb_core_user","id":"admin"}`
+
+			s.mustDo(fasthttp.StatusOK, "POST", "/api/posts", `{"id":"p1","title":"t"}`)
+			s.mustDo(fasthttp.StatusForbidden, "POST", "/api/posts", `{"id":"p2","x":`+hookRef+`}`)
+			s.mustDo(fasthttp.StatusForbidden, "POST", "/api/posts", `[{"id":"p3","items":[`+userRef+`]}]`)
+			s.mustDo(fasthttp.StatusForbidden, "PUT", "/api/posts/p1", `{"owner":`+userRef+`}`)
+			s.mustDo(fasthttp.StatusForbidden, "PUT", "/api/posts", `[{"id":"p1","meta":{"deep":`+hookRef+`}}]`)
+
+			tx := beginTransaction(t, s)
+			s.mustDo(fasthttp.StatusForbidden, "POST", "/api/tx/"+tx+"/entity/posts", `{"id":"p4","x":`+hookRef+`}`)
+			s.mustDo(fasthttp.StatusForbidden, "PUT", "/api/tx/"+tx+"/entity/posts/p1", `{"owner":`+userRef+`}`)
+			s.mustDo(fasthttp.StatusOK, "POST", "/api/tx/"+tx+"/commit", "")
+
+			if hooks := s.mustDo(fasthttp.StatusOK, "GET", "/api/hook/posts", "").list(t); len(hooks) != 0 {
+				t.Fatalf("expected no hook to be created through a nested write, got %v", hooks)
+			}
+
+			post := s.mustDo(fasthttp.StatusOK, "GET", "/api/posts/p1", "").object(t)
+			if _, ok := post["owner"]; ok || post["pwn"] != nil {
+				t.Fatalf("expected the post to be left untouched, got %v", post)
+			}
+
+			s.mustDo(fasthttp.StatusNotFound, "GET", "/api/posts/p2", "")
+		})
+	}
+}
+
+func TestIncludesDoNotResolveCoreEntities(t *testing.T) {
+	s := startAPIServer(t, func(cfg *configuration.Config) { cfg.Security.Authentication.Enabled = false })
+
+	api_storage.WriteEntity("leak", map[string]any{"id": "l1", "u": map[string]any{"@entity": "_elysiandb_core_user", "id": "admin"}, "w": map[string]any{"@entity": "writer", "id": "w1"}})
+	api_storage.WriteEntity("writer", map[string]any{"id": "w1", "name": "W"})
+
+	for _, path := range []string{"/api/leak/l1?includes=u,w", "/api/leak?includes=all", "/api/leak?includes=u"} {
+		resp := s.mustDo(fasthttp.StatusOK, "GET", path, "")
+		if strings.Contains(string(resp.body), "password") || strings.Contains(string(resp.body), `"role"`) {
+			t.Fatalf("GET %s resolved a core entity: %s", path, resp.body)
+		}
+	}
+
+	if got := s.mustDo(fasthttp.StatusOK, "GET", "/api/leak/l1?includes=w", "").object(t)["w"].(map[string]any)["name"]; got != "W" {
+		t.Fatalf("expected regular includes to keep working, got %v", got)
+	}
+}
+
+func TestPreReadHooksDoNotScanTheWholeEntityForAPage(t *testing.T) {
+	s := startAdminSession(t, withoutStrictSchema)
+
+	posts := make([]map[string]any, 0, 300)
+	authors := make([]map[string]any, 0, 300)
+	for i := 0; i < 300; i++ {
+		posts = append(posts, map[string]any{"id": fmt.Sprintf("p%03d", i), "authorId": fmt.Sprintf("a%03d", i), "rank": i})
+		authors = append(authors, map[string]any{"id": fmt.Sprintf("a%03d", i), "name": fmt.Sprintf("Author %d", i)})
+	}
+	postsBody, _ := json.Marshal(posts)
+	authorsBody, _ := json.Marshal(authors)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/post", string(postsBody))
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/author", string(authorsBody))
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/hook/post", `{"name":"join","event":"pre_read","language":"javascript","enabled":true,"bypass_acl":true,"script":"function preRead(ctx){ var r = ctx.query(\"author\", {\"id\": {\"eq\": ctx.entity.authorId}}); ctx.entity.authorName = r.length ? r[0].name : null }"}`)
+
+	elapsed := func(method, path, body string) time.Duration {
+		start := time.Now()
+		s.mustDo(fasthttp.StatusOK, method, path, body)
+		return time.Since(start)
+	}
+
+	full := elapsed("POST", "/api/query", `{"entity":"post","filters":{"authorName":{"eq":"Author*"}}}`)
+
+	page := elapsed("POST", "/api/query", `{"entity":"post","limit":5}`)
+	one := elapsed("POST", "/api/query", `{"entity":"post","filters":{"id":{"eq":"p007"}}}`)
+	firstMatches := elapsed("POST", "/api/query", `{"entity":"post","filters":{"authorName":{"eq":"Author*"}},"limit":5}`)
+	rest := elapsed("GET", "/api/post?filter%5BauthorName%5D%5Beq%5D=Author*&limit=5", "")
+
+	for name, d := range map[string]time.Duration{"page": page, "stored filter": one, "virtual filter with limit": firstMatches, "REST virtual filter with limit": rest} {
+		if d*10 > full {
+			t.Fatalf("%s took %v, expected far less than a full scan (%v)", name, d, full)
+		}
+	}
+
+	resp := s.mustDo(fasthttp.StatusOK, "POST", "/api/query", `{"entity":"post","filters":{"id":{"eq":"p007"}}}`).list(t)
+	if len(resp) != 1 || resp[0]["authorName"] != "Author 7" {
+		t.Fatalf("expected the hook to run on the matching document, got %v", resp)
+	}
+
+	if ids := s.mustDo(fasthttp.StatusOK, "POST", "/api/query", `{"entity":"post","filters":{"authorName":{"eq":"Author 1*"}},"sorts":{"rank":"asc"},"offset":2,"limit":2}`).ids(t); !reflect.DeepEqual(ids, []string{"p011", "p012"}) {
+		t.Fatalf("expected pagination over the virtual matches, got %v", ids)
+	}
 }
