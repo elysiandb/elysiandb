@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/storage"
 	api_controller "github.com/taymour/elysiandb/internal/transport/http/api"
 	"github.com/valyala/fasthttp"
@@ -175,6 +177,57 @@ func TestCreateTypeController_OK(t *testing.T) {
 
 	if !api_storage.EntityTypeExists("person") {
 		t.Fatalf("entity type not created")
+	}
+}
+
+func TestCreate_StrictManualSchemaWithUserAuthentication(t *testing.T) {
+	setup(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Strict = true
+	cfg.Security.Authentication.Enabled = true
+	cfg.Security.Authentication.Mode = "user"
+	globals.SetConfig(cfg)
+
+	security.SetCurrentUsername("admin")
+	defer security.SetCurrentUsername("")
+
+	ctx := newCtx("POST", "/api/oeuvre/create", `{"fields":{"titre":{"type":"string","required":true},"annee":{"type":"number","required":false}}}`)
+	ctx.SetUserValue("entity", "oeuvre")
+	api_controller.CreateTypeController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200 on type creation, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+
+	ctx = newCtx("POST", "/api/oeuvre", `{"titre":"Alien","annee":1979}`)
+	ctx.SetUserValue("entity", "oeuvre")
+	api_controller.CreateController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+
+	var obj map[string]any
+	json.Unmarshal(ctx.Response.Body(), &obj)
+	if obj[acl.UsernameField] != "admin" {
+		t.Fatalf("expected owner admin, got %v", obj[acl.UsernameField])
+	}
+
+	ctx = newCtx("POST", "/api/oeuvre", `[{"titre":"Alien"},{"titre":"Aliens","annee":1986}]`)
+	ctx.SetUserValue("entity", "oeuvre")
+	api_controller.CreateController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200 on list creation, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+
+	ctx = newCtx("POST", "/api/oeuvre", `{"titre":"X","note":9}`)
+	ctx.SetUserValue("entity", "oeuvre")
+	api_controller.CreateController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatalf("expected 400 for undeclared field, got %d", ctx.Response.StatusCode())
 	}
 }
 
