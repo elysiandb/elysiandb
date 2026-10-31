@@ -160,6 +160,8 @@ Core entity types (`_elysiandb_core_*`, which hold users, ACLs, hooks and schema
 
 The `_elysiandb_core_*` entity types (users with their password hashes, ACLs, hooks and schemas) are managed by ElysianDB itself. They cannot be read or written through the generic routes (`/api/<entity>...`, `POST /api/query` and the transaction routes), whatever the authentication mode: these requests return `403`. Use the dedicated endpoints instead (User Management, ACL and Hooks APIs).
 
+The same applies to nested objects: a create, update or transactional write whose payload contains `"@entity": "_elysiandb_core_..."` at any depth is rejected with `403`, and `includes` never resolve a link to a core entity.
+
 ### Partial Updates
 
 `PUT /api/<entity>/<id>` and `PUT /api/<entity>` merge the body into the stored document: fields absent from the body keep their stored value. To unset a field, send it with `null`; the field is then stored as `null`, which filters treat like a missing field.
@@ -176,7 +178,7 @@ The `_elysiandb_core_*` entity types (users with their password hashes, ACLs, ho
 
 `POST /api/import` takes the format produced by `GET /api/export` (`{ "<entity>": [ <document>, ... ] }`). For each entity present in the dump:
 
-* the entity indexes are dropped, then every listed document is written as it appears in the dump, with schema validation
+* the entity indexes are dropped, then every listed document is written as it appears in the dump. A manual schema still validates the documents; an inferred schema does not, so a dump keeps documents whose fields have different types
 * documents of that entity that are not in the dump are no longer listed, but stay readable by id
 * the owner field `_elysiandb_core_username` is kept when the dump contains it; a document without it has no owner
 
@@ -658,9 +660,11 @@ When `api.schema.enabled: true` **and no manual schema exists**, ElysianDB autom
 
 Each write **extends** the inferred schema; it never replaces it:
 
-* **New fields are allowed** and are added to the schema, including fields inside nested objects and arrays of objects.
-* Fields already in the schema keep their type: a value of another type is rejected (`expected type string but got number`).
+* **New fields are allowed** and are added to the schema, including fields inside nested objects and arrays of objects. Fields that a document does not contain are kept.
+* Creating a document (`POST /api/<entity>` or a transactional write) with a value of another type than the schema is rejected (`expected type string but got number`).
+* Writes that are not checked against an inferred schema update the type of the fields they write: partial updates (`PUT`), migrations, sub-entities written through nested `@entity` objects, and imports. The schema always describes the last value written to each field.
 * `null` is accepted for any field and does not set its type. A field first seen with `null` takes the type of the first non-null value written later.
+* `DELETE /api/<entity>` also removes the inferred schema of the entity. A manual schema is kept.
 
 This applies whatever the value of `api.schema.strict`. Strict mode (rejecting unknown fields and reporting missing `required` fields) only applies to **manual** schemas: with `strict = true`, inferred fields are recorded as `required = true`, but this flag is only enforced once the schema becomes manual, for example after `PUT /api/<entity>/schema`.
 
@@ -1448,7 +1452,7 @@ For list queries, results are automatically filtered to only include readable do
 * **Admin**: all permissions granted
 * **Regular user**: only owning permissions granted
 
-ACLs are generated automatically for all users and entities (after a REST create, an entity type creation or a transaction commit) and can be reset to their default state at any time.
+ACLs are generated automatically for all users and entities (after a REST create, an entity type creation, an import or a transaction commit) and can be reset to their default state at any time.
 
 Core entities (`_elysiandb_core_user`, `_elysiandb_core_acl`, `_elysiandb_core_hook`, `_elysiandb_core_schema`) have no ACL. `PUT /api/acl/<user_name>/<entity>` and `PUT /api/acl/<user_name>/<entity>/default` on them return `400 {"error":"core entities have no ACL: users, ACLs and hooks are managed by admin users only"}`: an admin cannot be restricted on accounts, ACLs or hooks.
 
@@ -1724,9 +1728,9 @@ This allows predictable composition of multiple hooks on the same entity and eve
 
 When listing entities (`GET /api/<entity>`) or querying them (`POST /api/query`):
 
-* Initial filtering is applied using stored fields only (the Query API loads every document of the entity)
-* `pre_read` hooks are executed for each item
-* Filters are re-applied, including those targeting virtual fields
+* Without filter, `offset` and `limit` are applied first, and `pre_read` hooks only run on the documents of the page
+* With a filter, documents are first filtered on their stored fields (a condition on a field that the stored document does not have is considered satisfied, since a hook may add it)
+* `pre_read` hooks are executed on the remaining documents, in order, and the filters are re-applied, including those targeting virtual fields; once enough documents match to fill the requested page, the remaining ones are skipped
 * `offset` and `limit` are applied to the filtered result, so a page always contains the matching documents
 * `post_read` hooks are executed for each remaining item
 
