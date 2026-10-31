@@ -864,6 +864,57 @@ func TestUpdateEntityById_NoExisting(t *testing.T) {
 	}
 }
 
+func TestUpdateEntityById_KeepsManualSchemaInStrictMode(t *testing.T) {
+	initTestStore(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Enabled = true
+	cfg.Api.Schema.Strict = true
+	globals.SetConfig(cfg)
+
+	api_storage.UpdateEntitySchema("film", map[string]interface{}{
+		"title": map[string]interface{}{"type": "string", "required": true},
+		"year":  map[string]interface{}{"type": "number", "required": false},
+	})
+
+	api_storage.WriteEntity("film", map[string]interface{}{"id": "1", "title": "Alien"})
+	api_storage.UpdateEntityById("film", "1", map[string]interface{}{"title": "Aliens"})
+
+	sc := api_storage.ReadEntityById("_elysiandb_core_schema", "film")
+	if _, ok := sc["_manual"]; !ok {
+		t.Fatalf("manual schema must be kept after update, got %v", sc)
+	}
+
+	fields := sc["fields"].(map[string]interface{})
+	year := fields["year"].(map[string]interface{})
+	if year["required"] != false {
+		t.Fatalf("manual field definition must be kept, got %v", year)
+	}
+
+	errs := api_storage.WriteEntity("film", map[string]interface{}{"id": "2", "title": "X", "note": float64(9)})
+	if len(errs) == 0 {
+		t.Fatalf("expected strict validation to still reject undeclared fields")
+	}
+}
+
+func TestUpdateEntityById_UpdatesInferredSchema(t *testing.T) {
+	initTestStore(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Enabled = true
+	cfg.Api.Schema.Strict = false
+	globals.SetConfig(cfg)
+
+	api_storage.WriteEntity("film", map[string]interface{}{"id": "1", "title": "Alien"})
+	api_storage.UpdateEntityById("film", "1", map[string]interface{}{"year": float64(1979)})
+
+	sc := api_storage.ReadEntityById("_elysiandb_core_schema", "film")
+	fields := sc["fields"].(map[string]interface{})
+	if _, ok := fields["year"]; !ok {
+		t.Fatalf("inferred schema must include fields added by an update, got %v", fields)
+	}
+}
+
 func TestWriteEntity_AutoIdAssignment(t *testing.T) {
 	initTestStore(t)
 

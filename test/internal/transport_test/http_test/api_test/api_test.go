@@ -115,6 +115,51 @@ func TestUpdateById(t *testing.T) {
 	}
 }
 
+func TestUpdateById_KeepsStrictManualSchema(t *testing.T) {
+	setup(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Strict = true
+	globals.SetConfig(cfg)
+
+	ctx := newCtx("POST", "/api/oeuvre/create", `{"fields":{"titre":{"type":"string","required":true},"annee":{"type":"number","required":false}}}`)
+	ctx.SetUserValue("entity", "oeuvre")
+	api_controller.CreateTypeController(ctx)
+
+	ctx = newCtx("POST", "/api/oeuvre", `{"id":"o1","titre":"Alien"}`)
+	ctx.SetUserValue("entity", "oeuvre")
+	api_controller.CreateController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200 on create, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+
+	ctx = newCtx("PUT", "/api/oeuvre/o1", `{"titre":"Alien (1979)"}`)
+	ctx.SetUserValue("entity", "oeuvre")
+	ctx.SetUserValue("id", "o1")
+	api_controller.UpdateByIdController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200 on update, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+
+	ctx = newCtx("POST", "/api/oeuvre", `{"titre":"X","note":9}`)
+	ctx.SetUserValue("entity", "oeuvre")
+	api_controller.CreateController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatalf("expected 400 for undeclared field after update, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+
+	ctx = newCtx("POST", "/api/oeuvre", `{"annee":1979}`)
+	ctx.SetUserValue("entity", "oeuvre")
+	api_controller.CreateController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatalf("expected 400 for missing required field after update, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+}
+
 func TestUpdateList(t *testing.T) {
 	setup(t)
 
