@@ -203,7 +203,8 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		SortOrder: payload.SortOrder,
 	}
 
-	if preReadHooks {
+	filterAfterHooks := preReadHooks && !api_storage.QueryFilterIsEmpty(filter)
+	if filterAfterHooks {
 		q.Offset = 0
 		q.Limit = 0
 		q.Filter = query.FilterNode{Leaf: map[string]map[string]string{}}
@@ -215,15 +216,19 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	if filterAfterHooks {
+		data = api_storage.ApplyStoredQueryFilter(data, filter)
+	}
+
 	data = acl.FilterListOfEntities(currentUser, payload.Entity, data)
 
-	if preReadHooks {
+	if filterAfterHooks {
+		matches := func(item map[string]any) bool { return api_storage.QueryFilterMatchesEntity(filter, item) }
+		data = applyPreReadHooksAndFilter(currentUser, payload.Entity, data, matches, payload.Offset, payload.Limit)
+	} else if preReadHooks {
 		for i, item := range data {
 			data[i] = hook.ApplyPreReadHooksForEntity(currentUser, payload.Entity, item)
 		}
-
-		data = api_storage.ApplyQueryFilter(data, filter)
-		data = api_storage.Paginate(data, payload.Offset, payload.Limit)
 	}
 
 	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(payload.Entity) {

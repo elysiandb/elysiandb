@@ -71,16 +71,15 @@ func ListController(ctx *fasthttp.RequestCtx) {
 
 	data = acl.FilterListOfEntities(currentUser, entity, data)
 
-	if preReadHooks {
+	if paginateAfterHooks {
+		matches := func(item map[string]any) bool { return api_storage.FiltersMatchEntity(item, filters) }
+		data = applyPreReadHooksAndFilter(currentUser, entity, data, matches, offset, limit)
+	} else if preReadHooks {
 		for i, item := range data {
 			data[i] = hook.ApplyPreReadHooksForEntity(currentUser, entity, item)
 		}
 
 		data = engine.ApplyFiltersToList(data, filters)
-	}
-
-	if paginateAfterHooks {
-		data = api_storage.Paginate(data, offset, limit)
 	}
 
 	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(entity) {
