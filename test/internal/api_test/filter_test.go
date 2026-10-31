@@ -82,6 +82,69 @@ func TestSearchMatchesEntityNoStringValues(t *testing.T) {
 	}
 }
 
+func TestSearchMatchesEntitySkipsIdsMarkersAndCoreFields(t *testing.T) {
+	entity := map[string]any{
+		"id":                       "m1",
+		"_elysiandb_core_username": "admin",
+		"title":                    "Blade Runner",
+		"directors": []any{
+			map[string]any{"@entity": "director", "id": "ridley-scott"},
+		},
+	}
+
+	for _, search := range []string{"m1", "admin", "director", "scott", "*admin*"} {
+		if api_storage.SearchMatchesEntity(entity, search) {
+			t.Fatalf("expected %q not to match ids, markers or core fields", search)
+		}
+	}
+
+	if !api_storage.SearchMatchesEntity(entity, "runner") {
+		t.Fatalf("expected content fields to stay searchable")
+	}
+}
+
+func TestSearchMatchesEntityIncludedDocumentContent(t *testing.T) {
+	entity := map[string]any{
+		"id":    "f1",
+		"title": "Blade Runner",
+		"directors": []any{
+			map[string]any{
+				"@entity":                  "director",
+				"id":                       "ridley-scott",
+				"_elysiandb_core_username": "admin",
+				"name":                     "Ridley Scott",
+			},
+		},
+	}
+
+	if !api_storage.SearchMatchesEntity(entity, "scott") {
+		t.Fatalf("expected the content of an included document to be searchable")
+	}
+
+	for _, search := range []string{"ridley-scott", "admin", "director"} {
+		if api_storage.SearchMatchesEntity(entity, search) {
+			t.Fatalf("expected %q not to match the id, owner or marker of an included document", search)
+		}
+	}
+}
+
+func TestSearchMatchesEntityIncludedList(t *testing.T) {
+	entity := map[string]any{
+		"title": "Blade Runner",
+		"directors": []map[string]any{
+			{"@entity": "director", "id": "ridley-scott", "name": "Ridley Scott"},
+		},
+	}
+
+	if !api_storage.SearchMatchesEntity(entity, "scott") {
+		t.Fatalf("expected the content of an included list to be searchable")
+	}
+
+	if api_storage.SearchMatchesEntity(entity, "ridley-scott") {
+		t.Fatalf("expected the ids of an included list to be skipped")
+	}
+}
+
 func TestGetNestedValue(t *testing.T) {
 	data := map[string]interface{}{
 		"user": map[string]interface{}{

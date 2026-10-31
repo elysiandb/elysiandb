@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
@@ -30,11 +31,19 @@ func SearchMatchesEntity(entityData map[string]any, search string) bool {
 
 		switch v := cur.(type) {
 		case map[string]any:
-			for _, val := range v {
+			for key, val := range v {
+				if !isSearchableKey(key) {
+					continue
+				}
+
 				stack = append(stack, val)
 			}
 		case []any:
 			stack = append(stack, v...)
+		case []map[string]any:
+			for _, item := range v {
+				stack = append(stack, item)
+			}
 		case string:
 			if storage.MatchGlob(pattern, v) {
 				return true
@@ -43,6 +52,10 @@ func SearchMatchesEntity(entityData map[string]any, search string) bool {
 	}
 
 	return false
+}
+
+func isSearchableKey(key string) bool {
+	return key != "id" && key != "@entity" && !strings.HasPrefix(key, globals.CoreFieldsPrefix)
 }
 
 func FiltersMatchEntity(
