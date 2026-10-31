@@ -165,7 +165,7 @@ func TestApplyPostReadScriptMissingPostReadIsNoop(t *testing.T) {
 
 	entity := map[string]any{"id": "1", "x": 0}
 	script := `function other(ctx){ return ctx.entity }`
-	if err := hook.ApplyPostReadScript(script, entity, true); err != nil {
+	if err := hook.ApplyPostReadScript("", script, entity, true); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if entity["x"].(int) != 0 {
@@ -178,7 +178,7 @@ func TestApplyPostReadScriptSyntaxError(t *testing.T) {
 
 	entity := map[string]any{"id": "1"}
 	script := `function postRead(ctx) {`
-	if err := hook.ApplyPostReadScript(script, entity, true); err == nil {
+	if err := hook.ApplyPostReadScript("", script, entity, true); err == nil {
 		t.Fatalf("expected error")
 	}
 }
@@ -192,7 +192,7 @@ function postRead(ctx) {
   ctx.query("order")
   return ctx.entity
 }`
-	if err := hook.ApplyPostReadScript(script, entity, true); err == nil {
+	if err := hook.ApplyPostReadScript("", script, entity, true); err == nil {
 		t.Fatalf("expected error")
 	}
 }
@@ -217,7 +217,7 @@ function postRead(ctx) {
   ctx.entity.ok = true
   return ctx.entity
 }`
-	if err := hook.ApplyPostReadScript(script, entity, true); err != nil {
+	if err := hook.ApplyPostReadScript("", script, entity, true); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
@@ -425,7 +425,7 @@ func TestApplyPostReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.
 
 	entity := map[string]any{"id": "1"}
 
-	out := hook.ApplyPostReadHooksForEntity("toto", entity)
+	out := hook.ApplyPostReadHooksForEntity("", "toto", entity)
 	if out == nil {
 		t.Fatalf("expected non-nil entity")
 	}
@@ -517,7 +517,7 @@ func TestApplyPreReadHooksForEntityPriorityEnabledAndErrorTolerance(t *testing.T
 
 	entity := map[string]any{"id": "1"}
 
-	out := hook.ApplyPreReadHooksForEntity("toto", entity)
+	out := hook.ApplyPreReadHooksForEntity("", "toto", entity)
 	if out == nil {
 		t.Fatalf("expected non-nil entity")
 	}
@@ -533,7 +533,7 @@ func TestApplyPreReadScriptMissingPreReadIsNoop(t *testing.T) {
 
 	entity := map[string]any{"id": "1", "x": 0}
 	script := `function other(ctx){ return ctx.entity }`
-	if err := hook.ApplyPreReadScript(script, entity, true); err != nil {
+	if err := hook.ApplyPreReadScript("", script, entity, true); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if entity["x"].(int) != 0 {
@@ -546,7 +546,7 @@ func TestApplyPreReadScriptSyntaxError(t *testing.T) {
 
 	entity := map[string]any{"id": "1"}
 	script := `function preRead(ctx) {`
-	if err := hook.ApplyPreReadScript(script, entity, true); err == nil {
+	if err := hook.ApplyPreReadScript("", script, entity, true); err == nil {
 		t.Fatalf("expected error")
 	}
 }
@@ -560,7 +560,7 @@ function preRead(ctx) {
   ctx.query("order")
   return ctx.entity
 }`
-	if err := hook.ApplyPreReadScript(script, entity, true); err == nil {
+	if err := hook.ApplyPreReadScript("", script, entity, true); err == nil {
 		t.Fatalf("expected error")
 	}
 }
@@ -585,7 +585,7 @@ function preRead(ctx) {
   ctx.entity.ok = true
   return ctx.entity
 }`
-	if err := hook.ApplyPreReadScript(script, entity, true); err != nil {
+	if err := hook.ApplyPreReadScript("", script, entity, true); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 

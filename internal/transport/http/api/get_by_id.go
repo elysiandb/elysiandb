@@ -9,12 +9,14 @@ import (
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/hook"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
 
 func GetByIdController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 	id := ctx.UserValue("id").(string)
+	username := security.GetCurrentUsername(ctx)
 	fieldsParam := string(ctx.QueryArgs().Peek("fields"))
 	fields := api_storage.ParseFieldsParam(fieldsParam)
 	includesParam := string(ctx.QueryArgs().Peek("includes"))
@@ -38,7 +40,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if !acl.CanReadEntity(entity, data) {
+	if !acl.CanReadEntity(username, entity, data) {
 		ctx.SetStatusCode(fasthttp.StatusForbidden)
 		ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
 		ctx.SetBodyString("Access denied")
@@ -56,7 +58,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(entity) {
-		data = hook.ApplyPostReadHooksForEntity(entity, data)
+		data = hook.ApplyPostReadHooksForEntity(username, entity, data)
 	}
 
 	response, err := json.Marshal(data)

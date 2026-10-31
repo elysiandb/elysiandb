@@ -3,10 +3,12 @@ package api_transaction
 import (
 	"encoding/json"
 
+	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/mongodb"
 	"github.com/taymour/elysiandb/internal/schema"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/transaction"
 	"github.com/valyala/fasthttp"
 )
@@ -19,9 +21,17 @@ func WriteTransactionController(ctx *fasthttp.RequestCtx) {
 
 	var payload map[string]interface{}
 	err := json.Unmarshal(ctx.PostBody(), &payload)
-	if err != nil {
+	if err != nil || payload == nil {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error":"invalid json"}`)
+
+		return
+	}
+
+	username := security.GetCurrentUsername(ctx)
+	if !acl.CanWriteEntity(username, entity, payload) {
+		ctx.SetStatusCode(fasthttp.StatusForbidden)
+		ctx.SetBodyString(`{"error":"forbidden"}`)
 
 		return
 	}
@@ -42,6 +52,10 @@ func WriteTransactionController(ctx *fasthttp.RequestCtx) {
 
 			return
 		}
+	}
+
+	if security.UserAuthenticationIsEnabled() {
+		payload[acl.UsernameField] = username
 	}
 
 	op := transaction.TxOperation{

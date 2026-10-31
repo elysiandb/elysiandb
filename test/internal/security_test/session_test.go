@@ -34,9 +34,14 @@ func writeSessions(t *testing.T, dir string, sf security.SessionsFile) {
 	_ = os.WriteFile(filepath.Join(dir, security.SessionsFilename), b, 0o644)
 }
 
-func TestSetAndGetCurrentUsername(t *testing.T) {
-	security.SetCurrentUsername("alice")
-	if security.GetCurrentUsername() != "alice" {
+func TestGetCurrentUsername(t *testing.T) {
+	ctx := &fasthttp.RequestCtx{}
+	if security.GetCurrentUsername(ctx) != "" {
+		t.Fatalf("expected empty username")
+	}
+
+	ctx.SetUserValue("username", "alice")
+	if security.GetCurrentUsername(ctx) != "alice" {
 		t.Fatalf("expected alice")
 	}
 }

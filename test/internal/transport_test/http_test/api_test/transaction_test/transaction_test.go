@@ -9,7 +9,6 @@ import (
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
-	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/storage"
 	api_transaction "github.com/taymour/elysiandb/internal/transport/http/api/transactions"
 	"github.com/valyala/fasthttp"
@@ -195,10 +194,10 @@ func setupOwnership(t *testing.T) {
 	cfg := globals.GetConfig()
 	cfg.Security.Authentication.Enabled = true
 	cfg.Security.Authentication.Mode = "user"
-	t.Cleanup(func() { security.SetCurrentUsername("") })
 
 	for _, username := range []string{"alice", "bob"} {
 		perms := acl.NewPermissions()
+		perms[acl.PermissionCreate] = true
 		perms[acl.PermissionOwningUpdate] = true
 		perms[acl.PermissionOwningDelete] = true
 		a := acl.ACL{Username: username, Entity: "notes", Permissions: perms}
@@ -212,9 +211,7 @@ func setupOwnership(t *testing.T) {
 	})
 }
 
-func beginAs(username string) string {
-	security.SetCurrentUsername(username)
-
+func begin() string {
 	ctx := newCtx("POST", "/api/tx/begin", "")
 	api_transaction.BeginTransactionController(ctx)
 
@@ -234,20 +231,32 @@ func commit(t *testing.T, txID string) {
 	}
 }
 
-func txUpdateNote(txID, id, body string) *fasthttp.RequestCtx {
-	ctx := newCtx("PUT", "/api/tx/"+txID+"/entity/notes/"+id, body)
+func newTxCtx(username, method, uri, body, txID string) *fasthttp.RequestCtx {
+	ctx := newCtx(method, uri, body)
+	ctx.SetUserValue("username", username)
 	ctx.SetUserValue("txId", txID)
 	ctx.SetUserValue("entity", "notes")
+
+	return ctx
+}
+
+func txWriteNote(username, txID, body string) *fasthttp.RequestCtx {
+	ctx := newTxCtx(username, "POST", "/api/tx/"+txID+"/entity/notes", body, txID)
+	api_transaction.WriteTransactionController(ctx)
+
+	return ctx
+}
+
+func txUpdateNote(username, txID, id, body string) *fasthttp.RequestCtx {
+	ctx := newTxCtx(username, "PUT", "/api/tx/"+txID+"/entity/notes/"+id, body, txID)
 	ctx.SetUserValue("id", id)
 	api_transaction.UpdateTransactionController(ctx)
 
 	return ctx
 }
 
-func txDeleteNote(txID, id string) *fasthttp.RequestCtx {
-	ctx := newCtx("DELETE", "/api/tx/"+txID+"/entity/notes/"+id, "")
-	ctx.SetUserValue("txId", txID)
-	ctx.SetUserValue("entity", "notes")
+func txDeleteNote(username, txID, id string) *fasthttp.RequestCtx {
+	ctx := newTxCtx(username, "DELETE", "/api/tx/"+txID+"/entity/notes/"+id, "", txID)
 	ctx.SetUserValue("id", id)
 	api_transaction.DeleteTransactionController(ctx)
 
@@ -257,9 +266,9 @@ func txDeleteNote(txID, id string) *fasthttp.RequestCtx {
 func TestTransactionUpdate_OwningUpdateRejectsOtherUsersEntity(t *testing.T) {
 	setupOwnership(t)
 
-	txID := beginAs("bob")
+	txID := begin()
 
-	ctx := txUpdateNote(txID, "1", `{"title":"bob","`+acl.UsernameField+`":"bob"}`)
+	ctx := txUpdateNote("bob", txID, "1", `{"title":"bob","`+acl.UsernameField+`":"bob"}`)
 	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
 		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
 	}
@@ -275,9 +284,9 @@ func TestTransactionUpdate_OwningUpdateRejectsOtherUsersEntity(t *testing.T) {
 func TestTransactionUpdate_OwnerAllowed(t *testing.T) {
 	setupOwnership(t)
 
-	txID := beginAs("alice")
+	txID := begin()
 
-	ctx := txUpdateNote(txID, "1", `{"title":"v2"}`)
+	ctx := txUpdateNote("alice", txID, "1", `{"title":"v2"}`)
 	if ctx.Response.StatusCode() != 200 {
 		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
 	}
@@ -293,9 +302,9 @@ func TestTransactionUpdate_OwnerAllowed(t *testing.T) {
 func TestTransactionDelete_OwningDeleteRejectsOtherUsersEntity(t *testing.T) {
 	setupOwnership(t)
 
-	txID := beginAs("bob")
+	txID := begin()
 
-	ctx := txDeleteNote(txID, "1")
+	ctx := txDeleteNote("bob", txID, "1")
 	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
 		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
 	}
@@ -310,9 +319,9 @@ func TestTransactionDelete_OwningDeleteRejectsOtherUsersEntity(t *testing.T) {
 func TestTransactionDelete_OwnerAllowed(t *testing.T) {
 	setupOwnership(t)
 
-	txID := beginAs("alice")
+	txID := begin()
 
-	ctx := txDeleteNote(txID, "1")
+	ctx := txDeleteNote("alice", txID, "1")
 	if ctx.Response.StatusCode() != 200 {
 		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
 	}
@@ -321,5 +330,76 @@ func TestTransactionDelete_OwnerAllowed(t *testing.T) {
 
 	if api_storage.ReadEntityById("notes", "1") != nil {
 		t.Fatal("note was not deleted")
+	}
+}
+
+func TestTransactionWrite_StampsOwner(t *testing.T) {
+	setupOwnership(t)
+
+	txID := begin()
+
+	ctx := txWriteNote("alice", txID, `{"id":"2","title":"new","`+acl.UsernameField+`":"bob"}`)
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("expected 200, got %d", ctx.Response.StatusCode())
+	}
+
+	commit(t, txID)
+
+	stored := api_storage.ReadEntityById("notes", "2")
+	if stored["title"] != "new" || stored[acl.UsernameField] != "alice" {
+		t.Fatalf("unexpected note: %v", stored)
+	}
+}
+
+func TestTransactionWrite_ExistingIdOfOtherUserIsForbidden(t *testing.T) {
+	setupOwnership(t)
+
+	txID := begin()
+
+	ctx := txWriteNote("bob", txID, `{"id":"1","title":"bob"}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+
+	commit(t, txID)
+
+	stored := api_storage.ReadEntityById("notes", "1")
+	if stored["title"] != "alice" || stored[acl.UsernameField] != "alice" {
+		t.Fatalf("note was modified: %v", stored)
+	}
+}
+
+func TestTransactionWrite_RequiresCreatePermission(t *testing.T) {
+	setupOwnership(t)
+
+	perms := acl.NewPermissions()
+	perms[acl.PermissionOwningUpdate] = true
+	a := acl.ACL{Username: "carol", Entity: "notes", Permissions: perms}
+	api_storage.WriteEntity(acl.ACLEntity, a.ToDataMap())
+
+	txID := begin()
+
+	ctx := txWriteNote("carol", txID, `{"id":"3","title":"carol"}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+
+	commit(t, txID)
+
+	if api_storage.ReadEntityById("notes", "3") != nil {
+		t.Fatal("note was created")
+	}
+}
+
+func TestTransactionWrite_NullPayload(t *testing.T) {
+	setup(t)
+
+	txID := begin()
+
+	ctx := newTxCtx("", "POST", "/api/tx/"+txID+"/entity/notes", "null", txID)
+	api_transaction.WriteTransactionController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", ctx.Response.StatusCode())
 	}
 }

@@ -155,7 +155,7 @@ func CreateHookEntity() error {
 	return nil
 }
 
-func ApplyPostReadHooksForEntity(entity string, data map[string]any) map[string]any {
+func ApplyPostReadHooksForEntity(username, entity string, data map[string]any) map[string]any {
 	if !globals.GetConfig().Api.Hooks.Enabled {
 		return data
 	}
@@ -173,7 +173,7 @@ func ApplyPostReadHooksForEntity(entity string, data map[string]any) map[string]
 			continue
 		}
 
-		if err := ApplyPostReadScript(hook.Script, enriched, hook.ByPassACL); err != nil {
+		if err := ApplyPostReadScript(username, hook.Script, enriched, hook.ByPassACL); err != nil {
 			log.Error("Error applying post-read hook " + hook.ID + ": " + err.Error())
 		}
 	}
@@ -181,7 +181,7 @@ func ApplyPostReadHooksForEntity(entity string, data map[string]any) map[string]
 	return enriched
 }
 
-func ApplyPreReadHooksForEntity(entity string, data map[string]any) map[string]any {
+func ApplyPreReadHooksForEntity(username, entity string, data map[string]any) map[string]any {
 	if !globals.GetConfig().Api.Hooks.Enabled {
 		return data
 	}
@@ -199,7 +199,7 @@ func ApplyPreReadHooksForEntity(entity string, data map[string]any) map[string]a
 			continue
 		}
 
-		if err := ApplyPreReadScript(hook.Script, enriched, hook.ByPassACL); err != nil {
+		if err := ApplyPreReadScript(username, hook.Script, enriched, hook.ByPassACL); err != nil {
 			log.Error("Error applying pre-read hook " + hook.ID + ": " + err.Error())
 		}
 	}

@@ -12,8 +12,6 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-var CurrentUsername string
-
 type Session struct {
 	ID        string `json:"id"`
 	Username  string `json:"username"`
@@ -25,12 +23,10 @@ type SessionsFile struct {
 	Sessions []Session `json:"sessions"`
 }
 
-func SetCurrentUsername(username string) {
-	CurrentUsername = username
-}
+func GetCurrentUsername(ctx *fasthttp.RequestCtx) string {
+	username, _ := ctx.UserValue("username").(string)
 
-func GetCurrentUsername() string {
-	return CurrentUsername
+	return username
 }
 
 func CurrentUserCanManageUser(ctx *fasthttp.RequestCtx, username string) (bool, error) {

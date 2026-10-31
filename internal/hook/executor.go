@@ -9,6 +9,7 @@ import (
 )
 
 func applyScript(
+	username string,
 	script string,
 	fnName string,
 	entity map[string]any,
@@ -53,7 +54,7 @@ func applyScript(
 			)
 
 			if !bypassAcl {
-				results = acl.FilterListOfEntities(targetEntity, results)
+				results = acl.FilterListOfEntities(username, targetEntity, results)
 			}
 
 			return vm.ToValue(results)
@@ -79,17 +80,19 @@ func applyScript(
 }
 
 func ApplyPostReadScript(
+	username string,
 	script string,
 	entity map[string]any,
 	bypassAcl bool,
 ) error {
-	return applyScript(script, "postRead", entity, bypassAcl)
+	return applyScript(username, script, "postRead", entity, bypassAcl)
 }
 
 func ApplyPreReadScript(
+	username string,
 	script string,
 	entity map[string]any,
 	bypassAcl bool,
 ) error {
-	return applyScript(script, "preRead", entity, bypassAcl)
+	return applyScript(username, script, "preRead", entity, bypassAcl)
 }

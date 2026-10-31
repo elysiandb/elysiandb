@@ -8,6 +8,7 @@ import (
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/mongodb"
 	"github.com/taymour/elysiandb/internal/schema"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/transaction"
 	"github.com/valyala/fasthttp"
 )
@@ -36,7 +37,7 @@ func UpdateTransactionController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if !acl.CanUpdateEntity(entity, id, payload) {
+	if !acl.CanUpdateEntity(security.GetCurrentUsername(ctx), entity, id, payload) {
 		ctx.SetStatusCode(fasthttp.StatusForbidden)
 		ctx.SetBodyString(`{"error":"forbidden"}`)
 

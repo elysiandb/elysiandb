@@ -1277,6 +1277,10 @@ _core_username
 ### Evaluation Rules
 
 * **Create**: allowed if `create` is granted
+
+  * a document sent with the `id` of an existing document replaces it, so the update rules below also apply
+  * the owner is always the current user, whatever the payload contains
+  * for an entity type that does not exist yet, the user's role defaults apply: admins can create it, regular users cannot
 * **Read**:
 
   * allowed if `read`
@@ -1284,7 +1288,7 @@ _core_username
 * **Update**:
 
   * allowed if `update`
-  * otherwise allowed only if `owning_update` and ownership matches
+  * otherwise allowed only if `owning_update` and the stored document belongs to the current user; the owner field cannot be changed
 * **Delete**:
 
   * allowed if `delete`
