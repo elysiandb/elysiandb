@@ -187,6 +187,89 @@ func TestUpdateList(t *testing.T) {
 	}
 }
 
+func updateById(entity, id, body string) *fasthttp.RequestCtx {
+	ctx := newCtx("PUT", "/api/"+entity+"/"+id, body)
+	ctx.SetUserValue("entity", entity)
+	ctx.SetUserValue("id", id)
+	api_controller.UpdateByIdController(ctx)
+
+	return ctx
+}
+
+func updateList(entity, body string) *fasthttp.RequestCtx {
+	ctx := newCtx("PUT", "/api/"+entity, body)
+	ctx.SetUserValue("entity", entity)
+	api_controller.UpdateListController(ctx)
+
+	return ctx
+}
+
+func TestUpdateById_MissingEntityIsNotFound(t *testing.T) {
+	setup(t)
+
+	api_storage.WriteEntity("movie", map[string]any{"id": "m1", "title": "Alien"})
+
+	ctx := updateById("movie", "nope", `{"title":"x"}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusNotFound || string(ctx.Response.Body()) != `{"error":"entity not found"}` {
+		t.Fatalf("expected 404, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+
+	if api_storage.ReadEntityById("movie", "nope") != nil {
+		t.Fatalf("a missing document must not be created by an update")
+	}
+}
+
+func TestUpdateById_MissingEntityIsNotFoundBeforeStrictValidation(t *testing.T) {
+	setup(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Strict = true
+	globals.SetConfig(cfg)
+
+	ctx := newCtx("POST", "/api/book/create", `{"fields":{"title":{"type":"string","required":true},"year":{"type":"number","required":false}}}`)
+	ctx.SetUserValue("entity", "book")
+	api_controller.CreateTypeController(ctx)
+
+	ctx = updateById("book", "nope", `{"year":2000}`)
+	if ctx.Response.StatusCode() != fasthttp.StatusNotFound {
+		t.Fatalf("expected 404 instead of a validation error, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+}
+
+func TestUpdateList_MissingEntitiesAreNotFound(t *testing.T) {
+	setup(t)
+
+	api_storage.WriteEntity("movie", map[string]any{"id": "m1", "title": "Alien"})
+
+	ctx := updateList("movie", `[{"id":"m1","title":"Alien (1979)"},{"id":"nope","title":"x"},{"id":"nope","title":"y"},{"id":"gone"}]`)
+	if ctx.Response.StatusCode() != fasthttp.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+
+	if string(ctx.Response.Body()) != `{"error":"entity not found","ids":["nope","gone"]}` {
+		t.Fatalf("expected the missing ids, got %s", ctx.Response.Body())
+	}
+
+	if got := api_storage.ReadEntityById("movie", "m1")["title"]; got != "Alien" {
+		t.Fatalf("a batch with a missing id must not apply any update, got title %v", got)
+	}
+
+	ctx = updateList("movie", `[{"id":"m1","title":"Alien (1979)"}]`)
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+}
+
+func TestUpdateList_InvalidBodyIsBadRequest(t *testing.T) {
+	setup(t)
+
+	for _, body := range []string{`{"id":"m1"}`, `[]`, `not json`} {
+		if ctx := updateList("movie", body); ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
+			t.Fatalf("body %s: expected 400, got %d", body, ctx.Response.StatusCode())
+		}
+	}
+}
+
 func TestDeleteAndDestroy(t *testing.T) {
 	setup(t)
 
@@ -1140,6 +1223,18 @@ func TestUpdateById_IdInPayloadDoesNotRedirectWrite(t *testing.T) {
 
 	assertNote(t, aliceID, "alice", "alice")
 	assertNote(t, bobID, "bob", "bob v2")
+}
+
+func TestUpdateById_MissingEntityIsNotFoundBeforeACL(t *testing.T) {
+	setupOwnership(t)
+
+	if ctx := updateNoteAs("bob", "nope", `{"title":"bob"}`); ctx.Response.StatusCode() != fasthttp.StatusNotFound {
+		t.Fatalf("expected 404, got %d", ctx.Response.StatusCode())
+	}
+
+	if ctx := updateNotesAs("bob", `[{"id":"nope","title":"bob"}]`); ctx.Response.StatusCode() != fasthttp.StatusNotFound {
+		t.Fatalf("expected 404, got %d", ctx.Response.StatusCode())
+	}
 }
 
 func TestUpdateList_OwningUpdateRejectsOtherUsersEntity(t *testing.T) {
