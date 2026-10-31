@@ -113,7 +113,7 @@ func ValidateEntity(entity string, data map[string]any, schemaData map[string]an
 
 func validateNoExtraFieldsRecursive(fields map[string]Field, data map[string]interface{}, prefix string, errors *[]ValidationError) {
 	for key, val := range data {
-		if key == "id" {
+		if key == "id" || strings.HasPrefix(key, globals.CoreFieldsPrefix) {
 			continue
 		}
 
