@@ -10,6 +10,7 @@ import (
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/storage"
+	api_controller "github.com/taymour/elysiandb/internal/transport/http/api"
 	api_transaction "github.com/taymour/elysiandb/internal/transport/http/api/transactions"
 	"github.com/valyala/fasthttp"
 )
@@ -401,5 +402,46 @@ func TestTransactionWrite_NullPayload(t *testing.T) {
 
 	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", ctx.Response.StatusCode())
+	}
+}
+
+func getNote(id string) *fasthttp.RequestCtx {
+	ctx := newCtx("GET", "/api/notes/"+id, "")
+	ctx.SetUserValue("entity", "notes")
+	ctx.SetUserValue("id", id)
+	api_controller.GetByIdController(ctx)
+
+	return ctx
+}
+
+func TestTransactionCommit_PurgesCache(t *testing.T) {
+	setup(t)
+	globals.GetConfig().Api.Cache.Enabled = true
+
+	api_storage.WriteEntity("notes", map[string]any{"id": "1", "title": "v1"})
+
+	for _, want := range []string{"MISS", "HIT"} {
+		ctx := getNote("1")
+		if got := string(ctx.Response.Header.Peek("X-Elysian-Cache")); got != want {
+			t.Fatalf("expected %s, got %s", want, got)
+		}
+	}
+
+	txID := begin()
+	txUpdateNote("", txID, "1", `{"title":"v2"}`)
+	commit(t, txID)
+
+	var obj map[string]any
+	json.Unmarshal(getNote("1").Response.Body(), &obj)
+	if obj["title"] != "v2" {
+		t.Fatalf("expected updated document after commit, got %v", obj)
+	}
+
+	txID = begin()
+	txDeleteNote("", txID, "1")
+	commit(t, txID)
+
+	if ctx := getNote("1"); ctx.Response.StatusCode() != fasthttp.StatusNotFound {
+		t.Fatalf("expected 404 after delete commit, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
 	}
 }
