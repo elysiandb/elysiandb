@@ -1,10 +1,12 @@
 package api
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 
 	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
@@ -25,15 +27,78 @@ type QueryPayload struct {
 	Sorts     map[string]string `json:"sorts"`
 	CountOnly bool              `json:"countOnly"`
 	Fields    string            `json:"fields"`
+	SortOrder []string          `json:"-"`
+}
+
+func (q *QueryPayload) UnmarshalJSON(data []byte) error {
+	type rawPayload QueryPayload
+	var payload rawPayload
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return err
+	}
+
+	var raw struct {
+		Sorts json.RawMessage `json:"sorts"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	order, err := objectKeysInOrder(raw.Sorts)
+	if err != nil {
+		return err
+	}
+
+	*q = QueryPayload(payload)
+	q.SortOrder = order
+
+	return nil
+}
+
+func objectKeysInOrder(raw json.RawMessage) ([]string, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	token, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+
+	if delim, ok := token.(json.Delim); !ok || delim != '{' {
+		return nil, nil
+	}
+
+	var keys []string
+	for dec.More() {
+		token, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+
+		key, _ := token.(string)
+		keys = append(keys, key)
+
+		var value json.RawMessage
+		if err := dec.Decode(&value); err != nil {
+			return nil, err
+		}
+	}
+
+	return keys, nil
 }
 
 func (q *QueryPayload) Hash() []byte {
 	normalized := map[string]any{
-		"entity":  q.Entity,
-		"offset":  q.Offset,
-		"limit":   q.Limit,
-		"filters": normalizeAny(q.Filters),
-		"sorts":   normalizeStringMap(q.Sorts),
+		"entity":    q.Entity,
+		"offset":    q.Offset,
+		"limit":     q.Limit,
+		"filters":   normalizeAny(q.Filters),
+		"sorts":     normalizeStringMap(q.Sorts),
+		"sortOrder": q.queryForSorts().OrderedSorts(),
+		"countOnly": q.CountOnly,
+		"fields":    q.Fields,
 	}
 
 	b, _ := json.Marshal(normalized)
@@ -88,12 +153,27 @@ func normalizeStringMap(m map[string]string) map[string]string {
 	return out
 }
 
+func (q *QueryPayload) queryForSorts() query.Query {
+	return query.Query{Sorts: q.Sorts, SortOrder: q.SortOrder}
+}
+
+func sendQueryError(ctx *fasthttp.RequestCtx, status int, err error) {
+	body, _ := json.Marshal(map[string]string{"error": err.Error()})
+	ctx.SetStatusCode(status)
+	ctx.SetBody(body)
+}
+
 func QueryController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 
 	var payload QueryPayload
 	if err := json.Unmarshal(ctx.PostBody(), &payload); err != nil {
-		ctx.SetStatusCode(fasthttp.StatusBadRequest)
+		sendQueryError(ctx, fasthttp.StatusBadRequest, err)
+		return
+	}
+
+	if engine.IsCoreEntityType(payload.Entity) {
+		sendCoreEntityForbidden(ctx)
 		return
 	}
 
@@ -130,32 +210,42 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 
 	filter, err := ParseFilterNode(payload.Filters)
 	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusBadRequest)
+		sendQueryError(ctx, fasthttp.StatusBadRequest, err)
 		return
 	}
 
-	query := query.Query{
-		Entity: payload.Entity,
-		Offset: payload.Offset,
-		Limit:  payload.Limit,
-		Filter: filter,
-		Sorts:  payload.Sorts,
+	preReadHooks := globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPreReadHooks(payload.Entity)
+
+	q := query.Query{
+		Entity:    payload.Entity,
+		Offset:    payload.Offset,
+		Limit:     payload.Limit,
+		Filter:    filter,
+		Sorts:     payload.Sorts,
+		SortOrder: payload.SortOrder,
 	}
 
-	data, err := engine.ExecuteQuery(query)
+	if preReadHooks {
+		q.Offset = 0
+		q.Limit = 0
+		q.Filter = query.FilterNode{Leaf: map[string]map[string]string{}}
+	}
+
+	data, err := engine.ExecuteQuery(q)
 	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		sendQueryError(ctx, fasthttp.StatusInternalServerError, err)
 		return
 	}
 
 	data = acl.FilterListOfEntities(currentUser, payload.Entity, data)
 
-	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPreReadHooks(payload.Entity) {
+	if preReadHooks {
 		for i, item := range data {
 			data[i] = hook.ApplyPreReadHooksForEntity(currentUser, payload.Entity, item)
 		}
 
 		data = api_storage.ApplyQueryFilter(data, filter)
+		data = api_storage.Paginate(data, payload.Offset, payload.Limit)
 	}
 
 	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(payload.Entity) {
@@ -192,7 +282,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 
 	responseBody, err := json.Marshal(data)
 	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		sendQueryError(ctx, fasthttp.StatusInternalServerError, err)
 		return
 	}
 
@@ -201,6 +291,19 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 
 	if globals.GetConfig().Api.Cache.Enabled {
 		cache.CacheStore.Set(payload.Entity, hash, responseBody)
+	}
+}
+
+func filterValueToString(val any) (string, bool) {
+	switch v := val.(type) {
+	case string:
+		return v, true
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64), true
+	case bool:
+		return strconv.FormatBool(v), true
+	default:
+		return "", false
 	}
 }
 
@@ -266,9 +369,9 @@ func ParseFilterNode(raw map[string]any) (query.FilterNode, error) {
 
 		ops := make(map[string]string)
 		for op, val := range opsRaw {
-			s, ok := val.(string)
+			s, ok := filterValueToString(val)
 			if !ok {
-				return query.FilterNode{}, fmt.Errorf("invalid value for %s.%s", field, op)
+				return query.FilterNode{}, fmt.Errorf("invalid value for %s.%s: expected a string, a number or a boolean", field, op)
 			}
 
 			ops[op] = s

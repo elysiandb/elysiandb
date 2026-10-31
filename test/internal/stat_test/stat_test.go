@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/stat"
 )
 
@@ -23,7 +24,7 @@ func TestNewStatsContainer_Zeroed(t *testing.T) {
 		"total_requests":        "0",
 		"hits":                  "0",
 		"misses":                "0",
-		"version":               "0.1.10",
+		"version":               globals.VERSION,
 	}
 	for k, want := range wantZero {
 		if got := m[k]; got != want {
@@ -57,7 +58,7 @@ func TestIncrementsAndSets(t *testing.T) {
 		"total_requests":        "1",
 		"hits":                  "1",
 		"misses":                "1",
-		"version":               "0.1.10",
+		"version":               globals.VERSION,
 	}
 	for k, want := range tests {
 		if got := m[k]; got != want {

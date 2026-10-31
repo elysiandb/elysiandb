@@ -24,6 +24,13 @@ const (
 	DefaultAdminPassword = "admin"
 )
 
+var (
+	ErrUserNotFound          = errors.New("not found")
+	ErrInvalidRole           = errors.New("invalid role: expected 'admin' or 'user'")
+	ErrDefaultAdminProtected = errors.New("the default admin user cannot be deleted")
+	ErrLastAdmin             = errors.New("at least one admin user must remain")
+)
+
 type Role string
 
 const (
@@ -266,13 +273,21 @@ func ChangeUserPassword(username, newPassword string) error {
 func ChangeUserRole(username, newRole string) error {
 	u := engine.ReadEntityById(UserEntity, username)
 	if u == nil {
-		return fmt.Errorf("user '%s' not found", username)
+		return fmt.Errorf("user '%s' %w", username, ErrUserNotFound)
+	}
+
+	if Role(newRole) != RoleAdmin && Role(newRole) != RoleUser {
+		return ErrInvalidRole
 	}
 
 	user := &BasicHashedUser{}
 	err := user.FromDataMap(u)
 	if err != nil {
 		return err
+	}
+
+	if Role(newRole) != RoleAdmin && isLastAdmin(username) {
+		return ErrLastAdmin
 	}
 
 	user.Role = Role(newRole)
@@ -285,12 +300,39 @@ func ChangeUserRole(username, newRole string) error {
 	return nil
 }
 
-func DeleteBasicUser(username string) {
+func DeleteBasicUser(username string) error {
 	if username == DefaultAdminUsername {
-		return
+		return ErrDefaultAdminProtected
+	}
+
+	if isLastAdmin(username) {
+		return ErrLastAdmin
 	}
 
 	engine.DeleteEntityById(UserEntity, username)
+
+	return nil
+}
+
+func isLastAdmin(username string) bool {
+	u := engine.ReadEntityById(UserEntity, username)
+	if u == nil || u["role"] != string(RoleAdmin) {
+		return false
+	}
+
+	users, err := ListBasicUsers()
+	if err != nil {
+		return true
+	}
+
+	admins := 0
+	for _, user := range users {
+		if user["role"] == string(RoleAdmin) {
+			admins++
+		}
+	}
+
+	return admins <= 1
 }
 
 func GenerateKey() (string, error) {

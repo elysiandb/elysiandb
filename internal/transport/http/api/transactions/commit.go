@@ -1,6 +1,8 @@
 package api_transaction
 
 import (
+	"github.com/taymour/elysiandb/internal/acl"
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/transaction"
@@ -18,6 +20,10 @@ func CommitTransactionController(ctx *fasthttp.RequestCtx) {
 	if tx != nil && globals.GetConfig().Api.Cache.Enabled {
 		for _, op := range tx.Ops {
 			cache.CacheStore.Purge(op.Entity)
+
+			for _, nested := range api_storage.NestedEntityTypes(op.Data) {
+				cache.CacheStore.Purge(nested)
+			}
 		}
 	}
 
@@ -27,6 +33,8 @@ func CommitTransactionController(ctx *fasthttp.RequestCtx) {
 
 		return
 	}
+
+	acl.InitACL()
 
 	ctx.SetStatusCode(fasthttp.StatusOK)
 }

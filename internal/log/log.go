@@ -31,6 +31,10 @@ func DirectInfo(args ...interface{}) {
 	directLog("INFO", cyan, args...)
 }
 
+func DirectWarn(args ...interface{}) {
+	directLog("WARN", yellow, args...)
+}
+
 func DirectError(args ...interface{}) {
 	directLog("ERROR", red, args...)
 }

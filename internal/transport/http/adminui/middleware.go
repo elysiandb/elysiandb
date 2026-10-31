@@ -7,6 +7,21 @@ import (
 
 func AdminAuth(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
+		if !security.AuthenticationIsEnabled() {
+			next(ctx)
+			return
+		}
+
+		if security.BasicAuthenticationIsEnabled() {
+			if !security.CheckBasicAuthentication(ctx) {
+				ctx.SetStatusCode(fasthttp.StatusUnauthorized)
+				return
+			}
+
+			next(ctx)
+			return
+		}
+
 		if security.TokenAuthenticationIsEnabled() {
 			if !security.CheckTokenAuthentication(ctx) {
 				ctx.SetStatusCode(fasthttp.StatusUnauthorized)

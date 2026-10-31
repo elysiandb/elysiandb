@@ -15,7 +15,7 @@ import (
 )
 
 func RegisterRoutes(r *router.Router) {
-	r.GET("/health", Version(security.Authenticate(controller.HealthController)))
+	r.GET("/health", Version(controller.HealthController))
 
 	r.GET("/kv/mget", Version(security.AuthenticateAdmin(controller.MultiGetController)))
 	r.GET("/kv/{key}", Version(security.AuthenticateAdmin(controller.GetKeyController)))
@@ -32,32 +32,32 @@ func RegisterRoutes(r *router.Router) {
 
 	r.GET("/api/export", Version(security.AuthenticateAdmin(api.ExportController)))
 	r.POST("/api/import", Version(security.AuthenticateAdmin(api.ImportController)))
-	r.GET("/api/{entity}", Version(security.Authenticate(api.ListController)))
+	r.GET("/api/{entity}", Version(security.Authenticate(api.RejectCoreEntity(api.ListController))))
 	r.POST("/api/query", Version(security.Authenticate(api.QueryController)))
-	r.POST("/api/{entity}", Version(security.Authenticate(api.CreateController)))
-	r.GET("/api/{entity}/{id}", Version(security.Authenticate(api.GetByIdController)))
-	r.PUT("/api/{entity}/{id}", Version(security.Authenticate(api.UpdateByIdController)))
-	r.PUT("/api/{entity}", Version(security.Authenticate(api.UpdateListController)))
-	r.DELETE("/api/{entity}/{id}", Version(security.Authenticate(api.DeleteByIdController)))
-	r.DELETE("/api/{entity}", Version(security.Authenticate(api.DestroyController)))
-	r.GET("/api/{entity}/count", Version(security.Authenticate(api.CountController)))
-	r.GET("/api/{entity}/{id}/exists", Version(security.Authenticate(api.ExistsController)))
-	r.POST("/api/{entity}/migrate", Version(security.AuthenticateAdmin(api.MigrateController)))
+	r.POST("/api/{entity}", Version(security.Authenticate(api.RejectCoreEntity(api.CreateController))))
+	r.GET("/api/{entity}/{id}", Version(security.Authenticate(api.RejectCoreEntity(api.GetByIdController))))
+	r.PUT("/api/{entity}/{id}", Version(security.Authenticate(api.RejectCoreEntity(api.UpdateByIdController))))
+	r.PUT("/api/{entity}", Version(security.Authenticate(api.RejectCoreEntity(api.UpdateListController))))
+	r.DELETE("/api/{entity}/{id}", Version(security.Authenticate(api.RejectCoreEntity(api.DeleteByIdController))))
+	r.DELETE("/api/{entity}", Version(security.Authenticate(api.RejectCoreEntity(api.DestroyController))))
+	r.GET("/api/{entity}/count", Version(security.Authenticate(api.RejectCoreEntity(api.CountController))))
+	r.GET("/api/{entity}/{id}/exists", Version(security.Authenticate(api.RejectCoreEntity(api.ExistsController))))
+	r.POST("/api/{entity}/migrate", Version(security.AuthenticateAdmin(api.RejectCoreEntity(api.MigrateController))))
 
 	r.GET("/api/entity/types", Version(security.Authenticate(api.GetEntityTypesController)))
 	r.GET("/api/entity/types/name", Version(security.Authenticate(api.GetEntityTypesNamesController)))
 
 	if globals.GetConfig().Api.Schema.Enabled {
-		r.POST("/api/{entity}/create", Version(security.AuthenticateAdmin(api.CreateTypeController)))
-		r.GET("/api/{entity}/schema", Version(security.Authenticate(api.GetSchemaController)))
-		r.PUT("/api/{entity}/schema", Version(security.AuthenticateAdmin(api.PutSchemaController)))
+		r.POST("/api/{entity}/create", Version(security.AuthenticateAdmin(api.RejectCoreEntity(api.CreateTypeController))))
+		r.GET("/api/{entity}/schema", Version(security.Authenticate(api.RejectCoreEntity(api.GetSchemaController))))
+		r.PUT("/api/{entity}/schema", Version(security.AuthenticateAdmin(api.RejectCoreEntity(api.PutSchemaController))))
 	}
 
 	r.POST("/api/tx/begin", Version(security.Authenticate(api_transaction.BeginTransactionController)))
 	r.POST("/api/tx/{txId}/rollback", Version(security.Authenticate(api_transaction.RollbackTransactionController)))
-	r.POST("/api/tx/{txId}/entity/{entity}", Version(security.Authenticate(api_transaction.WriteTransactionController)))
-	r.PUT("/api/tx/{txId}/entity/{entity}/{id}", Version(security.Authenticate(api_transaction.UpdateTransactionController)))
-	r.DELETE("/api/tx/{txId}/entity/{entity}/{id}", Version(security.Authenticate(api_transaction.DeleteTransactionController)))
+	r.POST("/api/tx/{txId}/entity/{entity}", Version(security.Authenticate(api.RejectCoreEntity(api_transaction.WriteTransactionController))))
+	r.PUT("/api/tx/{txId}/entity/{entity}/{id}", Version(security.Authenticate(api.RejectCoreEntity(api_transaction.UpdateTransactionController))))
+	r.DELETE("/api/tx/{txId}/entity/{entity}/{id}", Version(security.Authenticate(api.RejectCoreEntity(api_transaction.DeleteTransactionController))))
 	r.POST("/api/tx/{txId}/commit", Version(security.Authenticate(api_transaction.CommitTransactionController)))
 
 	r.GET("/config", Version(security.AuthenticateAdmin(controller.GetConfigController)))

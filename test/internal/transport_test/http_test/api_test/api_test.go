@@ -1406,3 +1406,127 @@ func TestGetById_FilteredResponseIsNotCached(t *testing.T) {
 		t.Fatalf("expected full document, got %s", ctx.Response.Body())
 	}
 }
+
+func TestQueryPayload_HashDependsOnCountOnlyFieldsAndSortOrder(t *testing.T) {
+	base := api_controller.QueryPayload{Entity: "book"}
+	count := api_controller.QueryPayload{Entity: "book", CountOnly: true}
+	fields := api_controller.QueryPayload{Entity: "book", Fields: "title"}
+
+	hashes := map[string]bool{}
+	for _, p := range []api_controller.QueryPayload{base, count, fields} {
+		hashes[hex.EncodeToString(p.Hash())] = true
+	}
+
+	if len(hashes) != 3 {
+		t.Fatalf("expected countOnly and fields to change the cache key")
+	}
+
+	var yearFirst, titleFirst api_controller.QueryPayload
+	if err := json.Unmarshal([]byte(`{"entity":"flm","sorts":{"year":"desc","title":"asc"}}`), &yearFirst); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(`{"entity":"flm","sorts":{"title":"asc","year":"desc"}}`), &titleFirst); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(yearFirst.SortOrder) != 2 || yearFirst.SortOrder[0] != "year" || titleFirst.SortOrder[0] != "title" {
+		t.Fatalf("expected the sort keys to keep the request order, got %v and %v", yearFirst.SortOrder, titleFirst.SortOrder)
+	}
+
+	if yearFirst.Sorts["year"] != "desc" || yearFirst.Entity != "flm" {
+		t.Fatalf("expected the payload to be decoded, got %+v", yearFirst)
+	}
+
+	if hex.EncodeToString(yearFirst.Hash()) == hex.EncodeToString(titleFirst.Hash()) {
+		t.Fatalf("expected the sort order to change the cache key")
+	}
+
+	var noSorts api_controller.QueryPayload
+	if err := json.Unmarshal([]byte(`{"entity":"flm","sorts":null}`), &noSorts); err != nil || len(noSorts.SortOrder) != 0 {
+		t.Fatalf("expected null sorts to be accepted, got %v %v", noSorts.SortOrder, err)
+	}
+
+	if err := json.Unmarshal([]byte(`{"entity":"flm","sorts":{"year":1}}`), &noSorts); err == nil {
+		t.Fatalf("expected an invalid sort direction type to be rejected")
+	}
+}
+
+func TestParseFilterNode_TypedValues(t *testing.T) {
+	node, err := api_controller.ParseFilterNode(map[string]any{
+		"year":  map[string]any{"eq": 1983.0, "lt": 2000.5},
+		"color": map[string]any{"eq": true},
+		"title": map[string]any{"eq": "C"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]map[string]string{
+		"year":  {"eq": "1983", "lt": "2000.5"},
+		"color": {"eq": "true"},
+		"title": {"eq": "C"},
+	}
+	for field, ops := range want {
+		for op, value := range ops {
+			if node.Leaf[field][op] != value {
+				t.Fatalf("%s.%s: expected %q, got %q", field, op, value, node.Leaf[field][op])
+			}
+		}
+	}
+
+	for _, raw := range []map[string]any{
+		{"year": map[string]any{"eq": nil}},
+		{"year": map[string]any{"eq": []any{1.0}}},
+		{"year": map[string]any{"eq": map[string]any{}}},
+	} {
+		if _, err := api_controller.ParseFilterNode(raw); err == nil {
+			t.Fatalf("expected %v to be rejected", raw)
+		}
+	}
+}
+
+func TestQueryController_ReturnsJSONErrors(t *testing.T) {
+	setup(t)
+
+	for _, body := range []string{`{bad`, `{"entity":"film","filters":{"year":{"eq":null}}}`} {
+		ctx := newCtx("POST", "/api/query", body)
+		api_controller.QueryController(ctx)
+
+		var out map[string]string
+		if ctx.Response.StatusCode() != fasthttp.StatusBadRequest || json.Unmarshal(ctx.Response.Body(), &out) != nil || out["error"] == "" {
+			t.Fatalf("%s: expected a 400 with an error message, got %d %s", body, ctx.Response.StatusCode(), ctx.Response.Body())
+		}
+	}
+}
+
+func TestQueryController_RejectsCoreEntities(t *testing.T) {
+	setup(t)
+
+	ctx := newCtx("POST", "/api/query", `{"entity":"_elysiandb_core_user"}`)
+	api_controller.QueryController(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected 403, got %d", ctx.Response.StatusCode())
+	}
+}
+
+func TestRejectCoreEntity(t *testing.T) {
+	called := false
+	h := api_controller.RejectCoreEntity(func(ctx *fasthttp.RequestCtx) { called = true })
+
+	ctx := newCtx("GET", "/api/_elysiandb_core_acl", "")
+	ctx.SetUserValue("entity", "_elysiandb_core_acl")
+	h(ctx)
+
+	if called || ctx.Response.StatusCode() != fasthttp.StatusForbidden {
+		t.Fatalf("expected core entities to be rejected")
+	}
+
+	ctx = newCtx("GET", "/api/books", "")
+	ctx.SetUserValue("entity", "books")
+	h(ctx)
+
+	if !called {
+		t.Fatalf("expected public entities to pass")
+	}
+}

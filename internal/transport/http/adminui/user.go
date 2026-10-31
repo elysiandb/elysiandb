@@ -2,6 +2,7 @@ package adminui
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/security"
@@ -16,6 +17,16 @@ type loginRequest struct {
 type userResponse struct {
 	Username string        `json:"username"`
 	Role     security.Role `json:"role"`
+}
+
+func requestIsSecure(ctx *fasthttp.RequestCtx) bool {
+	if ctx.IsTLS() {
+		return true
+	}
+
+	proto, _, _ := strings.Cut(string(ctx.Request.Header.Peek("X-Forwarded-Proto")), ",")
+
+	return strings.EqualFold(strings.TrimSpace(proto), "https")
 }
 
 func LoginController(ctx *fasthttp.RequestCtx) {
@@ -43,7 +54,7 @@ func LoginController(ctx *fasthttp.RequestCtx) {
 	cookie.SetHTTPOnly(true)
 	cookie.SetSameSite(fasthttp.CookieSameSiteStrictMode)
 	cookie.SetPath("/")
-	cookie.SetSecure(true)
+	cookie.SetSecure(requestIsSecure(ctx))
 	ctx.Response.Header.SetCookie(cookie)
 	fasthttp.ReleaseCookie(cookie)
 
@@ -70,7 +81,7 @@ func LogoutController(ctx *fasthttp.RequestCtx) {
 	cookie.SetExpire(time.Unix(0, 0))
 	cookie.SetHTTPOnly(true)
 	cookie.SetSameSite(fasthttp.CookieSameSiteStrictMode)
-	cookie.SetSecure(true)
+	cookie.SetSecure(requestIsSecure(ctx))
 	ctx.Response.Header.SetCookie(cookie)
 	fasthttp.ReleaseCookie(cookie)
 

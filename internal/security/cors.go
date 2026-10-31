@@ -1,12 +1,17 @@
 package security
 
-import "github.com/valyala/fasthttp"
+import (
+	"strings"
+
+	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/valyala/fasthttp"
+)
 
 func CORS(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
 		origin := string(ctx.Request.Header.Peek("Origin"))
 
-		if origin != "" {
+		if origin != "" && OriginIsAllowed(origin) {
 			ctx.Response.Header.Set("Access-Control-Allow-Origin", origin)
 			ctx.Response.Header.Set("Vary", "Origin")
 			ctx.Response.Header.Set("Access-Control-Allow-Credentials", "true")
@@ -21,4 +26,15 @@ func CORS(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 
 		next(ctx)
 	}
+}
+
+func OriginIsAllowed(origin string) bool {
+	for _, allowed := range globals.GetConfig().Server.HTTP.CORS.AllowedOrigins {
+		allowed = strings.TrimSuffix(strings.TrimSpace(allowed), "/")
+		if allowed == "*" || strings.EqualFold(allowed, origin) {
+			return true
+		}
+	}
+
+	return false
 }

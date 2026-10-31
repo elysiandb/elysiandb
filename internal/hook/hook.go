@@ -1,6 +1,7 @@
 package hook
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/taymour/elysiandb/internal/engine"
@@ -82,6 +83,27 @@ func (h *Hook) ToDataMap() map[string]any {
 		"bypass_acl": h.ByPassACL,
 		"enabled":    h.Enabled,
 	}
+}
+
+func (h *Hook) Validate() error {
+	requiredFields := []struct {
+		name  string
+		value string
+	}{
+		{"name", h.Name},
+		{"entity", h.Entity},
+		{"event", h.Event},
+		{"language", h.Language},
+		{"script", h.Script},
+	}
+
+	for _, field := range requiredFields {
+		if field.value == "" {
+			return fmt.Errorf("the hook field '%s' is required", field.name)
+		}
+	}
+
+	return nil
 }
 
 func (h *Hook) FromDataMap(data map[string]any) {

@@ -122,8 +122,8 @@ func updateSchemaIfNeeded(entity string, data map[string]any) {
 		return
 	}
 
-	analyzed := schema.AnalyzeEntitySchema(entity, data)
-	WriteEntity(schema.SchemaEntity, analyzed)
+	merged := schema.MergeAnalyzedSchema(entity, GetEntitySchema(entity), data)
+	WriteEntity(schema.SchemaEntity, merged)
 }
 
 func WriteListOfEntities(entity string, list []map[string]any) [][]schema.ValidationError {
@@ -171,13 +171,17 @@ func ListEntityTypes() []string {
 	return decodeIDs(data)
 }
 
+func IsCoreEntityType(entity string) bool {
+	return strings.HasPrefix(entity, CoreEntityTypePrefix)
+}
+
 func ListPublicEntityTypes() []string {
 	data, _ := storage.GetByKey(globals.ApiAllEntityTypesListKey())
 	allEntityTypes := decodeIDs(data)
 
 	publicEntityTypes := make([]string, 0, len(allEntityTypes))
 	for _, entityType := range allEntityTypes {
-		if !strings.HasPrefix(entityType, CoreEntityTypePrefix) {
+		if !IsCoreEntityType(entityType) {
 			publicEntityTypes = append(publicEntityTypes, entityType)
 		}
 	}
@@ -212,7 +216,7 @@ func ListEntities(
 		return []map[string]any{}
 	}
 
-	if len(filters) == 0 {
+	if len(filters) == 0 && search == "" {
 		ids = applyOffsetLimit(ids, offset, limit)
 	}
 
@@ -233,16 +237,12 @@ func ListEntities(
 
 	filtered := make([]map[string]any, 0, len(all))
 	for _, e := range all {
-		if search == "" && FiltersMatchEntity(e, filters) {
-			filtered = append(filtered, e)
-		}
-
-		if search != "" && SearchMatchesEntity(e, search) {
+		if FiltersMatchEntity(e, filters) && (search == "" || SearchMatchesEntity(e, search)) {
 			filtered = append(filtered, e)
 		}
 	}
 
-	if len(filters) > 0 {
+	if len(filters) > 0 || search != "" {
 		return applyOffsetLimit(filtered, offset, limit)
 	}
 
@@ -281,6 +281,10 @@ func ApplyStoredFiltersToList(
 	}
 
 	return applyOffsetLimit(filtered, offset, limit)
+}
+
+func Paginate(entities []map[string]any, offset, limit int) []map[string]any {
+	return applyOffsetLimit(entities, offset, limit)
 }
 
 func applyOffsetLimit[T any](in []T, offset, limit int) []T {
