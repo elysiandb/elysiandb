@@ -56,8 +56,14 @@ func UpdateTransactionController(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
+	if err := acl.CheckEntityUpdate(entity, id, payload); err != nil {
+		sendWriteError(ctx, err)
+
+		return
+	}
+
 	if err := acl.CheckSubEntityWrites(payload); err != nil {
-		sendSubEntityError(ctx, err)
+		sendWriteError(ctx, err)
 
 		return
 	}
@@ -69,7 +75,7 @@ func UpdateTransactionController(ctx *fasthttp.RequestCtx) {
 		Data:   payload,
 	}
 
-	err = transaction.AddOperation(txID, op)
+	err = transaction.AddOperation(txID, transactionOwner(ctx), op)
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error":"` + err.Error() + `"}`)

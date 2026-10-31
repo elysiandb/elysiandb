@@ -3,7 +3,6 @@ package engines
 import (
 	"testing"
 
-	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/security"
 )
 
@@ -67,10 +66,6 @@ func TestCoreSubEntitiesCanOnlyBeReferenced(t *testing.T) {
 }
 
 func TestSubEntityWritesFollowACL(t *testing.T) {
-	userMode := func(c *configuration.Config) {
-		c.Security.Authentication = configuration.AuthenticationConfig{Enabled: true, Mode: "user"}
-	}
-
 	runOnEngines(t, userMode, func(s *session) {
 		s.loginAs("admin", security.RoleAdmin)
 		s.expectStatus(s.post("/api/security/user", map[string]any{"username": "alice", "password": "pw", "role": "user"}), 200)

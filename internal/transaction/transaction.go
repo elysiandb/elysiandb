@@ -18,6 +18,7 @@ type TxOperation struct {
 
 type Transaction struct {
 	ID        string
+	Owner     string
 	Ops       []TxOperation
 	StartedAt time.Time
 }
@@ -57,13 +58,14 @@ var TxManager = struct {
 	txs map[string]*Transaction
 }{txs: map[string]*Transaction{}}
 
-func BeginTransaction() *Transaction {
+func BeginTransaction(owner string) *Transaction {
 	TxManager.mu.Lock()
 	defer TxManager.mu.Unlock()
 
 	txID := generateTxID()
 	tx := &Transaction{
 		ID:        txID,
+		Owner:     owner,
 		Ops:       []TxOperation{},
 		StartedAt: time.Now(),
 	}
@@ -89,11 +91,11 @@ func GetTransaction(txID string) (*Transaction, error) {
 	return tx, nil
 }
 
-func AddOperation(txID string, op TxOperation) error {
+func AddOperation(txID, owner string, op TxOperation) error {
 	TxManager.mu.Lock()
 	defer TxManager.mu.Unlock()
 
-	tx, ok := TxManager.txs[txID]
+	tx, ok := ownedTransaction(txID, owner)
 	if !ok {
 		return errors.New("transaction not found")
 	}
@@ -103,9 +105,9 @@ func AddOperation(txID string, op TxOperation) error {
 	return nil
 }
 
-func CommitTransaction(txID string) error {
+func CommitTransaction(txID, owner string) error {
 	TxManager.mu.Lock()
-	tx, ok := TxManager.txs[txID]
+	tx, ok := ownedTransaction(txID, owner)
 	if !ok {
 		TxManager.mu.Unlock()
 
@@ -135,15 +137,24 @@ func CommitTransaction(txID string) error {
 	return nil
 }
 
-func RollbackTransaction(txID string) error {
+func RollbackTransaction(txID, owner string) error {
 	TxManager.mu.Lock()
 	defer TxManager.mu.Unlock()
 
-	if _, exists := TxManager.txs[txID]; !exists {
+	if _, exists := ownedTransaction(txID, owner); !exists {
 		return nil
 	}
 
 	delete(TxManager.txs, txID)
 
 	return nil
+}
+
+func ownedTransaction(txID, owner string) (*Transaction, bool) {
+	tx, ok := TxManager.txs[txID]
+	if !ok || tx.Owner != owner {
+		return nil, false
+	}
+
+	return tx, true
 }

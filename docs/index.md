@@ -1292,6 +1292,7 @@ Global permissions:
 
 Owning permissions (apply only to documents owned by the user):
 
+* `owning_write` (create documents, which are then owned by the user)
 * `owning_read`
 * `owning_update`
 * `owning_delete`
@@ -1299,26 +1300,38 @@ Owning permissions (apply only to documents owned by the user):
 Ownership is determined using the internal field:
 
 ```
-_core_username
+_elysiandb_core_username
 ```
+
+This field is managed by the server: a created document is owned by the current user, and an updated or replaced document keeps the owner it is stored with, whatever value the request body contains.
 
 ---
 
 ### Evaluation Rules
 
-* **Create**: allowed if `create` is granted
+* **Create** (`POST /api/<entity>` with one document or a list, and transaction writes):
+
+  * allowed if `create` or `owning_write` is granted
+  * if a document with the same `id` already exists, the request replaces it and follows the **Update** rules instead
+  * the first document of an entity type that does not exist yet can be created by any user, as with nested sub-entities; ACLs with the default permissions are then generated for every user on the new type
 * **Read**:
 
   * allowed if `read`
-  * otherwise allowed only if `owning_read` and `_core_username == current user`
-* **Update**:
+  * otherwise allowed only if `owning_read` and `_elysiandb_core_username == current user`
+* **Update** (`PUT /api/<entity>/<id>`, `PUT /api/<entity>` and transaction updates):
 
   * allowed if `update`
-  * otherwise allowed only if `owning_update` and ownership matches
-* **Delete**:
+  * otherwise allowed only if `owning_update` and the stored document is owned by the current user
+* **Delete** (`DELETE /api/<entity>/<id>` and transaction deletes):
 
   * allowed if `delete`
-  * otherwise allowed only if `owning_delete` and ownership matches
+  * otherwise allowed only if `owning_delete` and the stored document is owned by the current user
+
+Ownership is always read from the stored document, never from the request body.
+
+Core entity types (names starting with `_elysiandb_core_`, such as users, ACLs, hooks and schemas) can never be created, updated or deleted by a user through the entity or transaction routes, whatever the ACLs say. They are managed through the user, ACL and hook endpoints.
+
+A write that is not allowed is rejected with `403 Forbidden` and nothing is written. For a list, nothing is written when any of its documents is rejected.
 
 For list queries, results are automatically filtered to only include readable documents.
 
@@ -1339,8 +1352,8 @@ ACLs are generated automatically for all users and entities and can be reset to 
 
 * Default deny if no ACL is found
 * No implicit access
-* Ownership checks are enforced at read, update, and delete time
-* ACL logic applies uniformly across REST and transactional operations
+* Ownership checks are enforced at read, update, and delete time, against the stored document
+* ACL logic applies uniformly across REST and transactional operations; a transaction can only be used by the user who began it
 
 
 ---
@@ -1715,6 +1728,8 @@ DELETE /api/tx/{txId}/entity/{entity}/{id}
 ```
 
 Each operation is stored in memory and not applied until commit.
+
+In `user` authentication mode, a transaction belongs to the user who began it. For any other user it behaves like an unknown transaction: adding an operation or committing returns an error, and a rollback has no effect. Each operation is checked against the ACLs of the current user when it is added, with the same rules as the direct routes (see [Evaluation Rules](#evaluation-rules)), and is rejected with `403 Forbidden` when it is not allowed.
 
 #### Commit
 

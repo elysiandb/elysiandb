@@ -149,45 +149,138 @@ func TestCanDeleteEntity_Owning(t *testing.T) {
 	}
 }
 
-func TestCanUpdateListOfEntities_Global(t *testing.T) {
+func TestCheckEntityWrite_CreateNeedsCreateOrOwningWrite(t *testing.T) {
 	setup(t, true)
 	security.SetCurrentUsername("u")
+	api_storage.WriteEntity("doc", map[string]any{"id": "existing"})
 
-	perms := acl.NewPermissions()
-	perms[acl.PermissionUpdate] = true
-	writeACL("u", "doc", perms)
+	writeACL("u", "doc", acl.NewPermissions())
+	if err := acl.CheckEntityWrite("doc", map[string]any{"id": "d1"}); !errors.Is(err, acl.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
 
-	ok := acl.CanUpdateListOfEntities("doc", []map[string]any{
-		{acl.UsernameField: "x"},
-		{acl.UsernameField: "y"},
-	})
-	if !ok {
-		t.Fatalf("expected true")
+	for _, p := range []acl.Permission{acl.PermissionCreate, acl.PermissionOwningWrite} {
+		perms := acl.NewPermissions()
+		perms[p] = true
+		writeACL("u", "doc", perms)
+
+		data := map[string]any{"id": "d1", acl.UsernameField: "other"}
+		if err := acl.CheckEntityWrite("doc", data); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if data[acl.UsernameField] != "u" {
+			t.Fatalf("expected the document to be owned by u, got %v", data[acl.UsernameField])
+		}
 	}
 }
 
-func TestCanUpdateListOfEntities_Owning(t *testing.T) {
+func TestCheckEntityWrite_ExistingIdFollowsUpdateRules(t *testing.T) {
 	setup(t, true)
 	security.SetCurrentUsername("u")
+	api_storage.WriteEntity("doc", map[string]any{"id": "mine", acl.UsernameField: "u"})
+	api_storage.WriteEntity("doc", map[string]any{"id": "theirs", acl.UsernameField: "other"})
+
+	perms := acl.NewPermissions()
+	perms[acl.PermissionCreate] = true
+	perms[acl.PermissionOwningUpdate] = true
+	writeACL("u", "doc", perms)
+
+	if err := acl.CheckEntityWrite("doc", map[string]any{"id": "theirs"}); !errors.Is(err, acl.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+
+	mine := map[string]any{"id": "mine", acl.UsernameField: "other"}
+	if err := acl.CheckEntityWrite("doc", mine); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mine[acl.UsernameField] != "u" {
+		t.Fatalf("expected the stored owner to be kept, got %v", mine[acl.UsernameField])
+	}
+}
+
+func TestCheckEntityWrite_NewAndCoreEntityTypes(t *testing.T) {
+	setup(t, true)
+	security.SetCurrentUsername("u")
+
+	data := map[string]any{"label": "x"}
+	if err := acl.CheckEntityWrite("newtype", data); err != nil {
+		t.Fatalf("expected a document of a new type to be created, got %v", err)
+	}
+	if data[acl.UsernameField] != "u" {
+		t.Fatalf("expected the document to be owned by u, got %v", data[acl.UsernameField])
+	}
+
+	all := acl.DefaultPermissionsForRole(security.RoleAdmin)
+	writeACL("u", security.UserEntity, all)
+	api_storage.WriteEntity(security.UserEntity, map[string]any{"id": "admin", acl.UsernameField: "u"})
+
+	for _, id := range []string{"admin", "someone"} {
+		if err := acl.CheckEntityWrite(security.UserEntity, map[string]any{"id": id, "role": "admin"}); !errors.Is(err, acl.ErrForbidden) {
+			t.Fatalf("expected ErrForbidden for %s, got %v", id, err)
+		}
+	}
+	if err := acl.CheckEntityWrite("_elysiandb_core_hook", map[string]any{"id": "h1"}); !errors.Is(err, acl.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+	if err := acl.CheckEntityUpdate(security.UserEntity, "admin", map[string]any{"role": "admin"}); !errors.Is(err, acl.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+	if acl.CanDeleteEntity(security.UserEntity, map[string]any{acl.UsernameField: "u"}) {
+		t.Fatalf("expected core entities to never be deletable")
+	}
+}
+
+func TestCheckEntityUpdate_FollowsStoredOwner(t *testing.T) {
+	setup(t, true)
+	security.SetCurrentUsername("u")
+	api_storage.WriteEntity("doc", map[string]any{"id": "mine", acl.UsernameField: "u"})
+	api_storage.WriteEntity("doc", map[string]any{"id": "theirs", acl.UsernameField: "other"})
 
 	perms := acl.NewPermissions()
 	perms[acl.PermissionOwningUpdate] = true
 	writeACL("u", "doc", perms)
 
-	ok := acl.CanUpdateListOfEntities("doc", []map[string]any{
-		{acl.UsernameField: "u"},
-		{acl.UsernameField: "u"},
-	})
-	if !ok {
-		t.Fatalf("expected true")
+	if err := acl.CheckEntityUpdate("doc", "theirs", map[string]any{acl.UsernameField: "u"}); !errors.Is(err, acl.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
+	}
+	if err := acl.CheckEntityUpdate("doc", "missing", map[string]any{acl.UsernameField: "u"}); !errors.Is(err, acl.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 
-	ok = acl.CanUpdateListOfEntities("doc", []map[string]any{
-		{acl.UsernameField: "u"},
-		{acl.UsernameField: "x"},
-	})
-	if ok {
-		t.Fatalf("expected false")
+	mine := map[string]any{"text": "x", acl.UsernameField: "other"}
+	if err := acl.CheckEntityUpdate("doc", "mine", mine); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mine[acl.UsernameField] != "u" {
+		t.Fatalf("expected the stored owner to be kept, got %v", mine[acl.UsernameField])
+	}
+
+	perms[acl.PermissionUpdate] = true
+	writeACL("u", "doc", perms)
+
+	theirs := map[string]any{"text": "x", acl.UsernameField: "u"}
+	if err := acl.CheckEntityUpdate("doc", "theirs", theirs); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if theirs[acl.UsernameField] != "other" {
+		t.Fatalf("expected the stored owner to be kept, got %v", theirs[acl.UsernameField])
+	}
+}
+
+func TestCheckEntityWrite_AuthDisabled(t *testing.T) {
+	setup(t, false)
+	security.SetCurrentUsername("any")
+
+	data := map[string]any{"id": "admin", "role": "admin"}
+	if err := acl.CheckEntityWrite(security.UserEntity, data); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := acl.CheckEntityUpdate(security.UserEntity, "admin", data); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := data[acl.UsernameField]; ok {
+		t.Fatalf("expected no owner without user authentication")
 	}
 }
 
@@ -295,8 +388,8 @@ func TestCheckSubEntityWrites_CreateNeedsCreateOrOwningWrite(t *testing.T) {
 
 	writeACL("u", "doc", acl.NewPermissions())
 	err := acl.CheckSubEntityWrites(map[string]any{"x": map[string]any{"@entity": "doc", "id": "d1", "text": "x"}})
-	if !errors.Is(err, acl.ErrSubEntityForbidden) {
-		t.Fatalf("expected ErrSubEntityForbidden, got %v", err)
+	if !errors.Is(err, acl.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 
 	for _, p := range []acl.Permission{acl.PermissionCreate, acl.PermissionOwningWrite} {
@@ -335,8 +428,8 @@ func TestCheckSubEntityWrites_UpdateFollowsStoredOwner(t *testing.T) {
 	}
 
 	theirs := map[string]any{"@entity": "doc", "id": "theirs", "text": "x", acl.UsernameField: "u"}
-	if err := acl.CheckSubEntityWrites(map[string]any{"x": theirs}); !errors.Is(err, acl.ErrSubEntityForbidden) {
-		t.Fatalf("expected ErrSubEntityForbidden, got %v", err)
+	if err := acl.CheckSubEntityWrites(map[string]any{"x": theirs}); !errors.Is(err, acl.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 
 	perms[acl.PermissionUpdate] = true

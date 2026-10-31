@@ -3,26 +3,21 @@ package acl
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/security"
 )
 
-var ErrSubEntityForbidden = errors.New("forbidden")
+var ErrForbidden = errors.New("forbidden")
 
 func CanCreateEntity(entity string) bool {
 	if !security.UserAuthenticationIsEnabled() {
 		return true
 	}
 
-	username := security.GetCurrentUsername()
-	acl := GetACLEntityForUsername(entity, username)
-	if acl == nil {
-		return false
-	}
-
-	return acl.Can(PermissionCreate)
+	return canCreate(writableACL(entity, security.GetCurrentUsername()))
 }
 
 func CanDeleteEntity(entity string, data map[string]any) bool {
@@ -31,7 +26,7 @@ func CanDeleteEntity(entity string, data map[string]any) bool {
 	}
 
 	username := security.GetCurrentUsername()
-	acl := GetACLEntityForUsername(entity, username)
+	acl := writableACL(entity, username)
 	if acl == nil {
 		return false
 	}
@@ -55,7 +50,7 @@ func CanUpdateEntity(entity string, data map[string]any) bool {
 
 	username := security.GetCurrentUsername()
 
-	return canUpdate(GetACLEntityForUsername(entity, username), username, data)
+	return canUpdate(writableACL(entity, username), username, data)
 }
 
 func canUpdate(acl *ACL, username string, data map[string]any) bool {
@@ -75,6 +70,32 @@ func canUpdate(acl *ACL, username string, data map[string]any) bool {
 	return acl.Can(PermissionOwningUpdate) && dataUsername == username
 }
 
+func CheckEntityWrite(entity string, data map[string]any) error {
+	if !security.UserAuthenticationIsEnabled() {
+		return nil
+	}
+
+	id, _ := data["id"].(string)
+
+	return authorizeWrite(entity, id, security.GetCurrentUsername(), data)
+}
+
+func CheckEntityUpdate(entity, id string, data map[string]any) error {
+	if !security.UserAuthenticationIsEnabled() {
+		return nil
+	}
+
+	username := security.GetCurrentUsername()
+	stored := engine.ReadEntityById(entity, id)
+	if !canUpdate(writableACL(entity, username), username, stored) {
+		return fmt.Errorf("%w: cannot update %s", ErrForbidden, entity)
+	}
+
+	keepStoredOwner(data, stored)
+
+	return nil
+}
+
 func CheckSubEntityWrites(data map[string]any) error {
 	if !security.UserAuthenticationIsEnabled() {
 		return api_storage.RejectCoreSubEntities(data)
@@ -87,66 +108,57 @@ func CheckSubEntityWrites(data map[string]any) error {
 			return err
 		}
 
-		var stored map[string]any
-		if id != "" {
-			stored = engine.ReadEntityById(entity, id)
+		return authorizeWrite(entity, id, username, sub)
+	})
+}
+
+func authorizeWrite(entity, id, username string, data map[string]any) error {
+	var stored map[string]any
+	if id != "" {
+		stored = engine.ReadEntityById(entity, id)
+	}
+
+	if stored != nil {
+		if !canUpdate(writableACL(entity, username), username, stored) {
+			return fmt.Errorf("%w: cannot update %s", ErrForbidden, entity)
 		}
 
-		if stored != nil {
-			if !canUpdate(GetACLEntityForUsername(entity, username), username, stored) {
-				return fmt.Errorf("%w: cannot update %s", ErrSubEntityForbidden, entity)
-			}
-
-			if owner, ok := stored[UsernameField]; ok {
-				sub[UsernameField] = owner
-			} else {
-				delete(sub, UsernameField)
-			}
-
-			return nil
-		}
-
-		if engine.EntityTypeExists(entity) && !canCreate(GetACLEntityForUsername(entity, username)) {
-			return fmt.Errorf("%w: cannot create %s", ErrSubEntityForbidden, entity)
-		}
-
-		sub[UsernameField] = username
+		keepStoredOwner(data, stored)
 
 		return nil
-	})
+	}
+
+	if isCoreEntityType(entity) || (engine.EntityTypeExists(entity) && !canCreate(writableACL(entity, username))) {
+		return fmt.Errorf("%w: cannot create %s", ErrForbidden, entity)
+	}
+
+	data[UsernameField] = username
+
+	return nil
+}
+
+func keepStoredOwner(data, stored map[string]any) {
+	if owner, ok := stored[UsernameField]; ok {
+		data[UsernameField] = owner
+	} else {
+		delete(data, UsernameField)
+	}
 }
 
 func canCreate(acl *ACL) bool {
 	return acl != nil && (acl.Can(PermissionCreate) || acl.Can(PermissionOwningWrite))
 }
 
-func CanUpdateListOfEntities(entity string, data []map[string]any) bool {
-	if !security.UserAuthenticationIsEnabled() {
-		return true
+func writableACL(entity, username string) *ACL {
+	if isCoreEntityType(entity) {
+		return nil
 	}
 
-	username := security.GetCurrentUsername()
-	acl := GetACLEntityForUsername(entity, username)
-	if acl == nil {
-		return false
-	}
+	return GetACLEntityForUsername(entity, username)
+}
 
-	if acl.Can(PermissionUpdate) {
-		return true
-	}
-
-	for _, item := range data {
-		dataUsername, ok := item[UsernameField].(string)
-		if !ok || dataUsername == "" {
-			return false
-		}
-
-		if !acl.Can(PermissionOwningUpdate) || dataUsername != username {
-			return false
-		}
-	}
-
-	return true
+func isCoreEntityType(entity string) bool {
+	return strings.HasPrefix(entity, api_storage.CoreEntityTypePrefix)
 }
 
 func CanReadEntity(entity string, data map[string]any) bool {

@@ -31,7 +31,7 @@ func MigrateController(ctx *fasthttp.RequestCtx) {
 
 	for _, query := range migrationQueries {
 		if err := acl.CheckSubEntityWrites(query.Properties); err != nil {
-			sendSubEntityError(ctx, err)
+			sendWriteError(ctx, err)
 			return
 		}
 	}

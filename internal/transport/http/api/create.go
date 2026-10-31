@@ -9,7 +9,6 @@ import (
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/schema"
-	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
 
@@ -75,12 +74,8 @@ func handleSingleEntity(ctx *fasthttp.RequestCtx, entity string, body []byte) bo
 		data["id"] = uuid.New().String()
 	}
 
-	if security.UserAuthenticationIsEnabled() {
-		data[acl.UsernameField] = security.GetCurrentUsername()
-	}
-
-	if err := acl.CheckSubEntityWrites(data); err != nil {
-		sendSubEntityError(ctx, err)
+	if err := checkCreate(entity, data); err != nil {
+		sendWriteError(ctx, err)
 		return true
 	}
 
@@ -113,12 +108,8 @@ func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool
 			list[i]["id"] = uuid.New().String()
 		}
 
-		if security.UserAuthenticationIsEnabled() {
-			list[i][acl.UsernameField] = security.GetCurrentUsername()
-		}
-
-		if err := acl.CheckSubEntityWrites(list[i]); err != nil {
-			sendSubEntityError(ctx, err)
+		if err := checkCreate(entity, list[i]); err != nil {
+			sendWriteError(ctx, err)
 			return true
 		}
 	}
@@ -147,6 +138,14 @@ func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool
 	ctx.SetBody(response)
 
 	return true
+}
+
+func checkCreate(entity string, data map[string]any) error {
+	if err := acl.CheckEntityWrite(entity, data); err != nil {
+		return err
+	}
+
+	return acl.CheckSubEntityWrites(data)
 }
 
 func finalizeCreate(entity string) {

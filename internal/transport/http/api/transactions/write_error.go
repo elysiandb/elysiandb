@@ -8,8 +8,8 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func sendSubEntityError(ctx *fasthttp.RequestCtx, err error) {
-	if errors.Is(err, acl.ErrSubEntityForbidden) {
+func sendWriteError(ctx *fasthttp.RequestCtx, err error) {
+	if errors.Is(err, acl.ErrForbidden) {
 		ctx.SetStatusCode(fasthttp.StatusForbidden)
 		ctx.SetBodyString(`{"error":"forbidden"}`)
 

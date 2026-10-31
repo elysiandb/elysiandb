@@ -10,7 +10,7 @@ func CommitTransactionController(ctx *fasthttp.RequestCtx) {
 
 	txID := ctx.UserValue("txId").(string)
 
-	err := transaction.CommitTransaction(txID)
+	err := transaction.CommitTransaction(txID, transactionOwner(ctx))
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error":"` + err.Error() + `"}`)

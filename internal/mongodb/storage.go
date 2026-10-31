@@ -255,10 +255,7 @@ func UpdateEntityById(entity, id string, updated map[string]any) map[string]any 
 	}
 
 	maps.Copy(existing, updated)
-
-	if _, ok := existing["id"].(string); !ok || existing["id"] == "" {
-		existing["id"] = id
-	}
+	existing["id"] = id
 
 	if api_storage.RejectCoreSubEntities(existing) != nil {
 		return nil

@@ -77,15 +77,8 @@ func handleSingleUpdate(ctx *fasthttp.RequestCtx, entity, id string, body []byte
 		return false
 	}
 
-	if !acl.CanUpdateEntity(entity, single) {
-		ctx.SetStatusCode(fasthttp.StatusForbidden)
-		ctx.SetBody([]byte(`{"error":"forbidden"}`))
-
-		return false
-	}
-
-	if err := acl.CheckSubEntityWrites(single); err != nil {
-		sendSubEntityError(ctx, err)
+	if err := checkUpdate(entity, id, single); err != nil {
+		sendWriteError(ctx, err)
 		return true
 	}
 
@@ -103,16 +96,10 @@ func handleBatchUpdate(ctx *fasthttp.RequestCtx, entity string, body []byte) boo
 		return false
 	}
 
-	if !acl.CanUpdateListOfEntities(entity, list) {
-		ctx.SetStatusCode(fasthttp.StatusForbidden)
-		ctx.SetBody([]byte(`{"error":"forbidden"}`))
-
-		return false
-	}
-
 	for _, item := range list {
-		if err := acl.CheckSubEntityWrites(item); err != nil {
-			sendSubEntityError(ctx, err)
+		id, _ := item["id"].(string)
+		if err := checkUpdate(entity, id, item); err != nil {
+			sendWriteError(ctx, err)
 			return true
 		}
 	}
@@ -122,6 +109,14 @@ func handleBatchUpdate(ctx *fasthttp.RequestCtx, entity string, body []byte) boo
 	sendJSONResponse(ctx, response)
 
 	return true
+}
+
+func checkUpdate(entity, id string, data map[string]any) error {
+	if err := acl.CheckEntityUpdate(entity, id, data); err != nil {
+		return err
+	}
+
+	return acl.CheckSubEntityWrites(data)
 }
 
 func sendJSONResponse(ctx *fasthttp.RequestCtx, response []byte) {
@@ -135,10 +130,10 @@ func sendBadRequest(ctx *fasthttp.RequestCtx) {
 	ctx.SetBodyString("Invalid JSON")
 }
 
-func sendSubEntityError(ctx *fasthttp.RequestCtx, err error) {
+func sendWriteError(ctx *fasthttp.RequestCtx, err error) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 
-	if errors.Is(err, acl.ErrSubEntityForbidden) {
+	if errors.Is(err, acl.ErrForbidden) {
 		ctx.SetStatusCode(fasthttp.StatusForbidden)
 		ctx.SetBodyString(`{"error":"forbidden"}`)
 
