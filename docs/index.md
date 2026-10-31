@@ -2054,6 +2054,14 @@ Run tests:
 make test
 ```
 
+The MongoDB engine tests run only when `ELYSIAN_TEST_MONGODB_URI` points to a MongoDB server, for example with `docker compose -f docker/mongodb/docker-compose.yaml up -d`:
+
+```bash
+ELYSIAN_TEST_MONGODB_URI="mongodb://root:root@127.0.0.1:27017" make test
+```
+
+The CI starts a MongoDB service for them.
+
 Run performance benchmarks:
 
 ```bash
