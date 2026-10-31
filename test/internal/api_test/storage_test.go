@@ -491,6 +491,82 @@ func TestListEntities_AutoIncludeNested(t *testing.T) {
 	}
 }
 
+func TestListEntities_FilterExcludesMissingField(t *testing.T) {
+	initTestStore(t)
+
+	entity := "movies"
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "f1", "year": 1981.0})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "f2", "year": 1982.0})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "f3", "year": 1983.0})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "nf", "title": "No year"})
+
+	filters := map[string]map[string]string{"year": {"gte": "1982"}}
+	res := api_storage.ListEntities(entity, 0, 0, "year", true, filters, "", "")
+
+	if len(res) != 2 || res[0]["id"] != "f2" || res[1]["id"] != "f3" {
+		t.Fatalf("expected f2 and f3 only, got %v", res)
+	}
+}
+
+func TestListEntities_FilterTraversesArrays(t *testing.T) {
+	initTestStore(t)
+
+	entity := "tags"
+	api_storage.WriteEntity(entity, map[string]interface{}{
+		"id": "t1",
+		"cats": []interface{}{
+			map[string]interface{}{"name": "sf"},
+			map[string]interface{}{"name": "noir"},
+		},
+	})
+	api_storage.WriteEntity(entity, map[string]interface{}{
+		"id": "t2",
+		"cats": []interface{}{
+			map[string]interface{}{"name": "comedy"},
+		},
+	})
+
+	filters := map[string]map[string]string{"cats.name": {"eq": "sf"}}
+	res := api_storage.ListEntities(entity, 0, 0, "", true, filters, "", "")
+
+	if len(res) != 1 || res[0]["id"] != "t1" {
+		t.Fatalf("expected only t1, got %v", res)
+	}
+}
+
+func TestListEntities_FilterOnRelationList(t *testing.T) {
+	initTestStore(t)
+
+	entity := "books"
+	api_storage.WriteEntity(entity, map[string]interface{}{
+		"id": "b1",
+		"authors": []interface{}{
+			map[string]interface{}{"@entity": "author", "id": "32e1f608"},
+		},
+	})
+	api_storage.WriteEntity(entity, map[string]interface{}{
+		"id": "b2",
+		"authors": []interface{}{
+			map[string]interface{}{"@entity": "author", "id": "25667686"},
+		},
+	})
+	api_storage.WriteEntity(entity, map[string]interface{}{"id": "b3"})
+
+	filters := map[string]map[string]string{"authors.fullname": {"eq": "Alberto"}}
+	res := api_storage.ListEntities(entity, 0, 0, "", true, filters, "", "")
+
+	if len(res) != 1 || res[0]["id"] != "b2" {
+		t.Fatalf("expected only b2, got %v", res)
+	}
+
+	filters = map[string]map[string]string{"authors.job.designation": {"eq": "Worker"}}
+	res = api_storage.ListEntities(entity, 0, 0, "", true, filters, "", "")
+
+	if len(res) != 2 {
+		t.Fatalf("expected b1 and b2, got %v", res)
+	}
+}
+
 func TestListEntities_AutoIncludeDeepNested(t *testing.T) {
 	initTestStore(t)
 

@@ -1,10 +1,12 @@
 package api_test
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/query"
 )
 
 func TestSearchMatchesEntitySimple(t *testing.T) {
@@ -393,5 +395,147 @@ func TestFiltersMatchEntityArrayMixedTypes(t *testing.T) {
 	f = map[string]map[string]string{"values": {"none": "four,five"}}
 	if !api_storage.FiltersMatchEntity(entity, f) {
 		t.Fatalf("expected none match for absent values")
+	}
+}
+
+func TestFiltersMatchEntityMissingFieldDoesNotMatch(t *testing.T) {
+	entity := map[string]interface{}{"id": "nf", "title": "No year"}
+	for _, op := range []string{"eq", "neq", "lt", "lte", "gt", "gte", "contains", "not_contains", "any", "all", "none"} {
+		f := map[string]map[string]string{"year": {op: "1982"}}
+		if api_storage.FiltersMatchEntity(entity, f) {
+			t.Fatalf("expected %s on missing field to fail", op)
+		}
+	}
+
+	f := map[string]map[string]string{"author.name": {"eq": "Alice"}}
+	if api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected filter on missing nested field to fail")
+	}
+
+	f = map[string]map[string]string{"title": {"eq": "No year"}, "year": {"gte": "1982"}}
+	if api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected missing field to fail even when other filters match")
+	}
+}
+
+func TestFiltersMatchEntityNullValueDoesNotMatch(t *testing.T) {
+	entity := map[string]interface{}{"year": nil}
+	f := map[string]map[string]string{"year": {"gte": "1982"}}
+	if api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected filter on null field to fail")
+	}
+}
+
+func TestFiltersMatchEntityArrayTraversal(t *testing.T) {
+	entity := map[string]interface{}{
+		"cats": []interface{}{
+			map[string]interface{}{"name": "sf", "meta": map[string]interface{}{"rank": 1.0}},
+			map[string]interface{}{"name": "noir", "meta": map[string]interface{}{"rank": 4.0}},
+		},
+	}
+
+	f := map[string]map[string]string{"cats.name": {"eq": "sf"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected match when an array element satisfies the filter")
+	}
+
+	f = map[string]map[string]string{"cats.name": {"eq": "comedy"}}
+	if api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected no match when no array element satisfies the filter")
+	}
+
+	f = map[string]map[string]string{"cats.meta.rank": {"gte": "3"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected match on nested path through array")
+	}
+
+	f = map[string]map[string]string{"cats.meta.rank": {"gt": "4"}}
+	if api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected no match on nested path through array")
+	}
+}
+
+func TestFiltersMatchEntityTraversesIncludedRelationList(t *testing.T) {
+	entity := map[string]interface{}{
+		"authors": []map[string]interface{}{
+			{"name": "Alice", "job": map[string]interface{}{"title": "Writer"}},
+			{"name": "Bob"},
+		},
+	}
+
+	f := map[string]map[string]string{"authors.name": {"eq": "Bob"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected match on included relation list")
+	}
+
+	f = map[string]map[string]string{"authors.job.title": {"eq": "Writer"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected match on nested field of included relation list")
+	}
+
+	f = map[string]map[string]string{"authors.name": {"eq": "Carol"}}
+	if api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected no match on included relation list")
+	}
+}
+
+func TestFiltersMatchEntityIntegerValues(t *testing.T) {
+	entity := map[string]interface{}{"score": int64(5), "rank": 3, "level": int32(2)}
+
+	f := map[string]map[string]string{"score": {"gte": "5"}, "rank": {"eq": "3"}, "level": {"lt": "3"}}
+	if !api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected integer values to match")
+	}
+
+	f = map[string]map[string]string{"score": {"gt": "5"}}
+	if api_storage.FiltersMatchEntity(entity, f) {
+		t.Fatalf("expected integer value comparison to fail")
+	}
+}
+
+func TestFiltersMatchEntitySameSemanticsAsQueryFilter(t *testing.T) {
+	data := []map[string]any{
+		{"id": "f1", "year": 1981.0},
+		{"id": "f2", "year": 1982.0},
+		{"id": "nf", "title": "No year"},
+		{"id": "t1", "cats": []any{map[string]any{"name": "sf"}, map[string]any{"name": "noir"}}},
+		{"id": "t2", "cats": []any{map[string]any{"name": "comedy"}}},
+		{"id": "n1", "year": nil, "cats": "sf"},
+	}
+
+	filters := []map[string]map[string]string{
+		{"year": {"gte": "1982"}},
+		{"year": {"neq": "1982"}},
+		{"cats.name": {"eq": "sf"}},
+		{"cats.name": {"neq": "sf"}},
+		{"cats": {"eq": "sf"}},
+		{"title": {"eq": "*"}},
+	}
+
+	for _, f := range filters {
+		want := api_storage.ApplyQueryFilter(data, query.FilterNode{Leaf: f})
+		got := api_storage.ApplyFiltersToList(data, f)
+		if !reflect.DeepEqual(want, got) {
+			t.Fatalf("filter %v: REST %v, query %v", f, got, want)
+		}
+	}
+}
+
+func TestStoredFiltersMatchEntityIgnoresUnresolvedFields(t *testing.T) {
+	entity := map[string]interface{}{"tag": "a", "cats": []interface{}{map[string]interface{}{"name": "sf"}}}
+
+	f := map[string]map[string]string{"allowed": {"eq": "true"}, "tag": {"eq": "a"}, "cats.name": {"eq": "sf"}}
+	if !api_storage.StoredFiltersMatchEntity(entity, f) {
+		t.Fatalf("expected unresolved field to be ignored")
+	}
+
+	f = map[string]map[string]string{"allowed": {"eq": "true"}, "tag": {"eq": "b"}}
+	if api_storage.StoredFiltersMatchEntity(entity, f) {
+		t.Fatalf("expected stored field mismatch to fail")
+	}
+
+	f = map[string]map[string]string{"cats.name": {"eq": "noir"}}
+	if api_storage.StoredFiltersMatchEntity(entity, f) {
+		t.Fatalf("expected array traversal mismatch to fail")
 	}
 }

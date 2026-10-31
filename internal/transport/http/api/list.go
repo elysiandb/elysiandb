@@ -57,11 +57,20 @@ func ListController(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
-	data := engine.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
+	preReadHooks := globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPreReadHooks(entity)
+
+	var data []map[string]any
+	if preReadHooks && len(filters) > 0 {
+		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
+		data = engine.ListEntities(entity, 0, 0, sortField, sortAscending, nil, search, includes)
+		data = api_storage.ApplyStoredFiltersToList(data, filters, offset, limit)
+	} else {
+		data = engine.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
+	}
 
 	data = acl.FilterListOfEntities(entity, data)
 
-	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPreReadHooks(entity) {
+	if preReadHooks {
 		for i, item := range data {
 			data[i] = hook.ApplyPreReadHooksForEntity(entity, item)
 		}

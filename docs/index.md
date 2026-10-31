@@ -861,6 +861,8 @@ This mechanism also works recursively and supports **arrays of sub-entities**, a
 
 ### Filtering Operators
 
+Filters follow the same rules as the Query API. Nested paths traverse objects and arrays, including included sub-entities: `filter[categories.title][eq]=coco` matches if **any** element satisfies the condition. An entity that does not have the filtered field, or has it set to `null`, does not match, whatever the operator.
+
 | Operator       | Meaning                                |
 | -------------- | -------------------------------------- |
 | `eq`           | Equals                                 |

@@ -259,6 +259,22 @@ func ApplyFiltersToList(
 	return filtered
 }
 
+func ApplyStoredFiltersToList(
+	entities []map[string]any,
+	filters map[string]map[string]string,
+	offset int,
+	limit int,
+) []map[string]any {
+	filtered := make([]map[string]any, 0, len(entities))
+	for _, e := range entities {
+		if StoredFiltersMatchEntity(e, filters) {
+			filtered = append(filtered, e)
+		}
+	}
+
+	return applyOffsetLimit(filtered, offset, limit)
+}
+
 func applyOffsetLimit[T any](in []T, offset, limit int) []T {
 	start := offset
 	if start > len(in) {

@@ -529,8 +529,52 @@ function preRead(ctx) {
 	var list []map[string]any
 	json.Unmarshal(ctx.Response.Body(), &list)
 
-	if len(list) != 1 {
-		t.Fatalf("expected 1 item when pre_read is disabled")
+	if len(list) != 0 {
+		t.Fatalf("expected no item when pre_read is disabled, got %v", list)
+	}
+}
+
+func TestList_PreReadHookFilteringExcludesMissingStoredField(t *testing.T) {
+	setup(t)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Hooks.Enabled = true
+	globals.SetConfig(cfg)
+
+	api_storage.CreateEntityType("ticket")
+
+	api_storage.WriteEntity("_elysiandb_core_hook", map[string]any{
+		"id":         "h_pre_4",
+		"name":       "pre_read",
+		"entity":     "ticket",
+		"event":      "pre_read",
+		"language":   "javascript",
+		"priority":   1,
+		"enabled":    true,
+		"bypass_acl": true,
+		"script": `
+function preRead(ctx) {
+  ctx.entity.allowed = ctx.entity.value === 1
+  return ctx.entity
+}
+`,
+	})
+
+	for _, body := range []string{`{"value":1,"tag":"a"}`, `{"value":1}`, `{"value":2,"tag":"a"}`} {
+		ctx := newCtx("POST", "/api/ticket", body)
+		ctx.SetUserValue("entity", "ticket")
+		api_controller.CreateController(ctx)
+	}
+
+	ctx := newCtx("GET", "/api/ticket?filter[allowed][eq]=true&filter[tag][eq]=a", "")
+	ctx.SetUserValue("entity", "ticket")
+	api_controller.ListController(ctx)
+
+	var list []map[string]any
+	json.Unmarshal(ctx.Response.Body(), &list)
+
+	if len(list) != 1 || list[0]["value"] != float64(1) || list[0]["tag"] != "a" {
+		t.Fatalf("expected only the allowed ticket tagged a, got %v", list)
 	}
 }
 
