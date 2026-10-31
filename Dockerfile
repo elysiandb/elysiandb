@@ -21,7 +21,7 @@ ARG TARGETARCH
 ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
     go build -trimpath \
-    -ldflags="-s -w -X github.com/taymour/elysiandb/internal/globals.VERSION=${VERSION}" \
+    -ldflags="-s -w -X github.com/taymour/elysiandb/internal/globals.VERSION=${VERSION#v}" \
     -o /out/elysiandb .
 
 FROM alpine:3.20
