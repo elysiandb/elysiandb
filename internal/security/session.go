@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/globals"
@@ -48,8 +49,16 @@ func CurrentSession(ctx *fasthttp.RequestCtx) (*Session, error) {
 }
 
 func CurrentUserIsAdmin(ctx *fasthttp.RequestCtx) bool {
+	if !AuthenticationIsEnabled() {
+		return true
+	}
+
 	if TokenAuthenticationIsEnabled() {
 		return CheckTokenAuthentication(ctx)
+	}
+
+	if BasicAuthenticationIsEnabled() {
+		return CheckBasicAuthentication(ctx)
 	}
 
 	currentSession, err := CurrentSession(ctx)
@@ -94,23 +103,25 @@ func loadSessions() (*SessionsFile, error) {
 	return &sf, nil
 }
 
+var sessionsMu sync.Mutex
+
 func saveSessions(sf *SessionsFile) error {
 	cfg := globals.GetConfig()
 	path := fmt.Sprintf("%s/%s", cfg.Store.Folder, SessionsFilename)
+	tmpPath := path + ".tmp"
 
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
-	if err != nil {
+	data, _ := json.Marshal(sf)
+	if err := os.WriteFile(tmpPath, append(data, '\n'), 0o644); err != nil {
 		return err
 	}
 
-	defer file.Close()
-
-	enc := json.NewEncoder(file)
-
-	return enc.Encode(sf)
+	return os.Rename(tmpPath, path)
 }
 
 func CreateSession(username string, role Role, ttl time.Duration) (*Session, error) {
+	sessionsMu.Lock()
+	defer sessionsMu.Unlock()
+
 	sf, err := loadSessions()
 	if err != nil {
 		return nil, err
@@ -154,22 +165,23 @@ func GetSession(id string) (*Session, error) {
 	}
 
 	now := time.Now().Unix()
-	var active []Session
 	var found *Session
+	hasExpired := false
 
 	for _, s := range sf.Sessions {
-		if s.ExpiresAt > now {
-			active = append(active, s)
-			if s.ID == id {
-				tmp := s
-				found = &tmp
-			}
+		if s.ExpiresAt <= now {
+			hasExpired = true
+			continue
+		}
+
+		if s.ID == id {
+			tmp := s
+			found = &tmp
 		}
 	}
 
-	if len(active) != len(sf.Sessions) {
-		sf.Sessions = active
-		_ = saveSessions(sf)
+	if hasExpired {
+		removeExpiredSessions()
 	}
 
 	if found == nil {
@@ -179,7 +191,28 @@ func GetSession(id string) (*Session, error) {
 	return found, nil
 }
 
+func removeExpiredSessions() {
+	sessionsMu.Lock()
+	defer sessionsMu.Unlock()
+
+	if sf, err := loadSessions(); err == nil {
+		now := time.Now().Unix()
+		active := make([]Session, 0, len(sf.Sessions))
+		for _, s := range sf.Sessions {
+			if s.ExpiresAt > now {
+				active = append(active, s)
+			}
+		}
+
+		sf.Sessions = active
+		_ = saveSessions(sf)
+	}
+}
+
 func DeleteSession(id string) error {
+	sessionsMu.Lock()
+	defer sessionsMu.Unlock()
+
 	sf, err := loadSessions()
 	if err != nil {
 		return err

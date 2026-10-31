@@ -25,7 +25,10 @@ func DeleteUser() {
 		return
 	}
 
-	security.DeleteBasicUser(username)
+	if err := security.DeleteBasicUser(username); err != nil {
+		Printf("%sUser '%s' was not deleted: %s.%s\n", globals.Gold, username, err, globals.Reset)
+		return
+	}
 
 	Printf("%sUser '%s' deleted successfully.%s\n", globals.Gold, username, globals.Reset)
 }

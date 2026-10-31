@@ -94,7 +94,7 @@ func collectIncludeFields(entityData map[string]any, tree map[string][]string, f
 }
 
 func includeSingleEntity(m map[string]any) map[string]any {
-	if ent, ok := m["@entity"].(string); ok {
+	if ent, ok := m["@entity"].(string); ok && !IsCoreEntityType(ent) {
 		if id, ok := m["id"].(string); ok && id != "" {
 			read := ReadEntityByIdFunc(ent, id)
 			if read != nil {

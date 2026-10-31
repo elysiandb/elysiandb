@@ -10,6 +10,7 @@ import (
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/transaction"
+	"github.com/taymour/elysiandb/internal/transport/http/api"
 	"github.com/valyala/fasthttp"
 )
 
@@ -25,6 +26,10 @@ func WriteTransactionController(ctx *fasthttp.RequestCtx) {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error":"invalid json"}`)
 
+		return
+	}
+
+	if api.RejectCoreEntityReferences(ctx, payload) {
 		return
 	}
 

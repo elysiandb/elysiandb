@@ -4,11 +4,24 @@ import (
 	"net"
 
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/transport/tcp/handler"
 	"github.com/taymour/elysiandb/internal/transport/tcp/parsing"
 )
 
-func RouteLine(line []byte, c net.Conn) []byte {
+type Session struct {
+	authenticated bool
+}
+
+func NewSession() *Session {
+	return &Session{authenticated: !security.CredentialsAreRequired()}
+}
+
+func (s *Session) IsAuthenticated() bool {
+	return s.authenticated
+}
+
+func RouteLine(line []byte, c net.Conn, session *Session) []byte {
 	cmd, query := parsing.FirstWordBytes(line)
 
 	switch {
@@ -19,6 +32,21 @@ func RouteLine(line []byte, c net.Conn) []byte {
 		_ = c.Close()
 		return []byte("Goodbye!")
 
+	case parsing.EqASCII(cmd, []byte("AUTH")):
+		if !security.AuthenticateCredentials(string(query)) {
+			return []byte("ERR invalid credentials")
+		}
+
+		session.authenticated = true
+
+		return []byte("OK")
+	}
+
+	if !session.authenticated {
+		return []byte("ERR auth required")
+	}
+
+	switch {
 	case parsing.EqASCII(cmd, []byte("GET")):
 		return handler.HandleGet(query)
 

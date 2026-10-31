@@ -11,14 +11,7 @@ import (
 )
 
 func ExecuteQuery(q query.Query) ([]map[string]any, error) {
-	sortField := ""
-	sortAsc := true
-
-	for f, dir := range q.Sorts {
-		sortField = f
-		sortAsc = strings.ToLower(dir) != "desc"
-		break
-	}
+	sortField, sortAsc := q.PrimarySort()
 
 	mongoExpr := BuildMongoExpr(q.Filter)
 

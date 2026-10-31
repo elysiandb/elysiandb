@@ -181,6 +181,10 @@ func ListEntityTypes() []string {
 	return nil
 }
 
+func IsCoreEntityType(entity string) bool {
+	return api_storage.IsCoreEntityType(entity)
+}
+
 func ListPublicEntityTypes() []string {
 	if IsEngineInternal() {
 		return api_storage.ListPublicEntityTypes()

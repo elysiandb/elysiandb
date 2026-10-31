@@ -1,14 +1,13 @@
 package security
 
 import (
+	"crypto/subtle"
+
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/valyala/fasthttp"
 )
 
 var CheckTokenAuthentication = func(ctx *fasthttp.RequestCtx) bool {
-	cfg := globals.GetConfig()
-	expectedToken := cfg.Security.Authentication.Token
-
 	providedToken := string(ctx.Request.Header.Peek("Authorization"))
 	if providedToken == "" {
 		return false
@@ -19,7 +18,14 @@ var CheckTokenAuthentication = func(ctx *fasthttp.RequestCtx) bool {
 		return false
 	}
 
-	providedToken = providedToken[len(bearerPrefix):]
+	return TokenMatches(providedToken[len(bearerPrefix):])
+}
 
-	return providedToken == expectedToken
+func TokenMatches(providedToken string) bool {
+	expectedToken := globals.GetConfig().Security.Authentication.Token
+	if expectedToken == "" {
+		return false
+	}
+
+	return subtle.ConstantTimeCompare([]byte(providedToken), []byte(expectedToken)) == 1
 }

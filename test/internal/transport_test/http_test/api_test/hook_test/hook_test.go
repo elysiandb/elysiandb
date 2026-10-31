@@ -250,7 +250,7 @@ func TestUpdateHookById_OK(t *testing.T) {
 	http_hook.UpdateHookByIdController(ctx)
 
 	if ctx.Response.StatusCode() != fasthttp.StatusOK {
-		t.Fatalf("expected 200")
+		t.Fatalf("expected 200, got %d %s", ctx.Response.StatusCode(), ctx.Response.Body())
 	}
 }
 

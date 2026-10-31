@@ -34,6 +34,11 @@ func (v *ValidationError) ToError() error {
 	return fmt.Errorf("Field '%s': %s", v.Field, v.Message)
 }
 
+const (
+	MessageRequiredFieldMissing = "required field missing"
+	MessageRequiredFieldNull    = "required field cannot be null"
+)
+
 func AnalyzeEntitySchema(entity string, data map[string]any) map[string]any {
 	required := globals.GetConfig().Api.Schema.Strict
 	schema := Entity{
@@ -42,6 +47,51 @@ func AnalyzeEntitySchema(entity string, data map[string]any) map[string]any {
 	}
 
 	return SchemaEntityToStorableStructure(schema)
+}
+
+func MergeAnalyzedSchema(entity string, existing map[string]any, data map[string]any) map[string]any {
+	analyzed := AnalyzeEntitySchema(entity, data)
+	if existing == nil {
+		return analyzed
+	}
+
+	existingFields, _ := existing["fields"].(map[string]any)
+	analyzedFields, _ := analyzed["fields"].(map[string]any)
+
+	merged := SchemaEntityToStorableStructure(Entity{
+		ID:     entity,
+		Fields: mergeFields(MapToFields(existingFields), MapToFields(analyzedFields)),
+	})
+
+	if manual, ok := existing["_manual"]; ok {
+		merged["_manual"] = manual
+	}
+
+	return merged
+}
+
+func mergeFields(existing, incoming map[string]Field) map[string]Field {
+	merged := make(map[string]Field, len(existing)+len(incoming))
+	for name, field := range existing {
+		merged[name] = field
+	}
+
+	for name, field := range incoming {
+		current, ok := merged[name]
+		switch {
+		case !ok:
+			merged[name] = field
+		case field.Type == "unknown":
+		case current.Type == field.Type && (field.Type == "object" || field.Type == "array"):
+			current.Fields = mergeFields(current.Fields, field.Fields)
+			merged[name] = current
+		default:
+			field.Required = current.Required
+			merged[name] = field
+		}
+	}
+
+	return merged
 }
 
 func analyzeFields(data map[string]interface{}, isRoot, required bool) map[string]Field {
@@ -111,6 +161,42 @@ func ValidateEntity(entity string, data map[string]any, schemaData map[string]an
 	return errors
 }
 
+func ValidateEntityUpdate(entity string, existing, updates, schemaData map[string]any) []ValidationError {
+	if existing == nil {
+		return ValidateEntity(entity, updates, schemaData)
+	}
+
+	merged := make(map[string]any, len(existing)+len(updates))
+	for k, v := range existing {
+		merged[k] = v
+	}
+
+	for k, v := range updates {
+		merged[k] = v
+	}
+
+	var errors []ValidationError
+	for _, e := range ValidateEntity(entity, merged, schemaData) {
+		root := rootFieldName(e.Field)
+		_, updated := updates[root]
+		missingAtRoot := root == e.Field && e.Message == MessageRequiredFieldMissing
+
+		if updated || missingAtRoot {
+			errors = append(errors, e)
+		}
+	}
+
+	return errors
+}
+
+func rootFieldName(field string) string {
+	if i := strings.IndexAny(field, ".["); i >= 0 {
+		return field[:i]
+	}
+
+	return field
+}
+
 func validateNoExtraFieldsRecursive(fields map[string]Field, data map[string]interface{}, prefix string, errors *[]ValidationError) {
 	for key, val := range data {
 		if key == "id" || strings.HasPrefix(key, globals.CoreFieldsPrefix) {
@@ -166,7 +252,18 @@ func validateFieldsRecursive(fields map[string]Field, data map[string]interface{
 			if strict && fieldDef.Required {
 				*errors = append(*errors, ValidationError{
 					Field:   fullName,
-					Message: "required field missing",
+					Message: MessageRequiredFieldMissing,
+				})
+			}
+
+			continue
+		}
+
+		if value == nil {
+			if strict && fieldDef.Required {
+				*errors = append(*errors, ValidationError{
+					Field:   fullName,
+					Message: MessageRequiredFieldNull,
 				})
 			}
 
@@ -174,6 +271,10 @@ func validateFieldsRecursive(fields map[string]Field, data map[string]interface{
 		}
 
 		expected := fieldDef.Type
+		if expected == "unknown" {
+			continue
+		}
+
 		actual := DetectJSONType(value)
 		if actual != expected {
 			*errors = append(*errors, ValidationError{
@@ -262,6 +363,12 @@ func FieldsToMap(fields map[string]Field) map[string]any {
 func MapToFields(m map[string]any) map[string]Field {
 	fields := make(map[string]Field)
 	for k, v := range m {
+		if typeName, ok := v.(string); ok {
+			fields[k] = Field{Name: k, Type: typeName}
+
+			continue
+		}
+
 		if fieldMap, ok := v.(map[string]any); ok {
 			f := Field{Name: k}
 			if typeName, ok := fieldMap["type"].(string); ok {

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/globals"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -63,7 +64,7 @@ func BuildSpecsFromSample(entity string, includeAll bool, paths [][]string) []In
 			}
 
 			ent, ok := RefEntityFromValue(v)
-			if !ok || ent == "" {
+			if !ok || ent == "" || api_storage.IsCoreEntityType(ent) {
 				continue
 			}
 
@@ -99,6 +100,10 @@ func BuildSpecsFromSample(entity string, includeAll bool, paths [][]string) []In
 
 		if from == "" {
 			from = SingularFallback(field)
+		}
+
+		if api_storage.IsCoreEntityType(from) {
+			continue
 		}
 
 		as := field
@@ -359,7 +364,7 @@ func CollectAllRefMaps(root any, out *[]struct {
 }
 
 func LoadDocsByIds(entity string, ids []string) map[string]map[string]any {
-	if len(ids) == 0 {
+	if len(ids) == 0 || api_storage.IsCoreEntityType(entity) {
 		return map[string]map[string]any{}
 	}
 

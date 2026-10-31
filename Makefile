@@ -7,7 +7,10 @@ api_benchmark:
 
 COVERPKG := $(shell go list ./... | tr '\n' ',' | sed 's/,$$//')
 
-.PHONY: test test-e2e-http test-unit test-cover
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//')
+LDFLAGS := -X github.com/taymour/elysiandb/internal/globals.VERSION=$(VERSION)
+
+.PHONY: test test-e2e-http test-unit test-cover build
 
 test:
 	@pkgs=$$(go list -f '{{if or (len .TestGoFiles) (len .XTestGoFiles)}}{{.ImportPath}}{{end}}' ./... | grep -v '^$$'); \
@@ -28,12 +31,15 @@ test-cover:
 	go test $$pkgs -race -coverprofile=coverage.out -coverpkg=$(COVERPKG) -count=1 && \
 	go tool cover -func=coverage.out
 
+build:
+	go build -ldflags "$(LDFLAGS)" -o elysiandb .
+
 install:
 	rm -f /usr/local/bin/elysiandb
-	go build -o /usr/local/bin/elysiandb .
+	go build -ldflags "$(LDFLAGS)" -o /usr/local/bin/elysiandb .
 
 server:
-	go run . server
+	go run -ldflags "$(LDFLAGS)" . server
 
 run: build-admin server
 

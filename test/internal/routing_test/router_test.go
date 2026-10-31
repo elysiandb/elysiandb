@@ -2,7 +2,11 @@ package routing_test
 
 import (
 	"bytes"
+	"io"
 	"net"
+	"os"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -223,5 +227,32 @@ func TestRegisterRoutes_AdminRoutesInUserMode(t *testing.T) {
 		if status := performAs(r, admin.ID, c[0], c[1]); status == fasthttp.StatusForbidden || status == fasthttp.StatusUnauthorized {
 			t.Fatalf("expected access for an admin on %s %s, got %d", c[0], c[1], status)
 		}
+	}
+}
+
+func TestRegisterRoutes_AdminUIWarnsWhenAssetsAreMissing(t *testing.T) {
+	initEnv(t, false, false, true)
+
+	original := os.Stdout
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = writer
+
+	r := router.New()
+	routing.RegisterRoutes(r)
+
+	writer.Close()
+	os.Stdout = original
+	output, _ := io.ReadAll(reader)
+
+	warned := strings.Contains(string(output), "assets are missing")
+	if warned == http_adminui.IsBuilt() {
+		t.Fatalf("expected a warning only when the Admin UI assets are missing (built=%v, output=%q)", http_adminui.IsBuilt(), output)
+	}
+
+	if !slices.Contains(r.List()["GET"], "/admin/{filepath:*}") {
+		t.Fatalf("expected the Admin UI route to be registered, got %v", r.List()["GET"])
 	}
 }

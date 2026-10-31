@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/taymour/elysiandb/internal/acl"
-	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/mongodb"
@@ -18,6 +17,12 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 	id := ctx.UserValue("id").(string)
 	body := ctx.PostBody()
 
+	nestedTypes := nestedEntityTypesInBody(body)
+	if referencesCoreEntity(nestedTypes) {
+		sendCoreEntityForbidden(ctx)
+		return
+	}
+
 	var schemaData map[string]any
 
 	if engine.IsEngineMongoDB() {
@@ -29,7 +34,7 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, schemaData) {
 		var obj map[string]any
 		if json.Unmarshal(body, &obj) == nil {
-			if errs := schema.ValidateEntity(entity, obj, schemaData); len(errs) > 0 {
+			if errs := schema.ValidateEntityUpdate(entity, engine.ReadEntityById(entity, id), obj, schemaData); len(errs) > 0 {
 				b, _ := json.Marshal(errs)
 				ctx.SetStatusCode(fasthttp.StatusBadRequest)
 				ctx.Response.Header.Set("Content-Type", "application/json")
@@ -41,7 +46,7 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if handleSingleUpdate(ctx, entity, id, body) {
-		finalizeUpdate(entity)
+		purgeCache(entity, nestedTypes)
 		return
 	}
 
@@ -51,6 +56,12 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 func UpdateListController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 	body := ctx.PostBody()
+
+	nestedTypes := nestedEntityTypesInBody(body)
+	if referencesCoreEntity(nestedTypes) {
+		sendCoreEntityForbidden(ctx)
+		return
+	}
 
 	var schemaData map[string]any
 
@@ -64,7 +75,8 @@ func UpdateListController(ctx *fasthttp.RequestCtx) {
 		var arr []map[string]any
 		if json.Unmarshal(body, &arr) == nil {
 			for _, obj := range arr {
-				if errs := schema.ValidateEntity(entity, obj, schemaData); len(errs) > 0 {
+				id, _ := obj["id"].(string)
+				if errs := schema.ValidateEntityUpdate(entity, engine.ReadEntityById(entity, id), obj, schemaData); len(errs) > 0 {
 					b, _ := json.Marshal(errs)
 					ctx.SetStatusCode(fasthttp.StatusBadRequest)
 					ctx.Response.Header.Set("Content-Type", "application/json")
@@ -77,7 +89,7 @@ func UpdateListController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if handleBatchUpdate(ctx, entity, body) {
-		finalizeUpdate(entity)
+		purgeCache(entity, nestedTypes)
 		return
 	}
 
@@ -134,10 +146,4 @@ func sendJSONResponse(ctx *fasthttp.RequestCtx, response []byte) {
 func sendBadRequest(ctx *fasthttp.RequestCtx) {
 	ctx.SetStatusCode(fasthttp.StatusBadRequest)
 	ctx.SetBodyString("Invalid JSON")
-}
-
-func finalizeUpdate(entity string) {
-	if globals.GetConfig().Api.Cache.Enabled {
-		cache.CacheStore.Purge(entity)
-	}
 }

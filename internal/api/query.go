@@ -1,24 +1,11 @@
 package api_storage
 
 import (
-	"strings"
-
 	"github.com/taymour/elysiandb/internal/query"
 )
 
 func ExecuteQuery(q query.Query) ([]map[string]any, error) {
-	sortField := ""
-	sortAsc := true
-
-	if len(q.Sorts) > 0 {
-		for field, dir := range q.Sorts {
-			sortField = field
-			if strings.ToLower(dir) == "desc" {
-				sortAsc = false
-			}
-			break
-		}
-	}
+	sortField, sortAsc := q.PrimarySort()
 
 	data := ListEntities(
 		q.Entity,
@@ -30,6 +17,10 @@ func ExecuteQuery(q query.Query) ([]map[string]any, error) {
 		"",
 		"",
 	)
+
+	if sorts := q.OrderedSorts(); len(sorts) > 1 {
+		SortEntities(data, sorts)
+	}
 
 	filtered := ApplyQueryFilter(data, q.Filter)
 
@@ -47,14 +38,41 @@ func ApplyQueryFilter(data []map[string]any, filter query.FilterNode) []map[stri
 	return filtered
 }
 
+func QueryFilterIsEmpty(filter query.FilterNode) bool {
+	return filter.Leaf != nil && len(filter.Leaf) == 0 && len(filter.And) == 0 && len(filter.Or) == 0
+}
+
+func QueryFilterMatchesEntity(filter query.FilterNode, entity map[string]any) bool {
+	return matchFilterNode(filter, entity)
+}
+
+func ApplyStoredQueryFilter(data []map[string]any, filter query.FilterNode) []map[string]any {
+	filtered := make([]map[string]any, 0, len(data))
+	for _, e := range data {
+		if matchFilterNodeWith(filter, e, StoredFiltersMatchEntity) {
+			filtered = append(filtered, e)
+		}
+	}
+
+	return filtered
+}
+
 func matchFilterNode(node query.FilterNode, entity map[string]any) bool {
+	return matchFilterNodeWith(node, entity, matchLeafStrict)
+}
+
+func matchFilterNodeWith(
+	node query.FilterNode,
+	entity map[string]any,
+	matchLeaf func(map[string]any, map[string]map[string]string) bool,
+) bool {
 	if node.Leaf != nil {
-		return matchLeafStrict(entity, node.Leaf)
+		return matchLeaf(entity, node.Leaf)
 	}
 
 	if len(node.And) > 0 {
 		for _, n := range node.And {
-			if !matchFilterNode(n, entity) {
+			if !matchFilterNodeWith(n, entity, matchLeaf) {
 				return false
 			}
 		}
@@ -64,7 +82,7 @@ func matchFilterNode(node query.FilterNode, entity map[string]any) bool {
 
 	if len(node.Or) > 0 {
 		for _, n := range node.Or {
-			if matchFilterNode(n, entity) {
+			if matchFilterNodeWith(n, entity, matchLeaf) {
 				return true
 			}
 		}

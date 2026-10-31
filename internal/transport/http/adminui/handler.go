@@ -7,6 +7,12 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+func IsBuilt() bool {
+	_, err := adminui.UI.ReadFile("dist/index.html")
+
+	return err == nil
+}
+
 var AdminUIHandler func(ctx *fasthttp.RequestCtx) = func(ctx *fasthttp.RequestCtx) {
 	p := string(ctx.Path())
 

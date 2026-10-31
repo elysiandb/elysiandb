@@ -1,6 +1,8 @@
 package security
 
 import (
+	"strings"
+
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/valyala/fasthttp"
 )
@@ -23,6 +25,34 @@ func TokenAuthenticationIsEnabled() bool {
 func UserAuthenticationIsEnabled() bool {
 	cfg := globals.GetConfig()
 	return cfg.Security.Authentication.Enabled && cfg.Security.Authentication.Mode == "user"
+}
+
+func CredentialsAreRequired() bool {
+	return BasicAuthenticationIsEnabled() || TokenAuthenticationIsEnabled() || UserAuthenticationIsEnabled()
+}
+
+func AuthenticateCredentials(credentials string) bool {
+	if !CredentialsAreRequired() {
+		return true
+	}
+
+	credentials = strings.TrimSpace(credentials)
+
+	if TokenAuthenticationIsEnabled() {
+		return TokenMatches(credentials)
+	}
+
+	username, password, ok := strings.Cut(credentials, " ")
+	if !ok {
+		return false
+	}
+
+	user, ok := AuthenticateUser(username, password)
+	if !ok {
+		return false
+	}
+
+	return !UserAuthenticationIsEnabled() || user.Role == RoleAdmin
 }
 
 func Authenticate(requestHandler fasthttp.RequestHandler) fasthttp.RequestHandler {

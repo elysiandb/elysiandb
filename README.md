@@ -176,7 +176,20 @@ JavaScript and TypeScript client available at:
 docker run --rm -p 8089:8089 -p 8088:8088 taymour/elysiandb:latest
 ```
 
+The image ships with the Admin UI and a `HEALTHCHECK` on `/health`, which needs no credentials. The default configuration (`docker/elysian.yaml`) disables authentication and the Admin UI; mount your own file to change it:
+
+```bash
+docker run -d -p 8089:8089 -v elysian-data:/data -v $(pwd)/elysian.yaml:/app/elysian.yaml:ro taymour/elysiandb:latest
+```
+
 ## Build and Run Locally
+
+```bash
+make build-admin   # optional: embeds the Admin UI in the binary
+make build && ./elysiandb server
+```
+
+`make build` stamps the binary with the version from `git describe`, returned in the `X-Elysian-Version` header and by `/stats`. A plain `go build` reports `dev`:
 
 ```bash
 go build && ./elysiandb server
@@ -187,6 +200,14 @@ Or:
 ```bash
 go run elysiandb.go server
 ```
+
+## Security Notes
+
+* With `security.authentication.enabled`, every HTTP route except `/health` and every TCP command except `PING`, `EXIT` and `AUTH` requires credentials. TCP clients authenticate with `AUTH <token>` or `AUTH <username> <password>`.
+* Browsers on another origin can only call the API when that origin is listed in `server.http.cors.allowedOrigins` (empty by default).
+* `GET /config` redacts the token and the database password.
+
+See the [documentation](docs/index.md) for the details.
 
 ## Philosophy
 

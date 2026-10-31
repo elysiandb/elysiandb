@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 
+	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/valyala/fasthttp"
 )
@@ -18,6 +19,7 @@ func ImportController(ctx *fasthttp.RequestCtx) {
 	}
 
 	engine.ImportAll(dump)
+	acl.InitACL()
 
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody([]byte(`{"status":"import completed"}`))

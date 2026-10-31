@@ -10,6 +10,7 @@ import (
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/transaction"
+	"github.com/taymour/elysiandb/internal/transport/http/api"
 	"github.com/valyala/fasthttp"
 )
 
@@ -29,6 +30,10 @@ func UpdateTransactionController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	if api.RejectCoreEntityReferences(ctx, payload) {
+		return
+	}
+
 	existing := engine.ReadEntityById(entity, id)
 	if existing == nil {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
@@ -44,15 +49,6 @@ func UpdateTransactionController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	merged := make(map[string]interface{}, len(existing))
-	for k, v := range existing {
-		merged[k] = v
-	}
-
-	for k, v := range payload {
-		merged[k] = v
-	}
-
 	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
 		var schemaData map[string]any
 
@@ -62,7 +58,7 @@ func UpdateTransactionController(ctx *fasthttp.RequestCtx) {
 			schemaData = nil
 		}
 
-		errors := schema.ValidateEntity(entity, merged, schemaData)
+		errors := schema.ValidateEntityUpdate(entity, existing, payload, schemaData)
 		if len(errors) > 0 {
 			ctx.SetStatusCode(fasthttp.StatusBadRequest)
 			ctx.SetBodyString(`{"error":"schema validation failed"}`)

@@ -1,6 +1,7 @@
 package hook_test
 
 import (
+	"strings"
 	"testing"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
@@ -280,8 +281,16 @@ func TestCreateUpdateDeleteGetHookAndQueries(t *testing.T) {
 	got.Priority = 3
 	got.Enabled = false
 
-	if err := hook.UpdateHook(got); err == nil {
-		t.Fatalf("expected UpdateHook to error (id is not updatable in current storage layer)")
+	if err := hook.UpdateHook(got); err != nil {
+		t.Fatalf("UpdateHook: %v", err)
+	}
+
+	updated, err := hook.GetHookById(id)
+	if err != nil {
+		t.Fatalf("GetHookById after update: %v", err)
+	}
+	if updated.Name != "h1b" || updated.Priority != 3 || updated.Enabled || updated.Entity != "toto" {
+		t.Fatalf("expected the update to be stored, got %+v", updated)
 	}
 
 	if err := hook.DeleteHook(id); err != nil {
@@ -594,5 +603,82 @@ function preRead(ctx) {
 	}
 	if b, ok := entity["ok"].(bool); !ok || !b {
 		t.Fatalf("expected ok=true, got %#v", entity["ok"])
+	}
+}
+
+func TestHookValidateRequiresCoreFields(t *testing.T) {
+	valid := hook.Hook{Name: "n", Entity: "e", Event: hook.HookEventPostRead, Language: "javascript", Script: "function postRead(ctx) {}"}
+	if err := valid.Validate(); err != nil {
+		t.Fatalf("expected a valid hook, got %v", err)
+	}
+
+	for _, field := range []string{"name", "entity", "event", "language", "script"} {
+		h := valid
+		switch field {
+		case "name":
+			h.Name = ""
+		case "entity":
+			h.Entity = ""
+		case "event":
+			h.Event = ""
+		case "language":
+			h.Language = ""
+		case "script":
+			h.Script = ""
+		}
+
+		if err := h.Validate(); err == nil || !strings.Contains(err.Error(), "'"+field+"'") {
+			t.Fatalf("expected %s to be required, got %v", field, err)
+		}
+	}
+}
+
+func TestUpdateHookRestoresDefaultScriptAndRejectsInvalidHooks(t *testing.T) {
+	setup(t, true)
+	hook.InitHooks()
+
+	h := &hook.Hook{Entity: "toto", Name: "h", Event: hook.HookEventPreRead, Language: "javascript", Enabled: true}
+	if err := hook.CreateHook(h); err != nil {
+		t.Fatal(err)
+	}
+
+	h.Script = ""
+	if err := hook.UpdateHook(h); err != nil {
+		t.Fatalf("UpdateHook: %v", err)
+	}
+
+	stored, _ := hook.GetHookById(h.ID)
+	if stored.Script != hook.GetDefaultHookScriptJSForPreRead() {
+		t.Fatalf("expected the default script for the event, got %q", stored.Script)
+	}
+
+	h.Entity = ""
+	if err := hook.UpdateHook(h); err == nil {
+		t.Fatalf("expected a hook without entity to be refused")
+	}
+
+	if stored, _ := hook.GetHookById(h.ID); stored.Entity != "toto" {
+		t.Fatalf("a refused update must not be stored, got %+v", stored)
+	}
+}
+
+func TestUpdateHookRejectsUnknownHooksAndEvents(t *testing.T) {
+	setup(t, true)
+	hook.InitHooks()
+
+	missing := &hook.Hook{ID: "missing", Name: "m", Entity: "toto", Event: hook.HookEventPostRead, Language: "javascript", Script: "function postRead(ctx) {}"}
+	if err := hook.UpdateHook(missing); err == nil || !strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("expected an unknown hook to be refused, got %v", err)
+	}
+
+	h := &hook.Hook{Entity: "toto", Name: "h", Event: hook.HookEventPostRead, Language: "javascript"}
+	if err := hook.CreateHook(h); err != nil {
+		t.Fatal(err)
+	}
+
+	h.Event = "on_write"
+	h.Script = ""
+	if err := hook.UpdateHook(h); err == nil || !strings.Contains(err.Error(), "'script'") {
+		t.Fatalf("expected an empty script without default to be refused, got %v", err)
 	}
 }
