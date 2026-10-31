@@ -1030,6 +1030,22 @@ Requests without authentication headers are rejected when authentication is enab
 * Deleting `users.key` invalidates all stored password hashes
 * In `token` mode, anyone with the token can fully access the API
 
+### Admin-only routes in user mode
+
+In `user` mode, routes that act on the whole database, the configuration or entity schemas require an admin session. Other users get `403`. In `basic` and `token` modes, these routes still accept any valid credentials.
+
+| Method                 | Path                                           |
+| ---------------------- | ---------------------------------------------- |
+| `GET`, `PUT`, `DELETE` | `/kv/{key}`, `/kv/mget`                        |
+| `POST`                 | `/save`, `/reset`                              |
+| `GET`                  | `/stats`, `/config`, `/api/export`             |
+| `POST`                 | `/api/import`, `/api/<entity>/migrate`         |
+| `POST`                 | `/api/<entity>/create`                         |
+| `PUT`                  | `/api/<entity>/schema`                         |
+| `DELETE`               | `/api/<entity>`                                |
+
+Document routes (`/api/<entity>`, `/api/<entity>/<id>`, `/api/query`, transactions) are checked per document with ACLs instead.
+
 ---
 
 ## User Management API

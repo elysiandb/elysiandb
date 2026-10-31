@@ -17,21 +17,21 @@ import (
 func RegisterRoutes(r *router.Router) {
 	r.GET("/health", Version(security.Authenticate(controller.HealthController)))
 
-	r.GET("/kv/mget", Version(security.Authenticate(controller.MultiGetController)))
-	r.GET("/kv/{key}", Version(security.Authenticate(controller.GetKeyController)))
-	r.PUT("/kv/{key}", Version(security.Authenticate(controller.PutKeyController)))
-	r.DELETE("/kv/{key}", Version(security.Authenticate(controller.DeleteKeyController)))
+	r.GET("/kv/mget", Version(security.AuthenticateAdmin(controller.MultiGetController)))
+	r.GET("/kv/{key}", Version(security.AuthenticateAdmin(controller.GetKeyController)))
+	r.PUT("/kv/{key}", Version(security.AuthenticateAdmin(controller.PutKeyController)))
+	r.DELETE("/kv/{key}", Version(security.AuthenticateAdmin(controller.DeleteKeyController)))
 
-	r.POST("/save", Version(security.Authenticate(controller.SaveController)))
+	r.POST("/save", Version(security.AuthenticateAdmin(controller.SaveController)))
 
-	r.POST("/reset", Version(security.Authenticate(controller.ResetController)))
+	r.POST("/reset", Version(security.AuthenticateAdmin(controller.ResetController)))
 
 	if globals.GetConfig().Stats.Enabled {
-		r.GET("/stats", Version(security.Authenticate(controller.StatsController)))
+		r.GET("/stats", Version(security.AuthenticateAdmin(controller.StatsController)))
 	}
 
-	r.GET("/api/export", Version(security.Authenticate(api.ExportController)))
-	r.POST("/api/import", Version(security.Authenticate(api.ImportController)))
+	r.GET("/api/export", Version(security.AuthenticateAdmin(api.ExportController)))
+	r.POST("/api/import", Version(security.AuthenticateAdmin(api.ImportController)))
 	r.GET("/api/{entity}", Version(security.Authenticate(api.ListController)))
 	r.POST("/api/query", Version(security.Authenticate(api.QueryController)))
 	r.POST("/api/{entity}", Version(security.Authenticate(api.CreateController)))
@@ -42,15 +42,15 @@ func RegisterRoutes(r *router.Router) {
 	r.DELETE("/api/{entity}", Version(security.Authenticate(api.DestroyController)))
 	r.GET("/api/{entity}/count", Version(security.Authenticate(api.CountController)))
 	r.GET("/api/{entity}/{id}/exists", Version(security.Authenticate(api.ExistsController)))
-	r.POST("/api/{entity}/migrate", Version(security.Authenticate(api.MigrateController)))
+	r.POST("/api/{entity}/migrate", Version(security.AuthenticateAdmin(api.MigrateController)))
 
 	r.GET("/api/entity/types", Version(security.Authenticate(api.GetEntityTypesController)))
 	r.GET("/api/entity/types/name", Version(security.Authenticate(api.GetEntityTypesNamesController)))
 
 	if globals.GetConfig().Api.Schema.Enabled {
-		r.POST("/api/{entity}/create", Version(security.Authenticate(api.CreateTypeController)))
+		r.POST("/api/{entity}/create", Version(security.AuthenticateAdmin(api.CreateTypeController)))
 		r.GET("/api/{entity}/schema", Version(security.Authenticate(api.GetSchemaController)))
-		r.PUT("/api/{entity}/schema", Version(security.Authenticate(api.PutSchemaController)))
+		r.PUT("/api/{entity}/schema", Version(security.AuthenticateAdmin(api.PutSchemaController)))
 	}
 
 	r.POST("/api/tx/begin", Version(security.Authenticate(api_transaction.BeginTransactionController)))
@@ -60,7 +60,7 @@ func RegisterRoutes(r *router.Router) {
 	r.DELETE("/api/tx/{txId}/entity/{entity}/{id}", Version(security.Authenticate(api_transaction.DeleteTransactionController)))
 	r.POST("/api/tx/{txId}/commit", Version(security.Authenticate(api_transaction.CommitTransactionController)))
 
-	r.GET("/config", Version(security.Authenticate(controller.GetConfigController)))
+	r.GET("/config", Version(security.AuthenticateAdmin(controller.GetConfigController)))
 
 	if security.AuthenticationIsEnabled() && security.UserAuthenticationIsEnabled() {
 		// Security - User Management

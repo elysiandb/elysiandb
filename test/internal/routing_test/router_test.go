@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/fasthttp/router"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/routing"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/storage"
 	http_adminui "github.com/taymour/elysiandb/internal/transport/http/adminui"
 	"github.com/taymour/elysiandb/internal/transport/http/controller"
@@ -155,5 +157,71 @@ func TestRegisterRoutes_WithSchema(t *testing.T) {
 	}
 	if !perform(r, "PUT", "/api/books/schema") {
 		t.Fatalf("missing put schema")
+	}
+}
+
+func performAs(r *router.Router, sessionID, method, path string) int {
+	req := fasthttp.AcquireRequest()
+	req.Header.SetMethod(method)
+	req.SetRequestURI(path)
+	req.Header.SetCookie(security.SessionCookieName, sessionID)
+	var ctx fasthttp.RequestCtx
+	addr := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12345}
+	ctx.Init(req, addr, nil)
+	r.Handler(&ctx)
+
+	return ctx.Response.StatusCode()
+}
+
+func TestRegisterRoutes_AdminRoutesInUserMode(t *testing.T) {
+	initEnv(t, true, true, false)
+	cfg := globals.GetConfig()
+	cfg.Security.Authentication.Enabled = true
+	cfg.Security.Authentication.Mode = "user"
+
+	r := router.New()
+	routing.RegisterRoutes(r)
+
+	user, _ := security.CreateSession("bob", security.RoleUser, time.Hour)
+	admin, _ := security.CreateSession("admin", security.RoleAdmin, time.Hour)
+
+	adminRoutes := [][]string{
+		{"GET", "/kv/mget?keys=foo"},
+		{"GET", "/kv/foo"},
+		{"PUT", "/kv/foo"},
+		{"DELETE", "/kv/foo"},
+		{"POST", "/save"},
+		{"POST", "/reset"},
+		{"GET", "/stats"},
+		{"GET", "/config"},
+		{"GET", "/api/export"},
+		{"POST", "/api/import"},
+		{"POST", "/api/books/migrate"},
+		{"POST", "/api/books/create"},
+		{"PUT", "/api/books/schema"},
+	}
+
+	for _, c := range adminRoutes {
+		if status := performAs(r, user.ID, c[0], c[1]); status != fasthttp.StatusForbidden {
+			t.Fatalf("expected 403 for a regular user on %s %s, got %d", c[0], c[1], status)
+		}
+	}
+
+	userRoutes := [][]string{
+		{"GET", "/health"},
+		{"GET", "/api/books"},
+		{"GET", "/api/books/schema"},
+	}
+
+	for _, c := range userRoutes {
+		if status := performAs(r, user.ID, c[0], c[1]); status == fasthttp.StatusForbidden || status == fasthttp.StatusUnauthorized {
+			t.Fatalf("expected access for a regular user on %s %s, got %d", c[0], c[1], status)
+		}
+	}
+
+	for _, c := range adminRoutes {
+		if status := performAs(r, admin.ID, c[0], c[1]); status == fasthttp.StatusForbidden || status == fasthttp.StatusUnauthorized {
+			t.Fatalf("expected access for an admin on %s %s, got %d", c[0], c[1], status)
+		}
 	}
 }
