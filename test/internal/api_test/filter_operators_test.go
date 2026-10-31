@@ -53,6 +53,10 @@ func TestFiltersMatchEntityDatesStillCompareAsDates(t *testing.T) {
 		t.Fatalf("expected date comparisons")
 	}
 
+	if matches(entity, "day", "lte", "2024-04-30") || !matches(entity, "day", "lte", "2024-05-01") {
+		t.Fatalf("expected lte to compare dates")
+	}
+
 	if !matches(entity, "day", "contains", "-05-") {
 		t.Fatalf("expected contains to apply to the date string")
 	}

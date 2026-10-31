@@ -141,6 +141,10 @@ func TestStrictManualSchemaPartialUpdate(t *testing.T) {
 	}
 
 	s.mustDo(fasthttp.StatusOK, "PUT", "/api/film", `[{"id":"f1","year":2001}]`)
+	resp = s.mustDo(fasthttp.StatusBadRequest, "PUT", "/api/film", `[{"id":"f1","year":"x"}]`)
+	if !strings.Contains(string(resp.body), "expected type number") {
+		t.Fatalf("expected an invalid batch update to be rejected, got %s", resp.body)
+	}
 	if film = s.mustDo(fasthttp.StatusOK, "GET", "/api/film/f1", "").object(t); film["year"] != float64(2001) || film["title"] != "C2" {
 		t.Fatalf("expected a partial batch update to keep the title, got %v", film)
 	}
@@ -374,11 +378,17 @@ func TestPreReadVirtualFieldFiltersApplyBeforePagination(t *testing.T) {
 		"/api/num?filter%5Beven%5D%5Beq%5D=true&sort%5Bn%5D=asc":                         {"v2", "v4", "v6"},
 		"/api/num?filter%5Beven%5D%5Beq%5D=true&limit=1&offset=1&sort%5Bn%5D=asc":        {"v4"},
 		"/api/num?filter%5Beven%5D%5Beq%5D=true&filter%5Bn%5D%5Bgt%5D=2&sort%5Bn%5D=asc": {"v4", "v6"},
+		"/api/num?limit=2&offset=1&sort%5Bn%5D=asc":                                      {"v2", "v3"},
 	}
 	for path, want := range cases {
 		if ids := s.mustDo(fasthttp.StatusOK, "GET", path, "").ids(t); !reflect.DeepEqual(ids, want) {
 			t.Fatalf("GET %s: expected %v, got %v", path, want, ids)
 		}
+	}
+
+	page := s.mustDo(fasthttp.StatusOK, "GET", "/api/num?limit=2&offset=1&sort%5Bn%5D=asc", "").list(t)
+	if page[0]["even"] != true || page[1]["even"] != false {
+		t.Fatalf("expected the pre_read hook to run on a page without filter, got %v", page)
 	}
 
 	queries := map[string][]string{

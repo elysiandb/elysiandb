@@ -251,3 +251,12 @@ func TestGetSessionRemovesOnlyExpiredSessions(t *testing.T) {
 		t.Fatalf("expected no temporary file to be left, got %v", err)
 	}
 }
+
+func TestCreateSessionReportsWriteErrors(t *testing.T) {
+	setup(t)
+	globals.GetConfig().Store.Folder = filepath.Join(t.TempDir(), "missing")
+
+	if _, err := security.CreateSession("admin", security.RoleAdmin, time.Hour); err == nil {
+		t.Fatalf("expected an error when the sessions file cannot be written")
+	}
+}
