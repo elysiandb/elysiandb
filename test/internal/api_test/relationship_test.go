@@ -168,3 +168,20 @@ func TestExtractSubEntitiesArrayPureReference(t *testing.T) {
 		}
 	}
 }
+
+func TestMergeWithExisting(t *testing.T) {
+	sub := map[string]interface{}{"id": "m1", "rating": float64(10)}
+	if got := api_storage.MergeWithExisting(sub, nil); !reflect.DeepEqual(got, sub) {
+		t.Fatalf("expected sub unchanged without existing, got %v", got)
+	}
+
+	existing := map[string]interface{}{"id": "m1", "title": "Alien", "rating": float64(8)}
+	got := api_storage.MergeWithExisting(sub, existing)
+	want := map[string]interface{}{"id": "m1", "title": "Alien", "rating": float64(10)}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if existing["rating"] != float64(8) || len(sub) != 2 {
+		t.Fatalf("inputs must not be modified, existing=%v sub=%v", existing, sub)
+	}
+}

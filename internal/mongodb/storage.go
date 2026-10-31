@@ -126,7 +126,8 @@ func WriteEntity(entity string, data map[string]interface{}) []schema.Validation
 	for _, sub := range subs {
 		subEntity := sub["@entity"].(string)
 		delete(sub, "@entity")
-		WriteEntity(subEntity, sub)
+		id, _ := sub["id"].(string)
+		WriteEntity(subEntity, api_storage.MergeWithExisting(sub, ReadEntityById(subEntity, id)))
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

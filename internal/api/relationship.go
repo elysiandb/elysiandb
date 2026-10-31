@@ -1,6 +1,8 @@
 package api_storage
 
 import (
+	"maps"
+
 	"github.com/google/uuid"
 )
 
@@ -122,4 +124,16 @@ func buildSubEntity(subEntityName, id string, val map[string]any) map[string]any
 	}
 
 	return sub
+}
+
+func MergeWithExisting(sub, existing map[string]any) map[string]any {
+	if existing == nil {
+		return sub
+	}
+
+	merged := make(map[string]any, len(existing)+len(sub))
+	maps.Copy(merged, existing)
+	maps.Copy(merged, sub)
+
+	return merged
 }

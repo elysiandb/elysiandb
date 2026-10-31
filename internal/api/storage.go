@@ -27,17 +27,22 @@ func WriteEntity(entity string, data map[string]any) []schema.ValidationError {
 		data["id"] = uuid.New().String()
 	}
 
-	subs := ExtractSubEntities(entity, data)
-	for _, sub := range subs {
-		subEntity := sub["@entity"].(string)
-		delete(sub, "@entity")
-		WriteEntity(subEntity, sub)
-	}
+	writeSubEntities(entity, data)
 
 	persistEntity(entity, data)
 	updateSchemaIfNeeded(entity, data)
 
 	return []schema.ValidationError{}
+}
+
+func writeSubEntities(entity string, data map[string]any) {
+	subs := ExtractSubEntities(entity, data)
+	for _, sub := range subs {
+		subEntity := sub["@entity"].(string)
+		delete(sub, "@entity")
+		id, _ := sub["id"].(string)
+		WriteEntity(subEntity, MergeWithExisting(sub, ReadEntityById(subEntity, id)))
+	}
 }
 
 func UpdateEntitySchema(entity string, fieldsRaw map[string]any) map[string]any {
@@ -360,12 +365,7 @@ func UpdateEntityById(entity, id string, updated map[string]any) map[string]any 
 		existing["id"] = id
 	}
 
-	subs := ExtractSubEntities(entity, existing)
-	for _, sub := range subs {
-		subEntity := sub["@entity"].(string)
-		delete(sub, "@entity")
-		WriteEntity(subEntity, sub)
-	}
+	writeSubEntities(entity, existing)
 
 	persistEntity(entity, existing)
 	UpdateIndexesForEntity(entity, id, old, existing)

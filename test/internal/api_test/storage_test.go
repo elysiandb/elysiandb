@@ -950,40 +950,157 @@ func TestWriteEntity_SkipSchemaUpdatesForManualStrict(t *testing.T) {
 		t.Fatalf("manual schema must exist")
 	}
 }
+func deepCopy(v interface{}) interface{} {
+	switch tv := v.(type) {
+	case map[string]interface{}:
+		out := make(map[string]interface{}, len(tv))
+		for k, x := range tv {
+			out[k] = deepCopy(x)
+		}
+		return out
+	case []interface{}:
+		out := make([]interface{}, len(tv))
+		for i, x := range tv {
+			out[i] = deepCopy(x)
+		}
+		return out
+	default:
+		return v
+	}
+}
 
-func TestWriteEntity_ArrayPureReferenceKeepsTarget(t *testing.T) {
+func withFields(base map[string]interface{}, extra map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{}, len(base)+len(extra))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range extra {
+		out[k] = v
+	}
+
+	return out
+}
+
+func TestSubEntityReferencesKeepTargetFields(t *testing.T) {
+	movie := map[string]interface{}{"id": "m1", "title": "Blade Runner", "year": float64(1982), "rating": float64(8)}
+	person := map[string]interface{}{"id": "p1", "name": "Ridley Scott", "born": float64(1937), "country": "UK"}
+
+	cases := []struct {
+		name    string
+		payload map[string]interface{}
+		movie   map[string]interface{}
+		person  map[string]interface{}
+	}{
+		{
+			name: "pure reference in an array",
+			payload: map[string]interface{}{"items": []interface{}{
+				map[string]interface{}{"@entity": "movie", "id": "m1"},
+			}},
+			movie:  movie,
+			person: person,
+		},
+		{
+			name: "pure reference with @id in an array",
+			payload: map[string]interface{}{"items": []interface{}{
+				map[string]interface{}{"@entity": "movie", "@id": "m1"},
+			}},
+			movie:  movie,
+			person: person,
+		},
+		{
+			name:    "pure reference in an object",
+			payload: map[string]interface{}{"work": map[string]interface{}{"@entity": "movie", "id": "m1"}},
+			movie:   movie,
+			person:  person,
+		},
+		{
+			name:    "reference with a field in an object",
+			payload: map[string]interface{}{"work": map[string]interface{}{"@entity": "movie", "id": "m1", "rating": float64(10)}},
+			movie:   withFields(movie, map[string]interface{}{"rating": float64(10)}),
+			person:  person,
+		},
+		{
+			name: "reference with a field in an array",
+			payload: map[string]interface{}{"items": []interface{}{
+				map[string]interface{}{"@entity": "movie", "id": "m1", "rating": float64(10)},
+			}},
+			movie:  withFields(movie, map[string]interface{}{"rating": float64(10)}),
+			person: person,
+		},
+		{
+			name: "reference with a field two levels deep",
+			payload: map[string]interface{}{"items": []interface{}{
+				map[string]interface{}{
+					"@entity":  "movie",
+					"id":       "m1",
+					"director": map[string]interface{}{"@entity": "person", "id": "p1", "role": "director"},
+				},
+			}},
+			movie:  withFields(movie, map[string]interface{}{"director": map[string]interface{}{"@entity": "person", "id": "p1"}}),
+			person: withFields(person, map[string]interface{}{"role": "director"}),
+		},
+	}
+
+	modes := []struct {
+		name  string
+		apply func(payload map[string]interface{})
+	}{
+		{
+			name: "write",
+			apply: func(payload map[string]interface{}) {
+				payload["id"] = "c1"
+				api_storage.WriteEntity("collection", payload)
+			},
+		},
+		{
+			name: "update",
+			apply: func(payload map[string]interface{}) {
+				api_storage.WriteEntity("collection", map[string]interface{}{"id": "c1", "label": "Collection"})
+				api_storage.UpdateEntityById("collection", "c1", payload)
+			},
+		},
+	}
+
+	for _, c := range cases {
+		for _, m := range modes {
+			t.Run(c.name+"/"+m.name, func(t *testing.T) {
+				initTestStore(t)
+
+				api_storage.WriteEntity("movie", withFields(movie, nil))
+				api_storage.WriteEntity("person", withFields(person, nil))
+
+				m.apply(deepCopy(c.payload).(map[string]interface{}))
+
+				for entity, want := range map[string]map[string]interface{}{"movie": c.movie, "person": c.person} {
+					got := api_storage.ReadEntityById(entity, want["id"].(string))
+					if !reflect.DeepEqual(got, want) {
+						t.Fatalf("%s: got %v, want %v", entity, got, want)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestWriteEntity_SubEntityWithoutIdIsCreated(t *testing.T) {
 	initTestStore(t)
 
-	api_storage.WriteEntity("movie", map[string]interface{}{
-		"id":     "m1",
-		"title":  "Blade Runner",
-		"year":   float64(1982),
-		"rating": float64(8),
-	})
-
-	api_storage.WriteEntity("boxset", map[string]interface{}{
-		"id":    "b1",
-		"label": "Box set",
+	api_storage.WriteEntity("collection", map[string]interface{}{
+		"id": "c1",
 		"items": []interface{}{
-			map[string]interface{}{"@entity": "movie", "id": "m1"},
+			map[string]interface{}{"@entity": "movie", "title": "Heat"},
 		},
 	})
 
-	got := api_storage.ReadEntityById("movie", "m1")
-	if got == nil {
-		t.Fatalf("referenced movie must still exist")
-	}
-	if got["title"] != "Blade Runner" || got["year"] != float64(1982) || got["rating"] != float64(8) {
-		t.Fatalf("referenced movie must keep its fields, got %v", got)
+	stored := api_storage.ReadEntityById("collection", "c1")
+	link := stored["items"].([]interface{})[0].(map[string]interface{})
+	id, ok := link["id"].(string)
+	if !ok || id == "" || link["@entity"] != "movie" {
+		t.Fatalf("expected a link to the new movie, got %v", link)
 	}
 
-	box := api_storage.ReadEntityById("boxset", "b1")
-	items, ok := box["items"].([]interface{})
-	if !ok || len(items) != 1 {
-		t.Fatalf("expected one item link, got %v", box["items"])
-	}
-	link := items[0].(map[string]interface{})
-	if link["@entity"] != "movie" || link["id"] != "m1" {
-		t.Fatalf("unexpected item link: %v", link)
+	got := api_storage.ReadEntityById("movie", id)
+	if !reflect.DeepEqual(got, map[string]interface{}{"id": id, "title": "Heat"}) {
+		t.Fatalf("expected the new movie to be created, got %v", got)
 	}
 }
