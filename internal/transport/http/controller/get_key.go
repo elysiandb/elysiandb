@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/metrics"
 	"github.com/taymour/elysiandb/internal/stat"
 	"github.com/taymour/elysiandb/internal/storage"
 	"github.com/taymour/elysiandb/internal/wildcard"
@@ -45,6 +46,7 @@ func handleSingleKey(key string, ctx *fasthttp.RequestCtx) {
 	if storage.KeyHasExpired(key) {
 		storage.DeleteByKey(key)
 
+		metrics.KVMiss()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementMisses()
 		}
@@ -61,6 +63,7 @@ func handleSingleKey(key string, ctx *fasthttp.RequestCtx) {
 
 	data, err := storage.GetByKey(key)
 	if err != nil {
+		metrics.KVMiss()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementMisses()
 		}
@@ -75,6 +78,7 @@ func handleSingleKey(key string, ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	metrics.KVHit()
 	if cfg.Stats.Enabled {
 		stat.Stats.IncrementHits()
 	}
@@ -94,6 +98,7 @@ func handleWildcardKey(key string, ctx *fasthttp.RequestCtx) {
 	data := storage.GetByWildcardKey(key)
 
 	if len(data) == 0 {
+		metrics.KVMiss()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementMisses()
 		}
@@ -116,6 +121,7 @@ func handleWildcardKey(key string, ctx *fasthttp.RequestCtx) {
 			Val: &valStr,
 		})
 
+		metrics.KVHit()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementHits()
 		}

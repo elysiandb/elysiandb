@@ -16,6 +16,7 @@ import (
 	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/taymour/elysiandb/internal/query"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -212,6 +213,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 
 	data, err := engine.ExecuteQuery(q)
 	if err != nil {
+		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		return
 	}
@@ -265,6 +267,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 
 	responseBody, err := json.Marshal(data)
 	if err != nil {
+		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		return
 	}

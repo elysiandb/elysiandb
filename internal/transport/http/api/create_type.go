@@ -5,6 +5,7 @@ import (
 
 	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/engine"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -40,6 +41,7 @@ func CreateTypeController(ctx *fasthttp.RequestCtx) {
 
 	acl.InitACL()
 
+	observe.Audit(ctx, "entity type created", "entity", entity)
 	out, _ := json.Marshal(storable)
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(out)

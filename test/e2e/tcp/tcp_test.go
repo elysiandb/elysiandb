@@ -85,7 +85,6 @@ func startTCPServer(t *testing.T, security configuration.SecurityConfig) string 
 		storage.LoadJsonDB()
 		boot.BootSaver()
 		boot.BootExpirationHandler()
-		boot.BootLogger()
 
 		tcpServerAddr = fmt.Sprintf("127.0.0.1:%d", tcpServerPort)
 		go boot.InitTCP()

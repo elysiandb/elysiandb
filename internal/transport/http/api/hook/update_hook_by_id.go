@@ -5,6 +5,7 @@ import (
 
 	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -50,12 +51,14 @@ func UpdateHookByIdController(ctx *fasthttp.RequestCtx) {
 
 	response, err := json.Marshal(hookEntity)
 	if err != nil {
+		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		ctx.SetBodyString(`{"error":"internal server error"}`)
 
 		return
 	}
 
+	observe.Audit(ctx, "hook updated", "entity", hookEntity.Entity, "hook_id", id, "event", hookEntity.Event, "bypass_acl", hookEntity.ByPassACL, "enabled", hookEntity.Enabled)
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
 }

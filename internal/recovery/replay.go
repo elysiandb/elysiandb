@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"io"
 	"os"
-
-	"github.com/taymour/elysiandb/internal/log"
 )
 
 const FailedReplaySuffix = ".failed"
@@ -41,9 +39,9 @@ func replayReader(f *os.File) io.Reader {
 func keepUnreplayedLog(path string, err error) {
 	failedPath := path + FailedReplaySuffix
 	if renameErr := os.Rename(path, failedPath); renameErr != nil {
-		log.Error("Error reading recovery log ", path, ": ", err, ", and it could not be kept: ", renameErr)
+		recoveryLog.Error("cannot read the recovery log, and it could not be kept", "file", path, "err", err, "rename_err", renameErr)
 		return
 	}
 
-	log.Error("Error reading recovery log ", path, ": ", err, ", the log was kept as ", failedPath)
+	recoveryLog.Error("cannot read the recovery log, it was kept aside", "file", path, "kept_as", failedPath, "err", err)
 }

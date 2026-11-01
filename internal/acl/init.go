@@ -155,7 +155,7 @@ func InitACL() error {
 	InitACLStorage()
 
 	if err := saveACLList(GenerateACLFoAllrEntities()); err != nil {
-		log.Error("Unable to create the default ACLs: ", err)
+		log.Error("cannot create the default ACLs", "component", "acl", "err", err)
 		return err
 	}
 

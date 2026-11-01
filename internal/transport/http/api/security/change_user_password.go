@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -44,6 +45,7 @@ func ChangeUserPasswordController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	observe.Audit(ctx, "user password changed", "user", username)
 	ctx.SetStatusCode(fasthttp.StatusOK)
 }
 

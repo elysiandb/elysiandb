@@ -5,6 +5,7 @@ import (
 
 	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -71,5 +72,6 @@ func CreateUserController(ctx *fasthttp.RequestCtx) {
 
 	acl.InitACL()
 
+	observe.Audit(ctx, "user created", "user", user.User, "role", user.Role)
 	ctx.SetStatusCode(fasthttp.StatusOK)
 }

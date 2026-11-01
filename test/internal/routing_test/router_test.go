@@ -205,6 +205,13 @@ func TestRegisterRoutes_AdminRoutesInUserMode(t *testing.T) {
 		{"POST", "/api/books/migrate"},
 		{"POST", "/api/books/create"},
 		{"PUT", "/api/books/schema"},
+		{"GET", "/monitoring/overview"},
+		{"GET", "/monitoring/series"},
+		{"GET", "/monitoring/details"},
+		{"GET", "/monitoring/logs"},
+		{"GET", "/monitoring/logs/download"},
+		{"GET", "/monitoring/logs/level"},
+		{"PUT", "/monitoring/logs/level"},
 	}
 
 	for _, c := range adminRoutes {
@@ -256,6 +263,36 @@ func TestRegisterRoutes_AdminUIWarnsWhenAssetsAreMissing(t *testing.T) {
 
 	if !slices.Contains(r.List()["GET"], "/admin/{filepath:*}") {
 		t.Fatalf("expected the Admin UI route to be registered, got %v", r.List()["GET"])
+	}
+}
+
+func TestRegisterRoutes_MetricsOnlyWhenPrometheusIsEnabled(t *testing.T) {
+	initEnv(t, false, false, false)
+
+	r := router.New()
+	routing.RegisterRoutes(r)
+	if slices.Contains(r.List()["GET"], "/metrics") {
+		t.Fatalf("/metrics must not be served when Prometheus is disabled")
+	}
+
+	globals.GetConfig().Monitoring.Prometheus.Enabled = true
+	r = router.New()
+	routing.RegisterRoutes(r)
+	if !slices.Contains(r.List()["GET"], "/metrics") {
+		t.Fatalf("/metrics must be served when Prometheus is enabled, got %v", r.List()["GET"])
+	}
+}
+
+func TestRegisterRoutes_MonitoringDoesNotHideEntityTypes(t *testing.T) {
+	initEnv(t, false, false, false)
+
+	r := router.New()
+	routing.RegisterRoutes(r)
+
+	for _, path := range r.List()["GET"] {
+		if strings.HasPrefix(path, "/api/logs") || strings.HasPrefix(path, "/api/monitoring") {
+			t.Fatalf("%s would hide an entity type", path)
+		}
 	}
 }
 

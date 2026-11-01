@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/taymour/elysiandb/internal/engine"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -34,6 +35,7 @@ func PutSchemaController(ctx *fasthttp.RequestCtx) {
 
 	storable := engine.UpdateEntitySchema(entity, fieldsRaw)
 
+	observe.Audit(ctx, "schema changed", "entity", entity)
 	out, _ := json.Marshal(storable)
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(out)

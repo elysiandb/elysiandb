@@ -31,7 +31,21 @@ type ServersConfig struct {
 }
 
 type LogConfig struct {
-	FlushIntervalSeconds int `yaml:"flushIntervalSeconds"`
+	Level                string `yaml:"level"`
+	Format               string `yaml:"format"`
+	AccessLog            bool   `yaml:"accessLog"`
+	SlowRequestMs        int    `yaml:"slowRequestMs"`
+	BufferLines          int    `yaml:"bufferLines"`
+	FlushIntervalSeconds int    `yaml:"flushIntervalSeconds"`
+}
+
+type PrometheusConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Token   string `yaml:"token"`
+}
+
+type MonitoringConfig struct {
+	Prometheus PrometheusConfig `yaml:"prometheus"`
 }
 
 type ServerConfig struct {
@@ -93,14 +107,31 @@ type EngineConfig struct {
 }
 
 type Config struct {
-	Store    StoreConfig    `yaml:"store"`
-	Server   ServersConfig  `yaml:"server"`
-	Log      LogConfig      `yaml:"log"`
-	Security SecurityConfig `yaml:"security"`
-	Stats    StatsConfig    `yaml:"stats"`
-	Api      ApiConfig      `yaml:"api"`
-	AdminUI  AdminUIConfig  `yaml:"adminui"`
-	Engine   EngineConfig   `yaml:"engine"`
+	Store      StoreConfig      `yaml:"store"`
+	Server     ServersConfig    `yaml:"server"`
+	Log        LogConfig        `yaml:"log"`
+	Security   SecurityConfig   `yaml:"security"`
+	Stats      StatsConfig      `yaml:"stats"`
+	Api        ApiConfig        `yaml:"api"`
+	AdminUI    AdminUIConfig    `yaml:"adminui"`
+	Engine     EngineConfig     `yaml:"engine"`
+	Monitoring MonitoringConfig `yaml:"monitoring"`
+}
+
+const (
+	DefaultSlowRequestMs = 500
+	DefaultBufferLines   = 5000
+)
+
+func DefaultConfig() Config {
+	return Config{
+		Log: LogConfig{
+			Level:         "info",
+			Format:        "text",
+			SlowRequestMs: DefaultSlowRequestMs,
+			BufferLines:   DefaultBufferLines,
+		},
+	}
 }
 
 const RedactedValue = "***"
@@ -111,12 +142,15 @@ func (c *Config) ToJson() string {
 		copyConfig.Security.Authentication.Token = RedactedValue
 	}
 
+	if copyConfig.Monitoring.Prometheus.Token != "" {
+		copyConfig.Monitoring.Prometheus.Token = RedactedValue
+	}
+
 	copyConfig.Engine.URI = redactURIPassword(copyConfig.Engine.URI)
 
 	data, err := json.Marshal(copyConfig)
 	if err != nil {
-		log.Fatal("error:", err)
-		return ""
+		return "{}"
 	}
 
 	return string(data)
@@ -162,21 +196,36 @@ func isSecretParameter(name string) bool {
 }
 
 func LoadConfig(path string) (*Config, error) {
-	fmt.Println("Loading config from", path)
 	data, err := os.ReadFile(path)
 	if err != nil {
-		log.Fatal("error:", err)
-		return nil, err
+		return nil, fmt.Errorf("cannot read the configuration file: %w", err)
 	}
 
-	var cfg Config
+	cfg := DefaultConfig()
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		log.Fatal("error:", err)
-		return nil, err
+		return nil, fmt.Errorf("cannot parse the configuration file: %w", err)
 	}
 
 	if err := yaml.UnmarshalStrict(data, &Config{}); err != nil {
-		log.DirectWarn("Some configuration keys are not recognized and are ignored: ", err)
+		log.Warn("unknown configuration keys are ignored", "component", "boot", "path", path, "err", err)
+	}
+
+	if _, err := log.ParseLevel(cfg.Log.Level); err != nil {
+		return nil, err
+	}
+
+	switch strings.ToLower(strings.TrimSpace(cfg.Log.Format)) {
+	case "", log.FormatText, log.FormatJSON:
+	default:
+		return nil, fmt.Errorf("unknown log format %q: use text or json", cfg.Log.Format)
+	}
+
+	if cfg.Log.SlowRequestMs < 0 {
+		return nil, fmt.Errorf("log.slowRequestMs must be 0 or more")
+	}
+
+	if cfg.Log.BufferLines < 0 {
+		return nil, fmt.Errorf("log.bufferLines must be 0 or more")
 	}
 
 	if cfg.Security.Authentication.Enabled {

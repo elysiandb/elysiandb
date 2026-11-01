@@ -2,10 +2,14 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/hook"
+	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -38,6 +42,7 @@ func ImportController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	start := time.Now()
 	rejected := engine.ImportAll(dump)
 	for entity := range dump {
 		purgeCache(entity, nil)
@@ -46,6 +51,8 @@ func ImportController(ctx *fasthttp.RequestCtx) {
 	acl.InitACL()
 
 	if len(rejected) > 0 {
+		observe.SetError(ctx, fmt.Errorf("%d documents could not be imported", len(rejected)))
+		observe.Audit(ctx, "import done", "entity_types", len(dump), "entities", countDocuments(dump), "rejected", len(rejected), "duration_ms", log.Since(start))
 		sendImportResponse(ctx, fasthttp.StatusInternalServerError, map[string]any{
 			"error":    "some documents could not be imported",
 			"rejected": rejected,
@@ -53,7 +60,17 @@ func ImportController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	observe.Audit(ctx, "import done", "entity_types", len(dump), "entities", countDocuments(dump), "rejected", 0, "duration_ms", log.Since(start))
 	sendImportResponse(ctx, fasthttp.StatusOK, map[string]any{"status": "import completed"}, ignored)
+}
+
+func countDocuments(dump map[string][]map[string]any) int {
+	total := 0
+	for _, items := range dump {
+		total += len(items)
+	}
+
+	return total
 }
 
 func removeAccountEntities(dump map[string][]map[string]any) []string {

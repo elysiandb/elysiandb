@@ -3,8 +3,6 @@ package api_storage
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/taymour/elysiandb/internal/log"
 )
 
 type MigrationQuery struct {
@@ -52,21 +50,32 @@ func ParseMigrationQuery(s, entity string) []MigrationQuery {
 }
 
 func ExecuteMigrations(migrationQueries []MigrationQuery) error {
+	_, err := ExecuteMigrationsCount(migrationQueries)
+
+	return err
+}
+
+func ExecuteMigrationsCount(migrationQueries []MigrationQuery) (int, error) {
+	updated := 0
 	for _, query := range migrationQueries {
 		switch query.Action {
 		case ACTION_SET:
-			log.Info("Executing migration set action on entity:", query.Entity)
-			executeMigrationSetAction(query.Entity, query.Properties)
+			n, err := executeMigrationSetAction(query.Entity, query.Properties)
+			updated += n
+			if err != nil {
+				return updated, err
+			}
 		default:
-			return fmt.Errorf("unsupported action: %s", query.Action)
+			return updated, fmt.Errorf("unsupported action: %s", query.Action)
 		}
 	}
 
-	return nil
+	return updated, nil
 }
 
-func executeMigrationSetAction(entity string, properties map[string]any) error {
+func executeMigrationSetAction(entity string, properties map[string]any) (int, error) {
 	entities := ListEntities(entity, 0, 0, "", true, map[string]map[string]string{}, "", "all")
+	updated := 0
 
 	for _, ent := range entities {
 		for key, value := range properties {
@@ -81,11 +90,12 @@ func executeMigrationSetAction(entity string, properties map[string]any) error {
 		}
 
 		if id == "" {
-			return fmt.Errorf("missing id")
+			return updated, fmt.Errorf("missing id")
 		}
 
 		UpdateEntityById(entity, id, ent)
+		updated++
 	}
 
-	return nil
+	return updated, nil
 }

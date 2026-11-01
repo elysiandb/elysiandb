@@ -2,11 +2,14 @@ package hook
 
 import (
 	"fmt"
+	"log/slog"
 	"sort"
+	"time"
 
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/metrics"
 )
 
 const HookEntity = "_elysiandb_core_hook"
@@ -151,6 +154,31 @@ func (h *Hook) FromDataMap(data map[string]any) {
 	}
 }
 
+const (
+	PhasePreRead  = "pre_read"
+	PhasePostRead = "post_read"
+)
+
+var (
+	hookLog          = log.For("hook")
+	hookFailThrottle = log.NewThrottle(time.Minute)
+)
+
+func observeHook(h Hook, entity, phase string, start time.Time, err error) {
+	metrics.ObserveHook(h.ID, entity, phase, time.Since(start), err)
+
+	if err == nil {
+		if log.Enabled(slog.LevelDebug) {
+			hookLog.Debug("hook executed", "hook_id", h.ID, "entity", entity, "phase", phase, "duration_ms", log.Since(start))
+		}
+		return
+	}
+
+	if suppressed, ok := hookFailThrottle.Allow(h.ID); ok {
+		hookLog.Warn("hook script failed", log.WithSuppressed([]any{"hook_id", h.ID, "entity", entity, "phase", phase, "err", err}, suppressed)...)
+	}
+}
+
 func InitHooks() {
 	if !globals.GetConfig().Api.Hooks.Enabled {
 		return
@@ -162,7 +190,7 @@ func InitHooks() {
 
 	err := CreateHookEntity()
 	if err != nil {
-		log.Error("An error occurred while creating hooks entity type")
+		hookLog.Error("cannot create the hooks entity type", "err", err)
 	}
 }
 
@@ -195,9 +223,9 @@ func ApplyPostReadHooksForEntity(username, entity string, data map[string]any) m
 			continue
 		}
 
-		if err := ApplyPostReadScript(username, hook.Script, enriched, hook.ByPassACL); err != nil {
-			log.Error("Error applying post-read hook " + hook.ID + ": " + err.Error())
-		}
+		start := time.Now()
+		err := ApplyPostReadScript(username, hook.Script, enriched, hook.ByPassACL)
+		observeHook(hook, entity, PhasePostRead, start, err)
 	}
 
 	return enriched
@@ -221,9 +249,9 @@ func ApplyPreReadHooksForEntity(username, entity string, data map[string]any) ma
 			continue
 		}
 
-		if err := ApplyPreReadScript(username, hook.Script, enriched, hook.ByPassACL); err != nil {
-			log.Error("Error applying pre-read hook " + hook.ID + ": " + err.Error())
-		}
+		start := time.Now()
+		err := ApplyPreReadScript(username, hook.Script, enriched, hook.ByPassACL)
+		observeHook(hook, entity, PhasePreRead, start, err)
 	}
 
 	return enriched

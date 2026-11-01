@@ -5,6 +5,7 @@ import (
 
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/schema"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -32,6 +33,7 @@ func GetSchemaController(ctx *fasthttp.RequestCtx) {
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	data, err := json.Marshal(schema)
 	if err != nil {
+		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		ctx.SetBodyString(`{"error":"failed to marshal schema"}`)
 

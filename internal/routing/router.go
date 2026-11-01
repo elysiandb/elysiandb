@@ -12,6 +12,7 @@ import (
 	http_security "github.com/taymour/elysiandb/internal/transport/http/api/security"
 	api_transaction "github.com/taymour/elysiandb/internal/transport/http/api/transactions"
 	"github.com/taymour/elysiandb/internal/transport/http/controller"
+	http_monitoring "github.com/taymour/elysiandb/internal/transport/http/monitoring"
 	"github.com/valyala/fasthttp"
 )
 
@@ -93,10 +94,22 @@ func RegisterRoutes(r *router.Router) {
 		r.PUT("/api/hook/id/{id}", Version(http_adminui.AdminAuth(http_hook.UpdateHookByIdController)))
 	}
 
+	r.GET("/monitoring/overview", Version(http_adminui.AdminAuth(http_monitoring.OverviewController)))
+	r.GET("/monitoring/series", Version(http_adminui.AdminAuth(http_monitoring.SeriesController)))
+	r.GET("/monitoring/details", Version(http_adminui.AdminAuth(http_monitoring.DetailsController)))
+	r.GET("/monitoring/logs", Version(http_adminui.AdminAuth(http_monitoring.LogsController)))
+	r.GET("/monitoring/logs/download", Version(http_adminui.AdminAuth(http_monitoring.LogsDownloadController)))
+	r.GET("/monitoring/logs/level", Version(http_adminui.AdminAuth(http_monitoring.GetLogLevelController)))
+	r.PUT("/monitoring/logs/level", Version(http_adminui.AdminAuth(http_monitoring.PutLogLevelController)))
+
+	if globals.GetConfig().Monitoring.Prometheus.Enabled {
+		r.GET("/metrics", Version(http_monitoring.PrometheusAuth(http_adminui.AdminAuth, http_monitoring.PrometheusController)))
+	}
+
 	// Admin UI
 	if globals.GetConfig().AdminUI.Enabled {
 		if !http_adminui.IsBuilt() {
-			log.DirectWarn("The Admin UI is enabled but its assets are missing from this binary: build it with `make build-admin` before `go build`")
+			log.Warn("admin ui assets are missing from this binary", "component", "boot", "hint", "build them with `make build-admin` before `go build`")
 		}
 
 		r.GET("/admin/{filepath:*}", http_adminui.AdminUIHandler)

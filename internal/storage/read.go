@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/taymour/elysiandb/internal/globals"
-	"github.com/taymour/elysiandb/internal/log"
 )
 
 func ReadFromDB(fileName string) (map[string][]byte, error) {
@@ -19,7 +18,6 @@ func ReadFromDB(fileName string) (map[string][]byte, error) {
 	}
 
 	defer file.Close()
-	log.Info("Successfully Opened "+fileName, " for reading.")
 
 	data := make(map[string][]byte)
 

@@ -423,6 +423,38 @@ func EntityExists(entity, id string) bool {
 	return ReadEntityById(entity, id) != nil
 }
 
+func CountEntities(entity string) int {
+	raw, err := storage.GetByKey(globals.ApiEntityIndexIdKey(entity))
+	if err != nil {
+		return 0
+	}
+
+	count := 0
+	inID := false
+	for _, b := range raw {
+		if b == '\n' {
+			inID = false
+			continue
+		}
+
+		if !inID {
+			count++
+			inID = true
+		}
+	}
+
+	return count
+}
+
+func CountEntitiesPerType() map[string]int {
+	counts := map[string]int{}
+	for _, entity := range ListPublicEntityTypes() {
+		counts[entity] = CountEntities(entity)
+	}
+
+	return counts
+}
+
 func CountAllEntities() int {
 	counter := 0
 	entities := ListEntityTypes()
@@ -493,10 +525,8 @@ func ImportAll(data map[string][]map[string]any) []ImportRejection {
 			}
 		}
 
-		log.Info(fmt.Sprintf("The entity '%s' has been imported", entity))
+		log.Debug("entity type imported", "component", "api", "entity", entity, "documents", len(data[entity]))
 	}
-
-	log.Info("All entities have been imported")
 
 	return rejections
 }

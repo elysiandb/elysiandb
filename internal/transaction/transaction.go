@@ -101,6 +101,21 @@ func BeginTransaction() *Transaction {
 	return tx
 }
 
+func OpenTransactions() (int, time.Duration) {
+	TxManager.mu.Lock()
+	defer TxManager.mu.Unlock()
+
+	var oldest time.Duration
+	now := time.Now()
+	for _, tx := range TxManager.txs {
+		if age := now.Sub(tx.StartedAt); age > oldest {
+			oldest = age
+		}
+	}
+
+	return len(TxManager.txs), oldest
+}
+
 func generateTxID() string {
 	return time.Now().Format("20060102150405.000000000")
 }

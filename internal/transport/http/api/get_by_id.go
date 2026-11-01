@@ -10,6 +10,7 @@ import (
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -65,6 +66,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 
 	response, err := json.Marshal(data)
 	if err != nil {
+		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
 		ctx.SetBodyString("Error processing request")

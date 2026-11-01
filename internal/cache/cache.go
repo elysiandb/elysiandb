@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/metrics"
 )
 
 type cacheItem struct {
@@ -35,7 +36,25 @@ func InitCache(ttl time.Duration) {
 		ttl:      ttl,
 	}
 
-	log.Info("API Cache initialized with TTL of ", ttl.String())
+	log.Debug("api cache initialized", "component", "cache", "ttl", ttl)
+}
+
+func (s *cacheStore) Entries() int {
+	s.mu.RLock()
+	entities := make([]*cacheEntity, 0, len(s.entities))
+	for _, e := range s.entities {
+		entities = append(entities, e)
+	}
+	s.mu.RUnlock()
+
+	total := 0
+	for _, e := range entities {
+		e.mu.RLock()
+		total += len(e.data) + len(e.ids)
+		e.mu.RUnlock()
+	}
+
+	return total
 }
 
 func (s *cacheStore) Get(entity string, hash []byte) []byte {
@@ -50,6 +69,7 @@ func (s *cacheStore) Get(entity string, hash []byte) []byte {
 	s.mu.RUnlock()
 
 	if !exists {
+		metrics.CacheMiss()
 		return nil
 	}
 
@@ -58,8 +78,11 @@ func (s *cacheStore) Get(entity string, hash []byte) []byte {
 	e.mu.RUnlock()
 
 	if !ok {
+		metrics.CacheMiss()
 		return nil
 	}
+
+	metrics.CacheHit()
 
 	return it.v
 }

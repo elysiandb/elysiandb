@@ -380,6 +380,18 @@ func CountAllEntities() int {
 	return 0
 }
 
+func CountEntitiesPerType() map[string]int {
+	if IsEngineInternal() {
+		return api_storage.CountEntitiesPerType()
+	}
+
+	if IsEngineMongoDB() {
+		return mongodb.CountEntitiesPerType()
+	}
+
+	return map[string]int{}
+}
+
 func ValidateImport(data map[string][]map[string]interface{}) []api_storage.ImportRejection {
 	return api_storage.ValidateImport(data, GetEntitySchema)
 }

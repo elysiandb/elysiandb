@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -25,11 +26,16 @@ func LoginController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	user, retryAfter, ok := security.AuthenticateUserFrom(req.Username, req.Password, security.LoginSourceFromRequest(ctx))
+	source := security.LoginSourceFromRequest(ctx)
+	user, retryAfter, ok := security.AuthenticateUserFrom(req.Username, req.Password, source)
 	if retryAfter > 0 {
 		ctx.Response.Header.Set("Retry-After", strconv.Itoa(security.RetryAfterSeconds(retryAfter)))
 		ctx.SetStatusCode(fasthttp.StatusTooManyRequests)
 		return
+	}
+
+	if ok && user != nil && user.Role != security.RoleAdmin {
+		security.LogFailedLogin(req.Username, source, security.LoginFailureNotAdmin)
 	}
 
 	if !ok || user == nil || user.Role != security.RoleAdmin {
@@ -39,11 +45,13 @@ func LoginController(ctx *fasthttp.RequestCtx) {
 
 	session, err := security.CreateSession(user.Username, user.Role, security.SessionTTL)
 	if err != nil {
+		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		return
 	}
 
 	security.SetSessionCookie(ctx, session)
+	security.LogLogin(user.Username, source)
 
 	resp := userResponse{
 		Username: user.Username,
@@ -61,6 +69,7 @@ func LogoutController(ctx *fasthttp.RequestCtx) {
 		_ = security.DeleteSession(id)
 	}
 
+	security.LogLogout(security.GetCurrentUsername(ctx))
 	security.ClearSessionCookie(ctx)
 
 	ctx.SetStatusCode(fasthttp.StatusNoContent)

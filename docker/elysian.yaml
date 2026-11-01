@@ -7,7 +7,11 @@ server:
   http: { enabled: true, host: 0.0.0.0, port: 8089 }
   tcp:  { enabled: true, host: 0.0.0.0, port: 8088 }
 log:
-  flushIntervalSeconds: 5
+  level: info
+  format: text
+  accessLog: false
+  slowRequestMs: 500
+  bufferLines: 5000
 stats:
   enabled: false
 security:
@@ -24,3 +28,6 @@ api:
   cache:
     enabled: true
     cleanupIntervalSeconds: 10
+monitoring:
+  prometheus:
+    enabled: false

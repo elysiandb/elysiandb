@@ -6,8 +6,10 @@ import (
 	"strings"
 
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/metrics"
 	"github.com/taymour/elysiandb/internal/stat"
 	"github.com/taymour/elysiandb/internal/storage"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/taymour/elysiandb/internal/wildcard"
 	"github.com/valyala/fasthttp"
 )
@@ -58,6 +60,7 @@ func MultiGetController(ctx *fasthttp.RequestCtx) {
 
 	jsonData, err := json.Marshal(results)
 	if err != nil {
+		observe.SetError(ctx, err)
 		ctx.Error(err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -78,6 +81,7 @@ func handleMGETSingleKey(key string, results *[]multiGetEntry, seen map[string]s
 		storage.DeleteByKey(key)
 		*results = append(*results, multiGetEntry{Key: key, Val: nil})
 
+		metrics.KVMiss()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementMisses()
 		}
@@ -89,6 +93,7 @@ func handleMGETSingleKey(key string, results *[]multiGetEntry, seen map[string]s
 	if err != nil {
 		*results = append(*results, multiGetEntry{Key: key, Val: nil})
 
+		metrics.KVMiss()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementMisses()
 		}
@@ -99,6 +104,7 @@ func handleMGETSingleKey(key string, results *[]multiGetEntry, seen map[string]s
 	val := string(data)
 	*results = append(*results, multiGetEntry{Key: key, Val: &val})
 
+	metrics.KVHit()
 	if cfg.Stats.Enabled {
 		stat.Stats.IncrementHits()
 	}
@@ -121,6 +127,7 @@ func handleMGETWildcardKey(pattern string, results *[]multiGetEntry, seen map[st
 			Val: &valStr,
 		})
 
+		metrics.KVHit()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementHits()
 		}

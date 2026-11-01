@@ -8,6 +8,7 @@ import (
 
 	"github.com/taymour/elysiandb/internal/backup"
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -25,9 +26,10 @@ func (f temporaryFile) Close() error {
 func BackupController(ctx *fasthttp.RequestCtx) {
 	now := time.Now().UTC()
 
+	start := time.Now()
 	file, size, err := createTemporaryBackup(now)
 	if err != nil {
-		log.Error("Unable to create a backup: ", err)
+		observe.SetError(ctx, err)
 		ctx.Response.Header.Set("Content-Type", "application/json")
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		ctx.SetBodyString(`{"error":"unable to create the backup"}`)
@@ -36,6 +38,7 @@ func BackupController(ctx *fasthttp.RequestCtx) {
 
 	ctx.Response.Header.Set("Content-Type", "application/gzip")
 	ctx.Response.Header.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, backup.FileName(now)))
+	observe.Audit(ctx, "backup created", "output", "download", "bytes", size, "duration_ms", log.Since(start))
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBodyStream(file, int(size))
 }
