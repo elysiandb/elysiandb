@@ -158,8 +158,8 @@ func TestExecuteQuery_ComplexNestedQuery(t *testing.T) {
 	doc := map[string]any{
 		"id":      "x1",
 		"status":  "published",
-		"title":   "Pourquoi Go est le langage idéal",
-		"excerpt": "Go est adapté aux systèmes distribués",
+		"title":   "Why Go is the ideal language",
+		"excerpt": "Go is well suited to distributed systems",
 		"author":  map[string]any{"id": "u789", "name": "Taymour Negib"},
 		"tags":    []any{"Go", "distributed"},
 		"categories": []any{
@@ -177,7 +177,7 @@ func TestExecuteQuery_ComplexNestedQuery(t *testing.T) {
 				{
 					Or: []query.FilterNode{
 						{Leaf: map[string]map[string]string{"title": {"eq": "*Go*"}}},
-						{Leaf: map[string]map[string]string{"excerpt": {"eq": "*distribuées*"}}},
+						{Leaf: map[string]map[string]string{"excerpt": {"eq": "*distribution*"}}},
 					},
 				},
 			},

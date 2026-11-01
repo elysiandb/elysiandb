@@ -15,7 +15,7 @@ func TestApiEntityKey(t *testing.T) {
 		{"posts", "api:entity:posts"},
 		{"weird-entity_name42", "api:entity:weird-entity_name42"},
 		{"", "api:entity:"},
-		{"équipe", "api:entity:équipe"},
+		{"team", "api:entity:team"},
 	}
 	for _, tt := range tests {
 		if got := globals.ApiEntityKey(tt.entity); got != tt.want {
@@ -50,7 +50,7 @@ func TestApiSingleEntityKey(t *testing.T) {
 		{"users", "123", "api:entity:users:id:123"},
 		{"articles", "a1b2c3", "api:entity:articles:id:a1b2c3"},
 		{"", "", "api:entity::id:"},
-		{"produits", "é-Ü-42", "api:entity:produits:id:é-Ü-42"},
+		{"products", "Ω-λ-42", "api:entity:products:id:Ω-λ-42"},
 	}
 	for _, tt := range tests {
 		if got := globals.ApiSingleEntityKey(tt.entity, tt.id); got != tt.want {
