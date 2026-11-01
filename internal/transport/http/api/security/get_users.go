@@ -1,8 +1,6 @@
 package http_security
 
 import (
-	"fmt"
-
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
@@ -23,8 +21,6 @@ func GetUsersController(ctx *fasthttp.RequestCtx) {
 		ctx.SetBodyString(`{"error":"` + err.Error() + `"}`)
 		return
 	}
-
-	fmt.Printf("Users: %v\n", users)
 
 	responseBody := `{"users":[`
 	for i, user := range users {
