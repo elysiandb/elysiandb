@@ -119,8 +119,8 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 | `PUT`    | `/api/<entity>`                           | Update multiple documents (batch update)                    |
 | `DELETE` | `/api/<entity>/<id>`                      | Delete document by ID                                       |
 | `DELETE` | `/api/<entity>`                           | Delete all documents for an entity                          |
-| `GET`    | `/api/export`                             | Dumps all entities as a JSON object                         |
-| `POST`   | `/api/import`                             | Replaces entities with the documents of a JSON dump (see Import below) |
+| `GET`    | `/api/export`                             | Dumps the documents of all entities as a JSON object, without accounts and ACLs (see Export and Import below) |
+| `POST`   | `/api/import`                             | Replaces entities with the documents of a JSON dump         |
 | `GET`    | `/api/backup`                             | Downloads a full backup archive (see Backup and Restore)    |
 | `POST`   | `/api/restore`                            | Replaces all the data with a backup archive                 |
 | `POST`   | `/api/<entity>/migrate`                   | Run a **migration** across all documents for an entity      |
@@ -181,11 +181,28 @@ An update never creates a document. The target is checked before schema validati
 [[], [{ "Field": "a", "Message": "expected type string but got number" }]]
 ```
 
-### Import
+### Export and Import
 
-`POST /api/import` takes the format produced by `GET /api/export` (`{ "<entity>": [ <document>, ... ] }`). Export and import exchange documents as JSON; they are not a backup: users keep their password hashes but not the key that verifies them, and schemas and KV keys are not exported. To move a whole instance, use Backup and Restore below.
+`GET /api/export` returns the documents of every entity type as `{ "<entity>": [ <document>, ... ] }`, hooks (`_elysiandb_core_hook`) included. `POST /api/import` takes the same format.
 
-Every document is checked before anything is written. A document that does not match a manual schema rejects the whole import with `400`, and nothing is written:
+**Export and import are not a backup.** They exchange documents, and never include:
+
+* accounts (`_elysiandb_core_user`) and ACLs (`_elysiandb_core_acl`): a password hash can only be verified with the `users.key` of the instance that made it, so accounts can only move with a backup archive, which holds both
+* schemas, entity types without documents, and KV keys
+
+To save or move accounts, ACLs or a whole instance, use Backup and Restore below.
+
+Dumps made with ElysianDB 0.2.1 and earlier contain accounts and ACLs. `POST /api/import` ignores these two entities, so the accounts and ACLs of the instance are never changed by an import, and lists them in its answer:
+
+```json
+{
+  "status": "import completed",
+  "ignored": ["_elysiandb_core_acl", "_elysiandb_core_user"],
+  "message": "accounts and ACLs are not imported, use a backup and restore to move them"
+}
+```
+
+The other entities of the dump are imported as usual. Every document is checked before anything is written. A document that does not match a manual schema rejects the whole import with `400`, and nothing is written:
 
 ```json
 {
@@ -209,6 +226,8 @@ Entities absent from the dump are left untouched. ACLs are then created for user
 ## Backup and Restore
 
 A backup is a `tar.gz` archive that holds everything needed to rebuild an instance: the key that verifies password hashes, every schema, every document, core entities included (users, ACLs and hooks), entity types without documents, and the KV keys.
+
+It is the only way to save or move accounts and ACLs. A password hash is made with the `users.key` of the instance, and can only be verified with that key: the archive is the only file that holds both. `GET /api/export` leaves accounts and ACLs out, and `POST /api/import` ignores them.
 
 ### Commands
 
@@ -279,6 +298,19 @@ The HTTP server accepts request bodies up to 4 MB and sends a response within 3 
 The backup is staged in the system temporary folder (`TMPDIR`), which needs as much free space as the uncompressed data, for `GET /api/backup` and `elysiandb backup` alike.
 
 `GET /api/backup` and `POST /api/restore` take precedence over the generic routes: an entity named `backup` cannot be listed, and documents cannot be created in an entity named `restore`, as with `export`, `import` and `query`.
+
+## Upgrading
+
+From this version on, take a backup with `elysiandb backup` before each upgrade, and keep the archive until the new version runs. ElysianDB 0.2.1 has no backup command: to upgrade from it, stop ElysianDB, copy the data folder, `users.key` included, then start the new version on the same folder.
+
+### Behavior changes since 0.2.1
+
+* `GET /api/export` no longer contains accounts (`_elysiandb_core_user`) and ACLs (`_elysiandb_core_acl`). If you saved your accounts with an export, switch to `elysiandb backup` or `GET /api/backup`: an export does not keep them.
+* `POST /api/import` ignores accounts and ACLs found in a dump, and lists them in `ignored`.
+* `POST /api/import` checks every document first: if one does not match a manual schema, the answer is `400` and nothing is written. It used to answer `200` and drop the document.
+* `POST /api/import` replaces the documents of each entity in the dump: documents that are not in the dump are deleted. They used to stay readable by id while missing from lists.
+* `GET /api/backup` and `POST /api/restore` are new: an entity named `backup` can no longer be listed with `GET /api/backup`, and documents can no longer be created in an entity named `restore` with `POST /api/restore`.
+* `elysiandb help` lists the commands in alphabetical order, with the new `backup` and `restore` commands.
 
 ---
 
@@ -1231,7 +1263,8 @@ Requests without authentication headers are rejected when authentication is enab
 * Hashing is done using bcrypt
 * A per-instance secret key is used as part of the hashing process
 * Deleting `users.key` invalidates all stored password hashes
-* A backup archive holds `users.key` and the password hashes: protect it like the data folder (see Backup and Restore)
+* `GET /api/export` contains no password hashes: accounts and ACLs are left out of it
+* A backup archive holds `users.key` and the password hashes: store it like the data folder (see Backup and Restore)
 * In `token` mode, anyone with the token can fully access the API
 * The token is compared in constant time
 * `GET /config` never returns secrets: the token is replaced with `***` and the password of `engine.uri` with `xxxxx`

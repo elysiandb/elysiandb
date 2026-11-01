@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/taymour/elysiandb/internal/acl"
-	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/valyala/fasthttp"
 )
@@ -19,8 +18,13 @@ func ImportController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	ignored := removeAccountEntities(dump)
+
 	if rejected := engine.ValidateImport(dump); len(rejected) > 0 {
-		sendImportRejections(ctx, fasthttp.StatusBadRequest, "invalid documents, nothing was imported", rejected)
+		sendImportResponse(ctx, fasthttp.StatusBadRequest, map[string]any{
+			"error":    "invalid documents, nothing was imported",
+			"rejected": rejected,
+		}, ignored)
 		return
 	}
 
@@ -32,20 +36,35 @@ func ImportController(ctx *fasthttp.RequestCtx) {
 	acl.InitACL()
 
 	if len(rejected) > 0 {
-		sendImportRejections(ctx, fasthttp.StatusInternalServerError, "some documents could not be imported", rejected)
+		sendImportResponse(ctx, fasthttp.StatusInternalServerError, map[string]any{
+			"error":    "some documents could not be imported",
+			"rejected": rejected,
+		}, ignored)
 		return
 	}
 
-	ctx.SetStatusCode(fasthttp.StatusOK)
-	ctx.SetBody([]byte(`{"status":"import completed"}`))
+	sendImportResponse(ctx, fasthttp.StatusOK, map[string]any{"status": "import completed"}, ignored)
 }
 
-func sendImportRejections(ctx *fasthttp.RequestCtx, status int, message string, rejected []api_storage.ImportRejection) {
-	body, _ := json.Marshal(map[string]any{
-		"error":    message,
-		"rejected": rejected,
-	})
+func removeAccountEntities(dump map[string][]map[string]any) []string {
+	ignored := []string{}
+	for _, entity := range accountEntities {
+		if _, ok := dump[entity]; ok {
+			delete(dump, entity)
+			ignored = append(ignored, entity)
+		}
+	}
 
+	return ignored
+}
+
+func sendImportResponse(ctx *fasthttp.RequestCtx, status int, response map[string]any, ignored []string) {
+	if len(ignored) > 0 {
+		response["ignored"] = ignored
+		response["message"] = accountsNotImportedMessage
+	}
+
+	body, _ := json.Marshal(response)
 	ctx.SetStatusCode(status)
 	ctx.SetBody(body)
 }

@@ -1,7 +1,9 @@
 package e2e
 
 import (
+	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/valyala/fasthttp"
@@ -59,21 +61,87 @@ func TestImportReplacesTheDocumentsOfAnEntity(t *testing.T) {
 	s.mustDo(fasthttp.StatusOK, "GET", "/api/untouched/u1", "")
 }
 
-func TestACLsStillWorkAfterImportingTheACLEntity(t *testing.T) {
-	source := startAdminSession(t, nil)
-	source.mustDo(fasthttp.StatusOK, "POST", "/api/security/user", `{"username":"alice","password":"alice-pw","role":"admin"}`)
-	source.mustDo(fasthttp.StatusOK, "POST", "/api/book", `{"id":"b1","title":"Dune"}`)
-	dump := source.mustDo(fasthttp.StatusOK, "GET", "/api/export", "").body
+func TestExportLeavesAccountsAndACLsOut(t *testing.T) {
+	s := startAdminSession(t, nil)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/security/user", `{"username":"alice","password":"alice-pw","role":"admin"}`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/book", `{"id":"b1","title":"Dune"}`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/hook/book", `{"name":"tag","event":"post_read","language":"javascript","enabled":true,"script":"function postRead(ctx) {}"}`)
 
-	target := startAdminSession(t, nil)
-	target.mustDo(fasthttp.StatusOK, "POST", "/api/import", string(dump))
-
-	target.mustDo(fasthttp.StatusOK, "POST", "/api/security/user", `{"username":"bob","password":"bob-pw","role":"admin"}`)
-	if acl := target.mustDo(fasthttp.StatusOK, "GET", "/api/acl/bob/book", "").object(t); acl["username"] != "bob" {
-		t.Fatalf("expected the new user to get an ACL, got %v", acl)
+	dump := s.mustDo(fasthttp.StatusOK, "GET", "/api/export", "")
+	if strings.Contains(string(dump.body), "$2a$") {
+		t.Fatalf("the export must not contain password hashes: %s", dump.body)
 	}
 
-	target.mustDo(fasthttp.StatusOK, "PUT", "/api/acl/bob/book", `{"permissions":{"read":true,"create":false,"update":false,"delete":false,"owning_read":false,"owning_write":false,"owning_update":false,"owning_delete":false}}`)
-	target.mustDo(fasthttp.StatusOK, "POST", "/api/film", `{"id":"f1","title":"Alien"}`)
-	target.mustDo(fasthttp.StatusOK, "GET", "/api/film/f1", "")
+	entities := dump.object(t)
+	for _, entity := range []string{"_elysiandb_core_user", "_elysiandb_core_acl"} {
+		if _, ok := entities[entity]; ok {
+			t.Fatalf("the export must not contain %s", entity)
+		}
+	}
+
+	for _, entity := range []string{"book", "_elysiandb_core_hook"} {
+		if _, ok := entities[entity]; !ok {
+			t.Fatalf("expected %s in the export, got %v", entity, entities)
+		}
+	}
+}
+
+func TestImportNeverTouchesAccountsAndACLs(t *testing.T) {
+	source := startAdminSession(t, nil)
+	source.mustDo(fasthttp.StatusOK, "POST", "/api/book", `{"id":"b1","title":"Dune"}`)
+
+	var dump map[string]any
+	if err := json.Unmarshal(source.mustDo(fasthttp.StatusOK, "GET", "/api/export", "").body, &dump); err != nil {
+		t.Fatalf("invalid export: %v", err)
+	}
+
+	dump["_elysiandb_core_user"] = []any{
+		map[string]any{"id": "admin", "username": "admin", "password": "$2a$10$fromanotherinstance", "role": "admin"},
+		map[string]any{"id": "alice", "username": "alice", "password": "$2a$10$fromanotherinstance", "role": "admin"},
+	}
+	dump["_elysiandb_core_acl"] = []any{
+		map[string]any{"id": "alice::book", "username": "alice", "entity": "book", "permissions": map[string]any{"read": true}},
+	}
+	body, _ := json.Marshal(dump)
+
+	target := startAdminSession(t, nil)
+	target.mustDo(fasthttp.StatusOK, "POST", "/api/security/user", `{"username":"bob","password":"bob-pw","role":"admin"}`)
+	target.mustDo(fasthttp.StatusOK, "POST", "/api/movie", `{"id":"m1"}`)
+	target.mustDo(fasthttp.StatusOK, "PUT", "/api/acl/bob/movie", `{"permissions":{"read":true,"create":false,"update":false,"delete":false,"owning_read":false,"owning_write":false,"owning_update":false,"owning_delete":false}}`)
+	aclsBefore := string(target.mustDo(fasthttp.StatusOK, "GET", "/api/acl/bob/movie", "").body)
+
+	resp := target.mustDo(fasthttp.StatusOK, "POST", "/api/import", string(body)).object(t)
+	if !reflect.DeepEqual(resp["ignored"], []any{"_elysiandb_core_acl", "_elysiandb_core_user"}) || !strings.Contains(resp["message"].(string), "backup and restore") {
+		t.Fatalf("expected the import to report the ignored entities, got %v", resp)
+	}
+
+	anonymous := target.anonymous()
+	for _, login := range []struct {
+		username, password string
+		status             int
+	}{
+		{"bob", "bob-pw", fasthttp.StatusOK},
+		{"admin", "admin", fasthttp.StatusOK},
+		{"alice", "alice-pw", fasthttp.StatusUnauthorized},
+	} {
+		credentials, _ := json.Marshal(map[string]string{"username": login.username, "password": login.password})
+		anonymous.mustDo(login.status, "POST", "/api/security/login", string(credentials))
+	}
+
+	if got := string(target.mustDo(fasthttp.StatusOK, "GET", "/api/acl/bob/movie", "").body); got != aclsBefore {
+		t.Fatalf("the import must not change existing ACLs:\nbefore %s\nafter  %s", aclsBefore, got)
+	}
+
+	target.mustDo(fasthttp.StatusOK, "GET", "/api/book/b1", "")
+	if acl := target.mustDo(fasthttp.StatusOK, "GET", "/api/acl/bob/book", "").object(t); acl["username"] != "bob" {
+		t.Fatalf("expected an ACL for the imported entity type, got %v", acl)
+	}
+
+	target.mustDo(fasthttp.StatusNotFound, "GET", "/api/acl/alice/book", "")
+
+	target.mustDo(fasthttp.StatusOK, "POST", "/api/strict/create", `{"fields":{"title":{"type":"string","required":true}}}`)
+	rejected := target.mustDo(fasthttp.StatusBadRequest, "POST", "/api/import", `{"_elysiandb_core_user":[],"strict":[{"id":"s1"}]}`).object(t)
+	if !reflect.DeepEqual(rejected["ignored"], []any{"_elysiandb_core_user"}) || rejected["rejected"] == nil {
+		t.Fatalf("expected a rejected import to report the ignored entities too, got %v", rejected)
+	}
 }
