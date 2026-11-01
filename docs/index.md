@@ -2097,7 +2097,7 @@ Data is automatically persisted:
 2. **On shutdown** (SIGTERM / SIGINT)
 3. **On demand** via HTTP `/save` or TCP `SAVE`
 
-Crash recovery ensures data durability even if the process crashes mid-write. When the recovery log is replayed at startup, KV keys with a TTL keep their expiration date, and keys that expired in the meantime are skipped.
+Crash recovery ensures data durability even if the process crashes mid-write. When the recovery log is replayed at startup, KV keys with a TTL keep their expiration date, and keys that expired in the meantime are skipped. Entries of any size are replayed. If a recovery log cannot be read, it is kept next to the data files with a `.failed` suffix (for example `elysiandb.store.recovery.log.failed`) instead of being deleted, and the error is logged.
 
 ---
 

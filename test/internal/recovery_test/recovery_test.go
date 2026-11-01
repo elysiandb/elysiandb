@@ -1,13 +1,14 @@
 package recovery_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/taymour/elysiandb/internal/boot"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/recovery"
@@ -239,10 +240,13 @@ func TestStoreRecovery_ReplayKeepsTheLoggedExpiration(t *testing.T) {
 	)
 	writeLog(recovery.RecoveryFile, map[string]any{"op": "put", "key": "doc", "value": map[string]any{"id": "doc"}})
 
+	storage.LoadDB()
+	storage.LoadJsonDB()
 	recovery.ActivateStoreRecoveryLog(func() {})
 	recovery.ActivateJsonRecoveryLog(func() {})
 
-	boot.InitDB()
+	recovery.ReplayJsonRecoveryLog(storage.PutJsonValue, storage.DeleteJsonByKey)
+	recovery.ReplayStoreRecoveryLog(storage.PutKeyValueWithExpiration, storage.DeleteByKey)
 
 	if doc, err := storage.GetJsonByKey("doc"); err != nil || doc["id"] != "doc" {
 		t.Fatalf("expected the replayed document, got %v (%v)", doc, err)
@@ -258,5 +262,122 @@ func TestStoreRecovery_ReplayKeepsTheLoggedExpiration(t *testing.T) {
 
 	if _, ok := storage.GetKeyExpiration("plain"); ok {
 		t.Fatalf("a key logged without TTL must not get an expiration")
+	}
+}
+
+func setupStores(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	globals.SetConfig(&configuration.Config{Store: configuration.StoreConfig{Folder: dir, Shards: 4}})
+	storage.LoadDB()
+	storage.LoadJsonDB()
+
+	return dir
+}
+
+func writeRecoveryLog(t *testing.T, path string, ops []map[string]any, tail string) {
+	t.Helper()
+
+	var buf []byte
+	for _, op := range ops {
+		b, _ := json.Marshal(op)
+		buf = append(append(buf, b...), '\n')
+	}
+
+	if err := os.WriteFile(path, append(buf, tail...), 0o644); err != nil {
+		t.Fatalf("cannot write %s: %v", path, err)
+	}
+}
+
+func TestStoreRecovery_ReplaysEntriesOfAnySize(t *testing.T) {
+	dir := setupStores(t)
+	path := filepath.Join(dir, recovery.StoreRecoveryFile)
+	big := bytes.Repeat([]byte("x"), 200_000)
+
+	writeRecoveryLog(t, path, []map[string]any{
+		{"op": "put", "key": "before", "value": []byte("ok")},
+		{"op": "put", "key": "big", "value": big},
+		{"op": "put", "key": "after", "value": []byte("ok")},
+		{"op": "put", "key": "deleted", "value": []byte("ok")},
+		{"op": "del", "key": "deleted"},
+	}, `{"op":"put","key":"truncated","val`)
+
+	recovery.ReplayStoreRecoveryLog(storage.PutKeyValueWithExpiration, storage.DeleteByKey)
+
+	for key, value := range map[string][]byte{"before": []byte("ok"), "big": big, "after": []byte("ok")} {
+		if got, err := storage.GetByKey(key); err != nil || !bytes.Equal(got, value) {
+			t.Fatalf("expected %s to be replayed, got %d bytes (%v)", key, len(got), err)
+		}
+	}
+
+	for _, key := range []string{"deleted", "truncated"} {
+		if _, err := storage.GetByKey(key); err == nil {
+			t.Fatalf("%s must not be replayed", key)
+		}
+	}
+
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("expected the replayed log to be cleared, got %v", err)
+	}
+}
+
+func TestJsonRecovery_ReplaysEntriesOfAnySize(t *testing.T) {
+	dir := setupStores(t)
+	path := filepath.Join(dir, recovery.RecoveryFile)
+	big := strings.Repeat("x", 200_000)
+
+	writeRecoveryLog(t, path, []map[string]any{
+		{"op": "put", "key": "before", "value": map[string]any{"id": "before"}},
+		{"op": "put", "key": "big", "value": map[string]any{"id": "big", "text": big}},
+		{"op": "put", "key": "after", "value": map[string]any{"id": "after"}},
+	}, "")
+
+	recovery.ReplayJsonRecoveryLog(storage.PutJsonValue, storage.DeleteJsonByKey)
+
+	for _, key := range []string{"before", "big", "after"} {
+		if doc, err := storage.GetJsonByKey(key); err != nil || doc["id"] != key {
+			t.Fatalf("expected %s to be replayed, got %v", key, err)
+		}
+	}
+
+	if doc, _ := storage.GetJsonByKey("big"); doc["text"] != big {
+		t.Fatalf("expected the large document to be replayed in full")
+	}
+
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("expected the replayed log to be cleared, got %v", err)
+	}
+}
+
+func TestRecovery_KeepsALogItCannotRead(t *testing.T) {
+	for name, tc := range map[string]struct {
+		file   string
+		replay func()
+	}{
+		"store": {recovery.StoreRecoveryFile, func() {
+			recovery.ReplayStoreRecoveryLog(func(k string, v []byte, expiresAt int64) error { return nil }, func(k string) {})
+		}},
+		"json": {recovery.RecoveryFile, func() {
+			recovery.ReplayJsonRecoveryLog(func(k string, v map[string]any) error { return nil }, func(k string) {})
+		}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := setupStores(t)
+			path := filepath.Join(dir, tc.file)
+			if err := os.Mkdir(path, 0o755); err != nil {
+				t.Fatalf("cannot create %s: %v", path, err)
+			}
+
+			tc.replay()
+
+			if _, err := os.Stat(path); !os.IsNotExist(err) {
+				t.Fatalf("expected the unreadable log to be moved, got %v", err)
+			}
+
+			if _, err := os.Stat(path + recovery.FailedReplaySuffix); err != nil {
+				t.Fatalf("expected the unreadable log to be kept as %s: %v", path+recovery.FailedReplaySuffix, err)
+			}
+		})
 	}
 }
