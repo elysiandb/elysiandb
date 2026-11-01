@@ -33,6 +33,7 @@ func setup(t *testing.T, mutate func(cfg *configuration.Config)) fasthttp.Reques
 	}
 	log.SetOutput(&strings.Builder{}, false)
 	metrics.Reset()
+	observe.ResetThrottles()
 
 	t.Cleanup(func() {
 		log.SetOutput(nil, false)

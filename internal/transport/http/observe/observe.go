@@ -52,6 +52,12 @@ func newIDPrefix() string {
 	return hex.EncodeToString(b)
 }
 
+func ResetThrottles() {
+	unauthorizedThrottle = log.NewThrottle(time.Minute)
+	forbiddenThrottle = log.NewThrottle(time.Minute)
+	slowThrottle = log.NewThrottle(time.Minute)
+}
+
 func SetError(ctx *fasthttp.RequestCtx, err error) {
 	if err != nil {
 		ctx.SetUserValue(errorKey, err)

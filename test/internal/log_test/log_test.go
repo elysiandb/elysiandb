@@ -331,9 +331,13 @@ func TestTemporaryLevelGoesBackByItself(t *testing.T) {
 
 	pkglog.Debug("visible")
 
-	deadline := time.Now().Add(2 * time.Second)
-	for pkglog.CurrentLevel().Level != "info" && time.Now().Before(deadline) {
+	deadline := time.Now().Add(5 * time.Second)
+	for !strings.Contains(buf.String(), `msg="log level restored"`) && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
+	}
+
+	if !strings.Contains(buf.String(), `msg="log level restored"`) {
+		t.Fatalf("the restore should be logged: %q", buf.String())
 	}
 
 	if current := pkglog.CurrentLevel(); current.Level != "info" || current.Until != nil {
@@ -345,9 +349,6 @@ func TestTemporaryLevelGoesBackByItself(t *testing.T) {
 	out := buf.String()
 	if !strings.Contains(out, "msg=visible") || strings.Contains(out, "msg=hidden") {
 		t.Fatalf("unexpected output %q", out)
-	}
-	if !strings.Contains(out, `msg="log level restored"`) {
-		t.Fatalf("the restore should be logged: %q", out)
 	}
 }
 
