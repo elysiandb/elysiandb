@@ -7,6 +7,7 @@ import (
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/storage"
 )
@@ -506,5 +507,42 @@ func TestAllAllowedWhenAuthDisabled(t *testing.T) {
 	out := acl.FilterListOfEntities("u", "x", data)
 	if len(out) != 1 {
 		t.Fatalf("expected passthrough")
+	}
+}
+
+func TestInitACLReplacesAnInferredSchema(t *testing.T) {
+	setup(t, true)
+
+	cfg := globals.GetConfig()
+	cfg.Api.Schema.Enabled = true
+	cfg.Api.Schema.Strict = true
+
+	writeUser("admin", security.RoleAdmin)
+	api_storage.WriteEntity(schema.SchemaEntity, map[string]any{
+		"id": acl.ACLEntity,
+		"fields": map[string]any{
+			"permissions": map[string]any{"name": "permissions", "type": "map[string]bool", "required": true},
+		},
+	})
+
+	if err := acl.InitACL(); err != nil {
+		t.Fatalf("expected the ACLs to be created, got %v", err)
+	}
+
+	if !schema.IsManualSchema(acl.ACLEntity, nil) {
+		t.Fatalf("expected the ACL entity to get its manual schema")
+	}
+
+	api_storage.WriteEntity("book", map[string]any{"id": "b1"})
+	if err := acl.InitACL(); err != nil {
+		t.Fatalf("expected the ACLs of a new entity type to be created, got %v", err)
+	}
+
+	if acl.GetACLEntityForUsername("book", "admin") == nil {
+		t.Fatalf("expected an ACL for the new entity type")
+	}
+
+	if err := acl.UpdateACLEntityForUsername("book", "admin", acl.NewPermissions()); err != nil {
+		t.Fatalf("expected the ACL update to succeed, got %v", err)
 	}
 }
