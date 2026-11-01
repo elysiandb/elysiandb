@@ -1,0 +1,160 @@
+{
+    "common": {
+        "loading": "Laden...",
+        "cancel": "Annuleren",
+        "save": "Opslaan",
+        "create": "Aanmaken",
+        "delete": "Verwijderen",
+        "show": "Tonen",
+        "hide": "Verbergen",
+        "enabled": "Ingeschakeld",
+        "disabled": "Uitgeschakeld",
+        "updating": "Bijwerken...",
+        "error": "Fout: {message}",
+        "unknownError": "Onbekende fout",
+        "username": "Gebruikersnaam",
+        "password": "Wachtwoord",
+        "role": "Rol",
+        "actions": "Acties",
+        "name": "Naam",
+        "event": "Gebeurtenis",
+        "entities": "Entiteiten",
+        "users": "Gebruikers",
+        "searchUser": "Gebruiker zoeken…"
+    },
+    "language": {
+        "label": "Taal"
+    },
+    "login": {
+        "submit": "Inloggen"
+    },
+    "nav": {
+        "toggle": "Navigatie tonen",
+        "configuration": "Configuratie",
+        "users": "Gebruikers",
+        "acl": "ACL",
+        "schema": "Schema",
+        "hooks": "Hooks",
+        "browse": "Verkennen",
+        "hello": "Hallo {username}",
+        "logout": "Uitloggen"
+    },
+    "home": {
+        "title": "Startpagina"
+    },
+    "configuration": {
+        "entry": "{label}: {value}",
+        "sections": {
+            "store": "Opslag",
+            "server": "Server",
+            "logging": "Logboek",
+            "security": "Beveiliging",
+            "stats": "Statistieken",
+            "api": "API",
+            "adminUI": "Beheerinterface"
+        },
+        "fields": {
+            "folder": "Map",
+            "shards": "Shards",
+            "flushInterval": "Schrijfinterval",
+            "crashRecovery": "Herstel na crash",
+            "maxLogMB": "Max. logboekgrootte (MB)",
+            "http": "HTTP",
+            "tcp": "TCP",
+            "host": "Host",
+            "port": "Poort",
+            "authenticationEnabled": "Authenticatie ingeschakeld",
+            "mode": "Modus",
+            "enabled": "Ingeschakeld",
+            "indexWorkers": "Indexeringsworkers",
+            "cache": "Cache",
+            "cleanupInterval": "Opruiminterval",
+            "schema": "Schema",
+            "strict": "Strikt"
+        }
+    },
+    "users": {
+        "create": "Gebruiker aanmaken",
+        "changePassword": "Wachtwoord wijzigen",
+        "confirmDelete": "Gebruiker ‘{username}’ verwijderen?",
+        "editTitle": "Gebruiker bewerken",
+        "createTitle": "Gebruiker aanmaken",
+        "passwordRequired": "Voer een wachtwoord in.",
+        "created": "Gebruiker aangemaakt",
+        "createFailed": "Gebruiker aanmaken mislukt",
+        "passwordChanged": "Wachtwoord van de gebruiker gewijzigd",
+        "passwordChangeFailed": "Wachtwoord van de gebruiker wijzigen mislukt",
+        "roleChanged": "Rol van de gebruiker gewijzigd",
+        "roleChangeFailed": "Rol van de gebruiker wijzigen mislukt",
+        "deleted": "Gebruiker verwijderd",
+        "deleteFailed": "Gebruiker verwijderen mislukt"
+    },
+    "acl": {
+        "searchEntity": "Entiteit zoeken…",
+        "update": "ACL's bijwerken",
+        "restore": "Standaardwaarden herstellen",
+        "confirmRestore": "Standaardrechten voor ‘{username}’ herstellen?",
+        "updated": "ACL's bijgewerkt voor ‘{username}’ (entiteiten: {count})",
+        "updateFailed": "ACL's voor ‘{username}’ bijwerken mislukt",
+        "restored": "Standaard-ACL's hersteld voor ‘{username}’",
+        "restoreFailed": "Standaard-ACL's voor ‘{username}’ herstellen mislukt",
+        "overview": "Overzicht van rechten",
+        "permissions": {
+            "read": "Staat het lezen van alle records van de entiteit toe.",
+            "create": "Staat het aanmaken van nieuwe records in de entiteit toe.",
+            "update": "Staat het wijzigen van elk record van de entiteit toe.",
+            "delete": "Staat het verwijderen van elk record van de entiteit toe.",
+            "owning_read": "Staat alleen het lezen toe van records die eigendom zijn van de gebruiker.",
+            "owning_write": "Staat het aanmaken toe van records die eigendom zijn van de gebruiker.",
+            "owning_update": "Staat alleen het wijzigen toe van records die eigendom zijn van de gebruiker.",
+            "owning_delete": "Staat alleen het verwijderen toe van records die eigendom zijn van de gebruiker."
+        }
+    },
+    "schema": {
+        "createTitle": "Entiteitstype aanmaken",
+        "namePlaceholder": "Naam van de entiteit",
+        "manual": "handmatig",
+        "autoManaged": "automatisch beheerd",
+        "addField": "+ Veld toevoegen",
+        "update": "Schema bijwerken",
+        "drop": "Entiteitstype verwijderen",
+        "confirmDrop": "Entiteitstype ‘{entity}’ verwijderen?",
+        "required": "verplicht",
+        "created": "Entiteit ‘{entity}’ aangemaakt",
+        "createFailed": "Entiteit ‘{entity}’ aanmaken mislukt",
+        "dropped": "Entiteit ‘{entity}’ verwijderd",
+        "dropFailed": "‘{entity}’ verwijderen mislukt",
+        "updated": "Schema bijgewerkt voor ‘{entity}’",
+        "updateFailed": "Schema voor ‘{entity}’ bijwerken mislukt"
+    },
+    "hooks": {
+        "createTitle": "Hook aanmaken",
+        "off": "UIT",
+        "title": "Hook",
+        "options": "Opties",
+        "bypassAcl": "ACL's omzeilen",
+        "language": "Scripttaal",
+        "priority": "Prioriteit",
+        "script": "Script",
+        "mustStartWith": "{event}-hooks moeten beginnen met: {signature}",
+        "created": "De hook ‘{name}’ is aangemaakt voor ‘{entity}’",
+        "createFailed": "Hook aanmaken voor ‘{entity}’ mislukt",
+        "saved": "Hook ‘{name}’ opgeslagen",
+        "saveFailed": "Hook opslaan mislukt"
+    },
+    "browse": {
+        "query": "Query",
+        "search": "Zoeken",
+        "invalidQuery": "Ongeldige JSON-query",
+        "queryError": "Fout bij het uitvoeren van de query",
+        "document": "Document",
+        "confirmDelete": "Entiteit ‘{id}’ verwijderen?",
+        "deleted": "Entiteit ‘{id}’ verwijderd",
+        "deleteFailed": "‘{id}’ verwijderen mislukt",
+        "help": {
+            "filters": "Filters",
+            "sort": "Sortering",
+            "pagination": "Paginering"
+        }
+    }
+}

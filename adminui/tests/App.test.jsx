@@ -61,6 +61,13 @@ describe("Home", () => {
     it.each([
         ["en", "Home"],
         ["fr", "Accueil"],
+        ["es", "Inicio"],
+        ["zh", "首页"],
+        ["de", "Startseite"],
+        ["ja", "ホーム"],
+        ["ko", "홈"],
+        ["pt", "Início"],
+        ["nl", "Startpagina"],
     ])("shows its title in %s", (language, title) => {
         renderWithProviders(<Home />, { language });
 

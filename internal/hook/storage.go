@@ -55,7 +55,7 @@ func CreateHook(hook *Hook) error {
 
 	err := engine.WriteEntity(HookEntity, hook.ToDataMap())
 	if len(err) > 0 {
-		return fmt.Errorf("an error occured while creating the hook: %v", err)
+		return fmt.Errorf("an error occurred while creating the hook: %v", err)
 	}
 
 	return nil
@@ -105,7 +105,7 @@ func GetHookById(hookId string) (*Hook, error) {
 
 	data := engine.ReadEntityById(HookEntity, hookId)
 	if data == nil {
-		return nil, fmt.Errorf("an error occured while retrieving the hook with id '%s'", hookId)
+		return nil, fmt.Errorf("an error occurred while retrieving the hook with id '%s'", hookId)
 	}
 
 	hook := &Hook{}

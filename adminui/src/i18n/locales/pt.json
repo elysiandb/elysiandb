@@ -1,0 +1,160 @@
+{
+    "common": {
+        "loading": "Carregando...",
+        "cancel": "Cancelar",
+        "save": "Salvar",
+        "create": "Criar",
+        "delete": "Excluir",
+        "show": "Mostrar",
+        "hide": "Ocultar",
+        "enabled": "Ativado",
+        "disabled": "Desativado",
+        "updating": "Atualizando...",
+        "error": "Erro: {message}",
+        "unknownError": "Erro desconhecido",
+        "username": "Nome de usuário",
+        "password": "Senha",
+        "role": "Função",
+        "actions": "Ações",
+        "name": "Nome",
+        "event": "Evento",
+        "entities": "Entidades",
+        "users": "Usuários",
+        "searchUser": "Pesquisar usuário…"
+    },
+    "language": {
+        "label": "Idioma"
+    },
+    "login": {
+        "submit": "Entrar"
+    },
+    "nav": {
+        "toggle": "Mostrar a navegação",
+        "configuration": "Configuração",
+        "users": "Usuários",
+        "acl": "ACL",
+        "schema": "Esquema",
+        "hooks": "Hooks",
+        "browse": "Explorar",
+        "hello": "Olá, {username}",
+        "logout": "Sair"
+    },
+    "home": {
+        "title": "Início"
+    },
+    "configuration": {
+        "entry": "{label}: {value}",
+        "sections": {
+            "store": "Armazenamento",
+            "server": "Servidor",
+            "logging": "Registro",
+            "security": "Segurança",
+            "stats": "Estatísticas",
+            "api": "API",
+            "adminUI": "Interface de administração"
+        },
+        "fields": {
+            "folder": "Pasta",
+            "shards": "Shards",
+            "flushInterval": "Intervalo de gravação",
+            "crashRecovery": "Recuperação após falha",
+            "maxLogMB": "Tamanho máx. do log (MB)",
+            "http": "HTTP",
+            "tcp": "TCP",
+            "host": "Host",
+            "port": "Porta",
+            "authenticationEnabled": "Autenticação ativada",
+            "mode": "Modo",
+            "enabled": "Ativado",
+            "indexWorkers": "Workers de indexação",
+            "cache": "Cache",
+            "cleanupInterval": "Intervalo de limpeza",
+            "schema": "Esquema",
+            "strict": "Estrito"
+        }
+    },
+    "users": {
+        "create": "Criar um usuário",
+        "changePassword": "Alterar a senha",
+        "confirmDelete": "Excluir o usuário “{username}”?",
+        "editTitle": "Editar usuário",
+        "createTitle": "Criar usuário",
+        "passwordRequired": "Digite uma senha.",
+        "created": "Usuário criado com sucesso",
+        "createFailed": "Falha ao criar o usuário",
+        "passwordChanged": "Senha do usuário alterada com sucesso",
+        "passwordChangeFailed": "Falha ao alterar a senha do usuário",
+        "roleChanged": "Função do usuário alterada com sucesso",
+        "roleChangeFailed": "Falha ao alterar a função do usuário",
+        "deleted": "Usuário excluído com sucesso",
+        "deleteFailed": "Falha ao excluir o usuário"
+    },
+    "acl": {
+        "searchEntity": "Pesquisar entidade…",
+        "update": "Atualizar ACLs",
+        "restore": "Restaurar padrões",
+        "confirmRestore": "Restaurar as permissões padrão de “{username}”?",
+        "updated": "ACLs atualizadas para “{username}” (entidades: {count})",
+        "updateFailed": "Falha ao atualizar as ACLs de “{username}”",
+        "restored": "ACLs padrão restauradas para “{username}”",
+        "restoreFailed": "Falha ao restaurar as ACLs padrão de “{username}”",
+        "overview": "Visão geral das permissões",
+        "permissions": {
+            "read": "Permite ler todos os registros da entidade.",
+            "create": "Permite criar novos registros na entidade.",
+            "update": "Permite alterar qualquer registro da entidade.",
+            "delete": "Permite excluir qualquer registro da entidade.",
+            "owning_read": "Permite ler apenas os registros que pertencem ao usuário.",
+            "owning_write": "Permite criar registros que pertencem ao usuário.",
+            "owning_update": "Permite alterar apenas os registros que pertencem ao usuário.",
+            "owning_delete": "Permite excluir apenas os registros que pertencem ao usuário."
+        }
+    },
+    "schema": {
+        "createTitle": "Criar tipo de entidade",
+        "namePlaceholder": "Nome da entidade",
+        "manual": "manual",
+        "autoManaged": "gerenciado automaticamente",
+        "addField": "+ Adicionar campo",
+        "update": "Atualizar esquema",
+        "drop": "Excluir tipo de entidade",
+        "confirmDrop": "Excluir o tipo de entidade “{entity}”?",
+        "required": "obrigatório",
+        "created": "Entidade “{entity}” criada com sucesso",
+        "createFailed": "Falha ao criar a entidade “{entity}”",
+        "dropped": "Entidade “{entity}” excluída",
+        "dropFailed": "Falha ao excluir “{entity}”",
+        "updated": "Esquema atualizado para “{entity}”",
+        "updateFailed": "Falha ao atualizar o esquema de “{entity}”"
+    },
+    "hooks": {
+        "createTitle": "Criar hook",
+        "off": "INATIVO",
+        "title": "Hook",
+        "options": "Opções",
+        "bypassAcl": "Ignorar as ACLs",
+        "language": "Linguagem",
+        "priority": "Prioridade",
+        "script": "Script",
+        "mustStartWith": "Os hooks {event} devem começar com: {signature}",
+        "created": "O hook “{name}” foi criado para “{entity}”",
+        "createFailed": "Falha ao criar um hook para “{entity}”",
+        "saved": "Hook “{name}” salvo",
+        "saveFailed": "Falha ao salvar o hook"
+    },
+    "browse": {
+        "query": "Consulta",
+        "search": "Pesquisar",
+        "invalidQuery": "Consulta JSON inválida",
+        "queryError": "Erro ao executar a consulta",
+        "document": "Documento",
+        "confirmDelete": "Excluir a entidade “{id}”?",
+        "deleted": "Entidade “{id}” excluída",
+        "deleteFailed": "Falha ao excluir “{id}”",
+        "help": {
+            "filters": "Filtros",
+            "sort": "Ordenação",
+            "pagination": "Paginação"
+        }
+    }
+}

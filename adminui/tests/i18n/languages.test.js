@@ -7,18 +7,36 @@ describe("languages", () => {
         expect(isSupportedLanguage(DEFAULT_LANGUAGE)).toBe(true);
     });
 
-    it("offers English and French", () => {
-        expect(LANGUAGES.map(({ code }) => code)).toEqual(["en", "fr"]);
+    it("offers English, French, Spanish, Chinese, German, Japanese, Korean, Portuguese and Dutch", () => {
+        expect(LANGUAGES.map(({ code }) => code)).toEqual(["en", "fr", "es", "zh", "de", "ja", "ko", "pt", "nl"]);
     });
 
     it("labels each language in its own language", () => {
-        expect(LANGUAGES.map(({ label }) => label)).toEqual(["English", "Français"]);
+        expect(LANGUAGES.map(({ label }) => label)).toEqual([
+            "English",
+            "Français",
+            "Español",
+            "简体中文",
+            "Deutsch",
+            "日本語",
+            "한국어",
+            "Português",
+            "Nederlands",
+        ]);
     });
 
     it.each([
         ["en", true],
         ["fr", true],
-        ["de", false],
+        ["es", true],
+        ["zh", true],
+        ["de", true],
+        ["ja", true],
+        ["ko", true],
+        ["pt", true],
+        ["nl", true],
+        ["it", false],
+        ["zh-TW", false],
         ["EN", false],
         ["", false],
         [undefined, false],
@@ -34,8 +52,22 @@ describe("detectLanguage", () => {
         [["fr"], "fr"],
         [["FR-ca"], "fr"],
         [["en-GB", "fr"], "en"],
-        [["de-DE", "fr-FR"], "fr"],
-        [["de-DE", "es"], "en"],
+        [["it-IT", "fr-FR"], "fr"],
+        [["it-IT", "ru"], "en"],
+        [["es-ES"], "es"],
+        [["es-419"], "es"],
+        [["zh-CN"], "zh"],
+        [["zh-TW"], "zh"],
+        [["zh-HK"], "zh"],
+        [["zh-Hans-CN"], "zh"],
+        [["de-DE"], "de"],
+        [["de-AT", "en"], "de"],
+        [["ja-JP"], "ja"],
+        [["ko-KR"], "ko"],
+        [["pt-BR"], "pt"],
+        [["pt-PT"], "pt"],
+        [["nl-NL"], "nl"],
+        [["nl-BE", "fr-BE"], "nl"],
         [[], "en"],
         [undefined, "en"],
         [null, "en"],

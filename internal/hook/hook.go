@@ -162,7 +162,7 @@ func InitHooks() {
 
 	err := CreateHookEntity()
 	if err != nil {
-		log.Error("An error occured while creating hooks entity type")
+		log.Error("An error occurred while creating hooks entity type")
 	}
 }
 

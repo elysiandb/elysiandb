@@ -10,8 +10,18 @@ describe("LanguageSelector", () => {
         renderWithProviders(<LanguageSelector />);
 
         const options = screen.getAllByRole("option");
-        expect(options.map((option) => option.textContent)).toEqual(["English", "Français"]);
-        expect(options.map((option) => option.getAttribute("lang"))).toEqual(["en", "fr"]);
+        expect(options.map((option) => option.textContent)).toEqual([
+            "English",
+            "Français",
+            "Español",
+            "简体中文",
+            "Deutsch",
+            "日本語",
+            "한국어",
+            "Português",
+            "Nederlands",
+        ]);
+        expect(options.map((option) => option.getAttribute("lang"))).toEqual(["en", "fr", "es", "zh", "de", "ja", "ko", "pt", "nl"]);
     });
 
     it("shows the current language", () => {

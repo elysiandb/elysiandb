@@ -220,12 +220,12 @@ func TestFileNameIsUTCInBasicFormat(t *testing.T) {
 func TestEntityNamesAreEscapedInPaths(t *testing.T) {
 	setup(t, "")
 
-	for _, entity := range []string{"a/b c", "../x", "é"} {
+	for _, entity := range []string{"a/b c", "../x", "Ω"} {
 		api_storage.WriteEntity(entity, map[string]any{"id": "1", "v": entity})
 	}
 
 	archive := create(t)
-	for _, entity := range []string{"a/b c", "../x", "é"} {
+	for _, entity := range []string{"a/b c", "../x", "Ω"} {
 		for _, path := range []string{backup.EntityPath(entity), backup.SchemaPath(entity)} {
 			folder, file, _ := strings.Cut(path, "/")
 			if (folder != "entities" && folder != "schemas") || strings.ContainsAny(file, "/ ") || !strings.Contains(strings.Join(names(entries(t, archive)), ","), path) {
@@ -237,7 +237,7 @@ func TestEntityNamesAreEscapedInPaths(t *testing.T) {
 	setup(t, "")
 	restore(t, archive)
 
-	for _, entity := range []string{"a/b c", "../x", "é"} {
+	for _, entity := range []string{"a/b c", "../x", "Ω"} {
 		if got := api_storage.ReadEntityById(entity, "1"); got == nil || got["v"] != entity {
 			t.Fatalf("expected %q to be restored, got %v", entity, got)
 		}

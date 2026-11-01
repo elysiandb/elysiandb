@@ -28,7 +28,7 @@ Here is a related and explicative article https://dev.to/taymour/why-i-built-ely
 
 ElysianDB uses a **pluggable storage engine abstraction** that cleanly separates API logic from the underlying persistence layer.
 
-The same REST API, Query API, ACLs, hooks, transactions, and Admin UI work identically regardless of the selected engine.
+Its goal is for the REST API, Query API, ACLs, hooks, transactions, and Admin UI to work identically regardless of the selected engine. The `internal` engine is the default and recommended one. The `mongodb` engine is in beta and does not reach that goal yet.
 
 The storage engine is selected at startup via configuration:
 
@@ -39,7 +39,7 @@ engine:
 
 ### Available Engines
 
-**internal (default)**
+**internal (default, recommended)**
 
 The `internal` engine is the original storage engine shipped with ElysianDB. It provides:
 
@@ -50,18 +50,18 @@ The `internal` engine is the original storage engine shipped with ElysianDB. It 
 * Very high throughput and low latency
 * Full compatibility with all ElysianDB features
 
-This engine is production-ready and optimized for speed, prototyping, and controlled workloads.
+This engine is production-ready and optimized for speed, prototyping, and controlled workloads. It is the recommended engine.
 
-**mongodb**
+**mongodb (beta)**
 
-The `mongodb` engine allows ElysianDB to run on top of MongoDB while keeping the same API surface and behavior.
+> **Beta.** The `mongodb` engine is not yet fully functional and is not interchangeable with the `internal` engine: switching engines can change behavior. The remaining work is tracked in [#167](https://github.com/elysiandb/elysiandb/issues/167) and [#164](https://github.com/elysiandb/elysiandb/issues/164). Use the `internal` engine unless you are testing MongoDB support.
+
+The `mongodb` engine allows ElysianDB to run on top of MongoDB. It aims to offer the same API surface and behavior as the `internal` engine.
 
 It provides:
 
 * Persistence backed by MongoDB
-* Better durability guarantees for long-lived datasets
-* Horizontal scalability through MongoDB deployments
-* Identical REST API, Query API, ACLs, hooks, and Admin UI behavior
+* Durability and scalability handled by MongoDB deployments
 
 Example configuration:
 
@@ -82,7 +82,7 @@ The engine abstraction is designed to support additional backends in the future,
 * Specialized engines optimized for specific workloads
 * Experimental or in-memory–only backends
 
-All engines are selected using the same configuration mechanism, without impacting application code or API usage.
+All engines are selected using the same configuration mechanism.
 
 ## What You Get Out of the Box
 
@@ -139,7 +139,7 @@ With the internal engine, the system relies on sharded in-memory storage, minima
 
 On a MacBook Pro M4, mixed workloads with CRUD, filtering, sorting, nested writes, and includes reach tens of thousands of requests per second with sub-millisecond latencies under moderate load.
 
-With the MongoDB engine, performance is naturally bounded by MongoDB and network latency, but remains stable and predictable while enabling durability and scalability.
+With the MongoDB engine, which is in beta, performance is bounded by MongoDB and network latency.
 
 These are real API scenarios, not synthetic microbenchmarks.
 
@@ -223,6 +223,6 @@ What you send is what you get.
 
 ElysianDB is actively developed and evolving.
 
-The MongoDB engine expands its applicability to more persistent and scalable workloads, while the internal engine remains ideal for speed and simplicity.
+The internal engine is the recommended one. The MongoDB engine is in beta: it is not yet fully functional, and the work to make it interchangeable with the internal engine is tracked in [#167](https://github.com/elysiandb/elysiandb/issues/167) and [#164](https://github.com/elysiandb/elysiandb/issues/164).
 
 Feedback, issues, and contributions are welcome.
