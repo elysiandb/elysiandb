@@ -7,9 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/taymour/elysiandb/internal/boot"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/recovery"
+	"github.com/taymour/elysiandb/internal/storage"
 )
 
 func setupTempDir(t *testing.T) string {
@@ -63,7 +65,7 @@ func TestStoreRecovery_LogReplayAndClear(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	var puts, dels int
 	recovery.ReplayStoreRecoveryLog(
-		func(k string, v []byte, ttl int) error { puts++; return nil },
+		func(k string, v []byte, expiresAt int64) error { puts++; return nil },
 		func(k string) { dels++ },
 	)
 	if puts < 1 || dels != 1 {
@@ -86,7 +88,7 @@ func TestStoreRecovery_InvalidJson(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "elysiandb.store.recovery.log")
 	_ = os.WriteFile(path, []byte("bad\n"), 0o644)
-	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, ttl int) error { return nil }, func(k string) {})
+	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, expiresAt int64) error { return nil }, func(k string) {})
 }
 
 func TestJsonRecovery_LogSizeTrigger(t *testing.T) {
@@ -118,7 +120,7 @@ func TestJsonRecovery_EmptyReplay(t *testing.T) {
 
 func TestStoreRecovery_EmptyReplay(t *testing.T) {
 	setupTempDir(t)
-	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, ttl int) error { return nil }, func(k string) {})
+	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, expiresAt int64) error { return nil }, func(k string) {})
 }
 
 func TestJsonRecovery_MultipleOps(t *testing.T) {
@@ -175,7 +177,7 @@ func TestStoreRecovery_MultipleOpsWithTTL(t *testing.T) {
 	_ = os.WriteFile(f, buf, 0o644)
 	var puts, dels int
 	recovery.ReplayStoreRecoveryLog(
-		func(k string, v []byte, ttl int) error { puts++; return nil },
+		func(k string, v []byte, expiresAt int64) error { puts++; return nil },
 		func(k string) { dels++ },
 	)
 	if puts != 1 || dels != 1 {
@@ -204,5 +206,57 @@ func TestStoreRecovery_ReplayWithUnreadableFile(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "elysiandb.store.recovery.log")
 	_ = os.WriteFile(path, []byte("{bad"), 0o000)
-	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, ttl int) error { return nil }, func(k string) {})
+	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, expiresAt int64) error { return nil }, func(k string) {})
+}
+
+func TestStoreRecovery_ReplayKeepsTheLoggedExpiration(t *testing.T) {
+	dir := t.TempDir()
+	globals.SetConfig(&configuration.Config{
+		Store: configuration.StoreConfig{
+			Folder: dir,
+			Shards: 4,
+			CrashRecovery: configuration.CrashRecoveryConfig{
+				Enabled:  true,
+				MaxLogMB: 1,
+			},
+		},
+	})
+
+	expiresAt := time.Now().Unix() + 3600
+	writeLog := func(file string, ops ...map[string]any) {
+		var buf []byte
+		for _, op := range ops {
+			b, _ := json.Marshal(op)
+			buf = append(append(buf, b...), '\n')
+		}
+
+		_ = os.WriteFile(filepath.Join(dir, file), buf, 0o644)
+	}
+
+	writeLog(recovery.StoreRecoveryFile,
+		map[string]any{"op": "put", "key": "session", "value": []byte("short"), "ttl": expiresAt},
+		map[string]any{"op": "put", "key": "plain", "value": []byte("kept")},
+	)
+	writeLog(recovery.RecoveryFile, map[string]any{"op": "put", "key": "doc", "value": map[string]any{"id": "doc"}})
+
+	recovery.ActivateStoreRecoveryLog(func() {})
+	recovery.ActivateJsonRecoveryLog(func() {})
+
+	boot.InitDB()
+
+	if doc, err := storage.GetJsonByKey("doc"); err != nil || doc["id"] != "doc" {
+		t.Fatalf("expected the replayed document, got %v (%v)", doc, err)
+	}
+
+	if got, err := storage.GetByKey("session"); err != nil || string(got) != "short" {
+		t.Fatalf("expected the replayed key, got %q (%v)", got, err)
+	}
+
+	if got, ok := storage.GetKeyExpiration("session"); !ok || got != expiresAt {
+		t.Fatalf("expected the replayed key to expire at %d, got %d (%v)", expiresAt, got, ok)
+	}
+
+	if _, ok := storage.GetKeyExpiration("plain"); ok {
+		t.Fatalf("a key logged without TTL must not get an expiration")
+	}
 }

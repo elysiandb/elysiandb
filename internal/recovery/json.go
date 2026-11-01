@@ -87,7 +87,7 @@ func ReplayJsonRecoveryLog(
 
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(replayReader(f))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {

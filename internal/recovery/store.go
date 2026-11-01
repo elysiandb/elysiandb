@@ -3,6 +3,7 @@ package recovery
 import (
 	"bufio"
 	"encoding/json"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -85,7 +86,7 @@ func LogStoreDelete(key string) {
 }
 
 func ReplayStoreRecoveryLog(
-	putFunc func(key string, value []byte, ttl int) error,
+	putFunc func(key string, value []byte, expiresAt int64) error,
 	deleteFunc func(key string),
 ) {
 	cfg := globals.GetConfig()
@@ -104,7 +105,7 @@ func ReplayStoreRecoveryLog(
 	defer f.Close()
 
 	now := int(time.Now().Unix())
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(replayReader(f))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
@@ -122,7 +123,7 @@ func ReplayStoreRecoveryLog(
 			if op.TTL > 0 && now >= op.TTL {
 				continue
 			}
-			_ = putFunc(op.Key, op.Value, op.TTL)
+			_ = putFunc(op.Key, op.Value, int64(op.TTL))
 		case "del":
 			deleteFunc(op.Key)
 		}
@@ -134,6 +135,15 @@ func ReplayStoreRecoveryLog(
 
 	log.Info("Recovery MainStore log replay completed.")
 	ClearStoreRecoveryLog()
+}
+
+func replayReader(f *os.File) io.Reader {
+	info, err := f.Stat()
+	if err != nil {
+		return f
+	}
+
+	return io.LimitReader(f, info.Size())
 }
 
 func ClearStoreRecoveryLog() {

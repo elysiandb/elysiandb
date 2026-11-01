@@ -2097,7 +2097,7 @@ Data is automatically persisted:
 2. **On shutdown** (SIGTERM / SIGINT)
 3. **On demand** via HTTP `/save` or TCP `SAVE`
 
-Crash recovery ensures data durability even if the process crashes mid-write.
+Crash recovery ensures data durability even if the process crashes mid-write. When the recovery log is replayed at startup, KV keys with a TTL keep their expiration date, and keys that expired in the meantime are skipped.
 
 ---
 
