@@ -1,6 +1,9 @@
 package http_security_test
 
 import (
+	"io"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -62,6 +65,33 @@ func TestGetUsersController_AdminOK(t *testing.T) {
 
 	if ctx.Response.StatusCode() != fasthttp.StatusOK {
 		t.Fatal("expected 200")
+	}
+}
+
+func TestGetUsersController_DoesNotPrintTheUsers(t *testing.T) {
+	setup(t)
+
+	_ = security.CreateBasicUser(&security.BasicUser{Username: "u1", Password: "p1", Role: security.RoleUser})
+
+	s := login(t, security.DefaultAdminUsername, security.RoleAdmin)
+	ctx := newCtx("GET", "/api/security/user", "", s)
+
+	r, w, _ := os.Pipe()
+	stdout := os.Stdout
+	os.Stdout = w
+
+	http_security.GetUsersController(ctx)
+
+	os.Stdout = stdout
+	w.Close()
+	printed, _ := io.ReadAll(r)
+
+	if len(printed) != 0 {
+		t.Fatalf("expected nothing on stdout, got %q", printed)
+	}
+
+	if !strings.Contains(string(ctx.Response.Body()), `"username":"u1"`) {
+		t.Fatalf("expected the users in the response, got %s", ctx.Response.Body())
 	}
 }
 

@@ -119,8 +119,10 @@ For some requests, there is a `X-Elysian-Cache` header with values : `HIT` or `M
 | `PUT`    | `/api/<entity>`                           | Update multiple documents (batch update)                    |
 | `DELETE` | `/api/<entity>/<id>`                      | Delete document by ID                                       |
 | `DELETE` | `/api/<entity>`                           | Delete all documents for an entity                          |
-| `GET`    | `/api/export`                             | Dumps all entities as a JSON object                         |
-| `POST`   | `/api/import`                             | Writes the documents of a JSON dump (see Import below)      |
+| `GET`    | `/api/export`                             | Dumps the documents of all entities as a JSON object, without accounts and ACLs (see Export and Import below) |
+| `POST`   | `/api/import`                             | Replaces entities with the documents of a JSON dump         |
+| `GET`    | `/api/backup`                             | Downloads a full backup archive (see Backup and Restore)    |
+| `POST`   | `/api/restore`                            | Replaces all the data with a backup archive                 |
 | `POST`   | `/api/<entity>/migrate`                   | Run a **migration** across all documents for an entity      |
 | `GET`    | `/api/<entity>/count`                     | Counts all documents for an entity                          |
 | `GET`    | `/api/<entity>/<id>/exists`               | Verifiy if an entity exists                                 |
@@ -179,15 +181,136 @@ An update never creates a document. The target is checked before schema validati
 [[], [{ "Field": "a", "Message": "expected type string but got number" }]]
 ```
 
-### Import
+### Export and Import
 
-`POST /api/import` takes the format produced by `GET /api/export` (`{ "<entity>": [ <document>, ... ] }`). For each entity present in the dump:
+`GET /api/export` returns the documents of every entity type as `{ "<entity>": [ <document>, ... ] }`, hooks (`_elysiandb_core_hook`) included. `POST /api/import` takes the same format.
 
-* the entity indexes are dropped, then every listed document is written as it appears in the dump. A manual schema still validates the documents; an inferred schema does not, so a dump keeps documents whose fields have different types
-* documents of that entity that are not in the dump are no longer listed, but stay readable by id
+**Export and import are not a backup.** They exchange documents, and never include:
+
+* accounts (`_elysiandb_core_user`) and ACLs (`_elysiandb_core_acl`): a password hash can only be verified with the `users.key` of the instance that made it, so accounts can only move with a backup archive, which holds both
+* schemas, entity types without documents, and KV keys
+
+To save or move accounts, ACLs or a whole instance, use Backup and Restore below.
+
+Dumps made with ElysianDB 0.2.1 and earlier contain accounts and ACLs. `POST /api/import` ignores these two entities, so the accounts and ACLs of the instance are never changed by an import, and lists them in its answer:
+
+```json
+{
+  "status": "import completed",
+  "ignored": ["_elysiandb_core_acl", "_elysiandb_core_user"],
+  "message": "accounts and ACLs are not imported, use a backup and restore to move them"
+}
+```
+
+The other entities of the dump are imported as usual. Every document is checked before anything is written. A document that does not match a manual schema rejects the whole import with `400`, and nothing is written:
+
+```json
+{
+  "error": "invalid documents, nothing was imported",
+  "rejected": [
+    { "entity": "book", "index": 1, "id": "ko", "errors": [{ "Field": "title", "Message": "required field missing" }] }
+  ]
+}
+```
+
+`index` is the position of the document in its list. Inferred schemas do not reject documents, so a dump keeps documents whose fields have different types.
+
+Then, for each entity present in the dump:
+
+* the documents of that entity are replaced: documents that are not in the dump are deleted, then every listed document is written as it appears in the dump
 * the owner field `_elysiandb_core_username` is kept when the dump contains it; a document without it has no owner
+* the API cache of the entity is cleared
 
-Entities absent from the dump are left untouched.
+Entities absent from the dump are left untouched. ACLs are then created for users and entity types that have none.
+
+## Backup and Restore
+
+A backup is a `tar.gz` archive that holds everything needed to rebuild an instance: the key that verifies password hashes, every schema, every document, core entities included (users, ACLs and hooks), entity types without documents, and the KV keys.
+
+It is the only way to save or move accounts and ACLs. A password hash is made with the `users.key` of the instance, and can only be verified with that key: the archive is the only file that holds both. `GET /api/export` leaves accounts and ACLs out, and `POST /api/import` ignores them.
+
+### Commands
+
+Over HTTP, both routes need an admin (see Admin-only routes):
+
+```bash
+curl -b cookies -OJ http://localhost:8089/api/backup
+curl -b cookies --data-binary @elysiandb-backup-20261101T091400Z.tar.gz http://localhost:8089/api/restore
+```
+
+`GET /api/backup` answers `application/gzip` with `Content-Disposition: attachment; filename="elysiandb-backup-20261101T091400Z.tar.gz"`. `POST /api/restore` takes the archive as the request body, or as the file of a `multipart/form-data` upload. Any file name is accepted: the date, version and content of an archive come from its manifest, never from its name.
+
+From the command line, while ElysianDB is stopped (this is the upgrade path):
+
+```bash
+elysiandb backup --output /backups
+elysiandb restore /backups/elysiandb-backup-20261101T091400Z.tar.gz
+```
+
+`backup` writes `<folder>/elysiandb-backup-<date>.tar.gz` (the current folder without `--output`) and refuses to overwrite an existing file. `restore` checks the archive, then asks for a typed `yes`; `--force` skips the question. Both use the configuration given with `--config`, before the command: `elysiandb --config elysian.yaml backup`.
+
+The date is UTC, in ISO 8601 basic format (`20261101T091400Z`), so names are valid on every filesystem and sort by date.
+
+### Archive layout
+
+```
+manifest.json            format, format version, ElysianDB version, created_at, engine,
+                         documents per entity, schemas, KV key count, SHA-256 of every file
+security/users.key       the key that verifies password hashes
+schemas/<entity>.json    every schema, manual or inferred
+entities/<entity>.jsonl  one document per line, in list order
+kv/keys.jsonl            {"key", "value", "encoding", "expires_at"} for every KV key
+```
+
+Entity names are escaped in paths: characters other than letters, digits, `_`, `-` and `.` become `%XX`. A KV value that is not valid UTF-8 is stored in base64, with `"encoding": "base64"`. `expires_at` is a Unix timestamp, absent for keys without TTL. Keys under `api:entity:`, which hold the REST API indexes, are rebuilt from the documents instead of being saved. Sessions are not saved.
+
+Two backups of the same data hold the same files; only `created_at` in the manifest differs.
+
+### Restore rules
+
+* The manifest and the SHA-256 of every file are checked, and every file is read, before anything is touched. An archive with a newer format version, a bad checksum, a missing or unexpected file, or an invalid line is refused with `400`, and the data is left as it was.
+* A restore replaces everything, without merging: documents, entity types, schemas and KV keys that are not in the archive no longer exist afterwards. With MongoDB, every collection of the `elysiandb` database is dropped.
+* The order is: `users.key`, then schemas, then documents, then KV keys. Keys that have already expired are skipped; the others keep their expiration date.
+* Documents are written as they are stored in the archive, without schema validation: the checksums guarantee that they are the documents of the backup.
+* Every session ends, the session that ran the restore included. Log in again with the accounts and passwords of the backup: the previous `admin` is replaced by the one in the archive.
+* The answer reports what was restored:
+
+```json
+{ "status": "restore completed", "entities": { "book": 2, "empty": 0 }, "schemas": 3, "kv_keys": 12, "kv_keys_expired": 0 }
+```
+
+If the data cannot be written once the restore has started (a MongoDB error, a full disk), the answer is `500` and the instance is left partly restored: run the restore again.
+
+Stop the clients that write to ElysianDB during a restore: their writes would be lost or mixed with the restored data.
+
+### Security
+
+The archive holds `users.key` and the password hashes: it gives the same access as the data folder. Store it like the data folder, and do not send it to someone who should not administer the instance. Archives written by `elysiandb backup` are only readable by their owner (`0600`).
+
+### Engines and versions
+
+The manifest records the engine and the ElysianDB version, but the archive does not depend on the engine: a backup of the internal engine can be restored on MongoDB, and the other way around. The format version lets a newer ElysianDB read older archives; an ElysianDB refuses archives whose format is newer than its own.
+
+### Limits
+
+The HTTP server accepts request bodies up to 4 MB and sends a response within 3 seconds. A larger archive is refused with `400 Error when parsing request`, and a large backup may not download in time. For large databases, use the command line.
+
+The backup is staged in the system temporary folder (`TMPDIR`), which needs as much free space as the uncompressed data, for `GET /api/backup` and `elysiandb backup` alike.
+
+`GET /api/backup` and `POST /api/restore` take precedence over the generic routes: an entity named `backup` cannot be listed, and documents cannot be created in an entity named `restore`, as with `export`, `import` and `query`.
+
+## Upgrading
+
+From this version on, take a backup with `elysiandb backup` before each upgrade, and keep the archive until the new version runs. ElysianDB 0.2.1 has no backup command: to upgrade from it, stop ElysianDB, copy the data folder, `users.key` included, then start the new version on the same folder.
+
+### Behavior changes since 0.2.1
+
+* `GET /api/export` no longer contains accounts (`_elysiandb_core_user`) and ACLs (`_elysiandb_core_acl`). If you saved your accounts with an export, switch to `elysiandb backup` or `GET /api/backup`: an export does not keep them.
+* `POST /api/import` ignores accounts and ACLs found in a dump, and lists them in `ignored`.
+* `POST /api/import` checks every document first: if one does not match a manual schema, the answer is `400` and nothing is written. It used to answer `200` and drop the document.
+* `POST /api/import` replaces the documents of each entity in the dump: documents that are not in the dump are deleted. They used to stay readable by id while missing from lists.
+* `GET /api/backup` and `POST /api/restore` are new: an entity named `backup` can no longer be listed with `GET /api/backup`, and documents can no longer be created in an entity named `restore` with `POST /api/restore`.
+* `elysiandb help` lists the commands in alphabetical order, with the new `backup` and `restore` commands.
 
 ---
 
@@ -1140,6 +1263,8 @@ Requests without authentication headers are rejected when authentication is enab
 * Hashing is done using bcrypt
 * A per-instance secret key is used as part of the hashing process
 * Deleting `users.key` invalidates all stored password hashes
+* `GET /api/export` contains no password hashes: accounts and ACLs are left out of it
+* A backup archive holds `users.key` and the password hashes: store it like the data folder (see Backup and Restore)
 * In `token` mode, anyone with the token can fully access the API
 * The token is compared in constant time
 * `GET /config` never returns secrets: the token is replaced with `***` and the password of `engine.uri` with `xxxxx`
@@ -1173,8 +1298,8 @@ In `user` mode, routes that act on the whole database, the configuration or enti
 | ---------------------- | ---------------------------------------------- |
 | `GET`, `PUT`, `DELETE` | `/kv/{key}`, `/kv/mget`                        |
 | `POST`                 | `/save`, `/reset`                              |
-| `GET`                  | `/stats`, `/config`, `/api/export`             |
-| `POST`                 | `/api/import`, `/api/<entity>/migrate`         |
+| `GET`                  | `/stats`, `/config`, `/api/export`, `/api/backup` |
+| `POST`                 | `/api/import`, `/api/restore`, `/api/<entity>/migrate` |
 | `POST`                 | `/api/<entity>/create`                         |
 | `PUT`                  | `/api/<entity>/schema`                         |
 | `DELETE`               | `/api/<entity>`                                |
@@ -1459,7 +1584,7 @@ For list queries, results are automatically filtered to only include readable do
 * **Admin**: all permissions granted
 * **Regular user**: only owning permissions granted
 
-ACLs are generated automatically for all users and entities (after a REST create, an entity type creation, an import or a transaction commit) and can be reset to their default state at any time.
+ACLs are generated automatically for all users and entities (after a REST create, an entity type creation, an import, a restore or a transaction commit) and can be reset to their default state at any time.
 
 Core entities (`_elysiandb_core_user`, `_elysiandb_core_acl`, `_elysiandb_core_hook`, `_elysiandb_core_schema`) have no ACL. `PUT /api/acl/<user_name>/<entity>` and `PUT /api/acl/<user_name>/<entity>/default` on them return `400 {"error":"core entities have no ACL: users, ACLs and hooks are managed by admin users only"}`: an admin cannot be restricted on accounts, ACLs or hooks.
 
@@ -2005,7 +2130,7 @@ Data is automatically persisted:
 2. **On shutdown** (SIGTERM / SIGINT)
 3. **On demand** via HTTP `/save` or TCP `SAVE`
 
-Crash recovery ensures data durability even if the process crashes mid-write.
+Crash recovery ensures data durability even if the process crashes mid-write. When the recovery log is replayed at startup, KV keys with a TTL keep their expiration date, and keys that expired in the meantime are skipped. Entries of any size are replayed. If a recovery log cannot be read, it is kept next to the data files with a `.failed` suffix (for example `elysiandb.store.recovery.log.failed`) instead of being deleted, and the error is logged.
 
 ---
 
@@ -2085,7 +2210,7 @@ make api_benchmark # requires installing k6
 
 ## Command-Line Interface (CLI)
 
-ElysianDB provides a simple command-line interface with three available commands.
+ElysianDB provides a command-line interface with eight commands. `elysiandb help` lists them. Options of the binary, such as `--config`, go before the command: `elysiandb --config elysian.yaml backup`.
 
 ### 1. `server` (default)
 
@@ -2105,7 +2230,7 @@ elysiandb
 
 ### 2. `create-user` (basic or user authentication only)
 
-Creates a new user when the authentication mode is set to `basic`.
+Creates a new user.
 
 ```bash
 elysiandb create-user
@@ -2114,9 +2239,10 @@ elysiandb create-user
 The command interactively prompts for:
 
 * username
+* role (`admin` or `user`)
 * password
 
-The user is stored in a core entity
+The user is stored in a core entity.
 
 ---
 
@@ -2144,31 +2270,61 @@ The command prompts for the username and the new password. If the user does not 
 
 ---
 
-### 5. `help`
+### 5. `backup`
 
-Deletes an existing user.
+Writes a full backup archive (see Backup and Restore).
 
 ```bash
-elysiandb help
+elysiandb backup --output /backups
 ```
 
-The command prompts the list fo available commands.
+The archive is written to `<folder>/elysiandb-backup-<UTC date>.tar.gz`, in the current folder without `--output`. Run it while ElysianDB is stopped, or use `GET /api/backup` on a running instance. The archive holds `users.key` and the password hashes: store it like the data folder.
 
 ---
 
-### 6. `reset`
+### 6. `restore`
 
-Reset ElysianDB completely including schemas and users.
+Replaces all the data with a backup archive (see Backup and Restore).
 
 ```bash
-elysiandb reset
+elysiandb restore /backups/elysiandb-backup-20261101T091400Z.tar.gz
+```
+
+The archive is checked first; an invalid archive is refused and the data is left as it was. The command then asks for a typed `yes`. `--force` skips the question, for scripts:
+
+```bash
+elysiandb restore /backups/elysiandb-backup-20261101T091400Z.tar.gz --force
+```
+
+Run it while ElysianDB is stopped.
+
+---
+
+### 7. `reset`
+
+Deletes the data folder, schemas and users included. With MongoDB, it also drops the entity collections.
+
+```bash
+elysiandb reset --force
+```
+
+The command asks for a typed `yes`, then exits without deleting anything unless `--force` is passed. Run it while ElysianDB is stopped.
+
+---
+
+### 8. `help`
+
+Lists the available commands.
+
+```bash
+elysiandb help
 ```
 
 ---
 
 ## Requirements
 
-Both `create-user` and `delete-user` require authentication in `basic` or `user` mode:
+`create-user`, `delete-user` and `change-password` require authentication in `basic` or `user` mode:
 
 ```yaml
 security:

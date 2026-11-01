@@ -1,15 +1,18 @@
 package recovery_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/recovery"
+	"github.com/taymour/elysiandb/internal/storage"
 )
 
 func setupTempDir(t *testing.T) string {
@@ -63,7 +66,7 @@ func TestStoreRecovery_LogReplayAndClear(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	var puts, dels int
 	recovery.ReplayStoreRecoveryLog(
-		func(k string, v []byte, ttl int) error { puts++; return nil },
+		func(k string, v []byte, expiresAt int64) error { puts++; return nil },
 		func(k string) { dels++ },
 	)
 	if puts < 1 || dels != 1 {
@@ -86,7 +89,7 @@ func TestStoreRecovery_InvalidJson(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "elysiandb.store.recovery.log")
 	_ = os.WriteFile(path, []byte("bad\n"), 0o644)
-	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, ttl int) error { return nil }, func(k string) {})
+	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, expiresAt int64) error { return nil }, func(k string) {})
 }
 
 func TestJsonRecovery_LogSizeTrigger(t *testing.T) {
@@ -118,7 +121,7 @@ func TestJsonRecovery_EmptyReplay(t *testing.T) {
 
 func TestStoreRecovery_EmptyReplay(t *testing.T) {
 	setupTempDir(t)
-	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, ttl int) error { return nil }, func(k string) {})
+	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, expiresAt int64) error { return nil }, func(k string) {})
 }
 
 func TestJsonRecovery_MultipleOps(t *testing.T) {
@@ -175,7 +178,7 @@ func TestStoreRecovery_MultipleOpsWithTTL(t *testing.T) {
 	_ = os.WriteFile(f, buf, 0o644)
 	var puts, dels int
 	recovery.ReplayStoreRecoveryLog(
-		func(k string, v []byte, ttl int) error { puts++; return nil },
+		func(k string, v []byte, expiresAt int64) error { puts++; return nil },
 		func(k string) { dels++ },
 	)
 	if puts != 1 || dels != 1 {
@@ -204,5 +207,177 @@ func TestStoreRecovery_ReplayWithUnreadableFile(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "elysiandb.store.recovery.log")
 	_ = os.WriteFile(path, []byte("{bad"), 0o000)
-	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, ttl int) error { return nil }, func(k string) {})
+	recovery.ReplayStoreRecoveryLog(func(k string, v []byte, expiresAt int64) error { return nil }, func(k string) {})
+}
+
+func TestStoreRecovery_ReplayKeepsTheLoggedExpiration(t *testing.T) {
+	dir := t.TempDir()
+	globals.SetConfig(&configuration.Config{
+		Store: configuration.StoreConfig{
+			Folder: dir,
+			Shards: 4,
+			CrashRecovery: configuration.CrashRecoveryConfig{
+				Enabled:  true,
+				MaxLogMB: 1,
+			},
+		},
+	})
+
+	expiresAt := time.Now().Unix() + 3600
+	writeLog := func(file string, ops ...map[string]any) {
+		var buf []byte
+		for _, op := range ops {
+			b, _ := json.Marshal(op)
+			buf = append(append(buf, b...), '\n')
+		}
+
+		_ = os.WriteFile(filepath.Join(dir, file), buf, 0o644)
+	}
+
+	writeLog(recovery.StoreRecoveryFile,
+		map[string]any{"op": "put", "key": "session", "value": []byte("short"), "ttl": expiresAt},
+		map[string]any{"op": "put", "key": "plain", "value": []byte("kept")},
+	)
+	writeLog(recovery.RecoveryFile, map[string]any{"op": "put", "key": "doc", "value": map[string]any{"id": "doc"}})
+
+	storage.LoadDB()
+	storage.LoadJsonDB()
+	recovery.ActivateStoreRecoveryLog(func() {})
+	recovery.ActivateJsonRecoveryLog(func() {})
+
+	recovery.ReplayJsonRecoveryLog(storage.PutJsonValue, storage.DeleteJsonByKey)
+	recovery.ReplayStoreRecoveryLog(storage.PutKeyValueWithExpiration, storage.DeleteByKey)
+
+	if doc, err := storage.GetJsonByKey("doc"); err != nil || doc["id"] != "doc" {
+		t.Fatalf("expected the replayed document, got %v (%v)", doc, err)
+	}
+
+	if got, err := storage.GetByKey("session"); err != nil || string(got) != "short" {
+		t.Fatalf("expected the replayed key, got %q (%v)", got, err)
+	}
+
+	if got, ok := storage.GetKeyExpiration("session"); !ok || got != expiresAt {
+		t.Fatalf("expected the replayed key to expire at %d, got %d (%v)", expiresAt, got, ok)
+	}
+
+	if _, ok := storage.GetKeyExpiration("plain"); ok {
+		t.Fatalf("a key logged without TTL must not get an expiration")
+	}
+}
+
+func setupStores(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	globals.SetConfig(&configuration.Config{Store: configuration.StoreConfig{Folder: dir, Shards: 4}})
+	storage.LoadDB()
+	storage.LoadJsonDB()
+
+	return dir
+}
+
+func writeRecoveryLog(t *testing.T, path string, ops []map[string]any, tail string) {
+	t.Helper()
+
+	var buf []byte
+	for _, op := range ops {
+		b, _ := json.Marshal(op)
+		buf = append(append(buf, b...), '\n')
+	}
+
+	if err := os.WriteFile(path, append(buf, tail...), 0o644); err != nil {
+		t.Fatalf("cannot write %s: %v", path, err)
+	}
+}
+
+func TestStoreRecovery_ReplaysEntriesOfAnySize(t *testing.T) {
+	dir := setupStores(t)
+	path := filepath.Join(dir, recovery.StoreRecoveryFile)
+	big := bytes.Repeat([]byte("x"), 200_000)
+
+	writeRecoveryLog(t, path, []map[string]any{
+		{"op": "put", "key": "before", "value": []byte("ok")},
+		{"op": "put", "key": "big", "value": big},
+		{"op": "put", "key": "after", "value": []byte("ok")},
+		{"op": "put", "key": "deleted", "value": []byte("ok")},
+		{"op": "del", "key": "deleted"},
+	}, `{"op":"put","key":"truncated","val`)
+
+	recovery.ReplayStoreRecoveryLog(storage.PutKeyValueWithExpiration, storage.DeleteByKey)
+
+	for key, value := range map[string][]byte{"before": []byte("ok"), "big": big, "after": []byte("ok")} {
+		if got, err := storage.GetByKey(key); err != nil || !bytes.Equal(got, value) {
+			t.Fatalf("expected %s to be replayed, got %d bytes (%v)", key, len(got), err)
+		}
+	}
+
+	for _, key := range []string{"deleted", "truncated"} {
+		if _, err := storage.GetByKey(key); err == nil {
+			t.Fatalf("%s must not be replayed", key)
+		}
+	}
+
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("expected the replayed log to be cleared, got %v", err)
+	}
+}
+
+func TestJsonRecovery_ReplaysEntriesOfAnySize(t *testing.T) {
+	dir := setupStores(t)
+	path := filepath.Join(dir, recovery.RecoveryFile)
+	big := strings.Repeat("x", 200_000)
+
+	writeRecoveryLog(t, path, []map[string]any{
+		{"op": "put", "key": "before", "value": map[string]any{"id": "before"}},
+		{"op": "put", "key": "big", "value": map[string]any{"id": "big", "text": big}},
+		{"op": "put", "key": "after", "value": map[string]any{"id": "after"}},
+	}, "")
+
+	recovery.ReplayJsonRecoveryLog(storage.PutJsonValue, storage.DeleteJsonByKey)
+
+	for _, key := range []string{"before", "big", "after"} {
+		if doc, err := storage.GetJsonByKey(key); err != nil || doc["id"] != key {
+			t.Fatalf("expected %s to be replayed, got %v", key, err)
+		}
+	}
+
+	if doc, _ := storage.GetJsonByKey("big"); doc["text"] != big {
+		t.Fatalf("expected the large document to be replayed in full")
+	}
+
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("expected the replayed log to be cleared, got %v", err)
+	}
+}
+
+func TestRecovery_KeepsALogItCannotRead(t *testing.T) {
+	for name, tc := range map[string]struct {
+		file   string
+		replay func()
+	}{
+		"store": {recovery.StoreRecoveryFile, func() {
+			recovery.ReplayStoreRecoveryLog(func(k string, v []byte, expiresAt int64) error { return nil }, func(k string) {})
+		}},
+		"json": {recovery.RecoveryFile, func() {
+			recovery.ReplayJsonRecoveryLog(func(k string, v map[string]any) error { return nil }, func(k string) {})
+		}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := setupStores(t)
+			path := filepath.Join(dir, tc.file)
+			if err := os.Mkdir(path, 0o755); err != nil {
+				t.Fatalf("cannot create %s: %v", path, err)
+			}
+
+			tc.replay()
+
+			if _, err := os.Stat(path); !os.IsNotExist(err) {
+				t.Fatalf("expected the unreadable log to be moved, got %v", err)
+			}
+
+			if _, err := os.Stat(path + recovery.FailedReplaySuffix); err != nil {
+				t.Fatalf("expected the unreadable log to be kept as %s: %v", path+recovery.FailedReplaySuffix, err)
+			}
+		})
+	}
 }

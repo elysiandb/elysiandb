@@ -33,6 +33,8 @@ func RegisterRoutes(r *router.Router) {
 
 	r.GET("/api/export", Version(security.AuthenticateAdmin(api.ExportController)))
 	r.POST("/api/import", Version(security.AuthenticateAdmin(api.ImportController)))
+	r.GET("/api/backup", Version(security.AuthenticateAdmin(api.BackupController)))
+	r.POST("/api/restore", Version(security.AuthenticateAdmin(api.RestoreController)))
 	r.GET("/api/{entity}", Version(security.Authenticate(api.RejectCoreEntity(api.ListController))))
 	r.POST("/api/query", Version(security.Authenticate(api.QueryController)))
 	r.POST("/api/{entity}", Version(security.Authenticate(api.RejectCoreEntity(api.CreateController))))

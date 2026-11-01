@@ -18,9 +18,53 @@ func ImportController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	engine.ImportAll(dump)
+	ignored := removeAccountEntities(dump)
+
+	if rejected := engine.ValidateImport(dump); len(rejected) > 0 {
+		sendImportResponse(ctx, fasthttp.StatusBadRequest, map[string]any{
+			"error":    "invalid documents, nothing was imported",
+			"rejected": rejected,
+		}, ignored)
+		return
+	}
+
+	rejected := engine.ImportAll(dump)
+	for entity := range dump {
+		purgeCache(entity, nil)
+	}
+
 	acl.InitACL()
 
-	ctx.SetStatusCode(fasthttp.StatusOK)
-	ctx.SetBody([]byte(`{"status":"import completed"}`))
+	if len(rejected) > 0 {
+		sendImportResponse(ctx, fasthttp.StatusInternalServerError, map[string]any{
+			"error":    "some documents could not be imported",
+			"rejected": rejected,
+		}, ignored)
+		return
+	}
+
+	sendImportResponse(ctx, fasthttp.StatusOK, map[string]any{"status": "import completed"}, ignored)
+}
+
+func removeAccountEntities(dump map[string][]map[string]any) []string {
+	ignored := []string{}
+	for _, entity := range accountEntities {
+		if _, ok := dump[entity]; ok {
+			delete(dump, entity)
+			ignored = append(ignored, entity)
+		}
+	}
+
+	return ignored
+}
+
+func sendImportResponse(ctx *fasthttp.RequestCtx, status int, response map[string]any, ignored []string) {
+	if len(ignored) > 0 {
+		response["ignored"] = ignored
+		response["message"] = accountsNotImportedMessage
+	}
+
+	body, _ := json.Marshal(response)
+	ctx.SetStatusCode(status)
+	ctx.SetBody(body)
 }

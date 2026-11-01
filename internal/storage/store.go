@@ -146,7 +146,16 @@ func (c *ExpirationContainer) reset() {
 	c.mu.Lock()
 	c.Buckets = make(map[int64]*ExpirationBucket)
 	c.index = make(map[string]int64)
+	c.saved.Store(false)
 	c.mu.Unlock()
+}
+
+func (c *ExpirationContainer) expiration(key string) (int64, bool) {
+	c.mu.RLock()
+	ts, ok := c.index[key]
+	c.mu.RUnlock()
+
+	return ts, ok
 }
 
 type shard struct {
@@ -258,6 +267,21 @@ func (s *Store) Iterate(fn func(k string, v []byte)) {
 
 		sh.mu.RUnlock()
 	}
+}
+
+func (s *Store) keys() []string {
+	keys := make([]string, 0)
+	for i := 0; i < s.shardCount; i++ {
+		sh := s.shards[i]
+		sh.mu.RLock()
+		for k := range sh.m {
+			keys = append(keys, k)
+		}
+
+		sh.mu.RUnlock()
+	}
+
+	return keys
 }
 
 func (s *Store) FromMap(src map[string][]byte) {

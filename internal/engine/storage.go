@@ -6,6 +6,7 @@ import (
 	"github.com/taymour/elysiandb/internal/mongodb"
 	"github.com/taymour/elysiandb/internal/query"
 	"github.com/taymour/elysiandb/internal/schema"
+	"github.com/taymour/elysiandb/internal/storage"
 )
 
 const (
@@ -379,18 +380,64 @@ func CountAllEntities() int {
 	return 0
 }
 
-func ImportAll(data map[string][]map[string]interface{}) {
+func ValidateImport(data map[string][]map[string]interface{}) []api_storage.ImportRejection {
+	return api_storage.ValidateImport(data, GetEntitySchema)
+}
+
+func ImportAll(data map[string][]map[string]interface{}) []api_storage.ImportRejection {
 	if IsEngineInternal() {
-		api_storage.ImportAll(data)
-		return
+		return api_storage.ImportAll(data)
 	}
 
 	if IsEngineMongoDB() {
-		mongodb.ImportAll(data)
-		return
+		return mongodb.ImportAll(data)
 	}
 
 	ThrowErrorIfNotValidEngine()
+
+	return nil
+}
+
+func IterateEntities(entity string, fn func(data map[string]any) error) error {
+	if IsEngineInternal() {
+		return api_storage.IterateEntities(entity, fn)
+	}
+
+	if IsEngineMongoDB() {
+		return mongodb.IterateEntities(entity, fn)
+	}
+
+	ThrowErrorIfNotValidEngine()
+
+	return nil
+}
+
+func RestoreEntities(entity string, next func() (map[string]any, error)) (int, error) {
+	if IsEngineInternal() {
+		return api_storage.RestoreEntities(entity, next)
+	}
+
+	if IsEngineMongoDB() {
+		return mongodb.RestoreEntities(entity, next)
+	}
+
+	ThrowErrorIfNotValidEngine()
+
+	return 0, nil
+}
+
+func WipeAll() error {
+	if IsEngineMongoDB() {
+		if err := mongodb.DropAllCollections(); err != nil {
+			return err
+		}
+	} else if !IsEngineInternal() {
+		ThrowErrorIfNotValidEngine()
+	}
+
+	storage.ClearAll()
+
+	return nil
 }
 
 func IsEngineInternal() bool {

@@ -1,10 +1,14 @@
 package acl
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/security"
 )
 
@@ -82,7 +86,7 @@ func DefaultPermissionsForRole(role security.Role) map[Permission]bool {
 }
 
 func (a *ACL) ToDataMap() map[string]any {
-	perms := make(map[string]bool, len(a.Permissions))
+	perms := make(map[string]any, len(a.Permissions))
 	for p, v := range a.Permissions {
 		perms[permissionStrings[p]] = v
 	}
@@ -107,21 +111,85 @@ func (a *ACL) Revoke(p Permission) {
 	a.Permissions[p] = false
 }
 
-func InitACL() {
-	if !security.UserAuthenticationIsEnabled() {
-		return
-	}
-
-	saveACLList(GenerateACLFoAllrEntities())
-}
-
-func saveACLList(acls []ACL) {
-	for _, acl := range acls {
-		id := GetACLEntityId(acl.Username, acl.Entity)
-		if !engine.EntityExists(ACLEntity, id) {
-			engine.WriteEntity(ACLEntity, acl.ToDataMap())
+func ACLEntitySchema() map[string]any {
+	permissions := make(map[string]any, len(permissionStrings))
+	for _, name := range permissionStrings {
+		permissions[name] = map[string]any{
+			"type":     "boolean",
+			"required": true,
 		}
 	}
+
+	return map[string]any{
+		"username": map[string]any{
+			"type":     "string",
+			"required": true,
+		},
+		"entity": map[string]any{
+			"type":     "string",
+			"required": true,
+		},
+		"permissions": map[string]any{
+			"type":     "object",
+			"required": true,
+			"fields":   permissions,
+		},
+	}
+}
+
+func InitACLStorage() {
+	if !engine.EntityTypeExists(ACLEntity) {
+		engine.AddEntityType(ACLEntity)
+	}
+
+	if !schema.IsManualSchema(ACLEntity, engine.GetEntitySchema(ACLEntity)) {
+		engine.UpdateEntitySchema(ACLEntity, ACLEntitySchema())
+	}
+}
+
+func InitACL() error {
+	if !security.UserAuthenticationIsEnabled() {
+		return nil
+	}
+
+	InitACLStorage()
+
+	if err := saveACLList(GenerateACLFoAllrEntities()); err != nil {
+		log.Error("Unable to create the default ACLs: ", err)
+		return err
+	}
+
+	return nil
+}
+
+func saveACLList(acls []ACL) error {
+	var errs []error
+	for _, acl := range acls {
+		id := GetACLEntityId(acl.Username, acl.Entity)
+		if engine.EntityExists(ACLEntity, id) {
+			continue
+		}
+
+		if err := writeACL(&acl); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
+func writeACL(a *ACL) error {
+	validationErrors := engine.WriteEntity(ACLEntity, a.ToDataMap())
+	if len(validationErrors) == 0 {
+		return nil
+	}
+
+	messages := make([]string, 0, len(validationErrors))
+	for _, e := range validationErrors {
+		messages = append(messages, e.ToError().Error())
+	}
+
+	return fmt.Errorf("unable to write the ACL of %s on %s: %s", a.Username, a.Entity, strings.Join(messages, "; "))
 }
 
 func GenerateACLFoAllrEntities() []ACL {
@@ -204,9 +272,7 @@ func UpdateACLEntityForUsername(entity, username string, permissions map[Permiss
 
 	existing.Permissions = permissions
 
-	engine.WriteEntity(ACLEntity, existing.ToDataMap())
-
-	return nil
+	return writeACL(existing)
 }
 
 func StringToPermission(s string) (Permission, bool) {
@@ -284,7 +350,5 @@ func ResetACLEntityToDefault(entity, username string) error {
 		existing.Permissions = permissions
 	}
 
-	engine.WriteEntity(ACLEntity, existing.ToDataMap())
-
-	return nil
+	return writeACL(existing)
 }

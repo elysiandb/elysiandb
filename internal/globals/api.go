@@ -1,8 +1,13 @@
 package globals
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 const CoreFieldsPrefix = "_elysiandb_core_"
+
+const ApiKeyPrefix = "api:entity:"
 
 const (
 	ApiEntityTypesListPattern          = "api:entity:types:list"
@@ -17,6 +22,10 @@ const (
 	ApiEntityIndexFieldSortAscPattern  = "api:entity:%s:internal:index:field:%s:sort:asc"
 	ApiEntityIndexFieldSortDescPattern = "api:entity:%s:internal:index:field:%s:sort:desc"
 )
+
+func IsApiKey(key string) bool {
+	return strings.HasPrefix(key, ApiKeyPrefix)
+}
 
 func ApiAllEntityTypesListKey() string {
 	return ApiEntityTypesListPattern

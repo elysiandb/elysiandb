@@ -3,6 +3,8 @@ package mongodb
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -106,8 +108,12 @@ func ResolveIncludesAllRecursive(items []map[string]any, maxDepth int) {
 }
 
 func WriteEntity(entity string, data map[string]interface{}) []schema.ValidationError {
+	return writeEntity(entity, data, true)
+}
+
+func writeEntity(entity string, data map[string]interface{}, checkInferredSchema bool) []schema.ValidationError {
 	schemaData := GetEntitySchema(entity)
-	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
+	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity && (checkInferredSchema || schema.IsManualSchema(entity, schemaData)) {
 		errors := schema.ValidateEntity(entity, data, schemaData)
 		if len(errors) > 0 {
 			return errors
@@ -310,10 +316,17 @@ func CountAllEntities() int {
 	return total
 }
 
-func ImportAll(data map[string][]map[string]interface{}) {
-	for e, list := range data {
-		for _, d := range list {
-			WriteEntity(e, d)
+func ImportAll(data map[string][]map[string]interface{}) []api_storage.ImportRejection {
+	rejections := []api_storage.ImportRejection{}
+	for _, entity := range slices.Sorted(maps.Keys(data)) {
+		globals.MongoDB.Collection(entity).DeleteMany(context.Background(), bson.M{})
+
+		for index, item := range data[entity] {
+			if errs := writeEntity(entity, item, false); len(errs) > 0 {
+				rejections = append(rejections, api_storage.NewImportRejection(entity, index, item, errs))
+			}
 		}
 	}
+
+	return rejections
 }

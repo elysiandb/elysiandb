@@ -1,10 +1,8 @@
 package recovery
 
 import (
-	"bufio"
 	"encoding/json"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -85,7 +83,7 @@ func LogStoreDelete(key string) {
 }
 
 func ReplayStoreRecoveryLog(
-	putFunc func(key string, value []byte, ttl int) error,
+	putFunc func(key string, value []byte, expiresAt int64) error,
 	deleteFunc func(key string),
 ) {
 	cfg := globals.GetConfig()
@@ -104,32 +102,26 @@ func ReplayStoreRecoveryLog(
 	defer f.Close()
 
 	now := int(time.Now().Unix())
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-
+	err = replayLines(f, func(line []byte) {
 		var op storeRecoveryOp
-		if err := json.Unmarshal([]byte(line), &op); err != nil {
+		if err := json.Unmarshal(line, &op); err != nil {
 			log.Error("Error decoding store recovery log entry:", err)
-			continue
+			return
 		}
 
 		switch op.Op {
 		case "put":
 			if op.TTL > 0 && now >= op.TTL {
-				continue
+				return
 			}
-			_ = putFunc(op.Key, op.Value, op.TTL)
+			_ = putFunc(op.Key, op.Value, int64(op.TTL))
 		case "del":
 			deleteFunc(op.Key)
 		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		log.Error("Error scanning store recovery log:", err)
+	})
+	if err != nil {
+		keepUnreplayedLog(path, err)
+		return
 	}
 
 	log.Info("Recovery MainStore log replay completed.")

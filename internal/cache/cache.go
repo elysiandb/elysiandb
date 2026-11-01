@@ -127,6 +127,12 @@ func (s *cacheStore) Purge(entity string) {
 	s.mu.Unlock()
 }
 
+func (s *cacheStore) PurgeAll() {
+	s.mu.Lock()
+	s.entities = make(map[string]*cacheEntity)
+	s.mu.Unlock()
+}
+
 func HashQuery(
 	entity string,
 	limit int,

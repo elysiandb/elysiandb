@@ -1,10 +1,8 @@
 package recovery
 
 import (
-	"bufio"
 	"encoding/json"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/taymour/elysiandb/internal/globals"
@@ -87,17 +85,11 @@ func ReplayJsonRecoveryLog(
 
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-
+	err = replayLines(f, func(line []byte) {
 		var op recoveryOp
-		if err := json.Unmarshal([]byte(line), &op); err != nil {
+		if err := json.Unmarshal(line, &op); err != nil {
 			log.Error("Error decoding recovery log entry:", err)
-			continue
+			return
 		}
 
 		switch op.Op {
@@ -106,10 +98,10 @@ func ReplayJsonRecoveryLog(
 		case "del":
 			deleteFunc(op.Key)
 		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		log.Error("Error scanning recovery log:", err)
+	})
+	if err != nil {
+		keepUnreplayedLog(path, err)
+		return
 	}
 
 	log.Info("Recovery Json log replay completed.")

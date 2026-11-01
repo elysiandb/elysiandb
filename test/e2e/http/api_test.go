@@ -788,8 +788,8 @@ func TestImportKeepsDocumentsWithMixedTypes(t *testing.T) {
 	}
 
 	s.mustDo(fasthttp.StatusOK, "POST", "/api/strictimp/create", `{"fields":{"title":{"type":"string","required":true}}}`)
-	s.mustDo(fasthttp.StatusOK, "POST", "/api/import", `{"strictimp":[{"id":"s1","title":"ok"},{"id":"s2","title":5}]}`)
-	if ids := s.mustDo(fasthttp.StatusOK, "GET", "/api/strictimp", "").ids(t); !reflect.DeepEqual(ids, []string{"s1"}) {
+	s.mustDo(fasthttp.StatusBadRequest, "POST", "/api/import", `{"strictimp":[{"id":"s1","title":"ok"},{"id":"s2","title":5}]}`)
+	if ids := s.mustDo(fasthttp.StatusOK, "GET", "/api/strictimp", "").ids(t); len(ids) != 0 {
 		t.Fatalf("expected manual schemas to keep validating imports, got %v", ids)
 	}
 }
