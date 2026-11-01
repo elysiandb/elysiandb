@@ -23,6 +23,7 @@
     "react-dom": "^19.2.0",
     "react-error-boundary": "^6.0.0",
     "react-router-dom": "^7.10.1",
+    "uplot": "^1.6.32",
     "uuid": "^13.0.0",
     "zustand": "^5.0.9"
   },

@@ -2,11 +2,12 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import App from "../src/App.jsx";
-import Home from "../src/pages/Home.jsx";
+import Dashboard from "../src/pages/Dashboard.jsx";
 import { ToastProvider } from "../src/components/notification/ToastProvider.jsx";
 import { useAccountStore } from "../src/account/store.ts";
 import { useLanguageStore } from "../src/i18n/store.js";
 import { mockApi, renderWithProviders, requestsTo } from "./helpers.jsx";
+import { OVERVIEW, logsResponse, series } from "./fixtures/monitoring.js";
 
 function renderApp(language) {
     useLanguageStore.setState({ language });
@@ -57,20 +58,38 @@ describe("App", () => {
     });
 });
 
-describe("Home", () => {
+describe("Dashboard", () => {
     it.each([
-        ["en", "Home"],
-        ["fr", "Accueil"],
-        ["es", "Inicio"],
-        ["zh", "首页"],
-        ["de", "Startseite"],
-        ["ja", "ホーム"],
-        ["ko", "홈"],
-        ["pt", "Início"],
-        ["nl", "Startpagina"],
-    ])("shows its title in %s", (language, title) => {
-        renderWithProviders(<Home />, { language });
+        ["en", "Dashboard"],
+        ["fr", "Tableau de bord"],
+        ["es", "Panel"],
+        ["zh", "仪表盘"],
+        ["de", "Dashboard"],
+        ["ja", "ダッシュボード"],
+        ["ko", "대시보드"],
+        ["pt", "Painel"],
+        ["nl", "Dashboard"],
+    ])("shows its title in %s", async (language, title) => {
+        mockApi({
+            "GET /monitoring/overview": OVERVIEW,
+            "GET /monitoring/series": series(),
+            "GET /monitoring/logs": logsResponse([]),
+        });
+        renderWithProviders(<Dashboard />, { language });
 
-        expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+        expect(await screen.findByRole("heading", { name: title })).toBeInTheDocument();
+    });
+
+    it("is the home page of the Admin UI", async () => {
+        mockApi({
+            "GET /monitoring/overview": OVERVIEW,
+            "GET /monitoring/series": series(),
+            "GET /monitoring/logs": logsResponse([]),
+        });
+        window.history.pushState({}, "", "/admin");
+        renderApp("en");
+
+        expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: "Dashboard" })).toHaveClass("active");
     });
 });

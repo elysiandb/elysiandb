@@ -1,5 +1,6 @@
 import { Card, Col, Container, ListGroup, Row, Spinner } from "react-bootstrap";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useEntityTypes } from "../hooks/entity/useEntityTypes.js";
 import { useTranslation } from "../hooks/i18n/useTranslation.js";
 import EntityDataList from "../components/entity/EntityDataList.jsx";
@@ -7,6 +8,8 @@ import EntityDataList from "../components/entity/EntityDataList.jsx";
 export default function EntitiesBrowser() {
     const { list, loadAll, loading } = useEntityTypes();
     const { t } = useTranslation();
+    const [searchParams] = useSearchParams();
+    const requested = searchParams.get("entity");
 
     useEffect(() => {
         loadAll();
@@ -28,7 +31,8 @@ export default function EntitiesBrowser() {
     }, [list]);
 
     const [selectedState, setSelectedState] = useState(null);
-    const selected = selectedState ?? (entities.length ? entities[0].id : null);
+    const fromUrl = entities.some((entity) => entity.id === requested) ? requested : null;
+    const selected = selectedState ?? fromUrl ?? (entities.length ? entities[0].id : null);
 
     if (loading) {
         return (
