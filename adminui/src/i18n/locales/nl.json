@@ -80,6 +80,7 @@
         "editTitle": "Gebruiker bewerken",
         "createTitle": "Gebruiker aanmaken",
         "passwordRequired": "Voer een wachtwoord in.",
+        "passwordTooShort": "Het wachtwoord moet minstens {min} tekens lang zijn.",
         "created": "Gebruiker aangemaakt",
         "createFailed": "Gebruiker aanmaken mislukt",
         "passwordChanged": "Wachtwoord van de gebruiker gewijzigd",

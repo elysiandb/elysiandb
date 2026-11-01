@@ -16,13 +16,9 @@ func GetUserByUsernameController(ctx *fasthttp.RequestCtx) {
 
 	user, err := security.GetBasicUserByUsername(username)
 	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusNotFound)
-		ctx.SetBodyString(`{"error":"` + err.Error() + `"}`)
+		writeError(ctx, fasthttp.StatusNotFound, err)
 		return
 	}
 
-	responseBody := `{"username":"` + user["username"].(string) + `","role":"` + user["role"].(string) + `"}`
-
-	ctx.SetBodyString(responseBody)
-	ctx.SetStatusCode(fasthttp.StatusOK)
+	writeJSON(ctx, fasthttp.StatusOK, userViewFrom(user))
 }

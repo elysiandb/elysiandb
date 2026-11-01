@@ -78,6 +78,7 @@ adminui:
 | **store.crashRecovery.maxLogMB**     | Maximum size of recovery logs before flush                                            |
 | **server.http**                      | Enables and configures the HTTP REST/KV interface                                     |
 | **server.http.cors.allowedOrigins**  | Origins allowed to call the HTTP API from a browser (see CORS below). Empty by default |
+| **server.http.trustedProxies**       | Addresses or CIDR ranges of the reverse proxies in front of ElysianDB (see Reverse proxy below). Empty by default |
 | **server.tcp**                       | Enables and configures the TCP text protocol interface (see TCP Protocol below) |
 | **log.flushIntervalSeconds**         | Interval for flushing in-memory logs                                                  |
 | **stats.enabled**                    | Enables runtime metrics and `/stats` endpoint                                         |
@@ -88,7 +89,7 @@ adminui:
 | **api.cache.cleanupIntervalSeconds** | Interval for cache expiration cleanup                                                 |
 | **api.hooks.enabled**                | Enables JavaScript hooks (see Hooks below)                                        |
 | **security.authentication.enabled**  | Enables authentication layer for all endpoints except `/health`                       |
-| **security.authentication.mode**     | Authentication mode (currently supports `basic`, `token` `user`)                      |
+| **security.authentication.mode**     | Authentication mode: `basic`, `token` or `user`. Any other value, or no value, stops ElysianDB at startup |
 | **security.authentication.token**    | Instance token used in `token` mode                                                   |
 | **engine.name**                      | Storage engine: `internal` (default, recommended) or `mongodb` (beta)                 |
 | **engine.uri**                       | Connection URI for the `mongodb` engine                                               |
@@ -202,6 +203,8 @@ Dumps made with ElysianDB 0.2.1 and earlier contain accounts and ACLs. `POST /ap
 }
 ```
 
+Other core entities (`_elysiandb_core_*`) found in a dump, hooks excepted, are skipped without being listed. A document that references a core entity (`"@entity": "_elysiandb_core_..."`) rejects the whole import with `403`, as with `POST /api/<entity>`, and nothing is written.
+
 The other entities of the dump are imported as usual. Every document is checked before anything is written. A document that does not match a manual schema rejects the whole import with `400`, and nothing is written:
 
 ```json
@@ -311,6 +314,17 @@ From this version on, take a backup with `elysiandb backup` before each upgrade,
 * `POST /api/import` replaces the documents of each entity in the dump: documents that are not in the dump are deleted. They used to stay readable by id while missing from lists.
 * `GET /api/backup` and `POST /api/restore` are new: an entity named `backup` can no longer be listed with `GET /api/backup`, and documents can no longer be created in an entity named `restore` with `POST /api/restore`.
 * `elysiandb help` lists the commands in alphabetical order, with the new `backup` and `restore` commands.
+* The default `admin` password is only accepted from the machine that runs ElysianDB. Change it, or set `ELYSIANDB_ADMIN_PASSWORD` before the first start, to log in from another machine (see Default admin password).
+* Repeated failed logins get `429` with a `Retry-After` header for a growing delay (see Failed logins). Behind a reverse proxy, list it in the new `server.http.trustedProxies` setting.
+* `security.authentication.mode` must be `basic`, `token` or `user` when authentication is enabled: ElysianDB no longer starts with another value or without one.
+* Sessions opened with a previous version end after the upgrade: log in again. Sessions now end when their account is deleted, changes role or changes password.
+* New passwords must have at least 8 characters, `POST /api/security/user` answers `409` for an existing username, and `PUT /api/security/user/<user_name>/password` answers `400` without a `password` field.
+* Browser requests that change data from a page of another origin get `403` unless the origin is in `server.http.cors.allowedOrigins`.
+* Responses carry security headers, and the hooks script editor of the Admin UI is served by ElysianDB instead of a CDN (see HTTP response headers).
+* Hook scripts are stopped after 2 seconds, work on a copy of the document, and `ctx.query` returns an empty list for core entities.
+* `POST /api/import` skips core entities other than hooks, and refuses documents that reference a core entity.
+* An unauthenticated TCP connection is closed after 30 seconds without a command.
+* Files created in the store folder are readable by their owner only.
 
 ---
 
@@ -1165,6 +1179,16 @@ Using `includes=all` expands all linked entities recursively.
 ElysianDB supports optional authentication to protect all REST, KV and TCP endpoints. Three modes are available: `basic`, `user` and `token`.
 When you boot Elysiandb, a default user (username: "admin", password: "admin") is created if it does not exist.
 
+### Default admin password
+
+The `admin` / `admin` pair is only accepted from the machine that runs ElysianDB: a client connected through the loopback address (`127.0.0.1` or `::1`), without a reverse proxy in between. From any other address, log in fails as with a wrong password. While the default password is in use, ElysianDB prints a warning at startup.
+
+To log in remotely, change the password first, from the Admin UI opened on the machine itself (or through an SSH tunnel) or with `elysiandb change-password`. You can also choose the initial password: when the `ELYSIANDB_ADMIN_PASSWORD` environment variable is set at the first start, the `admin` account is created with its value instead of `admin`. The variable is only read when the account is created; changing it later has no effect.
+
+```bash
+ELYSIANDB_ADMIN_PASSWORD='a-long-password' elysiandb --config elysian.yaml
+```
+
 ### Configuration
 
 Enable authentication in your `elysian.yaml`, under `security`:
@@ -1177,6 +1201,8 @@ security:
 ```
 
 If `enabled` is false, all endpoints are publicly accessible.
+
+When `enabled` is true, `mode` must be `basic`, `token` or `user` (case does not matter). Any other value, or a missing `mode`, stops ElysianDB at startup with an error.
 
 When using `token` mode, define a token:
 
@@ -1257,6 +1283,8 @@ If authentication fails, the server returns:
 
 Requests without authentication headers are rejected when authentication is enabled, except `GET /health`.
 
+After repeated failed logins, the server answers `429 Too Many Requests` with a `Retry-After` header (in seconds) instead, even for correct credentials, until the delay is over. See Failed logins below.
+
 ---
 
 ## Security Notes
@@ -1269,13 +1297,50 @@ Requests without authentication headers are rejected when authentication is enab
 * A backup archive holds `users.key` and the password hashes: store it like the data folder (see Backup and Restore)
 * In `token` mode, anyone with the token can fully access the API
 * The token is compared in constant time
-* `GET /config` never returns secrets: the token is replaced with `***` and the password of `engine.uri` with `xxxxx`
+* `GET /config` never returns secrets: the token is replaced with `***`, and the password of `engine.uri`, as well as its query parameters that hold secrets (passwords, keys, tokens, credentials), with `xxxxx`
+* Passwords set through the API, the Admin UI or the command line must be at least 8 characters long
+* Usernames have 1 to 128 characters, without spaces, control characters or `/`
+* `users.key`, `sessions.json` and the data files are created readable by their owner only (`0600`)
+* Every failed login is logged with the username and the client address
+
+### Failed logins
+
+Failed logins are counted per client address, for the Admin UI login, Basic authentication and the TCP `AUTH` command alike:
+
+* after 5 failures for the same account from the same address, or 20 failures for any accounts from the same address, the next attempts get `429` (`ERR invalid credentials` over TCP) during a delay;
+* the delay starts at 1 second and doubles with each new failure, up to 15 minutes;
+* a successful login clears the count for that account and address; counts are forgotten 15 minutes after the last failure.
+
+Other addresses are not affected. Behind a reverse proxy, declare it in `server.http.trustedProxies` so that each client is counted on its own address (see Reverse proxy below).
 
 ### Session cookie
 
 In `user` mode, `POST /api/security/login` sets an `edb_session` cookie (`HttpOnly`, `SameSite=Strict`, valid 24 hours). The cookie is marked `Secure` only when the request reached ElysianDB over HTTPS, or through a proxy that sends `X-Forwarded-Proto: https`. Over plain HTTP, for example on a LAN address or a Docker service name, browsers would otherwise drop the cookie.
 
-Sessions are stored in `sessions.json` in the store folder.
+Sessions are stored in `sessions.json` in the store folder, which only holds a hash of each session ID. A session ends:
+
+* when it expires, or when its user logs out;
+* when its account is deleted, or its role changes;
+* when the password of its account changes. When users change their own password, the session they used for it stays open and their other sessions end.
+
+### Reverse proxy
+
+When ElysianDB runs behind a reverse proxy, every request comes from the proxy address. List the proxies in `server.http.trustedProxies` (addresses or CIDR ranges):
+
+```yaml
+server:
+  http:
+    trustedProxies: ["127.0.0.1", "10.0.0.0/8"]
+```
+
+For a request coming from a listed proxy, the client address is read from `X-Forwarded-For`: it is the last address of the header that is not a listed proxy. The proxy must append the client address to that header (for example `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` with nginx). Without `trustedProxies`, ElysianDB ignores `X-Forwarded-For`, and every client of the proxy shares the proxy address for failed logins. A request that carries a forwarding header (`X-Forwarded-For`, `X-Real-IP` or `Forwarded`) never counts as coming from the local machine, so the default admin password is refused through a proxy that is not listed.
+
+### HTTP response headers
+
+Every HTTP response carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`.
+
+* API responses also carry `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` and, unless the route sets its own, `Cache-Control: no-store`.
+* Admin UI responses (`/admin`) carry a `Content-Security-Policy` that only allows scripts, styles, fonts, images, workers and requests from ElysianDB itself. The Admin UI loads nothing from other sites, the script editor of the hooks page included.
 
 ### CORS
 
@@ -1290,7 +1355,9 @@ server:
 
 For an allowed origin, responses include `Access-Control-Allow-Origin` (the request origin), `Access-Control-Allow-Credentials: true`, and the allowed headers and methods. Other origins get no CORS header, so the browser blocks the response.
 
-The list is empty by default: only same-origin pages, such as the Admin UI served at `/admin`, can call the API from a browser. `"*"` allows every origin, with credentials, which lets any website send requests with the session cookie of a logged-in user: only use it for local development. Clients that are not browsers (servers, scripts, mobile apps) are not affected by CORS.
+Browser requests that change data (any method other than `GET`, `HEAD` and `OPTIONS`) from a page of another origin are refused with `403 {"error":"cross-origin request rejected"}`, unless that origin is allowed. ElysianDB recognizes them from the `Sec-Fetch-Site` and `Origin` headers that browsers add; a page on another port or another subdomain of the same site counts as another origin.
+
+The list is empty by default: only same-origin pages, such as the Admin UI served at `/admin`, can call the API from a browser. `"*"` allows every origin, with credentials, which lets any website send requests with the session cookie of a logged-in user: only use it for local development. Clients that are not browsers (servers, scripts, mobile apps) send neither header and are not affected by CORS or by this check.
 
 ### Admin-only routes in user mode
 
@@ -1409,17 +1476,20 @@ Creates a new user.
 ```json
 {
   "username": "alice",
-  "password": "secret",
+  "password": "alice-password",
   "role": "user"
 }
 ```
+
+The username has 1 to 128 characters, without spaces, control characters or `/`. The password has at least 8 characters. The role is `admin` or `user` (`user` when omitted).
 
 **Response** `200 OK`
 
 **Errors**
 
 * `403 Forbidden` if the current user is not an admin
-* `400 Bad Request` if the body is invalid
+* `400 Bad Request` if the body is invalid, or the username, password or role does not follow the rules above
+* `409 Conflict` if a user with this username already exists
 * `404 Not Found` if creation fails
 
 ---
@@ -1812,7 +1882,9 @@ function postRead(ctx) {
 
 `post_read` hooks are executed after all filtering has completed and just before the response is returned.
 
-The return value is ignored in both cases; mutations are applied directly on `ctx.entity`.
+The return value is ignored in both cases; mutations are applied directly on `ctx.entity`. `ctx.entity` is a copy of the stored document: changes, nested objects included, only reach the response and are never saved.
+
+A script that runs for more than 2 seconds is stopped: the error is logged and the document is returned with the changes made so far.
 
 ---
 
@@ -1823,7 +1895,7 @@ The `ctx` object exposes:
 | Property                 | Description                               |
 | ------------------------ | ----------------------------------------- |
 | `entity`                 | The current entity object being processed |
-| `query(entity, filters)` | Query another entity programmatically     |
+| `query(entity, filters)` | Query another entity programmatically. Core entities (`_elysiandb_core_*`) always return an empty list |
 
 ---
 
@@ -2112,6 +2184,8 @@ When `security.authentication.enabled` is true, every command except `PING`, `EX
 
 The password is everything after the first space, so it may contain spaces. With authentication disabled, `AUTH` answers `OK` and is not needed.
 
+A connection that has not authenticated is closed when it sends no complete line for 30 seconds. Failed `AUTH` commands count as failed logins (see Failed logins), and the default admin password is only accepted from the loopback address.
+
 The KV store also holds the REST API indexes and the list of entity types: a `RESET` or `DEL` on internal keys breaks the REST API. Keep the TCP port private (bind it to `127.0.0.1` or disable `server.tcp`) unless clients need it.
 
 ### Example (telnet)
@@ -2256,7 +2330,7 @@ The command interactively prompts for:
 * role (`admin` or `user`)
 * password
 
-The user is stored in a core entity.
+The user is stored in a core entity. The same rules as `POST /api/security/user` apply: the password has at least 8 characters, and an existing username is refused.
 
 ---
 
@@ -2280,7 +2354,7 @@ Changes the password of an existing user.
 elysiandb change-password
 ```
 
-The command prompts for the username and the new password. If the user does not exist, an error is returned.
+The command prompts for the username and the new password, which must have at least 8 characters. If the user does not exist, an error is returned. The open sessions of the user end.
 
 ---
 
@@ -2377,5 +2451,6 @@ docker run -d --name elysiandb \
 ```
 
 * The image contains the Admin UI: set `adminui.enabled: true` and `security.authentication.mode: user` to serve it at `/admin`.
+* Inside a container, clients connect through the Docker network, not the loopback address, so the default `admin` password is refused (see Default admin password). Set `ELYSIANDB_ADMIN_PASSWORD` the first time the container starts on an empty volume: `docker run -e ELYSIANDB_ADMIN_PASSWORD='a-long-password' ...`. For an existing volume, run `docker exec -it elysiandb elysiandb change-password`.
 * The `HEALTHCHECK` calls `/health`, which works in every authentication mode.
 * Images report the version computed by `git describe` at build time. To build one yourself: `docker build --build-arg VERSION=$(git describe --tags --always) -t elysiandb .`

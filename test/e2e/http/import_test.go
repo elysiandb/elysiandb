@@ -105,7 +105,7 @@ func TestImportNeverTouchesAccountsAndACLs(t *testing.T) {
 	body, _ := json.Marshal(dump)
 
 	target := startAdminSession(t, nil)
-	target.mustDo(fasthttp.StatusOK, "POST", "/api/security/user", `{"username":"bob","password":"bob-pw","role":"admin"}`)
+	target.mustDo(fasthttp.StatusOK, "POST", "/api/security/user", `{"username":"bob","password":"bob-pass","role":"admin"}`)
 	target.mustDo(fasthttp.StatusOK, "POST", "/api/movie", `{"id":"m1"}`)
 	target.mustDo(fasthttp.StatusOK, "PUT", "/api/acl/bob/movie", `{"permissions":{"read":true,"create":false,"update":false,"delete":false,"owning_read":false,"owning_write":false,"owning_update":false,"owning_delete":false}}`)
 	aclsBefore := string(target.mustDo(fasthttp.StatusOK, "GET", "/api/acl/bob/movie", "").body)
@@ -120,7 +120,7 @@ func TestImportNeverTouchesAccountsAndACLs(t *testing.T) {
 		username, password string
 		status             int
 	}{
-		{"bob", "bob-pw", fasthttp.StatusOK},
+		{"bob", "bob-pass", fasthttp.StatusOK},
 		{"admin", "admin", fasthttp.StatusOK},
 		{"alice", "alice-pw", fasthttp.StatusUnauthorized},
 	} {

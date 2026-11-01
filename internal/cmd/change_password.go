@@ -45,6 +45,11 @@ func ChangePassword() {
 		return
 	}
 
+	if err := security.ValidatePassword(string(bytePassword)); err != nil {
+		Printf("%sFailed to update password: %v%s\n", globals.Red, err, globals.Reset)
+		return
+	}
+
 	err = security.ChangeUserPassword(username, string(bytePassword))
 	if err != nil {
 		Printf("%sFailed to update password: %v%s\n", globals.Red, err, globals.Reset)

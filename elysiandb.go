@@ -41,6 +41,7 @@ func main() {
 	args := flag.Args()
 
 	if len(args) == 0 {
+		security.WarnIfDefaultAdminPassword()
 		cmd.StartServer()
 		return
 	}

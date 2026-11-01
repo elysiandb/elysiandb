@@ -35,7 +35,7 @@ func appendJsonRecoveryOp(op recoveryOp) {
 
 	cfg := globals.GetConfig()
 	path := cfg.Store.Folder + "/" + RecoveryFile
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		log.Error("Error opening recovery log:", err)
 		return

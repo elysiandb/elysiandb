@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import HooksList from "../../src/pages/HooksList.jsx";
 import { expectNoRawTranslationKeys, mockApi, renderWithProviders, requestsTo } from "../helpers.jsx";
 
-vi.mock("@monaco-editor/react", () => ({
-    Editor: ({ value, onChange }) => (
+vi.mock("../../src/components/hook/ScriptEditor.jsx", () => ({
+    default: ({ value, onChange }) => (
         <textarea aria-label="script-editor" value={value} onChange={(e) => onChange(e.target.value)} />
     ),
 }));

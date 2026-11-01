@@ -46,6 +46,7 @@ func newCtx(method, uri, body string, session *security.Session) *fasthttp.Reque
 }
 
 func login(t *testing.T, username string, role security.Role) *security.Session {
+	ensureUser(username, role)
 	s, err := security.CreateSession(username, role, time.Minute)
 	if err != nil {
 		t.Fatal(err)
@@ -145,7 +146,7 @@ func TestCreateUserController_AdminOK(t *testing.T) {
 
 	s := login(t, security.DefaultAdminUsername, security.RoleAdmin)
 
-	body := `{"username":"alice","password":"pwd","role":"user"}`
+	body := `{"username":"alice","password":"alice-pass","role":"user"}`
 	ctx := newCtx("POST", "/api/security/user", body, s)
 
 	http_security.CreateUserController(ctx)
@@ -164,7 +165,7 @@ func TestCreateUserController_Forbidden(t *testing.T) {
 
 	s := login(t, "user", security.RoleUser)
 
-	body := `{"username":"alice","password":"pwd","role":"user"}`
+	body := `{"username":"alice","password":"alice-pass","role":"user"}`
 	ctx := newCtx("POST", "/api/security/user", body, s)
 
 	http_security.CreateUserController(ctx)
@@ -228,7 +229,7 @@ func TestChangeUserPasswordController_OK(t *testing.T) {
 	_ = security.CreateBasicUser(&security.BasicUser{Username: "john", Password: "old", Role: security.RoleUser})
 
 	s := login(t, security.DefaultAdminUsername, security.RoleAdmin)
-	ctx := newCtx("PUT", "/api/security/user/john/password", `{"password":"new"}`, s)
+	ctx := newCtx("PUT", "/api/security/user/john/password", `{"password":"new-password"}`, s)
 	ctx.SetUserValue("user_name", "john")
 
 	http_security.ChangeUserPasswordController(ctx)
@@ -237,7 +238,7 @@ func TestChangeUserPasswordController_OK(t *testing.T) {
 		t.Fatal("expected 200")
 	}
 
-	if _, ok := security.AuthenticateUser("john", "new"); !ok {
+	if _, ok := security.AuthenticateUser("john", "new-password"); !ok {
 		t.Fatal("password not changed")
 	}
 }
@@ -260,7 +261,7 @@ func TestChangeUserPasswordController_ForbiddenSelf(t *testing.T) {
 	setup(t)
 
 	s := login(t, "bob", security.RoleUser)
-	ctx := newCtx("PUT", "/api/security/user/bob/password", `{"password":"x"}`, s)
+	ctx := newCtx("PUT", "/api/security/user/bob/password", `{"password":"ghost-password"}`, s)
 	ctx.SetUserValue("user_name", "bob")
 
 	http_security.ChangeUserPasswordController(ctx)
@@ -274,7 +275,7 @@ func TestChangeUserPasswordController_UserNotFound(t *testing.T) {
 	setup(t)
 
 	s := login(t, security.DefaultAdminUsername, security.RoleAdmin)
-	ctx := newCtx("PUT", "/api/security/user/ghost/password", `{"password":"x"}`, s)
+	ctx := newCtx("PUT", "/api/security/user/ghost/password", `{"password":"ghost-password"}`, s)
 	ctx.SetUserValue("user_name", "ghost")
 
 	http_security.ChangeUserPasswordController(ctx)
@@ -358,5 +359,11 @@ func TestChangeUserRoleController_UserNotFound(t *testing.T) {
 
 	if ctx.Response.StatusCode() != fasthttp.StatusNotFound {
 		t.Fatal("expected 404")
+	}
+}
+
+func ensureUser(username string, role security.Role) {
+	if !security.BasicUserExists(username) {
+		_ = security.CreateBasicUser(&security.BasicUser{Username: username, Password: username + "-password", Role: role})
 	}
 }

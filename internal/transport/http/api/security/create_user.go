@@ -22,6 +22,26 @@ func (u *UserDto) ToBasicUser() *security.BasicUser {
 	}
 }
 
+func (u *UserDto) Validate() error {
+	if err := security.ValidateUsername(u.User); err != nil {
+		return err
+	}
+
+	if u.Role != "" && security.Role(u.Role) != security.RoleAdmin && security.Role(u.Role) != security.RoleUser {
+		return security.ErrInvalidRole
+	}
+
+	if err := security.ValidatePassword(u.Password); err != nil {
+		return err
+	}
+
+	if security.BasicUserExists(u.User) {
+		return security.ErrUserAlreadyExists
+	}
+
+	return nil
+}
+
 func CreateUserController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 
@@ -38,11 +58,14 @@ func CreateUserController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	if err := user.Validate(); err != nil {
+		writeError(ctx, createUserErrorStatus(err), err)
+		return
+	}
+
 	err := security.CreateBasicUser(user.ToBasicUser())
 	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusNotFound)
-		ctx.SetBodyString(`{"error":"` + err.Error() + `"}`)
-
+		writeError(ctx, fasthttp.StatusNotFound, err)
 		return
 	}
 

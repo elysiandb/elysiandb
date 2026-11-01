@@ -80,6 +80,7 @@
         "editTitle": "Edit user",
         "createTitle": "Create user",
         "passwordRequired": "Please enter a password.",
+        "passwordTooShort": "The password must be at least {min} characters long.",
         "created": "User created successfully",
         "createFailed": "Failed to create user",
         "passwordChanged": "User's password successfully modified",

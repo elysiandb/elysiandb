@@ -2,11 +2,14 @@ package hook
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/taymour/elysiandb/internal/acl"
 	engine "github.com/taymour/elysiandb/internal/engine"
 )
+
+const scriptTimeout = 2 * time.Second
 
 func applyScript(
 	username string,
@@ -16,6 +19,10 @@ func applyScript(
 	bypassAcl bool,
 ) error {
 	vm := goja.New()
+	timer := time.AfterFunc(scriptTimeout, func() {
+		vm.Interrupt(fmt.Sprintf("hook script stopped after %s", scriptTimeout))
+	})
+	defer timer.Stop()
 
 	ctx := map[string]any{
 		"entity": entity,
@@ -25,6 +32,10 @@ func applyScript(
 			}
 
 			targetEntity := call.Arguments[0].String()
+			if engine.IsCoreEntityType(targetEntity) {
+				return vm.ToValue([]map[string]any{})
+			}
+
 			params, _ := call.Arguments[1].Export().(map[string]any)
 
 			filters := make(map[string]map[string]string, len(params))

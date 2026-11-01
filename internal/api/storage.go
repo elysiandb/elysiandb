@@ -293,12 +293,16 @@ func Paginate(entities []map[string]any, offset, limit int) []map[string]any {
 
 func applyOffsetLimit[T any](in []T, offset, limit int) []T {
 	start := offset
+	if start < 0 {
+		start = 0
+	}
+
 	if start > len(in) {
 		start = len(in)
 	}
 
 	end := len(in)
-	if limit > 0 && start+limit < end {
+	if limit > 0 && limit < end-start {
 		end = start + limit
 	}
 

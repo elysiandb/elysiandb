@@ -257,7 +257,7 @@ func TestBackupAndRestoreRoundTrip(t *testing.T) {
 		t.Fatalf("a second backup must hold the same content as the first")
 	}
 
-	restored.mustDo(fasthttp.StatusOK, "POST", "/api/security/user", `{"username":"bob","password":"bob-pw","role":"admin"}`)
+	restored.mustDo(fasthttp.StatusOK, "POST", "/api/security/user", `{"username":"bob","password":"bob-pass","role":"admin"}`)
 	if acl := restored.mustDo(fasthttp.StatusOK, "GET", "/api/acl/bob/book", "").object(t); acl["username"] != "bob" {
 		t.Fatalf("expected a new user to get ACLs after the restore, got %v", acl)
 	}

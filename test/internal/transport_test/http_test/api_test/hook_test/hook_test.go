@@ -32,11 +32,13 @@ func setupHookTest(t *testing.T) {
 	api_storage.WriteEntity("_elysiandb_core_user", map[string]any{
 		"id":       "admin",
 		"username": "admin",
+		"password": "admin-password-hash",
 		"role":     "admin",
 	})
 }
 
 func adminCtx(method string, body []byte) *fasthttp.RequestCtx {
+	ensureUser("admin", security.RoleAdmin)
 	s, _ := security.CreateSession("admin", security.RoleAdmin, time.Hour)
 
 	req := fasthttp.AcquireRequest()
@@ -52,6 +54,7 @@ func adminCtx(method string, body []byte) *fasthttp.RequestCtx {
 }
 
 func userCtx(method string, body []byte) *fasthttp.RequestCtx {
+	ensureUser("user", security.RoleUser)
 	s, _ := security.CreateSession("user", security.RoleUser, time.Hour)
 
 	req := fasthttp.AcquireRequest()
@@ -327,5 +330,11 @@ func TestDeleteHookById_Forbidden(t *testing.T) {
 
 	if ctx.Response.StatusCode() != fasthttp.StatusForbidden {
 		t.Fatalf("expected 403")
+	}
+}
+
+func ensureUser(username string, role security.Role) {
+	if !security.BasicUserExists(username) {
+		_ = security.CreateBasicUser(&security.BasicUser{Username: username, Password: username + "-password", Role: role})
 	}
 }

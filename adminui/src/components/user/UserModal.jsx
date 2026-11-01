@@ -4,6 +4,8 @@ import { useUsers } from "../../hooks/user/useUsers.js";
 import {useToast} from "../../hooks/notification/useToast.js";
 import {useTranslation} from "../../hooks/i18n/useTranslation.js";
 
+const MIN_PASSWORD_LENGTH = 8;
+
 export default function UserModal({ showModal, onHide, user, onSaved }) {
     const { show } = useToast();
     const { createUser, changeUserPassword } = useUsers();
@@ -26,6 +28,16 @@ export default function UserModal({ showModal, onHide, user, onSaved }) {
     }, [user, show]);
 
     const handleSave = async () => {
+        if (!user && password === "") {
+            show("error", t("users.passwordRequired"));
+            return;
+        }
+
+        if (password !== "" && [...password].length < MIN_PASSWORD_LENGTH) {
+            show("error", t("users.passwordTooShort", { min: MIN_PASSWORD_LENGTH }));
+            return;
+        }
+
         setSaving(true);
         try {
             if (user) {

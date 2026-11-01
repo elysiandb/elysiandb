@@ -211,6 +211,7 @@ func TestLoginController_OK(t *testing.T) {
 func TestLogoutController(t *testing.T) {
 	setup(t)
 
+	ensureUser("a", security.RoleAdmin)
 	s, _ := security.CreateSession("a", security.RoleAdmin, time.Hour)
 
 	ctx := newCtx("POST", "/logout", "")
@@ -316,5 +317,11 @@ func TestIsBuiltMatchesEmbeddedAssets(t *testing.T) {
 	_, err := embeddedui.UI.ReadFile("dist/index.html")
 	if adminui.IsBuilt() != (err == nil) {
 		t.Fatalf("IsBuilt must report whether dist/index.html is embedded")
+	}
+}
+
+func ensureUser(username string, role security.Role) {
+	if !security.BasicUserExists(username) {
+		_ = security.CreateBasicUser(&security.BasicUser{Username: username, Password: username + "-password", Role: role})
 	}
 }

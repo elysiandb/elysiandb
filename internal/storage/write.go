@@ -83,7 +83,7 @@ func writeExpirationsToFile(cfg *configuration.Config, fileName string, expirati
 
 	path := cfg.Store.Folder + "/" + fileName
 
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		isSuccess = false
 		log.Error("Error opening file:", err)
@@ -114,7 +114,7 @@ func writeStoreToFile(cfg *configuration.Config, fileName string, store *Store) 
 
 	path := cfg.Store.Folder + "/" + fileName
 
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		isSuccess = false
 		log.Error("Error opening file:", err)
