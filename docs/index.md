@@ -1678,7 +1678,7 @@ ElysianDB includes an optional, built‑in **Admin UI** that allows you to visua
 
 The Admin UI is served directly by the ElysianDB HTTP server and requires no external frontend stack once built.
 
-By default, there is an admin user created with username = "admin" and password = "admin". Please connect to the AdminUI and change the password.
+The first start creates an `admin` account with the password `admin`, or with the value of `ELYSIANDB_ADMIN_PASSWORD` when it is set. The default password only works from the machine that runs ElysianDB, for example at `http://localhost:8089/admin`: log in there, or through an SSH tunnel, and change it from the Users page before opening the Admin UI from another machine (see Default admin password).
 
 ---
 
@@ -1730,7 +1730,9 @@ Then open:
 http://localhost:8089/admin
 ```
 
-You will be prompted to log in with your configured credentials. The Admin UI provides:
+You will be prompted to log in with your configured credentials. From another machine, the default `admin` password is refused: use a changed password (see Default admin password). After repeated failed logins from the same address, logging in fails until the delay is over, even with the right password (see Failed logins).
+
+The Admin UI provides:
 
 * A dashboard showing instance information
 * Entity type listing and creation
