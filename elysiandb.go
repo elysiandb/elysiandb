@@ -37,6 +37,7 @@ func main() {
 
 	boot.InitDB()
 	security.InitAdminUserIfNotExists()
+	security.ProtectSessionsFile()
 
 	args := flag.Args()
 

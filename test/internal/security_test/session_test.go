@@ -466,3 +466,23 @@ func TestCreateSessionRequiresAnExistingUser(t *testing.T) {
 		t.Fatalf("expected an error for an unknown user")
 	}
 }
+
+func TestProtectSessionsFile(t *testing.T) {
+	dir := setupTempStore(t)
+	path := filepath.Join(dir, security.SessionsFilename)
+	if err := os.WriteFile(path, []byte(`{"sessions":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	security.ProtectSessionsFile()
+
+	info, err := os.Stat(path)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("expected the sessions file to be private, got %v %v", info.Mode().Perm(), err)
+	}
+
+	security.ProtectSessionsFile()
+}

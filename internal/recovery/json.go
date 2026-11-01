@@ -41,6 +41,8 @@ func appendJsonRecoveryOp(op recoveryOp) {
 		return
 	}
 
+	_ = f.Chmod(0o600)
+
 	defer f.Close()
 
 	enc := json.NewEncoder(f)

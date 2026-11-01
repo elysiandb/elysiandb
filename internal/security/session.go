@@ -268,6 +268,11 @@ func removeExpiredSessions() {
 	}
 }
 
+func ProtectSessionsFile() {
+	cfg := globals.GetConfig()
+	_ = os.Chmod(fmt.Sprintf("%s/%s", cfg.Store.Folder, SessionsFilename), 0o600)
+}
+
 func DeleteAllSessions() error {
 	sessionsMu.Lock()
 	defer sessionsMu.Unlock()

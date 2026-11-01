@@ -324,7 +324,7 @@ From this version on, take a backup with `elysiandb backup` before each upgrade,
 * Hook scripts are stopped after 2 seconds, work on a copy of the document, and `ctx.query` returns an empty list for core entities.
 * `POST /api/import` skips core entities other than hooks, and refuses documents that reference a core entity.
 * An unauthenticated TCP connection is closed after 30 seconds without a command.
-* Files created in the store folder are readable by their owner only.
+* Files of the store folder are readable by their owner only (`0600`), existing ones included: ElysianDB changes their mode at startup.
 
 ---
 
@@ -1300,7 +1300,7 @@ After repeated failed logins, the server answers `429 Too Many Requests` with a 
 * `GET /config` never returns secrets: the token is replaced with `***`, and the password of `engine.uri`, as well as its query parameters that hold secrets (passwords, keys, tokens, credentials), with `xxxxx`
 * Passwords set through the API, the Admin UI or the command line must be at least 8 characters long
 * Usernames have 1 to 128 characters, without spaces, control characters or `/`
-* `users.key`, `sessions.json` and the data files are created readable by their owner only (`0600`)
+* `users.key`, `sessions.json`, the data files and the recovery logs are readable by their owner only (`0600`). Files of an existing store folder are switched to `0600` when ElysianDB starts
 * Every failed login is logged with the username and the client address
 
 ### Failed logins

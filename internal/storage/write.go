@@ -87,6 +87,8 @@ func writeExpirationsToFile(cfg *configuration.Config, fileName string, expirati
 	if err != nil {
 		isSuccess = false
 		log.Error("Error opening file:", err)
+	} else {
+		_ = file.Chmod(0o600)
 	}
 
 	defer file.Close()
@@ -118,6 +120,8 @@ func writeStoreToFile(cfg *configuration.Config, fileName string, store *Store) 
 	if err != nil {
 		isSuccess = false
 		log.Error("Error opening file:", err)
+	} else {
+		_ = file.Chmod(0o600)
 	}
 
 	defer file.Close()

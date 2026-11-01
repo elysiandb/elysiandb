@@ -43,6 +43,8 @@ func appendStoreRecoveryOp(op storeRecoveryOp) {
 		return
 	}
 
+	_ = f.Chmod(0o600)
+
 	defer f.Close()
 
 	enc := json.NewEncoder(f)
