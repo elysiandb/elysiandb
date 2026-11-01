@@ -137,3 +137,25 @@ func TestMongoDBIncludesDoNotResolveCoreEntities(t *testing.T) {
 		}
 	}
 }
+
+func TestMongoDBCountsDocumentsPerEntityTypeAndPings(t *testing.T) {
+	entity := connectMongoDB(t)
+
+	for _, id := range []string{"c1", "c2", "c3"} {
+		if errs := mongodb.WriteEntity(entity, map[string]any{"id": id, "n": 1.0}); len(errs) > 0 {
+			t.Fatalf("write: %v", errs)
+		}
+	}
+
+	if got := mongodb.CountEntitiesPerType()[entity]; got != 3 {
+		t.Fatalf("expected 3 documents for %s, got %d", entity, got)
+	}
+
+	if d, err := boot.MongoPing(); err != nil || d <= 0 {
+		t.Fatalf("expected a successful ping, got %v %v", d, err)
+	}
+
+	if host := boot.MongoHost(os.Getenv("ELYSIAN_TEST_MONGODB_URI")); host == "unknown" || strings.Contains(host, "@") {
+		t.Fatalf("unexpected host %q", host)
+	}
+}

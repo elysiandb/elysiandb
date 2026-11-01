@@ -89,3 +89,23 @@ func TestRepairIndexesWithoutChanges(t *testing.T) {
 		t.Fatalf("a consistent store needs no repair, got %+v", repair)
 	}
 }
+
+func TestCountEntitiesPerTypeCountsPublicTypesOnly(t *testing.T) {
+	initTestStore(t)
+
+	api_storage.WriteEntity("books", map[string]any{"id": "b1"})
+	api_storage.WriteEntity("books", map[string]any{"id": "b2"})
+	api_storage.WriteEntity("_elysiandb_core_hidden", map[string]any{"id": "h1"})
+	if err := api_storage.CreateEntityType("empty"); err != nil {
+		t.Fatal(err)
+	}
+
+	counts := api_storage.CountEntitiesPerType()
+	if counts["books"] != 2 || counts["empty"] != 0 || len(counts) != 2 {
+		t.Fatalf("unexpected counts %v", counts)
+	}
+
+	if got := api_storage.CountEntities("missing"); got != 0 {
+		t.Fatalf("an unknown type has no documents, got %d", got)
+	}
+}

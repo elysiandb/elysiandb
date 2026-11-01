@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"os/exec"
 	"strings"
@@ -422,5 +423,112 @@ func TestFatalLogsAndExitsWithCodeOne(t *testing.T) {
 
 	if !strings.Contains(string(out), "level=ERROR") || !strings.Contains(string(out), "msg=boom") || !strings.Contains(string(out), "err=kaboom") {
 		t.Fatalf("the fatal line should be written: %q", out)
+	}
+}
+
+type stringer struct{}
+
+func (stringer) String() string { return "from-stringer" }
+
+func TestValueKindsInText(t *testing.T) {
+	buf := setup(t, pkglog.Options{})
+
+	pkglog.For("kinds").WithGroup("ignored").Info("kinds",
+		"u", uint64(7),
+		"f", 1.25,
+		"nan", math.NaN(),
+		"d", 1500*time.Millisecond,
+		"t", time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC),
+		"b", true,
+		"raw", []byte("bytes"),
+		"list", []string{"a", "b"},
+		"none", nil,
+		"str", stringer{},
+		slog.Group("req", "method", "GET", "status", 200),
+		"", "dropped",
+	)
+
+	out := buf.String()
+	for _, want := range []string{"u=7", "f=1.25", "nan=NaN", "d=1.5s", "t=2026-11-01T12:00:00Z", "b=true", "raw=bytes", `list="[a b]"`, "none=<nil>", "str=from-stringer", "req.method=GET", "req.status=200", "component=kinds"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in %q", want, out)
+		}
+	}
+	if strings.Contains(out, "dropped") {
+		t.Fatalf("attributes without a key are dropped: %q", out)
+	}
+}
+
+func TestValueKindsInJSON(t *testing.T) {
+	buf := setup(t, pkglog.Options{Format: pkglog.FormatJSON, BufferLines: 10})
+
+	pkglog.Info("kinds", "u", uint64(7), "nan", math.Inf(1), "list", []string{"a"}, "none", nil, slog.Group("g", "k", "v"))
+
+	var line map[string]any
+	if err := json.Unmarshal([]byte(buf.String()), &line); err != nil {
+		t.Fatalf("not JSON: %v %q", err, buf.String())
+	}
+
+	if line["u"] != float64(7) || line["nan"] != "+Inf" || line["none"] != nil || line["g.k"] != "v" {
+		t.Fatalf("unexpected line %v", line)
+	}
+	if list, ok := line["list"].([]any); !ok || len(list) != 1 || list[0] != "a" {
+		t.Fatalf("unexpected list %v", line["list"])
+	}
+
+	entry := pkglog.Logs(pkglog.Query{}).Entries[0]
+	if entry.Attrs["g.k"] != "v" || entry.Attrs["u"] != uint64(7) {
+		t.Fatalf("unexpected buffered attributes %+v", entry.Attrs)
+	}
+}
+
+func TestLevelsAreColoredOnlyWhenColorIsOn(t *testing.T) {
+	buf := setup(t, pkglog.Options{Level: "debug"})
+	pkglog.SetOutput(buf, true)
+
+	pkglog.Debug("d")
+	pkglog.Info("i")
+	pkglog.Warn("w")
+	pkglog.Error("e")
+
+	out := buf.String()
+	for _, want := range []string{"\x1b[35mDEBUG\x1b[0m", "\x1b[36mINFO\x1b[0m", "\x1b[33mWARN\x1b[0m", "\x1b[31mERROR\x1b[0m"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in %q", want, out)
+		}
+	}
+
+	plain := setup(t, pkglog.Options{})
+	pkglog.Info("i")
+	if strings.Contains(plain.String(), "\x1b") {
+		t.Fatalf("no color expected: %q", plain.String())
+	}
+
+	if pkglog.Format() != pkglog.FormatText {
+		t.Fatalf("unexpected format %q", pkglog.Format())
+	}
+}
+
+func TestThrottleForgetsOldKeysWhenFull(t *testing.T) {
+	th := pkglog.NewThrottle(time.Minute)
+	now := time.Unix(1_000, 0)
+	th.SetClock(func() time.Time { return now })
+
+	for i := 0; i < 10_000; i++ {
+		th.Allow(fmt.Sprintf("k%d", i))
+	}
+
+	if _, ok := th.Allow("k1"); ok {
+		t.Fatalf("a recent key is still throttled")
+	}
+
+	now = now.Add(2 * time.Minute)
+	if _, ok := th.Allow("new"); !ok {
+		t.Fatalf("a new key always passes")
+	}
+
+	now = now.Add(time.Second)
+	if n, ok := th.Allow("k2"); !ok || n != 0 {
+		t.Fatalf("old keys were forgotten when the throttle was full, got %d %v", n, ok)
 	}
 }

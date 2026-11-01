@@ -3,6 +3,8 @@ package metrics_test
 import (
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -536,5 +538,56 @@ func TestAuthenticationOffOnPublicAddress(t *testing.T) {
 
 	if !metrics.IsLoopbackHost("[::1]") || metrics.IsLoopbackHost("") {
 		t.Fatalf("unexpected loopback detection")
+	}
+}
+
+func TestSlowSourcesMongoDiskAndDefaultPassword(t *testing.T) {
+	folder := t.TempDir()
+	if err := os.WriteFile(filepath.Join(folder, "data.json"), make([]byte, 1234), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	pingErr := errors.New("server selection error")
+	setup(t, metrics.Sources{
+		DataFolder:           func() string { return folder },
+		MongoPing:            func() (time.Duration, error) { return 0, pingErr },
+		MongoPoolInUse:       func() int { return 3 },
+		DefaultAdminPassword: func() bool { return false },
+	})
+	now := time.Now()
+
+	metrics.Tick(now)
+	metrics.Tick(now.Add(time.Second))
+
+	s := series(t, "15m", 0)
+	if got := last(t, s, "disk_bytes"); got == nil || *got != 1234 {
+		t.Fatalf("disk_bytes = %v, want 1234", got)
+	}
+	if got := last(t, s, "mongo_pool_in_use"); got == nil || *got != 3 {
+		t.Fatalf("mongo_pool_in_use = %v, want 3", got)
+	}
+	if got := last(t, s, "mongo_ping_ms"); got != nil {
+		t.Fatalf("a failed ping has no latency, got %v", *got)
+	}
+
+	status := metrics.CurrentStatus()
+	if p, ok := hasProblem(status, "mongodb_unreachable"); !ok || p.Severity != metrics.SeverityCritical {
+		t.Fatalf("expected mongodb_unreachable, got %v", problemCodes(status))
+	}
+	if _, ok := hasProblem(status, "default_admin_password"); ok {
+		t.Fatalf("the default password is not in use")
+	}
+}
+
+func TestStartAndStop(t *testing.T) {
+	setup(t, metrics.Sources{})
+
+	metrics.Start()
+	metrics.Start()
+	metrics.Stop()
+	metrics.Stop()
+
+	if s, _ := metrics.Series("15m", 0); len(s.Points) != 0 {
+		t.Fatalf("the first tick only records a baseline, got %d points", len(s.Points))
 	}
 }

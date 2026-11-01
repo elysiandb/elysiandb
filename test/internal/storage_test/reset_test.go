@@ -62,3 +62,20 @@ func TestResetStoreDeletesKVKeysAndKeepsRESTAPIKeys(t *testing.T) {
 		t.Fatalf("expected 3 keys and 1 with a TTL, got %d %d", keys, withTTL)
 	}
 }
+
+func TestListJsonKeysAndCountJsonDocuments(t *testing.T) {
+	globals.SetConfig(&configuration.Config{Store: configuration.StoreConfig{Folder: t.TempDir(), Shards: 4}})
+	storage.LoadDB()
+	storage.LoadJsonDB()
+
+	for _, key := range []string{"api:entity:books:id:1", "api:entity:books:id:2"} {
+		if err := storage.PutJsonValue(key, map[string]any{"id": key}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	keys := storage.ListJsonKeys()
+	if len(keys) != 2 || storage.CountJsonDocuments() != 2 {
+		t.Fatalf("unexpected keys %v and count %d", keys, storage.CountJsonDocuments())
+	}
+}

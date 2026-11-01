@@ -99,6 +99,10 @@ func RouteLine(line []byte, c net.Conn, session *Session) []byte {
 	return []byte("ERR")
 }
 
+func ResetThrottles() {
+	tcpAuthThrottle = log.NewThrottle(time.Minute)
+}
+
 func logTokenAuthFailure(addr string) {
 	metrics.FailedLogin(addr)
 	if suppressed, ok := tcpAuthThrottle.Allow(addr); ok {

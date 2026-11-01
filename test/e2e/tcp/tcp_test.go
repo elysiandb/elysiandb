@@ -3,8 +3,10 @@ package tcp
 import (
 	"bufio"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -12,8 +14,10 @@ import (
 	"github.com/taymour/elysiandb/internal/boot"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/storage"
+	tcprouting "github.com/taymour/elysiandb/internal/transport/tcp/tcp_routing"
 )
 
 func freeTCPPort(t *testing.T) int {
@@ -367,5 +371,62 @@ func TestTCP_NoAuthWhenAuthenticationDisabled(t *testing.T) {
 
 	if got := send("AUTH anything"); got != "OK" {
 		t.Fatalf("AUTH without authentication: want OK, got %q", got)
+	}
+}
+
+func TestTCP_LogsSecurityAuditAndDebugEvents(t *testing.T) {
+	addr := startTCPServer(t, configuration.SecurityConfig{
+		Authentication: configuration.AuthenticationConfig{Enabled: true, Mode: "token", Token: "tcp-token"},
+	})
+
+	if err := log.Configure(log.Options{Level: "debug", BufferLines: 1000}); err != nil {
+		t.Fatal(err)
+	}
+	log.SetOutput(&strings.Builder{}, false)
+	tcprouting.ResetThrottles()
+	t.Cleanup(func() {
+		log.SetOutput(nil, false)
+		_ = log.Configure(log.Options{})
+	})
+
+	send := dialTCP(t, addr)
+	if got := send("AUTH wrong-token"); got != "ERR invalid credentials" {
+		t.Fatalf("unexpected answer %q", got)
+	}
+	if got := send("AUTH tcp-token"); got != "OK" {
+		t.Fatalf("unexpected answer %q", got)
+	}
+	if got := send("FOO\x1b[31m bar"); got != "ERR" {
+		t.Fatalf("unexpected answer %q", got)
+	}
+	if got := send("RESET"); got != "OK" {
+		t.Fatalf("unexpected answer %q", got)
+	}
+
+	find := func(q log.Query) []log.Entry {
+		deadline := time.Now().Add(2 * time.Second)
+		for {
+			if got := log.Logs(q).Entries; len(got) > 0 || time.Now().After(deadline) {
+				return got
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	if got := find(log.Query{MinLevel: slog.LevelWarn, Text: "tcp auth failed"}); len(got) != 1 || got[0].Component != "security" {
+		t.Fatalf("expected a tcp auth failed warning, got %+v", got)
+	}
+
+	if got := find(log.Query{Component: "audit", Text: "store reset"}); len(got) != 1 || got[0].Attrs["actor"] != "token" || got[0].Attrs["source"] != "tcp" {
+		t.Fatalf("expected an audit line for RESET, got %+v", got)
+	}
+
+	unknown := find(log.Query{MinLevel: slog.LevelDebug, Text: "unknown command"})
+	if len(unknown) != 1 || unknown[0].Level != "DEBUG" || unknown[0].Attrs["command"] != "FOO\x1b[31m" {
+		t.Fatalf("expected one debug line for the unknown command, got %+v", unknown)
+	}
+
+	if got := find(log.Query{MinLevel: slog.LevelDebug, Text: "connection opened"}); len(got) == 0 {
+		t.Fatalf("expected a connection opened debug line")
 	}
 }

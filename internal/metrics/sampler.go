@@ -75,6 +75,7 @@ type sampler struct {
 	ticks       int64
 	running     bool
 	stop        chan struct{}
+	done        chan struct{}
 	problems    *problemTracker
 	backlogFrom time.Time
 }
@@ -114,19 +115,24 @@ func SetSources(s Sources) {
 }
 
 func Start() {
-	state.mu.Lock()
-	if state.running {
-		state.mu.Unlock()
+	s := state
+
+	s.mu.Lock()
+	if s.running {
+		s.mu.Unlock()
 		return
 	}
-	state.running = true
-	state.stop = make(chan struct{})
-	stop := state.stop
-	state.mu.Unlock()
+	s.running = true
+	s.stop = make(chan struct{})
+	s.done = make(chan struct{})
+	stop, done := s.stop, s.done
+	s.mu.Unlock()
 
-	state.tick(time.Now())
+	s.tick(time.Now())
 
 	go func() {
+		defer close(done)
+
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 
@@ -135,22 +141,27 @@ func Start() {
 			case <-stop:
 				return
 			case now := <-ticker.C:
-				state.tick(now)
+				s.tick(now)
 			}
 		}
 	}()
 }
 
 func Stop() {
-	state.mu.Lock()
-	defer state.mu.Unlock()
+	s := state
 
-	if !state.running {
+	s.mu.Lock()
+	if !s.running {
+		s.mu.Unlock()
 		return
 	}
 
-	close(state.stop)
-	state.running = false
+	close(s.stop)
+	s.running = false
+	done := s.done
+	s.mu.Unlock()
+
+	<-done
 }
 
 func Reset() {
