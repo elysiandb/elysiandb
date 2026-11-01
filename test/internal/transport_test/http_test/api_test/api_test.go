@@ -1266,6 +1266,7 @@ func TestUpdateList_OwnerCanUpdateWithoutUsernameField(t *testing.T) {
 }
 
 func newSessionCtx(t *testing.T, username, method, uri, body string) *fasthttp.RequestCtx {
+	ensureUser(username, security.RoleUser)
 	session, err := security.CreateSession(username, security.RoleUser, time.Hour)
 	if err != nil {
 		t.Fatalf("session creation failed: %v", err)
@@ -1623,5 +1624,11 @@ func TestRejectCoreEntity(t *testing.T) {
 
 	if !called {
 		t.Fatalf("expected public entities to pass")
+	}
+}
+
+func ensureUser(username string, role security.Role) {
+	if !security.BasicUserExists(username) {
+		_ = security.CreateBasicUser(&security.BasicUser{Username: username, Password: username + "-password", Role: role})
 	}
 }

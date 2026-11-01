@@ -1,7 +1,8 @@
 import { Card, Button, Form, Spinner, Alert } from "react-bootstrap";
-import { useEffect, useMemo, useState } from "react";
-import { Editor } from "@monaco-editor/react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "../../hooks/i18n/useTranslation.js";
+
+const Editor = lazy(() => import("./ScriptEditor.jsx"));
 
 export default function HookEditor({ hook, loading, onSave }) {
     const [optionsOpen, setOptionsOpen] = useState(false);
@@ -149,35 +150,37 @@ export default function HookEditor({ hook, loading, onSave }) {
                     <Form.Group className="mt-3">
                         <Form.Label>{t("hooks.script")}</Form.Label>
                         <div style={{ height: 260 }}>
-                            <Editor
-                                language="javascript"
-                                value={form.script}
-                                onChange={v => update("script", v ?? "")}
-                                theme="elysian"
-                                beforeMount={monaco => {
-                                    monaco.editor.defineTheme("elysian", {
-                                        base: "vs-dark",
-                                        inherit: true,
-                                        rules: [],
-                                        colors: {
-                                            "editor.background": "#151829",
-                                            "editor.foreground": "#e6e6f0",
-                                            "editorCursor.foreground": "#f7d64a",
-                                            "editor.lineHighlightBackground": "#1b1f3a",
-                                            "editor.selectionBackground": "#f7d64a33",
-                                        },
-                                    });
-                                }}
-                                options={{
-                                    minimap: { enabled: false },
-                                    fontSize: 13,
-                                    lineNumbers: "on",
-                                    scrollBeyondLastLine: false,
-                                    wordWrap: "on",
-                                    automaticLayout: true,
-                                    tabSize: 2,
-                                }}
-                            />
+                            <Suspense fallback={<div className="py-4 text-center"><Spinner animation="border" /></div>}>
+                                <Editor
+                                    language="javascript"
+                                    value={form.script}
+                                    onChange={v => update("script", v ?? "")}
+                                    theme="elysian"
+                                    beforeMount={monaco => {
+                                        monaco.editor.defineTheme("elysian", {
+                                            base: "vs-dark",
+                                            inherit: true,
+                                            rules: [],
+                                            colors: {
+                                                "editor.background": "#151829",
+                                                "editor.foreground": "#e6e6f0",
+                                                "editorCursor.foreground": "#f7d64a",
+                                                "editor.lineHighlightBackground": "#1b1f3a",
+                                                "editor.selectionBackground": "#f7d64a33",
+                                            },
+                                        });
+                                    }}
+                                    options={{
+                                        minimap: { enabled: false },
+                                        fontSize: 13,
+                                        lineNumbers: "on",
+                                        scrollBeyondLastLine: false,
+                                        wordWrap: "on",
+                                        automaticLayout: true,
+                                        tabSize: 2,
+                                    }}
+                                />
+                            </Suspense>
                         </div>
                     </Form.Group>
                 </Form>

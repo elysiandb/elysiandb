@@ -5,6 +5,7 @@ import (
 
 	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/engine"
+	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/valyala/fasthttp"
 )
 
@@ -19,6 +20,15 @@ func ImportController(ctx *fasthttp.RequestCtx) {
 	}
 
 	ignored := removeAccountEntities(dump)
+	removeInternalEntities(dump)
+
+	for _, items := range dump {
+		for _, item := range items {
+			if RejectCoreEntityReferences(ctx, item) {
+				return
+			}
+		}
+	}
 
 	if rejected := engine.ValidateImport(dump); len(rejected) > 0 {
 		sendImportResponse(ctx, fasthttp.StatusBadRequest, map[string]any{
@@ -56,6 +66,14 @@ func removeAccountEntities(dump map[string][]map[string]any) []string {
 	}
 
 	return ignored
+}
+
+func removeInternalEntities(dump map[string][]map[string]any) {
+	for entity := range dump {
+		if engine.IsCoreEntityType(entity) && entity != hook.HookEntity {
+			delete(dump, entity)
+		}
+	}
 }
 
 func sendImportResponse(ctx *fasthttp.RequestCtx, status int, response map[string]any, ignored []string) {

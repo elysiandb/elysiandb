@@ -19,10 +19,15 @@ func StartHTTP() {
 	addr := fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port)
 
 	r := router.New()
+	r.PanicHandler = func(ctx *fasthttp.RequestCtx, recovered any) {
+		log.Error(fmt.Sprintf("panic while handling %s %s: %v", ctx.Method(), ctx.Path(), recovered))
+		ctx.ResetBody()
+		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+	}
 	routing.RegisterRoutes(r)
 
 	srv := &fasthttp.Server{
-		Handler:               security.CORS(r.Handler),
+		Handler:               security.Protect(r.Handler),
 		Name:                  "ElysianDB",
 		NoDefaultServerHeader: true,
 		ReduceMemoryUsage:     true,

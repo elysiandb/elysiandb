@@ -33,7 +33,7 @@ func RouteLine(line []byte, c net.Conn, session *Session) []byte {
 		return []byte("Goodbye!")
 
 	case parsing.EqASCII(cmd, []byte("AUTH")):
-		if !security.AuthenticateCredentials(string(query)) {
+		if !security.AuthenticateCredentials(string(query), security.LoginSourceFromAddr(c.RemoteAddr())) {
 			return []byte("ERR invalid credentials")
 		}
 

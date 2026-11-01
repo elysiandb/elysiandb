@@ -28,10 +28,10 @@ func UserAuthenticationIsEnabled() bool {
 }
 
 func CredentialsAreRequired() bool {
-	return BasicAuthenticationIsEnabled() || TokenAuthenticationIsEnabled() || UserAuthenticationIsEnabled()
+	return AuthenticationIsEnabled()
 }
 
-func AuthenticateCredentials(credentials string) bool {
+func AuthenticateCredentials(credentials string, source LoginSource) bool {
 	if !CredentialsAreRequired() {
 		return true
 	}
@@ -42,12 +42,16 @@ func AuthenticateCredentials(credentials string) bool {
 		return TokenMatches(credentials)
 	}
 
+	if !BasicAuthenticationIsEnabled() && !UserAuthenticationIsEnabled() {
+		return false
+	}
+
 	username, password, ok := strings.Cut(credentials, " ")
 	if !ok {
 		return false
 	}
 
-	user, ok := AuthenticateUser(username, password)
+	user, _, ok := AuthenticateUserFrom(username, password, source)
 	if !ok {
 		return false
 	}
@@ -74,6 +78,11 @@ func Authenticate(requestHandler fasthttp.RequestHandler) fasthttp.RequestHandle
 
 		if UserAuthenticationIsEnabled() {
 			UserAuth(requestHandler)(ctx)
+			return
+		}
+
+		if !BasicAuthenticationIsEnabled() && !TokenAuthenticationIsEnabled() {
+			ctx.Response.SetStatusCode(fasthttp.StatusUnauthorized)
 			return
 		}
 

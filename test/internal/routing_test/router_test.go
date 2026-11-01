@@ -186,6 +186,8 @@ func TestRegisterRoutes_AdminRoutesInUserMode(t *testing.T) {
 	r := router.New()
 	routing.RegisterRoutes(r)
 
+	ensureUser("bob", security.RoleUser)
+	ensureUser("admin", security.RoleAdmin)
 	user, _ := security.CreateSession("bob", security.RoleUser, time.Hour)
 	admin, _ := security.CreateSession("admin", security.RoleAdmin, time.Hour)
 
@@ -254,5 +256,11 @@ func TestRegisterRoutes_AdminUIWarnsWhenAssetsAreMissing(t *testing.T) {
 
 	if !slices.Contains(r.List()["GET"], "/admin/{filepath:*}") {
 		t.Fatalf("expected the Admin UI route to be registered, got %v", r.List()["GET"])
+	}
+}
+
+func ensureUser(username string, role security.Role) {
+	if !security.BasicUserExists(username) {
+		_ = security.CreateBasicUser(&security.BasicUser{Username: username, Password: username + "-password", Role: role})
 	}
 }

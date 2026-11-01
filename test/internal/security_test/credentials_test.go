@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"sync"
@@ -15,6 +16,8 @@ import (
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
+
+var localSource = security.LoginSource{IP: net.IPv4(127, 0, 0, 1), Local: true}
 
 func setAuthentication(enabled bool, mode, token string) {
 	cfg := globals.GetConfig()
@@ -54,28 +57,28 @@ func TestAuthenticateCredentials(t *testing.T) {
 	}
 
 	setAuthentication(false, "", "")
-	if !security.AuthenticateCredentials("") || security.CredentialsAreRequired() {
+	if !security.AuthenticateCredentials("", localSource) || security.CredentialsAreRequired() {
 		t.Fatalf("expected no credentials to be required with authentication disabled")
 	}
 
 	setAuthentication(true, "token", "tcp-token")
-	if !security.CredentialsAreRequired() || !security.AuthenticateCredentials(" tcp-token ") || security.AuthenticateCredentials("ops ops pass") {
+	if !security.CredentialsAreRequired() || !security.AuthenticateCredentials(" tcp-token ", localSource) || security.AuthenticateCredentials("ops ops pass", localSource) {
 		t.Fatalf("unexpected token mode result")
 	}
 
 	setAuthentication(true, "basic", "")
-	if !security.AuthenticateCredentials("alice alice-pass") || !security.AuthenticateCredentials("ops ops pass") {
+	if !security.AuthenticateCredentials("alice alice-pass", localSource) || !security.AuthenticateCredentials("ops ops pass", localSource) {
 		t.Fatalf("expected any valid user in basic mode")
 	}
-	if security.AuthenticateCredentials("alice wrong") || security.AuthenticateCredentials("alice") || security.AuthenticateCredentials("ghost x") {
+	if security.AuthenticateCredentials("alice wrong", localSource) || security.AuthenticateCredentials("alice", localSource) || security.AuthenticateCredentials("ghost x", localSource) {
 		t.Fatalf("expected invalid credentials to be refused in basic mode")
 	}
 
 	setAuthentication(true, "user", "")
-	if !security.AuthenticateCredentials("ops ops pass") {
+	if !security.AuthenticateCredentials("ops ops pass", localSource) {
 		t.Fatalf("expected an admin to authenticate in user mode")
 	}
-	if security.AuthenticateCredentials("alice alice-pass") {
+	if security.AuthenticateCredentials("alice alice-pass", localSource) {
 		t.Fatalf("expected a regular user to be refused in user mode")
 	}
 }
@@ -122,6 +125,10 @@ func TestConcurrentSessionsAreAllKept(t *testing.T) {
 
 	const count = 40
 	ids := make([]string, count)
+	for i := 0; i < count; i++ {
+		seedUser(t, fmt.Sprintf("user%d", i), security.RoleAdmin)
+		seedUser(t, fmt.Sprintf("extra%d", i), security.RoleUser)
+	}
 
 	var wg sync.WaitGroup
 	for i := 0; i < count; i++ {
@@ -222,18 +229,24 @@ func TestDeleteBasicUserProtectsDefaultAndLastAdmin(t *testing.T) {
 func TestGetSessionRemovesOnlyExpiredSessions(t *testing.T) {
 	dir := setup(t)
 
-	now := time.Now().Unix()
-	writeSessions(t, dir, security.SessionsFile{Sessions: []security.Session{
-		{ID: "old", Username: "a", Role: security.RoleAdmin, ExpiresAt: now - 10},
-		{ID: "live", Username: "b", Role: security.RoleAdmin, ExpiresAt: now + 3600},
-	}})
+	seedUser(t, "b", security.RoleAdmin)
+	live, err := security.CreateSession("b", security.RoleAdmin, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	s, err := security.GetSession("live")
+	var stored security.SessionsFile
+	raw, _ := os.ReadFile(filepath.Join(dir, security.SessionsFilename))
+	_ = json.Unmarshal(raw, &stored)
+	stored.Sessions = append(stored.Sessions, security.Session{TokenHash: "old", Username: "a", Role: security.RoleAdmin, ExpiresAt: time.Now().Unix() - 10})
+	writeSessions(t, dir, stored)
+
+	s, err := security.GetSession(live.ID)
 	if err != nil || s == nil || s.Username != "b" {
 		t.Fatalf("expected the live session, got %v %v", s, err)
 	}
 
-	raw, err := os.ReadFile(filepath.Join(dir, security.SessionsFilename))
+	raw, err = os.ReadFile(filepath.Join(dir, security.SessionsFilename))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +256,7 @@ func TestGetSessionRemovesOnlyExpiredSessions(t *testing.T) {
 		t.Fatalf("expected a valid sessions file, got %q: %v", raw, err)
 	}
 
-	if len(sf.Sessions) != 1 || sf.Sessions[0].ID != "live" {
+	if len(sf.Sessions) != 1 || sf.Sessions[0].Username != "b" {
 		t.Fatalf("expected only the live session to remain, got %+v", sf.Sessions)
 	}
 
@@ -254,6 +267,7 @@ func TestGetSessionRemovesOnlyExpiredSessions(t *testing.T) {
 
 func TestCreateSessionReportsWriteErrors(t *testing.T) {
 	setup(t)
+	seedUser(t, "admin", security.RoleAdmin)
 	globals.GetConfig().Store.Folder = filepath.Join(t.TempDir(), "missing")
 
 	if _, err := security.CreateSession("admin", security.RoleAdmin, time.Hour); err == nil {

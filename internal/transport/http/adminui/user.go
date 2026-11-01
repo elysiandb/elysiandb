@@ -2,8 +2,7 @@ package adminui
 
 import (
 	"encoding/json"
-	"strings"
-	"time"
+	"strconv"
 
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
@@ -19,16 +18,6 @@ type userResponse struct {
 	Role     security.Role `json:"role"`
 }
 
-func requestIsSecure(ctx *fasthttp.RequestCtx) bool {
-	if ctx.IsTLS() {
-		return true
-	}
-
-	proto, _, _ := strings.Cut(string(ctx.Request.Header.Peek("X-Forwarded-Proto")), ",")
-
-	return strings.EqualFold(strings.TrimSpace(proto), "https")
-}
-
 func LoginController(ctx *fasthttp.RequestCtx) {
 	var req loginRequest
 	if err := json.Unmarshal(ctx.PostBody(), &req); err != nil {
@@ -36,27 +25,25 @@ func LoginController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	user, ok := security.AuthenticateUser(req.Username, req.Password)
+	user, retryAfter, ok := security.AuthenticateUserFrom(req.Username, req.Password, security.LoginSourceFromRequest(ctx))
+	if retryAfter > 0 {
+		ctx.Response.Header.Set("Retry-After", strconv.Itoa(security.RetryAfterSeconds(retryAfter)))
+		ctx.SetStatusCode(fasthttp.StatusTooManyRequests)
+		return
+	}
+
 	if !ok || user == nil || user.Role != security.RoleAdmin {
 		ctx.SetStatusCode(fasthttp.StatusUnauthorized)
 		return
 	}
 
-	session, err := security.CreateSession(user.Username, user.Role, 24*time.Hour)
+	session, err := security.CreateSession(user.Username, user.Role, security.SessionTTL)
 	if err != nil {
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		return
 	}
 
-	cookie := fasthttp.AcquireCookie()
-	cookie.SetKey(security.SessionCookieName)
-	cookie.SetValue(session.ID)
-	cookie.SetHTTPOnly(true)
-	cookie.SetSameSite(fasthttp.CookieSameSiteStrictMode)
-	cookie.SetPath("/")
-	cookie.SetSecure(requestIsSecure(ctx))
-	ctx.Response.Header.SetCookie(cookie)
-	fasthttp.ReleaseCookie(cookie)
+	security.SetSessionCookie(ctx, session)
 
 	resp := userResponse{
 		Username: user.Username,
@@ -74,16 +61,7 @@ func LogoutController(ctx *fasthttp.RequestCtx) {
 		_ = security.DeleteSession(id)
 	}
 
-	cookie := fasthttp.AcquireCookie()
-	cookie.SetKey(security.SessionCookieName)
-	cookie.SetValue("")
-	cookie.SetPath("/")
-	cookie.SetExpire(time.Unix(0, 0))
-	cookie.SetHTTPOnly(true)
-	cookie.SetSameSite(fasthttp.CookieSameSiteStrictMode)
-	cookie.SetSecure(requestIsSecure(ctx))
-	ctx.Response.Header.SetCookie(cookie)
-	fasthttp.ReleaseCookie(cookie)
+	security.ClearSessionCookie(ctx)
 
 	ctx.SetStatusCode(fasthttp.StatusNoContent)
 }

@@ -37,10 +37,12 @@ func main() {
 
 	boot.InitDB()
 	security.InitAdminUserIfNotExists()
+	security.ProtectSessionsFile()
 
 	args := flag.Args()
 
 	if len(args) == 0 {
+		security.WarnIfDefaultAdminPassword()
 		cmd.StartServer()
 		return
 	}

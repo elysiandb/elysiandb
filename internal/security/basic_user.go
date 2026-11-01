@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
+	"unicode"
 
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
@@ -22,6 +24,9 @@ const (
 	UserEntity           = "_elysiandb_core_user"
 	DefaultAdminUsername = "admin"
 	DefaultAdminPassword = "admin"
+	AdminPasswordEnvVar  = "ELYSIANDB_ADMIN_PASSWORD"
+	MinPasswordLength    = 8
+	MaxUsernameLength    = 128
 )
 
 var (
@@ -29,6 +34,9 @@ var (
 	ErrInvalidRole           = errors.New("invalid role: expected 'admin' or 'user'")
 	ErrDefaultAdminProtected = errors.New("the default admin user cannot be deleted")
 	ErrLastAdmin             = errors.New("at least one admin user must remain")
+	ErrUserAlreadyExists     = errors.New("user already exists")
+	ErrInvalidUsername       = errors.New("invalid username: 1 to 128 characters, without spaces, control characters or '/'")
+	ErrPasswordTooShort      = fmt.Errorf("password must be at least %d characters long", MinPasswordLength)
 )
 
 type Role string
@@ -130,9 +138,14 @@ func InitAdminUserIfNotExists() error {
 		return nil
 	}
 
+	password := os.Getenv(AdminPasswordEnvVar)
+	if password == "" {
+		password = DefaultAdminPassword
+	}
+
 	user := &BasicUser{
 		Username: DefaultAdminUsername,
-		Password: DefaultAdminPassword,
+		Password: password,
 		Role:     RoleAdmin,
 	}
 
@@ -218,6 +231,32 @@ func ListBasicUsers() ([]map[string]any, error) {
 	return result, nil
 }
 
+func ValidateUsername(username string) error {
+	if username == "" || len(username) > MaxUsernameLength || username == "." || username == ".." {
+		return ErrInvalidUsername
+	}
+
+	for _, r := range username {
+		if r == '/' || unicode.IsSpace(r) || unicode.IsControl(r) {
+			return ErrInvalidUsername
+		}
+	}
+
+	return nil
+}
+
+func ValidatePassword(password string) error {
+	if len([]rune(password)) < MinPasswordLength {
+		return ErrPasswordTooShort
+	}
+
+	return nil
+}
+
+func BasicUserExists(username string) bool {
+	return engine.ReadEntityById(UserEntity, username) != nil
+}
+
 func CreateBasicUser(user *BasicUser) error {
 	err := InitBasicUsersStorage()
 	if err != nil {
@@ -238,6 +277,14 @@ func CreateBasicUser(user *BasicUser) error {
 }
 
 func ChangeUserPassword(username, newPassword string) error {
+	return changeUserPassword(username, newPassword, "")
+}
+
+func ChangeUserPasswordKeepingSession(username, newPassword, sessionID string) error {
+	return changeUserPassword(username, newPassword, sessionID)
+}
+
+func changeUserPassword(username, newPassword, keptSessionID string) error {
 	u := engine.ReadEntityById(UserEntity, username)
 	if u == nil {
 		return fmt.Errorf("user '%s' not found", username)
@@ -267,7 +314,7 @@ func ChangeUserPassword(username, newPassword string) error {
 		return err
 	}
 
-	return nil
+	return deleteUserSessionsExcept(username, keptSessionID, credentialsFingerprint(user.Password))
 }
 
 func ChangeUserRole(username, newRole string) error {
@@ -290,11 +337,16 @@ func ChangeUserRole(username, newRole string) error {
 		return ErrLastAdmin
 	}
 
+	roleChanged := user.Role != Role(newRole)
 	user.Role = Role(newRole)
 
 	err = user.Save()
 	if err != nil {
 		return err
+	}
+
+	if roleChanged {
+		return DeleteUserSessions(username)
 	}
 
 	return nil
@@ -311,7 +363,7 @@ func DeleteBasicUser(username string) error {
 
 	engine.DeleteEntityById(UserEntity, username)
 
-	return nil
+	return DeleteUserSessions(username)
 }
 
 func isLastAdmin(username string) bool {
@@ -346,11 +398,13 @@ func CreateKeyFileOrGetKey() (string, error) {
 	cfg := globals.GetConfig()
 	path := fmt.Sprintf("%s/%s", cfg.Store.Folder, KeyFilename)
 
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o644)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return "", err
 	}
 	defer file.Close()
+
+	_ = file.Chmod(0o600)
 
 	fileInfo, err := file.Stat()
 	if err != nil {
@@ -399,15 +453,31 @@ func WriteKey(key string) error {
 	return os.Rename(tmpPath, path)
 }
 
+var (
+	dummyPasswordHashOnce sync.Once
+	dummyPasswordHash     []byte
+)
+
+func spendPasswordCheck(password string) {
+	dummyPasswordHashOnce.Do(func() {
+		dummyPasswordHash, _ = bcrypt.GenerateFromPassword([]byte("elysiandb-dummy-password"), bcrypt.DefaultCost)
+	})
+
+	sum := sha256.Sum256([]byte(password))
+	_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, sum[:])
+}
+
 func AuthenticateUser(username, password string) (*BasicHashedUser, bool) {
 	u := engine.ReadEntityById(UserEntity, username)
 	if u == nil {
+		spendPasswordCheck(password)
 		return nil, false
 	}
 
 	user := &BasicHashedUser{}
 	err := user.FromDataMap(u)
 	if err != nil {
+		spendPasswordCheck(password)
 		return nil, false
 	}
 
@@ -445,7 +515,7 @@ var CheckBasicAuthentication = func(ctx *fasthttp.RequestCtx) bool {
 	username := parts[0]
 	password := parts[1]
 
-	_, ok := AuthenticateUser(username, password)
+	_, _, ok := AuthenticateUserFrom(username, password, LoginSourceFromRequest(ctx))
 
 	return ok
 }

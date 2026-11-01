@@ -122,6 +122,12 @@ func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool
 		return false
 	}
 
+	for _, item := range list {
+		if item == nil {
+			return false
+		}
+	}
+
 	username := security.GetCurrentUsername(ctx)
 	if !acl.CanWriteListOfEntities(username, entity, list) {
 		sendForbidden(ctx)

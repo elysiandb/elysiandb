@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/taymour/elysiandb/internal/log"
 	"gopkg.in/yaml.v2"
@@ -34,10 +35,11 @@ type LogConfig struct {
 }
 
 type ServerConfig struct {
-	Enabled bool       `yaml:"enabled"`
-	Host    string     `yaml:"host"`
-	Port    int        `yaml:"port"`
-	CORS    CORSConfig `yaml:"cors"`
+	Enabled        bool       `yaml:"enabled"`
+	Host           string     `yaml:"host"`
+	Port           int        `yaml:"port"`
+	CORS           CORSConfig `yaml:"cors"`
+	TrustedProxies []string   `yaml:"trustedProxies"`
 }
 
 type CORSConfig struct {
@@ -130,7 +132,33 @@ func redactURIPassword(uri string) string {
 		return RedactedValue
 	}
 
+	query := parsed.Query()
+	redacted := false
+	for key := range query {
+		if isSecretParameter(key) {
+			query.Set(key, "xxxxx")
+			redacted = true
+		}
+	}
+
+	if redacted {
+		parsed.RawQuery = query.Encode()
+	}
+
 	return parsed.Redacted()
+}
+
+var secretParameterHints = []string{"password", "secret", "token", "key", "credential", "authmechanismproperties"}
+
+func isSecretParameter(name string) bool {
+	lower := strings.ToLower(name)
+	for _, hint := range secretParameterHints {
+		if strings.Contains(lower, hint) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -151,9 +179,17 @@ func LoadConfig(path string) (*Config, error) {
 		log.DirectWarn("Some configuration keys are not recognized and are ignored: ", err)
 	}
 
-	if cfg.Security.Authentication.Enabled && cfg.Security.Authentication.Mode == "token" {
-		if cfg.Security.Authentication.Token == "" {
-			return nil, fmt.Errorf("token authentication is enabled but no token is provided in the configuration")
+	if cfg.Security.Authentication.Enabled {
+		cfg.Security.Authentication.Mode = strings.ToLower(strings.TrimSpace(cfg.Security.Authentication.Mode))
+
+		switch cfg.Security.Authentication.Mode {
+		case "basic", "user":
+		case "token":
+			if cfg.Security.Authentication.Token == "" {
+				return nil, fmt.Errorf("token authentication is enabled but no token is provided in the configuration")
+			}
+		default:
+			return nil, fmt.Errorf("authentication is enabled with an unknown mode %q: use basic, token or user", cfg.Security.Authentication.Mode)
 		}
 	}
 

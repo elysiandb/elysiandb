@@ -26,6 +26,11 @@ func CreateUser() {
 		return
 	}
 
+	if err := validateNewUser(newUser); err != nil {
+		Printf("%sFailed to create user: %v%s\n", globals.Red, err, globals.Reset)
+		return
+	}
+
 	err = security.CreateBasicUser(newUser)
 	if err != nil {
 		Printf("%sFailed to create user: %v%s\n", globals.Red, err, globals.Reset)
@@ -78,4 +83,20 @@ func getUserInput() (*security.BasicUser, error) {
 		Password: string(bytePassword),
 		Role:     role,
 	}, nil
+}
+
+func validateNewUser(user *security.BasicUser) error {
+	if err := security.ValidateUsername(user.Username); err != nil {
+		return err
+	}
+
+	if err := security.ValidatePassword(user.Password); err != nil {
+		return err
+	}
+
+	if security.BasicUserExists(user.Username) {
+		return security.ErrUserAlreadyExists
+	}
+
+	return nil
 }

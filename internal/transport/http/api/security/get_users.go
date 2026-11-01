@@ -5,6 +5,10 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+type usersResponse struct {
+	Users []userView `json:"users"`
+}
+
 func GetUsersController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 
@@ -17,20 +21,14 @@ func GetUsersController(ctx *fasthttp.RequestCtx) {
 
 	users, err := security.ListBasicUsers()
 	if err != nil {
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-		ctx.SetBodyString(`{"error":"` + err.Error() + `"}`)
+		writeError(ctx, fasthttp.StatusInternalServerError, err)
 		return
 	}
 
-	responseBody := `{"users":[`
-	for i, user := range users {
-		if i > 0 {
-			responseBody += ","
-		}
-		responseBody += `{"username":"` + user["username"].(string) + `","role":"` + user["role"].(string) + `"}`
+	response := usersResponse{Users: make([]userView, 0, len(users))}
+	for _, user := range users {
+		response.Users = append(response.Users, userViewFrom(user))
 	}
-	responseBody += `]}`
 
-	ctx.SetBodyString(responseBody)
-	ctx.SetStatusCode(fasthttp.StatusOK)
+	writeJSON(ctx, fasthttp.StatusOK, response)
 }

@@ -80,6 +80,7 @@
         "editTitle": "编辑用户",
         "createTitle": "创建用户",
         "passwordRequired": "请输入密码。",
+        "passwordTooShort": "密码长度至少为 {min} 个字符。",
         "created": "用户创建成功",
         "createFailed": "创建用户失败",
         "passwordChanged": "用户密码修改成功",

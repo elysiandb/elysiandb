@@ -653,6 +653,8 @@ func TestDefaultAndLastAdminAreProtected(t *testing.T) {
 
 	s.mustDo(fasthttp.StatusOK, "POST", "/api/security/user", `{"username":"ops","password":"ops-pass-1","role":"admin"}`)
 	s.mustDo(fasthttp.StatusOK, "PUT", "/api/security/user/admin/role", `{"role":"user"}`)
+	s.mustDo(fasthttp.StatusUnauthorized, "GET", "/api/security/me", "")
+	s.login("ops", "ops-pass-1")
 	s.mustDo(fasthttp.StatusConflict, "PUT", "/api/security/user/ops/role", `{"role":"user"}`)
 	s.mustDo(fasthttp.StatusConflict, "DELETE", "/api/security/user/ops", "")
 	s.mustDo(fasthttp.StatusOK, "PUT", "/api/security/user/admin/role", `{"role":"admin"}`)

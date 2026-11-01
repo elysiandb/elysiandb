@@ -32,6 +32,11 @@ func AdminAuth(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 			return
 		}
 
+		if !security.UserAuthenticationIsEnabled() {
+			ctx.SetStatusCode(fasthttp.StatusUnauthorized)
+			return
+		}
+
 		id := string(ctx.Request.Header.Cookie(security.SessionCookieName))
 		if id == "" {
 			ctx.SetStatusCode(fasthttp.StatusUnauthorized)

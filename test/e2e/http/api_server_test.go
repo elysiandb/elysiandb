@@ -22,6 +22,7 @@ import (
 
 type apiServer struct {
 	t       *testing.T
+	ln      *fasthttputil.InmemoryListener
 	client  *fasthttp.Client
 	cookie  string
 	headers map[string]string
@@ -122,6 +123,7 @@ func startAPIServer(t *testing.T, configure func(cfg *configuration.Config)) *ap
 	}
 
 	globals.SetConfig(cfg)
+	security.ResetLoginAttempts()
 	storage.LoadDB()
 	storage.LoadJsonDB()
 	cache.InitCache(10 * time.Second)
@@ -135,7 +137,7 @@ func startAPIServer(t *testing.T, configure func(cfg *configuration.Config)) *ap
 
 	r := router.New()
 	routing.RegisterRoutes(r)
-	srv := &fasthttp.Server{Handler: security.CORS(r.Handler)}
+	srv := &fasthttp.Server{Handler: security.Protect(r.Handler)}
 
 	ln := fasthttputil.NewInmemoryListener()
 	go func() { _ = srv.Serve(ln) }()
@@ -146,12 +148,21 @@ func startAPIServer(t *testing.T, configure func(cfg *configuration.Config)) *ap
 	})
 
 	return &apiServer{
-		t: t,
-		client: &fasthttp.Client{
-			Dial: func(addr string) (net.Conn, error) { return ln.Dial() },
-		},
+		t:       t,
+		ln:      ln,
+		client:  clientFrom(ln, "127.0.0.1"),
 		headers: map[string]string{},
 	}
+}
+
+func clientFrom(ln *fasthttputil.InmemoryListener, ip string) *fasthttp.Client {
+	return &fasthttp.Client{
+		Dial: func(addr string) (net.Conn, error) { return ln.DialWithLocalAddr(&net.TCPAddr{IP: net.ParseIP(ip)}) },
+	}
+}
+
+func (s *apiServer) from(ip string) *apiServer {
+	return &apiServer{t: s.t, ln: s.ln, client: clientFrom(s.ln, ip), headers: map[string]string{}}
 }
 
 func startAdminSession(t *testing.T, configure func(cfg *configuration.Config)) *apiServer {
@@ -185,7 +196,7 @@ func (s *apiServer) login(username, password string) {
 }
 
 func (s *apiServer) anonymous() *apiServer {
-	return &apiServer{t: s.t, client: s.client, headers: map[string]string{}}
+	return &apiServer{t: s.t, ln: s.ln, client: s.client, headers: map[string]string{}}
 }
 
 func (s *apiServer) do(method, path, body string, headers ...string) apiResponse {

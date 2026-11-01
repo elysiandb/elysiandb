@@ -2,6 +2,7 @@ package boot
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -48,6 +49,8 @@ func InitTCP() {
 	}
 }
 
+const unauthenticatedReadTimeout = 30 * time.Second
+
 func handleConnection(c net.Conn) {
 	defer c.Close()
 	_ = c.SetDeadline(time.Time{})
@@ -57,9 +60,16 @@ func handleConnection(c net.Conn) {
 	session := tcprouting.NewSession()
 
 	for {
+		if session.IsAuthenticated() {
+			_ = c.SetReadDeadline(time.Time{})
+		} else {
+			_ = c.SetReadDeadline(time.Now().Add(unauthenticatedReadTimeout))
+		}
+
 		line, err := r.ReadSlice('\n')
 		if err != nil {
-			if err != io.EOF {
+			var netErr net.Error
+			if err != io.EOF && !(errors.As(err, &netErr) && netErr.Timeout()) {
 				log.Error("read:", err)
 			}
 			return

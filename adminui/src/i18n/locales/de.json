@@ -80,6 +80,7 @@
         "editTitle": "Benutzer bearbeiten",
         "createTitle": "Benutzer erstellen",
         "passwordRequired": "Bitte geben Sie ein Passwort ein.",
+        "passwordTooShort": "Das Passwort muss mindestens {min} Zeichen lang sein.",
         "created": "Benutzer erfolgreich erstellt",
         "createFailed": "Benutzer konnte nicht erstellt werden",
         "passwordChanged": "Passwort des Benutzers erfolgreich geändert",

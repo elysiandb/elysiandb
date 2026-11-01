@@ -154,3 +154,57 @@ func TestConfigToJsonRedactsSecrets(t *testing.T) {
 		t.Fatalf("expected a URI without password to be kept, got %s", noPassword.ToJson())
 	}
 }
+
+func TestConfigToJsonRedactsSecretQueryParameters(t *testing.T) {
+	cfg := &cfgpkg.Config{}
+	cfg.Engine.URI = "mongodb://elysian:s3cret@localhost:27017/elysiandb?authMechanismProperties=AWS_SESSION_TOKEN:abc123&tlsCertificateKeyFilePassword=k3y&replicaSet=rs0"
+
+	out := cfg.ToJson()
+	for _, secret := range []string{"s3cret", "abc123", "k3y"} {
+		if strings.Contains(out, secret) {
+			t.Fatalf("expected %q to be redacted, got %s", secret, out)
+		}
+	}
+
+	if !strings.Contains(out, "replicaSet=rs0") {
+		t.Fatalf("expected other parameters to be kept, got %s", out)
+	}
+}
+
+func TestLoadConfigChecksTheAuthenticationMode(t *testing.T) {
+	cases := map[string]struct {
+		block   string
+		mode    string
+		wantErr bool
+	}{
+		"unknown mode": {block: "enabled: true\n    mode: tokne\n    token: abc", wantErr: true},
+		"missing mode": {block: "enabled: true", wantErr: true},
+		"mixed case":   {block: "enabled: true\n    mode: \" User \"", mode: "user"},
+		"disabled":     {block: "enabled: false\n    mode: anything", mode: "anything"},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "elysian.yaml")
+			content := "store:\n  folder: /tmp/x\nsecurity:\n  authentication:\n    " + tc.block + "\n"
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			var cfg *cfgpkg.Config
+			var err error
+			captureStdout(t, func() { cfg, err = cfgpkg.LoadConfig(path) })
+
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected an error")
+				}
+				return
+			}
+
+			if err != nil || cfg.Security.Authentication.Mode != tc.mode {
+				t.Fatalf("unexpected result %v %v", cfg, err)
+			}
+		})
+	}
+}

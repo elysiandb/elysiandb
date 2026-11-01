@@ -64,12 +64,7 @@ func GetJsonByKeyImpl(key string) (map[string]any, error) {
 		return nil, err
 	}
 
-	cp := make(map[string]any, len(v))
-	for k, x := range v {
-		cp[k] = x
-	}
-
-	return cp, nil
+	return DeepCopyDocument(v), nil
 }
 
 func PutJsonValue(key string, value map[string]any) error {
@@ -80,7 +75,7 @@ func PutJsonValue(key string, value map[string]any) error {
 	}
 
 	_, existed := js.get(key)
-	js.put(key, value)
+	js.put(key, DeepCopyDocument(value))
 	if cfg.Stats.Enabled && !existed {
 		stat.Stats.IncrementKeysCount()
 	}
@@ -269,10 +264,12 @@ func writeJsonStoreToFile(cfg *configuration.Config, fileName string, store *Jso
 
 	isSuccess := true
 	path := cfg.Store.Folder + "/" + fileName
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		isSuccess = false
 		log.Error("Error opening file:", err)
+	} else {
+		_ = file.Chmod(0o600)
 	}
 
 	defer file.Close()

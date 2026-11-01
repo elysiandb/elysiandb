@@ -83,7 +83,7 @@ func createFolder(folder string) {
 func createFile(folder, file string) {
 	filePath := folder + "/" + file
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		file, err := os.Create(filePath)
+		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o600)
 		if err != nil {
 			log.Fatal("Error creating data file:", err)
 		}
@@ -91,7 +91,11 @@ func createFile(folder, file string) {
 		if _, err := file.WriteString("{}"); err != nil {
 			log.Fatal("Error writing to data file:", err)
 		}
+
+		return
 	}
+
+	_ = os.Chmod(filePath, 0o600)
 }
 
 func GetByKey(key string) ([]byte, error) {

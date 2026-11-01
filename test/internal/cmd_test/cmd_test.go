@@ -224,7 +224,7 @@ func TestCreateUser_OK(t *testing.T) {
 	defer restoreIn()
 
 	origReadPassword := cmd.ReadPassword
-	cmd.ReadPassword = func(int) ([]byte, error) { return []byte("secret"), nil }
+	cmd.ReadPassword = func(int) ([]byte, error) { return []byte("secret-password"), nil }
 	defer func() { cmd.ReadPassword = origReadPassword }()
 
 	buf, restore := captureCmdOutput()
@@ -492,7 +492,7 @@ func TestChangePassword_OK(t *testing.T) {
 	defer restoreIn()
 
 	origReadPassword := cmd.ReadPassword
-	cmd.ReadPassword = func(int) ([]byte, error) { return []byte("newpass"), nil }
+	cmd.ReadPassword = func(int) ([]byte, error) { return []byte("new-password"), nil }
 	defer func() { cmd.ReadPassword = origReadPassword }()
 
 	buf, restore := captureCmdOutput()
