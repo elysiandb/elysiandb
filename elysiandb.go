@@ -56,9 +56,5 @@ func main() {
 }
 
 func printListOfCommands() {
-	commands := cmd.GetAvailableCommands()
-
-	for name, description := range commands {
-		fmt.Printf("  %s%s%s  %s\n", globals.Bold, name, globals.Reset, description)
-	}
+	cmd.PrintHelp()
 }

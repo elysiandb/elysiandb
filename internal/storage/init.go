@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
@@ -176,15 +177,27 @@ func PutKeyValue(key string, value []byte) error {
 }
 
 func PutKeyValueWithTTL(key string, value []byte, ttl int) error {
+	expiresAt := int64(0)
+	if ttl > 0 {
+		expiresAt = time.Now().Unix() + int64(ttl)
+	}
+
+	return putKeyValue(key, value, expiresAt, ttl)
+}
+
+func PutKeyValueWithExpiration(key string, value []byte, expiresAt int64) error {
+	return putKeyValue(key, value, expiresAt, int(expiresAt-time.Now().Unix()))
+}
+
+func putKeyValue(key string, value []byte, expiresAt int64, ttl int) error {
 	cfg := globals.GetConfig()
 	_, existed := mainStore.get(key)
 	hadTTL := hasTTL(key)
 
 	mainStore.put(key, value)
 
-	if ttl > 0 {
-		expiration := time.Now().Unix() + int64(ttl)
-		expirationContainer.put(expiration, []string{key})
+	if expiresAt > 0 {
+		expirationContainer.put(expiresAt, []string{key})
 		if cfg.Stats.Enabled && !hadTTL {
 			stat.Stats.IncrementExpirationKeysCount()
 		}
@@ -234,6 +247,43 @@ func ResetStore() {
 	if cfg.Stats.Enabled {
 		stat.Stats.Reset()
 	}
+}
+
+func ClearAll() {
+	cfg := globals.GetConfig()
+
+	rootMu.RLock()
+	ms := mainStore
+	ec := expirationContainer
+	rootMu.RUnlock()
+
+	ms.reset()
+	ec.reset()
+	ResetJsonStore()
+
+	if cfg.Stats.Enabled {
+		stat.Stats.SetKeysCount(0)
+		stat.Stats.SetExpirationKeysCount(0)
+	}
+}
+
+func ListKeys() []string {
+	rootMu.RLock()
+	ms := mainStore
+	rootMu.RUnlock()
+
+	keys := ms.keys()
+	slices.Sort(keys)
+
+	return keys
+}
+
+func GetKeyExpiration(key string) (int64, bool) {
+	rootMu.RLock()
+	ec := expirationContainer
+	rootMu.RUnlock()
+
+	return ec.expiration(key)
 }
 
 func CleanExpiratedKeys(index int64) {

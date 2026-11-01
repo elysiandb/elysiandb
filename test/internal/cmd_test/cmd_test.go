@@ -2,10 +2,14 @@ package cmd_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cmd"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
@@ -285,7 +289,9 @@ func TestGetAvailableCommands(t *testing.T) {
 		cmds[cmd.DeleteUserCommand] == "" ||
 		cmds[cmd.HelpCommand] == "" ||
 		cmds[cmd.ChangePasswordCommand] == "" ||
-		cmds[cmd.ResetCommand] == "" {
+		cmds[cmd.ResetCommand] == "" ||
+		cmds[cmd.BackupCommand] == "" ||
+		cmds[cmd.RestoreCommand] == "" {
 		t.Fatalf("expected all commands to be present")
 	}
 }
@@ -298,7 +304,9 @@ func TestGetHandlers(t *testing.T) {
 		h[cmd.DeleteUserCommand] == nil ||
 		h[cmd.HelpCommand] == nil ||
 		h[cmd.ChangePasswordCommand] == nil ||
-		h[cmd.ResetCommand] == nil {
+		h[cmd.ResetCommand] == nil ||
+		h[cmd.BackupCommand] == nil ||
+		h[cmd.RestoreCommand] == nil {
 		t.Fatalf("expected all handlers to be present")
 	}
 }
@@ -322,6 +330,8 @@ func TestPrintHelp(t *testing.T) {
 		cmd.HelpCommand,
 		cmd.ChangePasswordCommand,
 		cmd.ResetCommand,
+		cmd.BackupCommand,
+		cmd.RestoreCommand,
 	}
 
 	for _, e := range expected {
@@ -584,5 +594,124 @@ func TestDeleteUser_DefaultAdminIsKept(t *testing.T) {
 
 	if _, err := security.GetBasicUserByUsername(security.DefaultAdminUsername); err != nil {
 		t.Fatalf("the default admin must still exist: %v", err)
+	}
+}
+
+func TestPrintHelpListsCommandsInOrder(t *testing.T) {
+	buf, restore := captureCmdOutput()
+	defer restore()
+
+	cmd.PrintHelp()
+
+	out := string(stripANSI(buf.Bytes()))
+	if strings.Index(out, cmd.BackupCommand) > strings.Index(out, cmd.RestoreCommand) || strings.Index(out, cmd.ChangePasswordCommand) > strings.Index(out, cmd.ServerCommand) {
+		t.Fatalf("expected the commands in alphabetical order, got: %s", out)
+	}
+}
+
+func TestRunBackupWritesAnArchiveInTheOutputFolder(t *testing.T) {
+	initCmdStore(t, &configuration.Config{})
+	api_storage.WriteEntity("book", map[string]any{"id": "b1"})
+	output := t.TempDir()
+
+	for _, args := range [][]string{{"--output", output}, {"--output=" + output}, {"-o", output}} {
+		path, err := cmd.RunBackup(args)
+		if err != nil {
+			t.Fatalf("backup %v failed: %v", args, err)
+		}
+
+		if filepath.Dir(path) != output || !strings.HasPrefix(filepath.Base(path), "elysiandb-backup-") || !strings.HasSuffix(path, ".tar.gz") {
+			t.Fatalf("unexpected backup path %s", path)
+		}
+
+		os.Remove(path)
+	}
+}
+
+func TestRunBackupRejectsInvalidArguments(t *testing.T) {
+	initCmdStore(t, &configuration.Config{})
+	file := filepath.Join(t.TempDir(), "file")
+	os.WriteFile(file, []byte("x"), 0o600)
+
+	for _, args := range [][]string{{"--output"}, {"--unknown"}, {"--output", filepath.Join(t.TempDir(), "missing")}, {"--output", file}} {
+		if _, err := cmd.RunBackup(args); err == nil {
+			t.Fatalf("expected backup %v to fail", args)
+		}
+	}
+}
+
+func TestRunRestoreAsksForConfirmation(t *testing.T) {
+	initCmdStore(t, &configuration.Config{})
+	api_storage.WriteEntity("book", map[string]any{"id": "b1"})
+	path, err := cmd.RunBackup([]string{"--output", t.TempDir()})
+	if err != nil {
+		t.Fatalf("backup failed: %v", err)
+	}
+
+	initCmdStore(t, &configuration.Config{})
+	api_storage.WriteEntity("keep", map[string]any{"id": "k1"})
+
+	_, restoreOutput := captureCmdOutput()
+	defer restoreOutput()
+
+	if _, err := cmd.RunRestore([]string{path}, strings.NewReader("no\n")); !errors.Is(err, cmd.ErrRestoreAborted) {
+		t.Fatalf("expected the restore to be aborted, got %v", err)
+	}
+
+	if api_storage.ReadEntityById("keep", "k1") == nil {
+		t.Fatalf("an aborted restore must leave the data untouched")
+	}
+
+	report, err := cmd.RunRestore([]string{path}, strings.NewReader("yes\n"))
+	if err != nil || report.Entities["book"] != 1 {
+		t.Fatalf("expected the restore to succeed, got %+v (%v)", report, err)
+	}
+
+	if api_storage.ReadEntityById("keep", "k1") != nil || api_storage.ReadEntityById("book", "b1") == nil {
+		t.Fatalf("expected the data of the archive only")
+	}
+}
+
+func TestRunRestoreWithForceDoesNotAsk(t *testing.T) {
+	initCmdStore(t, &configuration.Config{})
+	api_storage.WriteEntity("book", map[string]any{"id": "b1"})
+	path, _ := cmd.RunBackup([]string{"--output", t.TempDir()})
+
+	initCmdStore(t, &configuration.Config{})
+	if _, err := cmd.RunRestore([]string{"--force", path}, strings.NewReader("")); err != nil {
+		t.Fatalf("expected the restore to succeed, got %v", err)
+	}
+
+	if api_storage.ReadEntityById("book", "b1") == nil {
+		t.Fatalf("expected the document of the archive")
+	}
+}
+
+func TestRunRestoreRefusesInvalidInput(t *testing.T) {
+	initCmdStore(t, &configuration.Config{})
+	invalid := filepath.Join(t.TempDir(), "invalid.tar.gz")
+	os.WriteFile(invalid, []byte("not an archive"), 0o600)
+
+	for _, args := range [][]string{{}, {"--force"}, {"a", "b"}, {"--unknown", invalid}, {filepath.Join(t.TempDir(), "missing")}, {invalid, "--force"}} {
+		if _, err := cmd.RunRestore(args, strings.NewReader("yes\n")); err == nil || errors.Is(err, cmd.ErrRestoreAborted) {
+			t.Fatalf("expected restore %v to fail, got %v", args, err)
+		}
+	}
+}
+
+func TestBackupAndRestoreHandlersExitOnError(t *testing.T) {
+	initCmdStore(t, &configuration.Config{})
+
+	buf, restoreOutput := captureCmdOutput()
+	defer restoreOutput()
+
+	code := 0
+	origExit := cmd.Exit
+	cmd.Exit = func(c int) { code = c }
+	defer func() { cmd.Exit = origExit }()
+
+	cmd.Restore()
+	if code != 1 || !strings.Contains(string(stripANSI(buf.Bytes())), "Restore failed") {
+		t.Fatalf("expected the restore handler to exit with 1, got %d: %s", code, buf.String())
 	}
 }

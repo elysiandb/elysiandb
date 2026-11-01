@@ -3,11 +3,17 @@ package storage
 import (
 	"encoding/json"
 	"os"
+	"sync"
 
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/recovery"
+)
+
+var (
+	storeWriteMu sync.Mutex
+	jsonWriteMu  sync.Mutex
 )
 
 func WriteToDB() {
@@ -16,6 +22,9 @@ func WriteToDB() {
 }
 
 func WriteStoreDB() {
+	storeWriteMu.Lock()
+	defer storeWriteMu.Unlock()
+
 	cfg := globals.GetConfig()
 
 	rootMu.RLock()
@@ -41,6 +50,9 @@ func WriteStoreDB() {
 }
 
 func WriteJsonDB() {
+	jsonWriteMu.Lock()
+	defer jsonWriteMu.Unlock()
+
 	cfg := globals.GetConfig()
 
 	rootMu.RLock()

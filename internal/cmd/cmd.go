@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/taymour/elysiandb/internal/globals"
 	"golang.org/x/term"
@@ -19,6 +21,8 @@ const (
 	HelpCommand           = "help"
 	ChangePasswordCommand = "change-password"
 	ResetCommand          = "reset"
+	BackupCommand         = "backup"
+	RestoreCommand        = "restore"
 )
 
 func GetAvailableCommands() map[string]string {
@@ -27,7 +31,9 @@ func GetAvailableCommands() map[string]string {
 		CreateUserCommand:     "Create a new user (needs security.authentication.mode = basic or user)",
 		DeleteUserCommand:     "Delete an existing user (needs security.authentication.mode = basic or user)",
 		ChangePasswordCommand: "Change password for an existing user (needs security.authentication.mode = basic or user)",
-		ResetCommand:          "Reset the database by deleting all stored data and resets users (requires --force flag)",
+		ResetCommand:          "Reset the database by deleting all stored data and resets users (asks for yes, requires --force)",
+		BackupCommand:         "Write a full backup archive: elysiandb backup [--output <folder>]",
+		RestoreCommand:        "Replace all the data with a backup archive: elysiandb restore <file> [--force]",
 		HelpCommand:           "List available commands",
 	}
 }
@@ -39,6 +45,8 @@ func GetHandlers() map[string]func() {
 		ServerCommand:         StartServer,
 		ChangePasswordCommand: ChangePassword,
 		ResetCommand:          ResetAll,
+		BackupCommand:         Backup,
+		RestoreCommand:        Restore,
 		HelpCommand:           PrintHelp,
 	}
 }
@@ -46,7 +54,7 @@ func GetHandlers() map[string]func() {
 func PrintHelp() {
 	commands := GetAvailableCommands()
 
-	for name, description := range commands {
-		Printf("  %s%s%s  %s\n", globals.Bold, name, globals.Reset, description)
+	for _, name := range slices.Sorted(maps.Keys(commands)) {
+		Printf("  %s%s%s  %s\n", globals.Bold, name, globals.Reset, commands[name])
 	}
 }

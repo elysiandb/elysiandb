@@ -103,6 +103,22 @@ func DeleteJsonByKey(key string) {
 	}
 }
 
+func ResetJsonStore() {
+	js := mainJsonStore.Load()
+	if js == nil {
+		return
+	}
+
+	for _, sh := range js.shards {
+		sh.m.Clear()
+	}
+
+	js.saved.Store(false)
+	if globals.GetConfig().Store.CrashRecovery.Enabled {
+		recovery.ClearJsonRecoveryLog()
+	}
+}
+
 func DeleteJsonByPrefix(prefix string) int {
 	cfg := globals.GetConfig()
 	js := mainJsonStore.Load()

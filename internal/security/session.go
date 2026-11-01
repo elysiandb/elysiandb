@@ -209,6 +209,19 @@ func removeExpiredSessions() {
 	}
 }
 
+func DeleteAllSessions() error {
+	sessionsMu.Lock()
+	defer sessionsMu.Unlock()
+
+	cfg := globals.GetConfig()
+	path := fmt.Sprintf("%s/%s", cfg.Store.Folder, SessionsFilename)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
+}
+
 func DeleteSession(id string) error {
 	sessionsMu.Lock()
 	defer sessionsMu.Unlock()

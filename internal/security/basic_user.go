@@ -383,6 +383,22 @@ func CreateKeyFileOrGetKey() (string, error) {
 	return key, nil
 }
 
+func WriteKey(key string) error {
+	cfg := globals.GetConfig()
+	path := fmt.Sprintf("%s/%s", cfg.Store.Folder, KeyFilename)
+	tmpPath := path + ".tmp"
+
+	if err := os.MkdirAll(cfg.Store.Folder, 0o755); err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(tmpPath, []byte(key), 0o600); err != nil {
+		return err
+	}
+
+	return os.Rename(tmpPath, path)
+}
+
 func AuthenticateUser(username, password string) (*BasicHashedUser, bool) {
 	u := engine.ReadEntityById(UserEntity, username)
 	if u == nil {
