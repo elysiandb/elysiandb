@@ -25,7 +25,7 @@ ElysianDB is designed for **developers who want to prototype, benchmark, or buil
 
 ## Configuration
 
-The configuration file (`elysian.yaml`) defines server behavior, storage, and logging.
+The configuration file (`elysian.yaml`) defines server behavior, storage, logging and monitoring.
 
 ### Example
 
@@ -44,7 +44,11 @@ server:
       allowedOrigins: ["https://app.example.com"]
   tcp:  { enabled: true,  host: 127.0.0.1, port: 8088 }
 log:
-  flushIntervalSeconds: 5
+  level: info
+  format: text
+  accessLog: false
+  slowRequestMs: 500
+  bufferLines: 5000
 stats:
   enabled: true
 security:
@@ -65,6 +69,9 @@ api:
     enabled: true
 adminui:
   enabled: true
+monitoring:
+  prometheus:
+    enabled: false
 ```
 
 ### Configuration Fields
@@ -80,7 +87,12 @@ adminui:
 | **server.http.cors.allowedOrigins**  | Origins allowed to call the HTTP API from a browser (see CORS below). Empty by default |
 | **server.http.trustedProxies**       | Addresses or CIDR ranges of the reverse proxies in front of ElysianDB (see Reverse proxy below). Empty by default |
 | **server.tcp**                       | Enables and configures the TCP text protocol interface (see TCP Protocol below) |
-| **log.flushIntervalSeconds**         | Interval for flushing in-memory logs                                                  |
+| **log.level**                        | Minimum level written: `debug`, `info` (default), `warn` or `error` (see Logging below) |
+| **log.format**                       | `text` (default, logfmt) or `json`                                                    |
+| **log.accessLog**                    | Writes one `info` line per HTTP request. Off by default                               |
+| **log.slowRequestMs**                | HTTP requests and TCP commands slower than this are logged at `warn`. Default `500`, `0` turns it off |
+| **log.bufferLines**                  | Log lines kept in memory for the Admin UI Logs page. Default `5000`, `0` turns the page off |
+| **log.flushIntervalSeconds**         | Deprecated and ignored: logs are written immediately                                  |
 | **stats.enabled**                    | Enables runtime metrics and `/stats` endpoint                                         |
 | **api.index.workers**                | Number of workers that rebuild dirty indexes                                          |
 | **api.cache.enabled**                | Enables REST API caching for repeated queries                                         |
@@ -94,8 +106,82 @@ adminui:
 | **engine.name**                      | Storage engine: `internal` (default, recommended) or `mongodb` (beta)                 |
 | **engine.uri**                       | Connection URI for the `mongodb` engine                                               |
 | **adminui.enabled**                  | Enables the admin web interface                                                       |
+| **monitoring.prometheus.enabled**    | Serves `GET /metrics` in the Prometheus text format (see Monitoring below). Off by default |
+| **monitoring.prometheus.token**      | Bearer token for `GET /metrics`. Without it, `/metrics` takes the same credentials as the admin endpoints |
 
 Keys that ElysianDB does not know are ignored, and a warning listing them is printed at startup (for example `field authentication not found in type configuration.Config` when `authentication:` is written at the root instead of under `security:`).
+
+When the configuration file cannot be read or is invalid, ElysianDB logs the reason and exits with code `1`.
+
+---
+
+## Logging
+
+ElysianDB writes its logs to the standard output, one line per event, as soon as they happen. Each line has a time, a level, a fixed message and attributes. `component` tells which part of ElysianDB wrote it: `boot`, `storage`, `recovery`, `http`, `tcp`, `security`, `audit`, `hook`, `mongodb`, `cache`, `acl` or `api`.
+
+```text
+time=2026-11-01T12:00:00.123+01:00 level=INFO msg="storage loaded" component=storage folder=/data kv_keys=120394 kv_keys_with_ttl=812 documents=48211 duration_ms=412
+time=2026-11-01T12:03:12.874+01:00 level=ERROR msg="request failed" component=http method=GET route=/api/{entity} status=500 request_id=7f3c9a-1 user=alice err="..."
+```
+
+With `log.format: json`, each line is a JSON object with the same fields. Colors are only used when the output is a terminal, and never when `NO_COLOR` is set.
+
+At the default `info` level, the number of lines does not depend on the traffic: about ten lines at startup, three at shutdown, then only what changes, goes wrong or is done by an admin.
+
+| Level   | Meaning | Examples |
+| ------- | ------- | -------- |
+| `error` | ElysianDB failed to do its job | `500` answers, handler panics, failed flushes and recovery log writes, failed MongoDB operations |
+| `warn`  | Handled, but abnormal or risky | recovery log replayed after an unclean shutdown, default admin password, authentication off on a public address, failed logins, `401` and `403` answers, slow requests, hook script errors |
+| `info`  | Lifecycle and admin actions | configuration and storage loaded, listening addresses, shutdown, admin actions (component `audit`) |
+| `debug` | Investigation | other `4xx` answers, TCP connections, flushes, cache, hook timings |
+
+Errors that can repeat (failed flushes, recovery log writes, failed logins and `401` per address, hook script errors per hook, MongoDB errors, slow requests per route) are logged once per minute at most; the next line carries a `suppressed` attribute with the number of lines left out.
+
+Admin actions are logged at `info` with `component=audit`, the `actor`, the `source` (`http` or `tcp`) and the remote address: user, ACL, hook and schema changes, entity type creation and destruction, store reset, manual flush, import, migration, backup, restore and log level changes. The `elysiandb` commands print their own result and do not add log lines.
+
+Every HTTP answer carries an `X-Request-Id` header. ElysianDB keeps the value sent by the client when it is 1 to 64 letters, digits, `-`, `_` or `.`, and generates one otherwise. Log lines about a request carry it as `request_id`.
+
+Logs never contain passwords, tokens, session IDs, the `Authorization` header, the credentials of the MongoDB URI, document bodies or KV values.
+
+## Monitoring
+
+When `adminui.enabled` is true, the Admin UI home page is a dashboard of the instance: status and active problems, traffic, latency, errors, data and persistence, recent problems and admin actions. The Monitoring page shows charts over 15 minutes, 1 hour or 24 hours, and the Logs page lists the last `log.bufferLines` log lines with filters and a live tail. Pages refresh by themselves and stop while the browser tab is hidden.
+
+Metrics and the last log lines are kept in memory: a restart clears them.
+
+The same data is served by admin endpoints, which take the same credentials as `/config`:
+
+| Endpoint | Returns |
+| -------- | ------- |
+| `GET /monitoring/overview` | Instance, status and problems, traffic, data, persistence, runtime, connections and log counters |
+| `GET /monitoring/series?range=15m\|1h\|24h&since=<unix ms>` | Time series with one point per second (`15m`), 10 seconds (`1h`) or minute (`24h`). With `since`, only newer points |
+| `GET /monitoring/details` | Top routes, hook statistics and documents per entity type |
+| `GET /monitoring/logs?level=&component=&q=&user=&request_id=&since=&until=&before=&after=&limit=` | Log lines, newest first. `404` when `log.bufferLines` is `0` |
+| `GET /monitoring/logs/download?...` | The same lines as an NDJSON file |
+| `GET /monitoring/logs/level`, `PUT /monitoring/logs/level` | The current log level; `{"level": "debug", "minutes": 15}` changes it for 1 to 1440 minutes, then it goes back to `log.level` by itself |
+
+These endpoints live under `/monitoring` rather than `/api` so that they never hide an entity type named `logs` or `monitoring`.
+
+The status is `healthy`, `warning` or `critical`, with these problems:
+
+| Code | Severity | Condition |
+| ---- | -------- | --------- |
+| `flush_failing` | critical | The last flush to disk failed |
+| `recovery_write_failing` | critical | A recovery log write failed in the last 5 minutes |
+| `mongodb_unreachable` | critical | The MongoDB ping fails |
+| `error_rate_high` | warning | More than 1 % of at least 20 HTTP requests answered `5xx` over 5 minutes |
+| `latency_high` | warning | p95 above `log.slowRequestMs` over 5 minutes |
+| `hook_failing` | warning | A hook script failed in the last 5 minutes |
+| `auth_failures` | warning | More than 20 failed logins or `401` in a minute from one address |
+| `index_backlog` | warning | The lazy index backlog has not been empty for more than a minute |
+| `old_transaction` | warning | A transaction has been open for more than 10 minutes |
+| `default_admin_password` | warning | `admin`/`admin` still works |
+| `auth_disabled_public` | warning | Authentication is off on a non-loopback address |
+| `unclean_shutdown` | info | The recovery log was replayed at startup (shown for one hour) |
+
+With `monitoring.prometheus.enabled: true`, `GET /metrics` serves the counters, gauges and latency histograms in the Prometheus text format, for example `elysiandb_http_requests_total{status_class="5xx"}`, `elysiandb_http_request_duration_seconds`, `elysiandb_tcp_commands_total{command="GET"}`, `elysiandb_kv_keys` and `elysiandb_entities{entity_type="books"}`. Set `monitoring.prometheus.token` to let Prometheus authenticate with `Authorization: Bearer <token>`, since a scraper cannot log in with a session cookie in `user` mode.
+
+`GET /stats` and `stats.enabled` work as before.
 
 ---
 
@@ -325,6 +411,12 @@ From this version on, take a backup with `elysiandb backup` before each upgrade,
 * `POST /api/import` skips core entities other than hooks, and refuses documents that reference a core entity.
 * An unauthenticated TCP connection is closed after 30 seconds without a command.
 * Files of the store folder are readable by their owner only (`0600`), existing ones included: ElysianDB changes their mode at startup.
+* Log lines have a new format (see Logging), are written immediately, and `log.flushIntervalSeconds` is ignored with a warning. Lines that used to be lost (the last seconds before a shutdown or a fatal error, and everything logged by the `elysiandb` commands) are now written.
+* ElysianDB exits with code `1` when the configuration file is missing, unreadable or invalid. It used to exit with code `0` in some of these cases.
+* The startup and shutdown messages (`Storage`, `Ready`, `HTTP`, `TCP`, `Admin dashboard`, `Persisted`, `Goodbye`) are now log lines, and the banner is only printed when the output is a terminal.
+* A failed flush to disk now keeps the recovery log instead of clearing it, and is reported as an error.
+* Every HTTP answer carries an `X-Request-Id` header.
+* `GET /monitoring/...` endpoints are new, and `GET /metrics` when Prometheus is enabled.
 
 ---
 
