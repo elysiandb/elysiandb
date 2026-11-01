@@ -5,6 +5,9 @@ import NavBar from "../../src/components/header/NavBar.jsx";
 import { expectNoRawTranslationKeys, renderWithProviders } from "../helpers.jsx";
 
 const LINKS = [
+    ["/admin", "Dashboard", "Tableau de bord"],
+    ["/admin/monitoring", "Monitoring", "Supervision"],
+    ["/admin/logs", "Logs", "Journaux"],
     ["/admin/configuration", "Configuration", "Configuration"],
     ["/admin/users", "Users", "Utilisateurs"],
     ["/admin/acl", "ACL", "ACL"],

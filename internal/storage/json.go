@@ -1,9 +1,7 @@
 package storage
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -32,7 +30,7 @@ func LoadJsonDB() {
 func createJsonStore(file string) *JsonStore {
 	data, err := ReadJsonFromDB(file)
 	if err != nil {
-		log.Fatal("Error loading json database:", err)
+		log.Fatal("cannot load the document database", "component", "storage", "file", file, "err", err)
 	}
 
 	newStore := NewJsonStore()
@@ -257,30 +255,13 @@ func (s *JsonStore) ToMap() map[string]map[string]any {
 	return result
 }
 
-func writeJsonStoreToFile(cfg *configuration.Config, fileName string, store *JsonStore) error {
+func writeJsonStoreToFile(cfg *configuration.Config, fileName string, store *JsonStore) (bool, error) {
 	if store.saved.Load() {
-		return nil
+		return false, nil
 	}
 
-	isSuccess := true
-	path := cfg.Store.Folder + "/" + fileName
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-	if err != nil {
-		isSuccess = false
-		log.Error("Error opening file:", err)
-	} else {
-		_ = file.Chmod(0o600)
-	}
+	err := writeDataFile(cfg.Store.Folder+"/"+fileName, store.ToMap())
+	store.saved.Store(err == nil)
 
-	defer file.Close()
-	encoder := json.NewEncoder(file)
-	storeAsMap := store.ToMap()
-	if err := encoder.Encode(storeAsMap); err != nil {
-		isSuccess = false
-		log.Error("Error encoding JSON:", err)
-	}
-
-	store.saved.Store(isSuccess)
-
-	return nil
+	return true, err
 }

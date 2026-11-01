@@ -8,9 +8,11 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/taymour/elysiandb/internal/backup"
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -19,25 +21,35 @@ func RestoreController(ctx *fasthttp.RequestCtx) {
 
 	src, closeSource, err := restoreSource(ctx)
 	if err != nil {
+		observe.Audit(ctx, "restore rejected", "reason", err.Error())
 		sendRestoreError(ctx, fasthttp.StatusBadRequest, err.Error())
 		return
 	}
 
 	defer closeSource()
 
+	start := time.Now()
 	report, err := backup.Restore(src)
 	if err != nil {
 		var incomplete *backup.IncompleteRestoreError
 		var invalid *backup.ArchiveError
 		if !errors.As(err, &incomplete) && errors.As(err, &invalid) {
+			observe.Audit(ctx, "restore rejected", "reason", err.Error())
 			sendRestoreError(ctx, fasthttp.StatusBadRequest, err.Error())
 			return
 		}
 
-		log.Error("Unable to restore a backup: ", err)
+		observe.SetError(ctx, err)
 		sendRestoreError(ctx, fasthttp.StatusInternalServerError, err.Error())
 		return
 	}
+
+	observe.Audit(ctx, "restore done",
+		"entities", report.Entities,
+		"schemas", report.Schemas,
+		"kv_keys", report.KVKeys,
+		"duration_ms", log.Since(start),
+	)
 
 	body, _ := json.Marshal(map[string]any{
 		"status":          "restore completed",

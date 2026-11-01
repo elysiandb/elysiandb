@@ -3,6 +3,7 @@ package http_security
 import (
 	"encoding/json"
 
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -18,6 +19,10 @@ func writeJSON(ctx *fasthttp.RequestCtx, status int, body any) {
 }
 
 func writeError(ctx *fasthttp.RequestCtx, status int, err error) {
+	if status >= fasthttp.StatusInternalServerError {
+		observe.SetError(ctx, err)
+	}
+
 	writeJSON(ctx, status, map[string]string{"error": err.Error()})
 }
 

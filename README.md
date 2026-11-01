@@ -102,7 +102,9 @@ Access control lists enforced at the API level
 
 Configurable JavaScript hooks to enrich or filter data at read time
 
-Optional Admin UI served directly by the binary
+Optional Admin UI served directly by the binary, with a live dashboard, monitoring charts and a log viewer
+
+Structured logs (text or JSON), audit of admin actions, and an optional Prometheus `/metrics` endpoint
 
 HTTP REST API, Redis-style TCP protocol, and key–value endpoints
 

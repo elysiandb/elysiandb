@@ -4,6 +4,7 @@ import (
 	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -31,6 +32,7 @@ func SetDefaultACLForUsernameAndEntityController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	observe.Audit(ctx, "acl reset to default", "user", username, "entity", entity)
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBodyString(`{"status":"ACL reset to default"}`)
 }

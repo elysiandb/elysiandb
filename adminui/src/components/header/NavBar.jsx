@@ -21,6 +21,30 @@ export default function NavBar() {
 
                         <Nav.Link
                             as={NavLink}
+                            to="/admin"
+                            end
+                        >
+                            {t("nav.dashboard")}
+                        </Nav.Link>
+
+                        <Nav.Link
+                            as={NavLink}
+                            to="/admin/monitoring"
+                            end
+                        >
+                            {t("nav.monitoring")}
+                        </Nav.Link>
+
+                        <Nav.Link
+                            as={NavLink}
+                            to="/admin/logs"
+                            end
+                        >
+                            {t("nav.logs")}
+                        </Nav.Link>
+
+                        <Nav.Link
+                            as={NavLink}
                             to="/admin/configuration"
                             end
                         >

@@ -2,6 +2,8 @@ package boot
 
 import (
 	"fmt"
+	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/fasthttp/router"
@@ -10,24 +12,35 @@ import (
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/routing"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
+
+var (
+	httpLog    = log.For("http")
+	httpServer atomic.Pointer[fasthttp.Server]
+)
+
+func NewRouter() *router.Router {
+	r := router.New()
+	r.SaveMatchedRoutePath = true
+	r.PanicHandler = observe.Panic
+	routing.RegisterRoutes(r)
+
+	return r
+}
+
+func NewHTTPHandler(r *router.Router) fasthttp.RequestHandler {
+	return observe.Middleware(security.Protect(r.Handler))
+}
 
 func StartHTTP() {
 	cfg := globals.GetConfig()
 
 	addr := fmt.Sprintf("%s:%d", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port)
 
-	r := router.New()
-	r.PanicHandler = func(ctx *fasthttp.RequestCtx, recovered any) {
-		log.Error(fmt.Sprintf("panic while handling %s %s: %v", ctx.Method(), ctx.Path(), recovered))
-		ctx.ResetBody()
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-	}
-	routing.RegisterRoutes(r)
-
 	srv := &fasthttp.Server{
-		Handler:               security.Protect(r.Handler),
+		Handler:               NewHTTPHandler(NewRouter()),
 		Name:                  "ElysianDB",
 		NoDefaultServerHeader: true,
 		ReduceMemoryUsage:     true,
@@ -42,10 +55,23 @@ func StartHTTP() {
 		IdleTimeout:  30 * time.Second,
 	}
 
-	log.DirectInfo("ElysianDB HTTP listening on http://", addr)
-	if err := srv.ListenAndServe(addr); err != nil {
-		log.Fatal("server error: ", err)
+	ln, err := net.Listen("tcp4", addr)
+	if err != nil {
+		log.Fatal("cannot start the HTTP server", "component", "http", "addr", addr, "err", err)
 	}
 
-	log.WriteLogs()
+	httpServer.Store(srv)
+	httpLog.Info("http listening", "addr", addr)
+
+	if err := srv.Serve(ln); err != nil {
+		log.Fatal("http server stopped", "component", "http", "addr", addr, "err", err)
+	}
+}
+
+func HTTPConnections() int {
+	if srv := httpServer.Load(); srv != nil {
+		return int(srv.GetOpenConnectionsCount())
+	}
+
+	return 0
 }

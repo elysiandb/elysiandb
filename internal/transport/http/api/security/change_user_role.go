@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -36,6 +37,7 @@ func ChangeUserRoleController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	observe.Audit(ctx, "user role changed", "user", username, "role", userDto.Role)
 	ctx.SetStatusCode(fasthttp.StatusOK)
 }
 

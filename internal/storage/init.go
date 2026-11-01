@@ -10,6 +10,7 @@ import (
 
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/metrics"
 	"github.com/taymour/elysiandb/internal/recovery"
 	"github.com/taymour/elysiandb/internal/stat"
 )
@@ -48,7 +49,7 @@ func createExpirationContainer(fileName string) *ExpirationContainer {
 
 	data, err := ReadExpirationsFromDB(fileName)
 	if err != nil {
-		log.Fatal("Error loading expiration database:", err)
+		log.Fatal("cannot load the expiration database", "component", "storage", "file", fileName, "err", err)
 	}
 
 	for ts, keys := range data {
@@ -61,7 +62,7 @@ func createExpirationContainer(fileName string) *ExpirationContainer {
 func createStore(file string) *Store {
 	data, err := ReadFromDB(file)
 	if err != nil {
-		log.Fatal("Error loading database:", err)
+		log.Fatal("cannot load the key-value database", "component", "storage", "file", file, "err", err)
 	}
 
 	bytesData := make(map[string][]byte, len(data))
@@ -76,7 +77,7 @@ func createStore(file string) *Store {
 
 func createFolder(folder string) {
 	if err := os.MkdirAll(folder, 0o755); err != nil {
-		log.Fatal("Error creating data folder:", err)
+		log.Fatal("cannot create the data folder", "component", "storage", "folder", folder, "err", err)
 	}
 }
 
@@ -85,11 +86,11 @@ func createFile(folder, file string) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o600)
 		if err != nil {
-			log.Fatal("Error creating data file:", err)
+			log.Fatal("cannot create a data file", "component", "storage", "file", filePath, "err", err)
 		}
 		defer file.Close()
 		if _, err := file.WriteString("{}"); err != nil {
-			log.Fatal("Error writing to data file:", err)
+			log.Fatal("cannot write a data file", "component", "storage", "file", filePath, "err", err)
 		}
 
 		return
@@ -244,12 +245,40 @@ func DeleteByKey(key string) {
 func ResetStore() {
 	cfg := globals.GetConfig()
 
-	mainStore.reset()
-	expirationContainer.reset()
-	log.Info("Store has been reset")
+	rootMu.RLock()
+	ms := mainStore
+	ec := expirationContainer
+	rootMu.RUnlock()
+
+	kept := map[string][]byte{}
+	ms.Iterate(func(k string, v []byte) {
+		if globals.IsApiKey(k) {
+			kept[k] = v
+		}
+	})
+
+	keptExpirations := map[int64][]string{}
+	for k := range kept {
+		if ts, ok := ec.expiration(k); ok {
+			keptExpirations[ts] = append(keptExpirations[ts], k)
+		}
+	}
+
+	ms.reset()
+	ec.reset()
+
+	for k, v := range kept {
+		ms.put(k, v)
+	}
+
+	for ts, keys := range keptExpirations {
+		ec.put(ts, keys)
+	}
 
 	if cfg.Stats.Enabled {
 		stat.Stats.Reset()
+		stat.Stats.SetKeysCount(ms.CountTotalKeys())
+		stat.Stats.SetExpirationKeysCount(ec.CountTotalKeys())
 	}
 }
 
@@ -269,6 +298,42 @@ func ClearAll() {
 		stat.Stats.SetKeysCount(0)
 		stat.Stats.SetExpirationKeysCount(0)
 	}
+}
+
+func CountKeys() (uint64, uint64) {
+	rootMu.RLock()
+	ms := mainStore
+	ec := expirationContainer
+	rootMu.RUnlock()
+
+	if ms == nil || ec == nil {
+		return 0, 0
+	}
+
+	return ms.CountTotalKeys(), ec.CountTotalKeys()
+}
+
+func ListJsonKeys() []string {
+	js := mainJsonStore.Load()
+	if js == nil {
+		return nil
+	}
+
+	keys := []string{}
+	js.Iterate(func(k string, _ map[string]any) {
+		keys = append(keys, k)
+	})
+
+	return keys
+}
+
+func CountJsonDocuments() uint64 {
+	js := mainJsonStore.Load()
+	if js == nil {
+		return 0
+	}
+
+	return js.CountTotalKeys()
 }
 
 func ListKeys() []string {
@@ -308,6 +373,8 @@ func CleanExpiratedKeys(index int64) {
 	for _, v := range snapshot {
 		DeleteByKey(v)
 	}
+
+	metrics.KVExpired(len(snapshot))
 
 	expirationContainer.mu.Lock()
 	delete(expirationContainer.Buckets, index)

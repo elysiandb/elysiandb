@@ -2,106 +2,69 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/taymour/elysiandb/internal/boot"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/metrics"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
+var serverLog = log.For("boot")
+
+const mongoDisconnectTimeout = 5 * time.Second
+
 func StartServer() {
 	cfg := globals.GetConfig()
-
-	Printf(
-		"%s%sStorage%s  %s%s%s\n",
-		globals.Violet,
-		globals.Bold,
-		globals.Reset,
-		globals.Gray,
-		globals.GetConfig().Store.Folder,
-		globals.Reset,
-	)
 
 	if cfg.Stats.Enabled && engine.IsEngineInternal() {
 		boot.BootStats()
 	}
 
-	boot.BootLogger()
-
-	Printf(
-		"%s%sReady%s   %sServing a KV datastore with %sInstant REST API%s.\n",
-		globals.Blue,
-		globals.Bold,
-		globals.Reset,
-		globals.Gray,
-		globals.Gold,
-		globals.Reset,
-	)
+	boot.WarnIfAuthenticationIsOffOnPublicAddress()
+	security.WarnIfDefaultAdminPassword()
 
 	if cfg.Server.HTTP.Enabled {
 		go boot.StartHTTP()
-		Printf(
-			"%sHTTP%s     %shttp://%s:%d%s  %s(KV store & Instant REST API)%s\n",
-			globals.Gold,
-			globals.Reset,
-			globals.Bold,
-			cfg.Server.HTTP.Host,
-			cfg.Server.HTTP.Port,
-			globals.Reset,
-			globals.Gray,
-			globals.Reset,
-		)
 	}
+
 	if cfg.Server.TCP.Enabled {
 		go boot.InitTCP()
-		Printf(
-			"%sTCP %s     %s%s:%d%s\n",
-			globals.Gold,
-			globals.Reset,
-			globals.Bold,
-			cfg.Server.TCP.Host,
-			cfg.Server.TCP.Port,
-			globals.Reset,
-		)
 	}
 
-	if cfg.AdminUI.Enabled {
-		Printf(
-			"%sAdmin dashboard%s    %shttp://%s:%d/admin%s\n",
-			globals.Gold,
-			globals.Reset,
-			globals.Bold,
-			cfg.Server.HTTP.Host,
-			cfg.Server.HTTP.Port,
-			globals.Reset,
-		)
+	boot.BootMonitoring()
+
+	if cfg.AdminUI.Enabled && cfg.Server.HTTP.Enabled {
+		serverLog.Info("admin ui available", "url", fmt.Sprintf("http://%s:%d/admin", cfg.Server.HTTP.Host, cfg.Server.HTTP.Port))
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	<-ctx.Done()
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	received := <-signals
+	signal.Stop(signals)
 
+	serverLog.Info("shutdown requested", "signal", received.String())
+
+	start := time.Now()
 	storage.WriteToDB()
-	Printf(
-		"\n%sPersisted%s  %sAll data flushed to disk.%s\n",
-		globals.Gold,
-		globals.Reset,
-		globals.Gray,
-		globals.Reset,
-	)
+	serverLog.Info("data flushed on shutdown", "duration_ms", log.Since(start))
 
 	if globals.MongoClient != nil {
-		_ = globals.MongoClient.Disconnect(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), mongoDisconnectTimeout)
+		if err := globals.MongoClient.Disconnect(ctx); err != nil {
+			log.Warn("mongodb disconnect failed", "component", "mongodb", "err", err)
+		}
+		cancel()
 	}
 
-	Printf(
-		"%sGoodbye%s   %sElysianDB shutting down gracefully.%s\n",
-		globals.Blue,
-		globals.Reset,
-		globals.Faint,
-		globals.Reset,
-	)
+	metrics.Stop()
+
+	serverLog.Info("shutdown complete", "uptime", time.Since(metrics.StartedAt()).Round(time.Second).String())
 }

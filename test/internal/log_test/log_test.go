@@ -1,113 +1,534 @@
 package log_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"log/slog"
+	"math"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	pkglog "github.com/taymour/elysiandb/internal/log"
 )
 
-func captureStdout(t *testing.T) (finish func() string) {
+type safeBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *safeBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.b.Write(p)
+}
+
+func (s *safeBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.b.String()
+}
+
+func setup(t *testing.T, opts pkglog.Options) *safeBuffer {
 	t.Helper()
 
-	orig := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
+	if err := pkglog.Configure(opts); err != nil {
+		t.Fatalf("configure: %v", err)
 	}
-	os.Stdout = w
 
-	type result struct {
-		s   string
-		err error
-	}
-	done := make(chan result, 1)
+	buf := &safeBuffer{}
+	pkglog.SetOutput(buf, false)
 
-	go func() {
-		b, err := io.ReadAll(r)
-		done <- result{s: string(b), err: err}
-	}()
+	t.Cleanup(func() {
+		pkglog.SetOutput(nil, false)
+		_ = pkglog.Configure(pkglog.Options{})
+	})
 
-	return func() string {
-		_ = w.Close()
-		os.Stdout = orig
-		res := <-done
-		_ = r.Close()
-		if res.err != nil && !errors.Is(res.err, os.ErrClosed) {
-			t.Logf("capture: read error: %v", res.err)
-		}
-		return res.s
-	}
+	return buf
 }
 
-func waitLogs() { time.Sleep(20 * time.Millisecond) }
+func lines(s string) []string {
+	return strings.Split(strings.TrimRight(s, "\n"), "\n")
+}
 
-func TestAsyncEnqueueAndWriteLogs(t *testing.T) {
-	finish := captureStdout(t)
+func TestTextLineIsWrittenImmediatelyWithAttributes(t *testing.T) {
+	buf := setup(t, pkglog.Options{})
 
-	pkglog.Info("hello-info")
-	pkglog.Success("hello-success")
-	pkglog.Warn("hello-warn")
-	pkglog.Error("hello-error")
-	pkglog.Debug("hello-debug")
+	pkglog.For("storage").Info("storage loaded", "folder", "/data", "kv_keys", 12, "duration_ms", 1.5)
 
-	waitLogs()
-	pkglog.WriteLogs()
-
-	out := finish()
-
-	for _, frag := range []string{
-		"hello-info", "hello-success", "hello-warn", "hello-error", "hello-debug",
-	} {
-		if !strings.Contains(out, frag) {
-			t.Fatalf("flushed output missing %q.\nGot:\n%s", frag, out)
+	out := buf.String()
+	for _, want := range []string{"level=INFO", `msg="storage loaded"`, "component=storage", "folder=/data", "kv_keys=12", "duration_ms=1.5"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in %q", want, out)
 		}
 	}
 
-	finish2 := captureStdout(t)
-	pkglog.WriteLogs()
-	out2 := finish2()
-	if strings.TrimSpace(out2) != "" {
-		t.Fatalf("expected empty output after second WriteLogs, got: %q", out2)
+	if !strings.HasPrefix(out, "time=") || !strings.HasSuffix(out, "\n") {
+		t.Fatalf("unexpected line %q", out)
 	}
 }
 
-func TestDirectInfoPrintsImmediately(t *testing.T) {
-	finish := captureStdout(t)
+func TestComponentComesBeforeRecordAttributes(t *testing.T) {
+	buf := setup(t, pkglog.Options{})
 
-	pkglog.DirectInfo("direct-message")
+	pkglog.For("http").Error("request failed", "status", 500)
 
-	out := finish()
-
-	if !strings.Contains(out, "INFO") {
-		t.Fatalf("expected output to contain 'INFO', got:\n%s", out)
-	}
-	if !strings.Contains(out, "direct-message") {
-		t.Fatalf("expected output to contain 'direct-message', got:\n%s", out)
+	out := buf.String()
+	if strings.Index(out, "component=http") > strings.Index(out, "status=500") {
+		t.Fatalf("component should come first: %q", out)
 	}
 }
 
-func TestFatalExitsWithNonZero(t *testing.T) {
+func TestClientValuesAreQuotedAndEscaped(t *testing.T) {
+	buf := setup(t, pkglog.Options{})
+
+	pkglog.Warn("unknown command", "command", "FOO\x1b[31m bar\nlevel=ERROR")
+
+	out := buf.String()
+	if strings.Count(out, "\n") != 1 {
+		t.Fatalf("a client value must not split the line: %q", out)
+	}
+	if strings.Contains(out, "\x1b") {
+		t.Fatalf("escape sequences must be escaped: %q", out)
+	}
+	if !strings.Contains(out, `command="FOO\x1b[31m bar\nlevel=ERROR"`) {
+		t.Fatalf("unexpected quoting: %q", out)
+	}
+}
+
+func TestJSONFormat(t *testing.T) {
+	buf := setup(t, pkglog.Options{Format: pkglog.FormatJSON})
+
+	pkglog.For("security").Warn("login failed", "user", "admin", "attempts", 3, "err", errors.New("bad password"))
+
+	var line map[string]any
+	if err := json.Unmarshal([]byte(buf.String()), &line); err != nil {
+		t.Fatalf("not JSON: %v %q", err, buf.String())
+	}
+
+	want := map[string]any{"level": "WARN", "msg": "login failed", "component": "security", "user": "admin", "attempts": float64(3), "err": "bad password"}
+	for k, v := range want {
+		if line[k] != v {
+			t.Fatalf("%s = %v, want %v (%v)", k, line[k], v, line)
+		}
+	}
+
+	if _, err := time.Parse(time.RFC3339Nano, line["time"].(string)); err != nil {
+		t.Fatalf("time: %v", err)
+	}
+}
+
+func TestLevelFiltering(t *testing.T) {
+	buf := setup(t, pkglog.Options{Level: "warn"})
+
+	pkglog.Debug("d")
+	pkglog.Info("i")
+	pkglog.Warn("w")
+	pkglog.Error("e")
+
+	got := lines(buf.String())
+	if len(got) != 2 || !strings.Contains(got[0], "msg=w") || !strings.Contains(got[1], "msg=e") {
+		t.Fatalf("unexpected lines %q", got)
+	}
+
+	if pkglog.Enabled(slog.LevelInfo) || !pkglog.Enabled(slog.LevelWarn) {
+		t.Fatalf("Enabled does not follow the level")
+	}
+}
+
+func TestLinesKeepTheirOrder(t *testing.T) {
+	buf := setup(t, pkglog.Options{})
+
+	for i := 0; i < 500; i++ {
+		pkglog.Info("step", "i", i)
+	}
+
+	for i, line := range lines(buf.String()) {
+		if !strings.HasSuffix(line, fmt.Sprintf(" i=%d", i)) {
+			t.Fatalf("line %d out of order: %q", i, line)
+		}
+	}
+}
+
+func TestConcurrentLoggingIsSafe(t *testing.T) {
+	buf := setup(t, pkglog.Options{BufferLines: 100})
+
+	var wg sync.WaitGroup
+	for g := 0; g < 8; g++ {
+		wg.Add(1)
+		go func(g int) {
+			defer wg.Done()
+			for i := 0; i < 200; i++ {
+				pkglog.Info("concurrent", "g", g, "i", i)
+				_ = pkglog.Logs(pkglog.Query{Limit: 10})
+			}
+		}(g)
+	}
+	wg.Wait()
+
+	if got := len(lines(buf.String())); got != 1600 {
+		t.Fatalf("expected 1600 lines, got %d", got)
+	}
+}
+
+func TestConfigureRejectsUnknownValues(t *testing.T) {
+	if err := pkglog.Configure(pkglog.Options{Level: "verbose"}); err == nil {
+		t.Fatalf("expected an error for an unknown level")
+	}
+	if err := pkglog.Configure(pkglog.Options{Format: "xml"}); err == nil {
+		t.Fatalf("expected an error for an unknown format")
+	}
+	_ = pkglog.Configure(pkglog.Options{})
+}
+
+func TestParseLevel(t *testing.T) {
+	cases := map[string]slog.Level{"": slog.LevelInfo, "INFO": slog.LevelInfo, "debug": slog.LevelDebug, "warning": slog.LevelWarn, " error ": slog.LevelError}
+	for in, want := range cases {
+		got, err := pkglog.ParseLevel(in)
+		if err != nil || got != want {
+			t.Fatalf("ParseLevel(%q) = %v %v", in, got, err)
+		}
+	}
+}
+
+func TestCountsWarningsAndErrors(t *testing.T) {
+	setup(t, pkglog.Options{})
+
+	warnings, errorsCount := pkglog.Counts()
+	pkglog.Warn("w")
+	pkglog.Error("e")
+	pkglog.Error("e")
+	pkglog.Info("i")
+
+	w, e := pkglog.Counts()
+	if w-warnings != 1 || e-errorsCount != 2 {
+		t.Fatalf("unexpected counts %d %d", w-warnings, e-errorsCount)
+	}
+}
+
+func TestBufferIsDisabledWithZeroLines(t *testing.T) {
+	setup(t, pkglog.Options{BufferLines: 0})
+
+	pkglog.Info("not kept")
+
+	if pkglog.BufferEnabled() {
+		t.Fatalf("buffer should be disabled")
+	}
+	if page := pkglog.Logs(pkglog.Query{}); len(page.Entries) != 0 {
+		t.Fatalf("unexpected entries %v", page.Entries)
+	}
+}
+
+func TestBufferKeepsTheLastLinesNewestFirst(t *testing.T) {
+	setup(t, pkglog.Options{BufferLines: 3})
+
+	for i := 0; i < 5; i++ {
+		pkglog.For("boot").Info("line", "i", i)
+	}
+
+	page := pkglog.Logs(pkglog.Query{})
+	if page.Size != 3 || page.Capacity != 3 || len(page.Entries) != 3 {
+		t.Fatalf("unexpected page %+v", page)
+	}
+
+	if page.Entries[0].Attrs["i"] != int64(4) || page.Entries[2].Attrs["i"] != int64(2) {
+		t.Fatalf("unexpected order %+v", page.Entries)
+	}
+
+	if page.Entries[0].Component != "boot" || page.Entries[0].Level != "INFO" {
+		t.Fatalf("unexpected entry %+v", page.Entries[0])
+	}
+
+	if page.OldestSeq != page.Entries[2].Seq || page.LatestSeq != page.Entries[0].Seq || page.BufferSince == nil {
+		t.Fatalf("unexpected bounds %+v", page)
+	}
+}
+
+func TestBufferQueries(t *testing.T) {
+	setup(t, pkglog.Options{BufferLines: 100})
+
+	pkglog.For("http").Info("request", "route", "/api/{entity}", "request_id", "r-1", "user", "alice")
+	pkglog.For("http").Error("request failed", "route", "/api/{entity}", "request_id", "r-2", "err", "Timeout reached")
+	pkglog.For("security").Warn("login failed", "user", "bob")
+	pkglog.For("audit").Info("user created", "actor", "alice", "user", "carol")
+	pkglog.For("storage").Debug("flush done")
+
+	count := func(q pkglog.Query) int { return len(pkglog.Logs(q).Entries) }
+
+	if got := count(pkglog.Query{MinLevel: slog.LevelWarn}); got != 2 {
+		t.Fatalf("min level: %d", got)
+	}
+	if got := count(pkglog.Query{Component: "http"}); got != 2 {
+		t.Fatalf("component: %d", got)
+	}
+	if got := count(pkglog.Query{Text: "timeout"}); got != 1 {
+		t.Fatalf("text in attributes: %d", got)
+	}
+	if got := count(pkglog.Query{Text: "LOGIN"}); got != 1 {
+		t.Fatalf("text in message: %d", got)
+	}
+	if got := count(pkglog.Query{User: "alice"}); got != 2 {
+		t.Fatalf("user or actor: %d", got)
+	}
+	if got := count(pkglog.Query{RequestID: "r-2"}); got != 1 {
+		t.Fatalf("request id: %d", got)
+	}
+
+	all := pkglog.Logs(pkglog.Query{})
+	if strings.Join(all.Components, ",") != "audit,http,security" {
+		t.Fatalf("debug lines below the level are not kept, components %v", all.Components)
+	}
+
+	newest := all.Entries[0].Seq
+	pkglog.Info("after")
+	if after := pkglog.Logs(pkglog.Query{After: newest}); len(after.Entries) != 1 || after.Entries[0].Message != "after" {
+		t.Fatalf("after: %+v", after.Entries)
+	}
+
+	if before := pkglog.Logs(pkglog.Query{Before: newest}); len(before.Entries) != 3 {
+		t.Fatalf("before: %d", len(before.Entries))
+	}
+
+	page := pkglog.Logs(pkglog.Query{Limit: 2})
+	if len(page.Entries) != 2 || !page.HasMore {
+		t.Fatalf("limit: %+v", page)
+	}
+
+	since := pkglog.Logs(pkglog.Query{Since: time.Now().Add(time.Hour)})
+	if len(since.Entries) != 0 {
+		t.Fatalf("since: %d", len(since.Entries))
+	}
+}
+
+func TestBufferResizeKeepsTheNewestLines(t *testing.T) {
+	setup(t, pkglog.Options{BufferLines: 10})
+
+	for i := 0; i < 10; i++ {
+		pkglog.Info("line", "i", i)
+	}
+
+	_ = pkglog.Configure(pkglog.Options{BufferLines: 4})
+
+	page := pkglog.Logs(pkglog.Query{})
+	if len(page.Entries) != 4 || page.Entries[0].Attrs["i"] != int64(9) || page.Entries[3].Attrs["i"] != int64(6) {
+		t.Fatalf("unexpected entries %+v", page.Entries)
+	}
+}
+
+func TestTemporaryLevelGoesBackByItself(t *testing.T) {
+	buf := setup(t, pkglog.Options{Level: "info", BufferLines: 10})
+
+	info := pkglog.SetLevelFor(slog.LevelDebug, 50*time.Millisecond)
+	if info.Level != "debug" || info.Configured != "info" || info.Until == nil {
+		t.Fatalf("unexpected info %+v", info)
+	}
+
+	pkglog.Debug("visible")
+
+	deadline := time.Now().Add(5 * time.Second)
+	for !strings.Contains(buf.String(), `msg="log level restored"`) && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	if !strings.Contains(buf.String(), `msg="log level restored"`) {
+		t.Fatalf("the restore should be logged: %q", buf.String())
+	}
+
+	if current := pkglog.CurrentLevel(); current.Level != "info" || current.Until != nil {
+		t.Fatalf("level not restored: %+v", current)
+	}
+
+	pkglog.Debug("hidden")
+
+	out := buf.String()
+	if !strings.Contains(out, "msg=visible") || strings.Contains(out, "msg=hidden") {
+		t.Fatalf("unexpected output %q", out)
+	}
+}
+
+func TestSettingTheConfiguredLevelCancelsTheOverride(t *testing.T) {
+	setup(t, pkglog.Options{Level: "warn"})
+
+	pkglog.SetLevelFor(slog.LevelDebug, time.Hour)
+	info := pkglog.SetLevelFor(slog.LevelWarn, 0)
+
+	if info.Level != "warn" || info.Until != nil {
+		t.Fatalf("unexpected info %+v", info)
+	}
+}
+
+func TestThrottle(t *testing.T) {
+	th := pkglog.NewThrottle(time.Minute)
+	now := time.Unix(1_000, 0)
+	th.SetClock(func() time.Time { return now })
+
+	if n, ok := th.Allow("k"); !ok || n != 0 {
+		t.Fatalf("first call should pass")
+	}
+
+	for i := 0; i < 3; i++ {
+		if _, ok := th.Allow("k"); ok {
+			t.Fatalf("call %d should be suppressed", i)
+		}
+	}
+
+	if _, ok := th.Allow("other"); !ok {
+		t.Fatalf("keys are independent")
+	}
+
+	now = now.Add(time.Minute)
+	if n, ok := th.Allow("k"); !ok || n != 3 {
+		t.Fatalf("expected 3 suppressed, got %d %v", n, ok)
+	}
+
+	th.Allow("k")
+	if n := th.Reset("k"); n != 1 {
+		t.Fatalf("reset should return the suppressed count, got %d", n)
+	}
+	if _, ok := th.Allow("k"); !ok {
+		t.Fatalf("a reset key passes again")
+	}
+}
+
+func TestWithSuppressed(t *testing.T) {
+	if got := pkglog.WithSuppressed([]any{"a", 1}, 0); len(got) != 2 {
+		t.Fatalf("no attribute expected for 0: %v", got)
+	}
+	if got := pkglog.WithSuppressed([]any{"a", 1}, 4); len(got) != 4 || got[2] != "suppressed" || got[3] != 4 {
+		t.Fatalf("unexpected %v", got)
+	}
+}
+
+func TestFatalLogsAndExitsWithCodeOne(t *testing.T) {
 	if os.Getenv("RUN_FATAL_HELPER") == "1" {
-		pkglog.Fatal("boom", fmt.Errorf("kaboom"))
+		pkglog.Fatal("boom", "err", fmt.Errorf("kaboom"))
 		return
 	}
 
 	cmd := exec.Command(os.Args[0], "-test.run", t.Name())
 	cmd.Env = append(os.Environ(), "RUN_FATAL_HELPER=1")
-	err := cmd.Run()
-	if err == nil {
-		t.Fatal("expected non-nil error (process should have exited), got nil")
+	out, err := cmd.CombinedOutput()
+
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 1 {
+		t.Fatalf("expected exit code 1, got %v", err)
 	}
-	if exitErr, ok := err.(*exec.ExitError); !ok {
-		t.Fatalf("expected *exec.ExitError, got %T (%v)", err, err)
-	} else if exitErr.ExitCode() == 0 {
-		t.Fatalf("expected non-zero exit code, got 0")
+
+	if !strings.Contains(string(out), "level=ERROR") || !strings.Contains(string(out), "msg=boom") || !strings.Contains(string(out), "err=kaboom") {
+		t.Fatalf("the fatal line should be written: %q", out)
+	}
+}
+
+type stringer struct{}
+
+func (stringer) String() string { return "from-stringer" }
+
+func TestValueKindsInText(t *testing.T) {
+	buf := setup(t, pkglog.Options{})
+
+	pkglog.For("kinds").WithGroup("ignored").Info("kinds",
+		"u", uint64(7),
+		"f", 1.25,
+		"nan", math.NaN(),
+		"d", 1500*time.Millisecond,
+		"t", time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC),
+		"b", true,
+		"raw", []byte("bytes"),
+		"list", []string{"a", "b"},
+		"none", nil,
+		"str", stringer{},
+		slog.Group("req", "method", "GET", "status", 200),
+		"", "dropped",
+	)
+
+	out := buf.String()
+	for _, want := range []string{"u=7", "f=1.25", "nan=NaN", "d=1.5s", "t=2026-11-01T12:00:00Z", "b=true", "raw=bytes", `list="[a b]"`, "none=<nil>", "str=from-stringer", "req.method=GET", "req.status=200", "component=kinds"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in %q", want, out)
+		}
+	}
+	if strings.Contains(out, "dropped") {
+		t.Fatalf("attributes without a key are dropped: %q", out)
+	}
+}
+
+func TestValueKindsInJSON(t *testing.T) {
+	buf := setup(t, pkglog.Options{Format: pkglog.FormatJSON, BufferLines: 10})
+
+	pkglog.Info("kinds", "u", uint64(7), "nan", math.Inf(1), "list", []string{"a"}, "none", nil, slog.Group("g", "k", "v"))
+
+	var line map[string]any
+	if err := json.Unmarshal([]byte(buf.String()), &line); err != nil {
+		t.Fatalf("not JSON: %v %q", err, buf.String())
+	}
+
+	if line["u"] != float64(7) || line["nan"] != "+Inf" || line["none"] != nil || line["g.k"] != "v" {
+		t.Fatalf("unexpected line %v", line)
+	}
+	if list, ok := line["list"].([]any); !ok || len(list) != 1 || list[0] != "a" {
+		t.Fatalf("unexpected list %v", line["list"])
+	}
+
+	entry := pkglog.Logs(pkglog.Query{}).Entries[0]
+	if entry.Attrs["g.k"] != "v" || entry.Attrs["u"] != uint64(7) {
+		t.Fatalf("unexpected buffered attributes %+v", entry.Attrs)
+	}
+}
+
+func TestLevelsAreColoredOnlyWhenColorIsOn(t *testing.T) {
+	buf := setup(t, pkglog.Options{Level: "debug"})
+	pkglog.SetOutput(buf, true)
+
+	pkglog.Debug("d")
+	pkglog.Info("i")
+	pkglog.Warn("w")
+	pkglog.Error("e")
+
+	out := buf.String()
+	for _, want := range []string{"\x1b[35mDEBUG\x1b[0m", "\x1b[36mINFO\x1b[0m", "\x1b[33mWARN\x1b[0m", "\x1b[31mERROR\x1b[0m"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in %q", want, out)
+		}
+	}
+
+	plain := setup(t, pkglog.Options{})
+	pkglog.Info("i")
+	if strings.Contains(plain.String(), "\x1b") {
+		t.Fatalf("no color expected: %q", plain.String())
+	}
+
+	if pkglog.Format() != pkglog.FormatText {
+		t.Fatalf("unexpected format %q", pkglog.Format())
+	}
+}
+
+func TestThrottleForgetsOldKeysWhenFull(t *testing.T) {
+	th := pkglog.NewThrottle(time.Minute)
+	now := time.Unix(1_000, 0)
+	th.SetClock(func() time.Time { return now })
+
+	for i := 0; i < 10_000; i++ {
+		th.Allow(fmt.Sprintf("k%d", i))
+	}
+
+	if _, ok := th.Allow("k1"); ok {
+		t.Fatalf("a recent key is still throttled")
+	}
+
+	now = now.Add(2 * time.Minute)
+	if _, ok := th.Allow("new"); !ok {
+		t.Fatalf("a new key always passes")
+	}
+
+	now = now.Add(time.Second)
+	if n, ok := th.Allow("k2"); !ok || n != 0 {
+		t.Fatalf("old keys were forgotten when the throttle was full, got %d %v", n, ok)
 	}
 }

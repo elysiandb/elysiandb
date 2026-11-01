@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -12,6 +13,7 @@ import (
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/schema"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
@@ -148,6 +150,7 @@ func writeEntity(entity string, data map[string]interface{}, checkInferredSchema
 		options.Replace().SetUpsert(true),
 	)
 	if err != nil {
+		reportError("replace_one", entity, err)
 		return []schema.ValidationError{{Message: err.Error()}}
 	}
 
@@ -239,10 +242,13 @@ func ReadEntityById(entity, id string) map[string]any {
 	ctx := context.Background()
 
 	raw := map[string]any{}
-	if globals.MongoDB.
+	if err := globals.MongoDB.
 		Collection(entity).
 		FindOne(ctx, bson.M{"_id": id}).
-		Decode(&raw) != nil {
+		Decode(&raw); err != nil {
+		if !errors.Is(err, mongo.ErrNoDocuments) {
+			reportError("find_one", entity, err)
+		}
 		return nil
 	}
 
@@ -259,13 +265,19 @@ func GetListOfIds(entity, sortField string, sortAscending bool) ([]byte, error) 
 
 func DeleteEntityById(entity, id string) {
 	ctx := context.Background()
-	globals.MongoDB.Collection(entity).DeleteOne(ctx, bson.M{"_id": id})
+	if _, err := globals.MongoDB.Collection(entity).DeleteOne(ctx, bson.M{"_id": id}); err != nil {
+		reportError("delete_one", entity, err)
+	}
 }
 
 func DeleteAllEntities(entity string) {
 	ctx := context.Background()
-	globals.MongoDB.Collection(entity).DeleteMany(ctx, bson.M{})
-	DeleteEntityType(entity)
+	if _, err := globals.MongoDB.Collection(entity).DeleteMany(ctx, bson.M{}); err != nil {
+		reportError("delete_many", entity, err)
+	}
+	if err := DeleteEntityType(entity); err != nil {
+		reportError("drop", entity, err)
+	}
 }
 
 func DeleteAll() {
@@ -278,7 +290,9 @@ func DeleteAll() {
 func UpdateEntityById(entity, id string, updated map[string]interface{}) map[string]interface{} {
 	ctx := context.Background()
 	update := ToMongoDocument(updated)
-	globals.MongoDB.Collection(entity).UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": update})
+	if _, err := globals.MongoDB.Collection(entity).UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": update}); err != nil {
+		reportError("update_one", entity, err)
+	}
 	return ReadEntityById(entity, id)
 }
 
@@ -302,7 +316,10 @@ func DumpAll() map[string]interface{} {
 
 func EntityExists(entity, id string) bool {
 	ctx := context.Background()
-	n, _ := globals.MongoDB.Collection(entity).CountDocuments(ctx, bson.M{"_id": id})
+	n, err := globals.MongoDB.Collection(entity).CountDocuments(ctx, bson.M{"_id": id})
+	if err != nil {
+		reportError("count_documents", entity, err)
+	}
 	return n > 0
 }
 
@@ -310,10 +327,29 @@ func CountAllEntities() int {
 	total := 0
 	for _, e := range ListEntityTypes() {
 		ctx := context.Background()
-		n, _ := globals.MongoDB.Collection(e).CountDocuments(ctx, bson.M{})
+		n, err := globals.MongoDB.Collection(e).CountDocuments(ctx, bson.M{})
+		if err != nil {
+			reportError("count_documents", e, err)
+		}
 		total += int(n)
 	}
 	return total
+}
+
+func CountEntitiesPerType() map[string]int {
+	counts := map[string]int{}
+	for _, e := range ListPublicEntityTypes() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		n, err := globals.MongoDB.Collection(e).EstimatedDocumentCount(ctx)
+		cancel()
+		if err != nil {
+			reportError("estimated_document_count", e, err)
+			continue
+		}
+		counts[e] = int(n)
+	}
+
+	return counts
 }
 
 func ImportAll(data map[string][]map[string]interface{}) []api_storage.ImportRejection {

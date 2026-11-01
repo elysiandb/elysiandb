@@ -1,16 +1,30 @@
 package tcprouting
 
 import (
+	"log/slog"
 	"net"
+	"strings"
+	"time"
 
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/metrics"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/transport/tcp/handler"
 	"github.com/taymour/elysiandb/internal/transport/tcp/parsing"
 )
 
+var (
+	tcpLog          = log.For("tcp")
+	securityLog     = log.For("security")
+	auditLog        = log.For("audit")
+	tcpAuthThrottle = log.NewThrottle(time.Minute)
+)
+
+const maxLoggedCommandBytes = 64
+
 type Session struct {
 	authenticated bool
+	actor         string
 }
 
 func NewSession() *Session {
@@ -33,11 +47,16 @@ func RouteLine(line []byte, c net.Conn, session *Session) []byte {
 		return []byte("Goodbye!")
 
 	case parsing.EqASCII(cmd, []byte("AUTH")):
-		if !security.AuthenticateCredentials(string(query), security.LoginSourceFromAddr(c.RemoteAddr())) {
+		source := security.LoginSourceFromAddr(c.RemoteAddr())
+		if !security.AuthenticateCredentials(string(query), source) {
+			if security.TokenAuthenticationIsEnabled() {
+				logTokenAuthFailure(source.String())
+			}
 			return []byte("ERR invalid credentials")
 		}
 
 		session.authenticated = true
+		session.actor = actorFromCredentials(string(query))
 
 		return []byte("OK")
 	}
@@ -61,15 +80,67 @@ func RouteLine(line []byte, c net.Conn, session *Session) []byte {
 		return handler.HandleDelete(query)
 
 	case parsing.EqASCII(cmd, []byte("RESET")):
-		return handler.HandleReset()
+		resp := handler.HandleReset()
+		auditLog.Info("store reset", "actor", session.actorName(), "source", "tcp", "remote_addr", remoteAddr(c))
+		return resp
 
 	case parsing.EqASCII(cmd, []byte("SAVE")):
 		return handler.HandleSave()
 	}
 
-	log.Error("Unknown command:", string(cmd))
+	if log.Enabled(slog.LevelDebug) {
+		command := cmd
+		if len(command) > maxLoggedCommandBytes {
+			command = command[:maxLoggedCommandBytes]
+		}
+		tcpLog.Debug("unknown command", "remote_addr", remoteAddr(c), "command", string(command))
+	}
 
 	return []byte("ERR")
+}
+
+func ResetThrottles() {
+	tcpAuthThrottle = log.NewThrottle(time.Minute)
+}
+
+func logTokenAuthFailure(addr string) {
+	metrics.FailedLogin(addr)
+	if suppressed, ok := tcpAuthThrottle.Allow(addr); ok {
+		securityLog.Warn("tcp auth failed", log.WithSuppressed([]any{"remote_addr", addr, "auth_mode", "token"}, suppressed)...)
+	}
+}
+
+func (s *Session) actorName() string {
+	if s.actor != "" {
+		return s.actor
+	}
+
+	if !security.CredentialsAreRequired() {
+		return "anonymous"
+	}
+
+	return "unknown"
+}
+
+func actorFromCredentials(credentials string) string {
+	if security.TokenAuthenticationIsEnabled() {
+		return "token"
+	}
+
+	username, _, ok := strings.Cut(strings.TrimSpace(credentials), " ")
+	if !ok {
+		return ""
+	}
+
+	return username
+}
+
+func remoteAddr(c net.Conn) string {
+	if c == nil || c.RemoteAddr() == nil {
+		return "unknown"
+	}
+
+	return security.LoginSourceFromAddr(c.RemoteAddr()).String()
 }
 
 func extractTTLFromQuery(query *[]byte) int {
@@ -90,4 +161,21 @@ func extractTTLFromQuery(query *[]byte) int {
 	}
 
 	return 0
+}
+
+func CommandName(line []byte) string {
+	cmd, _ := parsing.FirstWordBytes(line)
+
+	switch {
+	case parsing.EqASCII(cmd, []byte("GET")):
+		return metrics.TCPGet
+	case parsing.EqASCII(cmd, []byte("MGET")):
+		return metrics.TCPMget
+	case parsing.EqASCII(cmd, []byte("SET")):
+		return metrics.TCPSet
+	case parsing.EqASCII(cmd, []byte("DEL")):
+		return metrics.TCPDel
+	}
+
+	return metrics.TCPOther
 }

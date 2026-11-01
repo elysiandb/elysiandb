@@ -8,6 +8,7 @@ import (
 
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/metrics"
 	tcprouting "github.com/taymour/elysiandb/internal/transport/tcp/tcp_routing"
 )
 
@@ -94,5 +95,24 @@ func TestNewSessionIsAuthenticatedWithoutAuthentication(t *testing.T) {
 
 	if !tcprouting.NewSession().IsAuthenticated() {
 		t.Fatal("a session must be authenticated when authentication is disabled")
+	}
+}
+
+func TestCommandName(t *testing.T) {
+	cases := map[string]string{
+		"GET k\n":       metrics.TCPGet,
+		"get k\n":       metrics.TCPGet,
+		"MGET a b\n":    metrics.TCPMget,
+		"SET k v\n":     metrics.TCPSet,
+		"DEL k\n":       metrics.TCPDel,
+		"PING\n":        metrics.TCPOther,
+		"AUTH secret\n": metrics.TCPOther,
+		"FOO\n":         metrics.TCPOther,
+	}
+
+	for line, want := range cases {
+		if got := tcprouting.CommandName([]byte(line)); got != want {
+			t.Fatalf("CommandName(%q) = %q, want %q", line, got, want)
+		}
 	}
 }

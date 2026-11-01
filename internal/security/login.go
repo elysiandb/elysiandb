@@ -2,11 +2,40 @@ package security
 
 import (
 	"crypto/subtle"
-	"fmt"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/metrics"
 )
+
+var (
+	securityLog         = log.For("security")
+	failedLoginThrottle = log.NewThrottle(time.Minute)
+)
+
+const (
+	LoginFailureBadCredentials          = "bad_credentials"
+	LoginFailureDefaultPasswordRemotely = "default_password_remote"
+	LoginFailureNotAdmin                = "not_admin"
+	LoginFailureBadRequest              = "bad_request"
+)
+
+func LogLogin(username string, source LoginSource) {
+	securityLog.Info("login succeeded", "user", username, "remote_addr", source.String())
+}
+
+func LogLogout(username string) {
+	securityLog.Debug("logout", "user", username)
+}
+
+func LogFailedLogin(username string, source LoginSource, reason string) {
+	addr := source.String()
+	metrics.FailedLogin(addr)
+
+	if suppressed, ok := failedLoginThrottle.Allow(addr + "|" + username); ok {
+		securityLog.Warn("login failed", log.WithSuppressed([]any{"user", username, "remote_addr", addr, "reason", reason}, suppressed)...)
+	}
+}
 
 func AuthenticateUserFrom(username, password string, source LoginSource) (*BasicHashedUser, time.Duration, bool) {
 	if wait := defaultLoginGuard.retryAfter(source, username); wait > 0 {
@@ -14,14 +43,15 @@ func AuthenticateUserFrom(username, password string, source LoginSource) (*Basic
 	}
 
 	user, ok := AuthenticateUser(username, password)
+	reason := LoginFailureBadCredentials
 	if ok && !source.Local && IsDefaultAdminCredentials(username, password) {
-		log.Warn(fmt.Sprintf("Login refused for %q from %s: the default admin password is only accepted from the local machine, change it to log in remotely", username, source))
+		reason = LoginFailureDefaultPasswordRemotely
 		ok = false
 	}
 
 	if !ok {
 		defaultLoginGuard.recordFailure(source, username)
-		log.Warn(fmt.Sprintf("Failed login for %q from %s", username, source))
+		LogFailedLogin(username, source, reason)
 
 		return nil, 0, false
 	}
@@ -57,6 +87,9 @@ func WarnIfDefaultAdminPassword() {
 	}
 
 	if DefaultAdminPasswordIsInUse() {
-		log.DirectWarn(fmt.Sprintf("The %q account still uses the default password: it is only accepted from this machine. Change it from the Admin UI or with `elysiandb change-password`, or set %s before the first start.", DefaultAdminUsername, AdminPasswordEnvVar))
+		securityLog.Warn("default admin password still valid",
+			"user", DefaultAdminUsername,
+			"hint", "it is only accepted from this machine: change it from the Admin UI or with `elysiandb change-password`, or set "+AdminPasswordEnvVar+" before the first start",
+		)
 	}
 }

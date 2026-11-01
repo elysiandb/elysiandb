@@ -6,6 +6,7 @@ import (
 	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -24,6 +25,7 @@ func ExportController(ctx *fasthttp.RequestCtx) {
 
 	response, err := json.Marshal(dump)
 	if err != nil {
+		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		ctx.SetBody([]byte(`{"error":"failed to marshal response"}`))
 		return

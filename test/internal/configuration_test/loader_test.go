@@ -2,30 +2,12 @@ package configuration_test
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	cfgpkg "github.com/taymour/elysiandb/internal/configuration"
 )
-
-func runAsSubprocess(t *testing.T, mode, arg string) (exitCode int, err error) {
-	t.Helper()
-
-	cmd := exec.Command(os.Args[0], "-test.run", "^TestConfigHelper$")
-	cmd.Env = append(os.Environ(),
-		"TEST_CFG_MODE="+mode,
-		"TEST_CFG_ARG="+arg,
-	)
-	err = cmd.Run()
-	if err == nil {
-		return 0, nil
-	}
-	if ee, ok := err.(*exec.ExitError); ok {
-		return ee.ExitCode(), nil
-	}
-	return -1, err
-}
 
 func TestLoadConfig_OK(t *testing.T) {
 	tmp := t.TempDir()
@@ -83,45 +65,88 @@ log:
 	}
 }
 
-func TestLoadConfig_FileMissing_FatalExit(t *testing.T) {
-	code, err := runAsSubprocess(t, "missing", "this-file-does-not-exist.yaml")
-	if err != nil {
-		t.Fatalf("subprocess error: %v", err)
-	}
-	if code == 0 {
-		t.Fatalf("expected non-zero exit code when file is missing, got 0")
+func TestLoadConfig_FileMissing_ReturnsError(t *testing.T) {
+	cfg, err := cfgpkg.LoadConfig(filepath.Join(t.TempDir(), "this-file-does-not-exist.yaml"))
+	if err == nil || cfg != nil {
+		t.Fatalf("expected an error for a missing file, got %v %v", cfg, err)
 	}
 }
 
-func TestLoadConfig_InvalidYAML_FatalExit(t *testing.T) {
-	tmp := t.TempDir()
-	path := filepath.Join(tmp, "bad.yaml")
-	if err := os.WriteFile(path, []byte("store: : : nope"), 0o644); err != nil {
+func TestLoadConfig_InvalidYAML_ReturnsError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bad.yaml")
+	if err := os.WriteFile(path, []byte("store: [unclosed"), 0o644); err != nil {
 		t.Fatalf("write bad yaml: %v", err)
 	}
 
-	code, err := runAsSubprocess(t, "badyaml", path)
-	if err != nil {
-		t.Fatalf("subprocess error: %v", err)
-	}
-	if code == 0 {
-		t.Fatalf("expected non-zero exit code for invalid YAML, got 0")
+	cfg, err := cfgpkg.LoadConfig(path)
+	if err == nil || cfg != nil {
+		t.Fatalf("expected an error for invalid YAML, got %v %v", cfg, err)
 	}
 }
 
-func TestConfigHelper(t *testing.T) {
-	mode := os.Getenv("TEST_CFG_MODE")
-	if mode == "" {
-		t.Skip("helper not invoked")
+func TestLoadConfig_LogDefaults(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "elysian.yaml")
+	if err := os.WriteFile(path, []byte("store:\n  folder: /tmp/x\n"), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	arg := os.Getenv("TEST_CFG_ARG")
 
-	switch mode {
-	case "missing":
-		_, _ = cfgpkg.LoadConfig(arg)
-	case "badyaml":
-		_, _ = cfgpkg.LoadConfig(arg)
-	default:
-		t.Fatalf("unknown TEST_CFG_MODE: %q", mode)
+	cfg, err := cfgpkg.LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+
+	if cfg.Log.Level != "info" || cfg.Log.Format != "text" || cfg.Log.AccessLog {
+		t.Fatalf("unexpected log defaults %+v", cfg.Log)
+	}
+	if cfg.Log.SlowRequestMs != cfgpkg.DefaultSlowRequestMs || cfg.Log.BufferLines != cfgpkg.DefaultBufferLines {
+		t.Fatalf("unexpected log defaults %+v", cfg.Log)
+	}
+	if cfg.Monitoring.Prometheus.Enabled {
+		t.Fatalf("prometheus must be off by default")
+	}
+}
+
+func TestLoadConfig_LogValues(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "elysian.yaml")
+	content := "log:\n  level: debug\n  format: json\n  accessLog: true\n  slowRequestMs: 0\n  bufferLines: 0\nmonitoring:\n  prometheus:\n    enabled: true\n    token: secret\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := cfgpkg.LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+
+	if cfg.Log.Level != "debug" || cfg.Log.Format != "json" || !cfg.Log.AccessLog || cfg.Log.SlowRequestMs != 0 || cfg.Log.BufferLines != 0 {
+		t.Fatalf("unexpected log config %+v", cfg.Log)
+	}
+	if !cfg.Monitoring.Prometheus.Enabled || cfg.Monitoring.Prometheus.Token != "secret" {
+		t.Fatalf("unexpected monitoring config %+v", cfg.Monitoring)
+	}
+	if strings.Contains(cfg.ToJson(), "secret") {
+		t.Fatalf("the prometheus token must be redacted: %s", cfg.ToJson())
+	}
+}
+
+func TestLoadConfig_RejectsInvalidLogValues(t *testing.T) {
+	cases := map[string]string{
+		"level":         "log:\n  level: verbose\n",
+		"format":        "log:\n  format: xml\n",
+		"slowRequestMs": "log:\n  slowRequestMs: -1\n",
+		"bufferLines":   "log:\n  bufferLines: -5\n",
+	}
+
+	for name, content := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "elysian.yaml")
+			if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := cfgpkg.LoadConfig(path); err == nil {
+				t.Fatalf("expected an error")
+			}
+		})
 	}
 }

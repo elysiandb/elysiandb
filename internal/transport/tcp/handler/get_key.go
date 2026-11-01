@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/metrics"
 	"github.com/taymour/elysiandb/internal/stat"
 	"github.com/taymour/elysiandb/internal/storage"
 	"github.com/taymour/elysiandb/internal/wildcard"
@@ -26,6 +27,7 @@ func handleWildcardKey(query []byte) []byte {
 	cfg := globals.GetConfig()
 	data := storage.GetByWildcardKey(string(query))
 	if len(data) == 0 {
+		metrics.KVMiss()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementMisses()
 		}
@@ -37,6 +39,7 @@ func handleWildcardKey(query []byte) []byte {
 	for k, v := range data {
 		result = append(result, []byte(k+"="+string(v)+"\n")...)
 
+		metrics.KVHit()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementHits()
 		}
@@ -57,6 +60,7 @@ func handleSingleKey(query []byte) []byte {
 	if storage.KeyHasExpired(key) {
 		storage.DeleteByKey(key)
 
+		metrics.KVMiss()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementMisses()
 		}
@@ -66,6 +70,7 @@ func handleSingleKey(query []byte) []byte {
 
 	data, err := storage.GetByKey(key)
 	if err != nil {
+		metrics.KVMiss()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementMisses()
 		}
@@ -73,6 +78,7 @@ func handleSingleKey(query []byte) []byte {
 		return []byte(fmt.Sprintf("%s=not found", key))
 	}
 
+	metrics.KVHit()
 	if cfg.Stats.Enabled {
 		stat.Stats.IncrementHits()
 	}

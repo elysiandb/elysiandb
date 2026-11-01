@@ -374,3 +374,13 @@ func newIdsWithout(ids []string, id string, changed *bool) []string {
 
 	return out
 }
+
+func DirtyFieldsCount() int {
+	count := 0
+	DirtyFields.Range(func(_, _ any) bool {
+		count++
+		return true
+	})
+
+	return count
+}

@@ -1,7 +1,9 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import AdminLayout from "./layouts/AdminLayout.jsx";
-import Home from "./pages/Home.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
+import Monitoring from "./pages/Monitoring.jsx";
+import Logs from "./pages/Logs.jsx";
 import Configuration from "./pages/Configuration.tsx";
 import {AuthStatus, useAuth} from "./hooks/account/useAuth.ts";
 import {Login} from "./pages/Login.tsx";
@@ -47,7 +49,15 @@ export default function App() {
             children: [
                 {
                     index: true,
-                    element: <Home />,
+                    element: <Dashboard />,
+                },
+                {
+                    path: "monitoring",
+                    element: <Monitoring />,
+                },
+                {
+                    path: "logs",
+                    element: <Logs />,
                 },
                 {
                     path: "configuration",

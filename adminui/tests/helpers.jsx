@@ -17,14 +17,14 @@ export function renderWithProviders(ui, { language = "en" } = {}) {
 
 export function mockApi(routes) {
     const fetchMock = vi.fn(async (url, options = {}) => {
-        const { pathname } = new URL(url);
-        const handler = routes[`${options.method ?? "GET"} ${pathname}`];
+        const parsed = new URL(url);
+        const handler = routes[`${options.method ?? "GET"} ${parsed.pathname}`];
 
         if (handler === undefined) {
             return new Response(null, { status: 404 });
         }
 
-        const body = typeof handler === "function" ? handler(options) : handler;
+        const body = typeof handler === "function" ? handler(options, parsed) : handler;
 
         if (body instanceof Response) {
             return body;

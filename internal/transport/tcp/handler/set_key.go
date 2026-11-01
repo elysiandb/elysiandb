@@ -27,7 +27,7 @@ func HandleSet(query []byte, ttl int) []byte {
 	}
 
 	if err != nil {
-		log.Error("Failed to store key-value pair:", err)
+		log.Error("set failed", "component", "tcp", "err", err)
 		return []byte("ERR")
 	}
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -25,5 +26,6 @@ func DeleteUserByUsernameController(ctx *fasthttp.RequestCtx) {
 	}
 
 	acl.DeleteUserACls(username)
+	observe.Audit(ctx, "user deleted", "user", username)
 	ctx.SetStatusCode(fasthttp.StatusOK)
 }

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/metrics"
 	"github.com/taymour/elysiandb/internal/stat"
 	"github.com/taymour/elysiandb/internal/storage"
 	"github.com/taymour/elysiandb/internal/transport/tcp/parsing"
@@ -39,6 +40,7 @@ func HandleMGETSingleKey(key string, i int, results *[][]byte) {
 	if storage.KeyHasExpired(key) {
 		storage.DeleteByKey(key)
 
+		metrics.KVMiss()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementMisses()
 		}
@@ -50,6 +52,7 @@ func HandleMGETSingleKey(key string, i int, results *[][]byte) {
 
 	data, err := storage.GetByKey(key)
 	if err != nil {
+		metrics.KVMiss()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementMisses()
 		}
@@ -61,6 +64,7 @@ func HandleMGETSingleKey(key string, i int, results *[][]byte) {
 
 	(*results)[i] = data
 
+	metrics.KVHit()
 	if cfg.Stats.Enabled {
 		stat.Stats.IncrementHits()
 	}
@@ -70,6 +74,7 @@ func HandleMGETWildcardKey(key string, i int, results *[][]byte) {
 	cfg := globals.GetConfig()
 	data := storage.GetByWildcardKey(key)
 	if len(data) == 0 {
+		metrics.KVMiss()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementMisses()
 		}
@@ -82,6 +87,7 @@ func HandleMGETWildcardKey(key string, i int, results *[][]byte) {
 	for k, v := range data {
 		result = append(result, []byte(k+"="+string(v)+"\n")...)
 
+		metrics.KVHit()
 		if cfg.Stats.Enabled {
 			stat.Stats.IncrementHits()
 		}

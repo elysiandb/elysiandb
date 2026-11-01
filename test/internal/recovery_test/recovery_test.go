@@ -3,6 +3,7 @@ package recovery_test
 import (
 	"bytes"
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/recovery"
 	"github.com/taymour/elysiandb/internal/storage"
 )
@@ -379,5 +381,61 @@ func TestRecovery_KeepsALogItCannotRead(t *testing.T) {
 				t.Fatalf("expected the unreadable log to be kept as %s: %v", path+recovery.FailedReplaySuffix, err)
 			}
 		})
+	}
+}
+
+func TestReplayReturnsTheEntriesAndWarnsOnce(t *testing.T) {
+	dir := setupTempDir(t)
+	if err := log.Configure(log.Options{BufferLines: 100}); err != nil {
+		t.Fatal(err)
+	}
+	log.SetOutput(&strings.Builder{}, false)
+	t.Cleanup(func() {
+		log.SetOutput(nil, false)
+		_ = log.Configure(log.Options{})
+	})
+
+	content := `{"op":"put","key":"a","value":{"x":1}}` + "\n" + `not json` + "\n" + `{"op":"del","key":"b"}` + "\n" + `{broken` + "\n"
+	if err := os.WriteFile(filepath.Join(dir, recovery.RecoveryFile), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	entries := recovery.ReplayJsonRecoveryLog(
+		func(k string, v map[string]interface{}) error { return nil },
+		func(k string) {},
+	)
+	if entries != 2 {
+		t.Fatalf("expected 2 replayed entries, got %d", entries)
+	}
+
+	warn := log.Logs(log.Query{MinLevel: slog.LevelWarn, Component: "recovery"}).Entries
+	if len(warn) != 2 {
+		t.Fatalf("expected one warning and one error, got %+v", warn)
+	}
+	if warn[0].Message != "unclean shutdown detected, recovery log replayed" || warn[0].Attrs["entries"] != int64(2) {
+		t.Fatalf("unexpected warning %+v", warn[0])
+	}
+	if warn[1].Message != "recovery log entries unreadable" || warn[1].Attrs["entries"] != int64(2) {
+		t.Fatalf("unreadable lines are reported once with a count: %+v", warn[1])
+	}
+
+	if again := recovery.ReplayJsonRecoveryLog(func(string, map[string]interface{}) error { return nil }, func(string) {}); again != 0 {
+		t.Fatalf("nothing is replayed after a clean replay, got %d", again)
+	}
+}
+
+func TestLogSizes(t *testing.T) {
+	dir := setupTempDir(t)
+
+	if j, s := recovery.LogSizes(); j != 0 || s != 0 {
+		t.Fatalf("missing logs have no size, got %d %d", j, s)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, recovery.StoreRecoveryFile), []byte("12345"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, s := recovery.LogSizes(); s != 5 {
+		t.Fatalf("expected 5 bytes, got %d", s)
 	}
 }

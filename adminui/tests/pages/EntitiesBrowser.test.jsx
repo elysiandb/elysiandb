@@ -1,4 +1,6 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { ToastProvider } from "../../src/components/notification/ToastProvider.jsx";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import EntitiesBrowser from "../../src/pages/EntitiesBrowser.jsx";
@@ -83,5 +85,30 @@ describe("EntitiesBrowser", () => {
         expect(confirm).toHaveBeenCalledWith("Supprimer l'entité « a1 » ?");
         expect(await screen.findByText("Entité « a1 » supprimée")).toBeInTheDocument();
         expect(requestsTo(fetchMock, "DELETE", "/api/articles/a1")).toHaveLength(1);
+    });
+
+    it("opens the entity type given in the URL", async () => {
+        const fetchMock = mockApi({
+            ...ROUTES,
+            "GET /api/entity/types": {
+                entities: [JSON.stringify({ id: "articles", _manual: false }), JSON.stringify({ id: "books", _manual: false })],
+            },
+        });
+        render(
+            <ToastProvider>
+                <MemoryRouter initialEntries={["/admin/browse?entity=books"]}>
+                    <EntitiesBrowser />
+                </MemoryRouter>
+            </ToastProvider>
+        );
+
+        await waitFor(() => {
+            const selected = document.querySelector(".entity-list-item.selected");
+            expect(selected).toHaveTextContent("books");
+        });
+        await waitFor(() => {
+            const queries = requestsTo(fetchMock, "POST", "/api/query").map(([, options]) => JSON.parse(options.body).entity);
+            expect(queries).toEqual(["books"]);
+        });
     });
 });

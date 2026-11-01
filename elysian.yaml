@@ -10,7 +10,11 @@ server:
   http: { enabled: true,  host: 0.0.0.0, port: 8089 }
   tcp:  { enabled: true,  host: 0.0.0.0, port: 8088 }
 log:
-  flushIntervalSeconds: 5
+  level: info  # debug | info | warn | error
+  format: text  # text | json
+  accessLog: false  # one info line per HTTP request
+  slowRequestMs: 500  # warn for requests slower than this; 0 disables
+  bufferLines: 5000  # lines kept in memory for the Admin UI Logs page; 0 disables it
 stats:
   enabled: false
 security:
@@ -31,3 +35,6 @@ api:
     enabled: true
 adminui:
   enabled: true
+monitoring:
+  prometheus:
+    enabled: false

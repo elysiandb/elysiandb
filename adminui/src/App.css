@@ -78,6 +78,7 @@ body {
     color: var(--text-dim) !important;
     margin-left: 1rem;
     transition: 0.2s;
+    white-space: nowrap;
 }
 
 .nav-link:hover {
@@ -1067,4 +1068,338 @@ button:hover, .btn:hover {
 
     white-space: pre;
     overflow-x: auto;
+}
+
+.monitoring-page {
+    max-width: 1800px;
+}
+
+.monitoring-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.monitoring-section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 12px;
+}
+
+.monitoring-card .card-body.monitoring-card-body {
+    padding: 10px 12px;
+}
+
+.monitoring-chart,
+.monitoring-sparkline {
+    width: 100%;
+    min-width: 0;
+}
+
+.monitoring-sparkline {
+    margin-top: 8px;
+}
+
+.monitoring-chart .u-legend {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+}
+
+.monitoring-chart .u-legend .u-marker {
+    border-radius: 2px;
+}
+
+.monitoring-kpi .card-body {
+    padding: 14px 16px 8px;
+}
+
+.monitoring-kpi-title {
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.monitoring-kpi-value {
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--text-main);
+    line-height: 1.3;
+}
+
+.monitoring-kpi-detail {
+    color: var(--text-dim);
+    font-size: 0.8rem;
+}
+
+.monitoring-kpi[data-tone="danger"] {
+    border-color: rgba(255, 92, 92, 0.55) !important;
+}
+
+.monitoring-kpi[data-tone="danger"] .monitoring-kpi-value {
+    color: #ffb1b1;
+}
+
+.monitoring-status[data-level="critical"] {
+    border-color: rgba(255, 92, 92, 0.55) !important;
+}
+
+.monitoring-status[data-level="warning"] {
+    border-color: rgba(247, 214, 74, 0.45) !important;
+}
+
+.monitoring-link {
+    color: var(--accent);
+    white-space: nowrap;
+}
+
+.monitoring-link:hover {
+    color: var(--accent-hover);
+}
+
+.monitoring-select,
+.monitoring-input {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    color: var(--text-main) !important;
+    border-radius: 8px !important;
+}
+
+.monitoring-select {
+    width: auto !important;
+}
+
+.monitoring-select option {
+    background: var(--bg-section);
+    color: var(--text-main);
+}
+
+.monitoring-select:focus,
+.monitoring-input:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px rgba(247, 214, 74, 0.25) !important;
+}
+
+.monitoring-button.btn {
+    padding: 4px 12px;
+    border-radius: 8px;
+    box-shadow: none;
+    transform: none;
+}
+
+.monitoring-button.btn:hover {
+    transform: none;
+}
+
+.monitoring-connection-lost {
+    padding: 8px 14px;
+}
+
+.monitoring-facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 4px 16px;
+    margin-bottom: 12px;
+}
+
+.monitoring-facts dt {
+    color: var(--text-dim);
+    font-weight: 400;
+}
+
+.monitoring-facts dd {
+    margin: 0;
+    text-align: right;
+    color: var(--text-main);
+}
+
+.monitoring-facts-wide {
+    grid-template-columns: max-content 1fr max-content 1fr;
+}
+
+.monitoring-facts-wide dd,
+.monitoring-facts-inline dd {
+    text-align: left;
+}
+
+.monitoring-facts-inline {
+    grid-template-columns: max-content 1fr max-content 1fr max-content 1fr;
+}
+
+.monitoring-bar-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 2fr max-content;
+    gap: 8px;
+    align-items: center;
+    color: var(--text-main);
+    padding: 2px 0;
+}
+
+.monitoring-bar-row:hover {
+    color: var(--accent);
+}
+
+.monitoring-bar-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.monitoring-bar {
+    display: block;
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+}
+
+.monitoring-bar span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+}
+
+.monitoring-recent .list-group-item {
+    font-size: 0.85rem;
+    padding: 6px 14px;
+}
+
+.monitoring-actor {
+    color: var(--accent);
+    white-space: nowrap;
+}
+
+.monitoring-table {
+    font-size: 0.85rem;
+    margin-bottom: 0;
+}
+
+.monitoring-table th {
+    color: var(--accent);
+    font-weight: 600;
+    border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.monitoring-table td,
+.monitoring-table th {
+    background: transparent !important;
+    color: var(--text-main);
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.logs-filters .form-label {
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+}
+
+.logs-card {
+    overflow: hidden;
+}
+
+.logs-list {
+    max-height: calc(100vh - 380px);
+    min-height: 240px;
+    overflow-y: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+}
+
+.logs-row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 4px 12px;
+}
+
+.logs-row[data-level="error"] {
+    background: rgba(255, 92, 92, 0.06);
+}
+
+.logs-row[data-level="warn"] {
+    background: rgba(247, 214, 74, 0.05);
+}
+
+.logs-row-summary {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    width: 100%;
+    text-align: left;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 2px 0 !important;
+    border-radius: 0 !important;
+    color: var(--text-main);
+    font: inherit;
+    transform: none !important;
+}
+
+.logs-time {
+    color: var(--text-dim);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.logs-level {
+    min-width: 72px;
+}
+
+.logs-component {
+    color: var(--accent);
+    min-width: 70px;
+}
+
+.logs-message {
+    color: var(--text-main);
+    word-break: break-word;
+}
+
+.logs-attributes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 2px 0 4px 0;
+}
+
+.logs-chip {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    word-break: break-all;
+}
+
+button.logs-chip.logs-chip-filter {
+    border: 1px solid rgba(247, 214, 74, 0.35);
+    color: var(--accent);
+    box-shadow: none;
+    transform: none;
+    font: inherit;
+    font-size: 0.75rem;
+    padding: 1px 8px;
+}
+
+.logs-details pre {
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--text-main);
+    padding: 10px;
+    border-radius: 8px;
+    margin: 4px 0 8px;
+    max-height: 320px;
+    overflow: auto;
+}
+
+.logs-pending,
+.logs-more {
+    display: flex;
+    justify-content: center;
+    padding: 8px;
+}
+
+.logs-empty {
+    padding: 24px;
+    text-align: center;
 }

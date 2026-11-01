@@ -116,9 +116,48 @@ func storedUser(username string) (*BasicHashedUser, bool) {
 	return user, true
 }
 
-func loadSessions() (*SessionsFile, error) {
+type sessionsCacheEntry struct {
+	path    string
+	modTime time.Time
+	size    int64
+	file    SessionsFile
+}
+
+var (
+	sessionsCacheMu sync.Mutex
+	sessionsCache   *sessionsCacheEntry
+)
+
+func sessionsPath() string {
 	cfg := globals.GetConfig()
-	path := fmt.Sprintf("%s/%s", cfg.Store.Folder, SessionsFilename)
+
+	return fmt.Sprintf("%s/%s", cfg.Store.Folder, SessionsFilename)
+}
+
+func copySessions(sf SessionsFile) *SessionsFile {
+	return &SessionsFile{Sessions: append([]Session(nil), sf.Sessions...)}
+}
+
+func loadSessions() (*SessionsFile, error) {
+	path := sessionsPath()
+
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			cacheSessions(nil)
+			return &SessionsFile{Sessions: []Session{}}, nil
+		}
+
+		return nil, err
+	}
+
+	sessionsCacheMu.Lock()
+	cached := sessionsCache
+	sessionsCacheMu.Unlock()
+
+	if cached != nil && cached.path == path && cached.modTime.Equal(info.ModTime()) && cached.size == info.Size() {
+		return copySessions(cached.file), nil
+	}
 
 	file, err := os.Open(path)
 	if err != nil {
@@ -137,14 +176,38 @@ func loadSessions() (*SessionsFile, error) {
 		return nil, err
 	}
 
+	cacheSessions(&sessionsCacheEntry{path: path, modTime: info.ModTime(), size: info.Size(), file: *copySessions(sf)})
+
 	return &sf, nil
+}
+
+func cacheSessions(entry *sessionsCacheEntry) {
+	sessionsCacheMu.Lock()
+	sessionsCache = entry
+	sessionsCacheMu.Unlock()
+}
+
+func ActiveSessionCount() int {
+	sf, err := loadSessions()
+	if err != nil {
+		return 0
+	}
+
+	now := time.Now().Unix()
+	count := 0
+	for _, s := range sf.Sessions {
+		if s.ExpiresAt > now && s.TokenHash != "" {
+			count++
+		}
+	}
+
+	return count
 }
 
 var sessionsMu sync.Mutex
 
 func saveSessions(sf *SessionsFile) error {
-	cfg := globals.GetConfig()
-	path := fmt.Sprintf("%s/%s", cfg.Store.Folder, SessionsFilename)
+	path := sessionsPath()
 	tmpPath := path + ".tmp"
 
 	data, _ := json.Marshal(sf)
@@ -154,7 +217,17 @@ func saveSessions(sf *SessionsFile) error {
 
 	_ = os.Chmod(tmpPath, 0o600)
 
-	return os.Rename(tmpPath, path)
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+
+	if info, err := os.Stat(path); err == nil {
+		cacheSessions(&sessionsCacheEntry{path: path, modTime: info.ModTime(), size: info.Size(), file: *copySessions(*sf)})
+	} else {
+		cacheSessions(nil)
+	}
+
+	return nil
 }
 
 func CreateSession(username string, role Role, ttl time.Duration) (*Session, error) {
@@ -264,7 +337,9 @@ func removeExpiredSessions() {
 		}
 
 		sf.Sessions = active
-		_ = saveSessions(sf)
+		if err := saveSessions(sf); err != nil {
+			securityLog.Error("cannot save the sessions file", "err", err)
+		}
 	}
 }
 
@@ -277,9 +352,9 @@ func DeleteAllSessions() error {
 	sessionsMu.Lock()
 	defer sessionsMu.Unlock()
 
-	cfg := globals.GetConfig()
-	path := fmt.Sprintf("%s/%s", cfg.Store.Folder, SessionsFilename)
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+	cacheSessions(nil)
+
+	if err := os.Remove(sessionsPath()); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 

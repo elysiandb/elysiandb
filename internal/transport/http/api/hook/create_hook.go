@@ -2,10 +2,10 @@ package http_hook
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -33,8 +33,7 @@ func CreateHookForEntityController(ctx *fasthttp.RequestCtx) {
 
 	err = hook.CreateHook(&hookData)
 	if err != nil {
-
-		fmt.Printf("Error %v\n", err)
+		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		ctx.SetBodyString(`{"error":"internal server error"}`)
 
@@ -43,13 +42,14 @@ func CreateHookForEntityController(ctx *fasthttp.RequestCtx) {
 
 	response, err := json.Marshal(hookData)
 	if err != nil {
-		fmt.Printf("Error %v\n", err)
+		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		ctx.SetBodyString(`{"error":"internal server error"}`)
 
 		return
 	}
 
+	observe.Audit(ctx, "hook created", "entity", entity, "hook_id", hookData.ID, "event", hookData.Event, "bypass_acl", hookData.ByPassACL, "enabled", hookData.Enabled)
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
 }

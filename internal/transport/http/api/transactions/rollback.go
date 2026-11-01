@@ -2,6 +2,7 @@ package api_transaction
 
 import (
 	"github.com/taymour/elysiandb/internal/transaction"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -11,6 +12,7 @@ func RollbackTransactionController(ctx *fasthttp.RequestCtx) {
 
 	err := transaction.RollbackTransaction(txID)
 	if err != nil {
+		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		ctx.SetBody([]byte(`{"error":"` + err.Error() + `"}`))
 

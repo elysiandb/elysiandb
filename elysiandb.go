@@ -22,27 +22,34 @@ func banner() {
 }
 
 func main() {
-	banner()
-
 	configFilename := flag.String("config", "elysian.yaml", "Path to configuration file")
 	flag.Parse()
 
 	cfg, err := configuration.LoadConfig(*configFilename)
 	if err != nil {
-		log.DirectError("Error loading config:", err)
-		return
+		log.Fatal("cannot load the configuration", "component", "boot", "path", *configFilename, "err", err)
+	}
+
+	if err := log.Configure(log.Options{Level: cfg.Log.Level, Format: cfg.Log.Format, BufferLines: cfg.Log.BufferLines}); err != nil {
+		log.Fatal("invalid log configuration", "component", "boot", "path", *configFilename, "err", err)
+	}
+
+	if log.Format() == log.FormatText && log.StdoutIsTerminal() {
+		banner()
 	}
 
 	globals.SetConfig(cfg)
+	boot.LogConfiguration(*configFilename)
 
 	boot.InitDB()
-	security.InitAdminUserIfNotExists()
+	if err := security.InitAdminUserIfNotExists(); err != nil {
+		log.Error("default admin creation failed", "component", "security", "err", err)
+	}
 	security.ProtectSessionsFile()
 
 	args := flag.Args()
 
 	if len(args) == 0 {
-		security.WarnIfDefaultAdminPassword()
 		cmd.StartServer()
 		return
 	}

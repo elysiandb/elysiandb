@@ -2,18 +2,31 @@ package storage
 
 import (
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"os"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/metrics"
 	"github.com/taymour/elysiandb/internal/recovery"
 )
 
 var (
-	storeWriteMu sync.Mutex
-	jsonWriteMu  sync.Mutex
+	storeWriteMu  sync.Mutex
+	jsonWriteMu   sync.Mutex
+	storageLog    = log.For("storage")
+	flushThrottle = log.NewThrottle(time.Minute)
+	flushFailures sync.Map
+)
+
+const (
+	flushTargetStore = "store"
+	flushTargetJSON  = "json"
 )
 
 func WriteToDB() {
@@ -32,15 +45,14 @@ func WriteStoreDB() {
 	ec := expirationContainer
 	rootMu.RUnlock()
 
-	if err := writeStoreToFile(cfg, DataFile, ms); err != nil {
-		log.Error("Error writing main store to database:", err)
-
-		return
+	start := time.Now()
+	wroteStore, err := writeStoreToFile(cfg, DataFile, ms)
+	wroteExpirations := false
+	if err == nil {
+		wroteExpirations, err = writeExpirationsToFile(cfg, ExpirationDataFile, ec)
 	}
 
-	if err := writeExpirationsToFile(cfg, ExpirationDataFile, ec); err != nil {
-		log.Error("Error writing expiration store to database:", err)
-
+	if !finishFlush(flushTargetStore, start, wroteStore || wroteExpirations, err) {
 		return
 	}
 
@@ -63,9 +75,9 @@ func WriteJsonDB() {
 		return
 	}
 
-	if err := writeJsonStoreToFile(cfg, JsonDataFile, js); err != nil {
-		log.Error("Error writing json store to database:", err)
-
+	start := time.Now()
+	wrote, err := writeJsonStoreToFile(cfg, JsonDataFile, js)
+	if !finishFlush(flushTargetJSON, start, wrote, err) {
 		return
 	}
 
@@ -74,68 +86,71 @@ func WriteJsonDB() {
 	}
 }
 
-func writeExpirationsToFile(cfg *configuration.Config, fileName string, expirationContainer *ExpirationContainer) error {
-	if expirationContainer.saved.Load() {
-		return nil
+func finishFlush(target string, start time.Time, wrote bool, err error) bool {
+	d := time.Since(start)
+	metrics.RecordFlush(target, d, wrote, err)
+
+	counter, _ := flushFailures.LoadOrStore(target, new(atomic.Int64))
+	failures := counter.(*atomic.Int64)
+
+	if err != nil {
+		failures.Add(1)
+		if suppressed, ok := flushThrottle.Allow(target); ok {
+			storageLog.Error("flush failed", log.WithSuppressed([]any{"target", target, "err", err}, suppressed)...)
+		}
+		return false
 	}
 
-	isSuccess := true
+	if n := failures.Swap(0); n > 0 {
+		flushThrottle.Reset(target)
+		storageLog.Info("flush working again", "target", target, "failures", n)
+	}
 
-	path := cfg.Store.Folder + "/" + fileName
+	if wrote && log.Enabled(slog.LevelDebug) {
+		storageLog.Debug("flush done", "target", target, "duration_ms", log.Since(start))
+	}
 
+	return true
+}
+
+func writeDataFile(path string, value any) error {
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
-		isSuccess = false
-		log.Error("Error opening file:", err)
-	} else {
-		_ = file.Chmod(0o600)
+		return err
 	}
 
-	defer file.Close()
+	_ = file.Chmod(0o600)
 
-	encoder := json.NewEncoder(file)
-
-	expirationsAsMap := expirationContainer.ToMap()
-
-	if err := encoder.Encode(expirationsAsMap); err != nil {
-		isSuccess = false
-		log.Error("Error encoding JSON:", err)
+	if err := json.NewEncoder(file).Encode(value); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("encode %s: %w", path, err)
 	}
 
-	expirationContainer.saved.Store(isSuccess)
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close %s: %w", path, err)
+	}
 
 	return nil
 }
 
-func writeStoreToFile(cfg *configuration.Config, fileName string, store *Store) error {
+func writeExpirationsToFile(cfg *configuration.Config, fileName string, expirationContainer *ExpirationContainer) (bool, error) {
+	if expirationContainer.saved.Load() {
+		return false, nil
+	}
+
+	err := writeDataFile(cfg.Store.Folder+"/"+fileName, expirationContainer.ToMap())
+	expirationContainer.saved.Store(err == nil)
+
+	return true, err
+}
+
+func writeStoreToFile(cfg *configuration.Config, fileName string, store *Store) (bool, error) {
 	if store.saved.Load() {
-		return nil
+		return false, nil
 	}
 
-	isSuccess := true
+	err := writeDataFile(cfg.Store.Folder+"/"+fileName, store.ToMap())
+	store.saved.Store(err == nil)
 
-	path := cfg.Store.Folder + "/" + fileName
-
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-	if err != nil {
-		isSuccess = false
-		log.Error("Error opening file:", err)
-	} else {
-		_ = file.Chmod(0o600)
-	}
-
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-
-	storeAsMap := store.ToMap()
-
-	if err := encoder.Encode(storeAsMap); err != nil {
-		isSuccess = false
-		log.Error("Error encoding JSON:", err)
-	}
-
-	store.saved.Store(isSuccess)
-
-	return nil
+	return true, err
 }

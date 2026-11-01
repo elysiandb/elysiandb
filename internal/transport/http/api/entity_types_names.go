@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/taymour/elysiandb/internal/engine"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -16,6 +17,7 @@ func GetEntityTypesNamesController(ctx *fasthttp.RequestCtx) {
 		"entities": entityTypes,
 	})
 	if err != nil {
+		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		ctx.SetBody([]byte(`{"error":"failed to marshal response"}`))
 		return
