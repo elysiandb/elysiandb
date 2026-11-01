@@ -1,0 +1,160 @@
+{
+    "common": {
+        "loading": "加载中...",
+        "cancel": "取消",
+        "save": "保存",
+        "create": "创建",
+        "delete": "删除",
+        "show": "显示",
+        "hide": "隐藏",
+        "enabled": "已启用",
+        "disabled": "已禁用",
+        "updating": "更新中...",
+        "error": "错误：{message}",
+        "unknownError": "未知错误",
+        "username": "用户名",
+        "password": "密码",
+        "role": "角色",
+        "actions": "操作",
+        "name": "名称",
+        "event": "事件",
+        "entities": "实体",
+        "users": "用户",
+        "searchUser": "搜索用户…"
+    },
+    "language": {
+        "label": "语言"
+    },
+    "login": {
+        "submit": "登录"
+    },
+    "nav": {
+        "toggle": "显示导航",
+        "configuration": "配置",
+        "users": "用户",
+        "acl": "ACL",
+        "schema": "模式",
+        "hooks": "钩子",
+        "browse": "浏览",
+        "hello": "你好，{username}",
+        "logout": "退出登录"
+    },
+    "home": {
+        "title": "首页"
+    },
+    "configuration": {
+        "entry": "{label}：{value}",
+        "sections": {
+            "store": "存储",
+            "server": "服务器",
+            "logging": "日志",
+            "security": "安全",
+            "stats": "统计",
+            "api": "API",
+            "adminUI": "管理界面"
+        },
+        "fields": {
+            "folder": "文件夹",
+            "shards": "分片",
+            "flushInterval": "写入间隔",
+            "crashRecovery": "崩溃恢复",
+            "maxLogMB": "日志最大大小 (MB)",
+            "http": "HTTP",
+            "tcp": "TCP",
+            "host": "主机",
+            "port": "端口",
+            "authenticationEnabled": "启用身份验证",
+            "mode": "模式",
+            "enabled": "启用",
+            "indexWorkers": "索引工作线程",
+            "cache": "缓存",
+            "cleanupInterval": "清理间隔",
+            "schema": "模式",
+            "strict": "严格"
+        }
+    },
+    "users": {
+        "create": "创建用户",
+        "changePassword": "修改密码",
+        "confirmDelete": "删除用户“{username}”？",
+        "editTitle": "编辑用户",
+        "createTitle": "创建用户",
+        "passwordRequired": "请输入密码。",
+        "created": "用户创建成功",
+        "createFailed": "创建用户失败",
+        "passwordChanged": "用户密码修改成功",
+        "passwordChangeFailed": "修改用户密码失败",
+        "roleChanged": "用户角色修改成功",
+        "roleChangeFailed": "修改用户角色失败",
+        "deleted": "用户删除成功",
+        "deleteFailed": "删除用户失败"
+    },
+    "acl": {
+        "searchEntity": "搜索实体…",
+        "update": "更新 ACL",
+        "restore": "恢复默认值",
+        "confirmRestore": "恢复“{username}”的默认权限？",
+        "updated": "已更新“{username}”的 ACL（实体：{count}）",
+        "updateFailed": "更新“{username}”的 ACL 失败",
+        "restored": "已恢复“{username}”的默认 ACL",
+        "restoreFailed": "恢复“{username}”的默认 ACL 失败",
+        "overview": "权限概览",
+        "permissions": {
+            "read": "允许读取该实体的所有记录。",
+            "create": "允许在该实体中创建新记录。",
+            "update": "允许更新该实体的任意记录。",
+            "delete": "允许删除该实体的任意记录。",
+            "owning_read": "仅允许读取属于该用户的记录。",
+            "owning_write": "允许创建属于该用户的记录。",
+            "owning_update": "仅允许更新属于该用户的记录。",
+            "owning_delete": "仅允许删除属于该用户的记录。"
+        }
+    },
+    "schema": {
+        "createTitle": "创建实体类型",
+        "namePlaceholder": "实体名称",
+        "manual": "手动",
+        "autoManaged": "自动管理",
+        "addField": "+ 添加字段",
+        "update": "更新模式",
+        "drop": "删除实体类型",
+        "confirmDrop": "删除实体类型“{entity}”？",
+        "required": "必填",
+        "created": "实体“{entity}”创建成功",
+        "createFailed": "创建实体“{entity}”失败",
+        "dropped": "实体“{entity}”已删除",
+        "dropFailed": "删除“{entity}”失败",
+        "updated": "已更新“{entity}”的模式",
+        "updateFailed": "更新“{entity}”的模式失败"
+    },
+    "hooks": {
+        "createTitle": "创建钩子",
+        "off": "关闭",
+        "title": "钩子",
+        "options": "选项",
+        "bypassAcl": "绕过 ACL",
+        "language": "脚本语言",
+        "priority": "优先级",
+        "script": "脚本",
+        "mustStartWith": "{event} 钩子必须以下列内容开头：{signature}",
+        "created": "已为“{entity}”创建钩子“{name}”",
+        "createFailed": "为“{entity}”创建钩子失败",
+        "saved": "钩子“{name}”已保存",
+        "saveFailed": "保存钩子失败"
+    },
+    "browse": {
+        "query": "查询",
+        "search": "搜索",
+        "invalidQuery": "无效的 JSON 查询",
+        "queryError": "执行查询时出错",
+        "document": "文档",
+        "confirmDelete": "删除实体“{id}”？",
+        "deleted": "实体“{id}”已删除",
+        "deleteFailed": "删除“{id}”失败",
+        "help": {
+            "filters": "过滤",
+            "sort": "排序",
+            "pagination": "分页"
+        }
+    }
+}

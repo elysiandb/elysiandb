@@ -26,7 +26,7 @@ describe("language store", () => {
 
     it("ignores unsupported languages", () => {
         useLanguageStore.getState().setLanguage("fr");
-        useLanguageStore.getState().setLanguage("de");
+        useLanguageStore.getState().setLanguage("it");
         useLanguageStore.getState().setLanguage(undefined);
 
         expect(useLanguageStore.getState().language).toBe("fr");
@@ -41,10 +41,26 @@ describe("language store", () => {
         expect(store.getState().language).toBe("fr");
     });
 
+    it.each([
+        [["es-MX"], "es"],
+        [["zh-TW", "en"], "zh"],
+        [["de-CH", "fr"], "de"],
+        [["ja"], "ja"],
+        [["ko-KR"], "ko"],
+        [["pt-PT"], "pt"],
+        [["nl-BE"], "nl"],
+    ])("starts with the browser language %j as %s", async (browserLanguages, expected) => {
+        localStorage.removeItem("language");
+
+        const store = await loadFreshStore(browserLanguages);
+
+        expect(store.getState().language).toBe(expected);
+    });
+
     it("starts in English when the browser language is not supported", async () => {
         localStorage.removeItem("language");
 
-        const store = await loadFreshStore(["de-DE", "it"]);
+        const store = await loadFreshStore(["it-IT", "ru"]);
 
         expect(store.getState().language).toBe("en");
     });

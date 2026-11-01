@@ -1,0 +1,160 @@
+{
+    "common": {
+        "loading": "Cargando...",
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "create": "Crear",
+        "delete": "Eliminar",
+        "show": "Mostrar",
+        "hide": "Ocultar",
+        "enabled": "Activado",
+        "disabled": "Desactivado",
+        "updating": "Actualizando...",
+        "error": "Error: {message}",
+        "unknownError": "Error desconocido",
+        "username": "Nombre de usuario",
+        "password": "Contraseña",
+        "role": "Rol",
+        "actions": "Acciones",
+        "name": "Nombre",
+        "event": "Evento",
+        "entities": "Entidades",
+        "users": "Usuarios",
+        "searchUser": "Buscar usuario…"
+    },
+    "language": {
+        "label": "Idioma"
+    },
+    "login": {
+        "submit": "Iniciar sesión"
+    },
+    "nav": {
+        "toggle": "Mostrar la navegación",
+        "configuration": "Configuración",
+        "users": "Usuarios",
+        "acl": "ACL",
+        "schema": "Esquema",
+        "hooks": "Hooks",
+        "browse": "Explorar",
+        "hello": "Hola, {username}",
+        "logout": "Cerrar sesión"
+    },
+    "home": {
+        "title": "Inicio"
+    },
+    "configuration": {
+        "entry": "{label}: {value}",
+        "sections": {
+            "store": "Almacenamiento",
+            "server": "Servidor",
+            "logging": "Registro",
+            "security": "Seguridad",
+            "stats": "Estadísticas",
+            "api": "API",
+            "adminUI": "Interfaz de administración"
+        },
+        "fields": {
+            "folder": "Carpeta",
+            "shards": "Shards",
+            "flushInterval": "Intervalo de escritura",
+            "crashRecovery": "Recuperación tras fallos",
+            "maxLogMB": "Tamaño máx. del registro (MB)",
+            "http": "HTTP",
+            "tcp": "TCP",
+            "host": "Host",
+            "port": "Puerto",
+            "authenticationEnabled": "Autenticación activada",
+            "mode": "Modo",
+            "enabled": "Activado",
+            "indexWorkers": "Workers de indexación",
+            "cache": "Caché",
+            "cleanupInterval": "Intervalo de limpieza",
+            "schema": "Esquema",
+            "strict": "Estricto"
+        }
+    },
+    "users": {
+        "create": "Crear un usuario",
+        "changePassword": "Cambiar la contraseña",
+        "confirmDelete": "¿Eliminar el usuario «{username}»?",
+        "editTitle": "Editar usuario",
+        "createTitle": "Crear usuario",
+        "passwordRequired": "Introduce una contraseña.",
+        "created": "Usuario creado correctamente",
+        "createFailed": "No se pudo crear el usuario",
+        "passwordChanged": "Contraseña del usuario modificada correctamente",
+        "passwordChangeFailed": "No se pudo cambiar la contraseña del usuario",
+        "roleChanged": "Rol del usuario modificado correctamente",
+        "roleChangeFailed": "No se pudo cambiar el rol del usuario",
+        "deleted": "Usuario eliminado correctamente",
+        "deleteFailed": "No se pudo eliminar el usuario"
+    },
+    "acl": {
+        "searchEntity": "Buscar entidad…",
+        "update": "Actualizar ACL",
+        "restore": "Restaurar valores predeterminados",
+        "confirmRestore": "¿Restaurar los permisos predeterminados de «{username}»?",
+        "updated": "ACL actualizadas para «{username}» (entidades: {count})",
+        "updateFailed": "No se pudieron actualizar las ACL de «{username}»",
+        "restored": "ACL predeterminadas restauradas para «{username}»",
+        "restoreFailed": "No se pudieron restaurar las ACL predeterminadas de «{username}»",
+        "overview": "Resumen de permisos",
+        "permissions": {
+            "read": "Permite leer todos los registros de la entidad.",
+            "create": "Permite crear nuevos registros en la entidad.",
+            "update": "Permite modificar cualquier registro de la entidad.",
+            "delete": "Permite eliminar cualquier registro de la entidad.",
+            "owning_read": "Permite leer solo los registros que pertenecen al usuario.",
+            "owning_write": "Permite crear registros que pertenecen al usuario.",
+            "owning_update": "Permite modificar solo los registros que pertenecen al usuario.",
+            "owning_delete": "Permite eliminar solo los registros que pertenecen al usuario."
+        }
+    },
+    "schema": {
+        "createTitle": "Crear tipo de entidad",
+        "namePlaceholder": "Nombre de la entidad",
+        "manual": "manual",
+        "autoManaged": "gestionado automáticamente",
+        "addField": "+ Añadir campo",
+        "update": "Actualizar esquema",
+        "drop": "Eliminar tipo de entidad",
+        "confirmDrop": "¿Eliminar el tipo de entidad «{entity}»?",
+        "required": "obligatorio",
+        "created": "Entidad «{entity}» creada correctamente",
+        "createFailed": "No se pudo crear la entidad «{entity}»",
+        "dropped": "Entidad «{entity}» eliminada",
+        "dropFailed": "No se pudo eliminar «{entity}»",
+        "updated": "Esquema actualizado para «{entity}»",
+        "updateFailed": "No se pudo actualizar el esquema de «{entity}»"
+    },
+    "hooks": {
+        "createTitle": "Crear hook",
+        "off": "INACTIVO",
+        "title": "Hook",
+        "options": "Opciones",
+        "bypassAcl": "Ignorar las ACL",
+        "language": "Lenguaje",
+        "priority": "Prioridad",
+        "script": "Script",
+        "mustStartWith": "Los hooks {event} deben empezar por: {signature}",
+        "created": "Se creó el hook «{name}» para «{entity}»",
+        "createFailed": "No se pudo crear un hook para «{entity}»",
+        "saved": "Hook «{name}» guardado",
+        "saveFailed": "No se pudo guardar el hook"
+    },
+    "browse": {
+        "query": "Consulta",
+        "search": "Buscar",
+        "invalidQuery": "Consulta JSON no válida",
+        "queryError": "Error al ejecutar la consulta",
+        "document": "Documento",
+        "confirmDelete": "¿Eliminar la entidad «{id}»?",
+        "deleted": "Entidad «{id}» eliminada",
+        "deleteFailed": "No se pudo eliminar «{id}»",
+        "help": {
+            "filters": "Filtros",
+            "sort": "Orden",
+            "pagination": "Paginación"
+        }
+    }
+}

@@ -3,6 +3,13 @@ export const DEFAULT_LANGUAGE = "en";
 export const LANGUAGES = [
     { code: "en", label: "English" },
     { code: "fr", label: "Français" },
+    { code: "es", label: "Español" },
+    { code: "zh", label: "简体中文" },
+    { code: "de", label: "Deutsch" },
+    { code: "ja", label: "日本語" },
+    { code: "ko", label: "한국어" },
+    { code: "pt", label: "Português" },
+    { code: "nl", label: "Nederlands" },
 ];
 
 export function isSupportedLanguage(code) {

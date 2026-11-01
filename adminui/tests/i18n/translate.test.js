@@ -12,6 +12,31 @@ describe("translate", () => {
         expect(translate("fr", "common.username")).toBe("Nom d'utilisateur");
     });
 
+    it.each([
+        ["es", "Iniciar sesión", "Nombre de usuario"],
+        ["zh", "登录", "用户名"],
+        ["de", "Anmelden", "Benutzername"],
+        ["ja", "ログイン", "ユーザー名"],
+        ["ko", "로그인", "사용자 이름"],
+        ["pt", "Entrar", "Nome de usuário"],
+        ["nl", "Inloggen", "Gebruikersnaam"],
+    ])("returns the %s text", (language, submit, username) => {
+        expect(translate(language, "login.submit")).toBe(submit);
+        expect(translate(language, "common.username")).toBe(username);
+    });
+
+    it.each([
+        ["es", "ACL actualizadas para «bob» (entidades: 3)"],
+        ["zh", "已更新“bob”的 ACL（实体：3）"],
+        ["de", "ACLs für „bob“ aktualisiert (Entitäten: 3)"],
+        ["ja", "「bob」の ACL を更新しました（エンティティ：3）"],
+        ["ko", "“bob”의 ACL을 업데이트했습니다 (엔터티: 3)"],
+        ["pt", "ACLs atualizadas para “bob” (entidades: 3)"],
+        ["nl", "ACL's bijgewerkt voor ‘bob’ (entiteiten: 3)"],
+    ])("interpolates parameters in %s", (language, expected) => {
+        expect(translate(language, "acl.updated", { username: "bob", count: 3 })).toBe(expected);
+    });
+
     it("interpolates parameters", () => {
         expect(translate("en", "nav.hello", { username: "alice" })).toBe("Hello alice");
         expect(translate("fr", "nav.hello", { username: "alice" })).toBe("Bonjour alice");
@@ -44,7 +69,7 @@ describe("translate", () => {
     });
 
     it("falls back to English for an unsupported language", () => {
-        expect(translate("de", "login.submit")).toBe("Log in");
+        expect(translate("it", "login.submit")).toBe("Log in");
         expect(translate(undefined, "login.submit")).toBe("Log in");
     });
 

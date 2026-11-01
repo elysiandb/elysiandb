@@ -1671,9 +1671,21 @@ You will be prompted to log in with your configured credentials. The Admin UI pr
 
 ## Languages
 
-The Admin UI is available in **English** and **French**.
+The Admin UI is available in:
 
-On the first visit, it follows the browser language and falls back to English when that language is not supported. The language can be changed at any time from the selector on the login page or in the navigation bar, and the choice is remembered by the browser.
+| Code | Language            |
+|------|---------------------|
+| `en` | English (default)   |
+| `fr` | French              |
+| `es` | Spanish             |
+| `zh` | Simplified Chinese  |
+| `de` | German              |
+| `ja` | Japanese            |
+| `ko` | Korean              |
+| `pt` | Portuguese (Brazil) |
+| `nl` | Dutch               |
+
+On the first visit, it follows the browser language and falls back to English when that language is not supported. Only the primary language is used: `zh-TW` and `zh-HK` get Simplified Chinese, and `pt-PT` gets Brazilian Portuguese. The language can be changed at any time from the selector on the login page or in the navigation bar, and the choice is remembered by the browser.
 
 Translations live in `adminui/src/i18n/locales/`, with one JSON file per language. To add a language, add its file there, register it in `adminui/src/i18n/translate.js` and `adminui/src/i18n/languages.js`, then run the Admin UI tests, which check that every language defines exactly the same keys and placeholders as English.
 

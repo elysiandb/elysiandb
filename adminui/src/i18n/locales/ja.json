@@ -1,0 +1,160 @@
+{
+    "common": {
+        "loading": "読み込み中...",
+        "cancel": "キャンセル",
+        "save": "保存",
+        "create": "作成",
+        "delete": "削除",
+        "show": "表示",
+        "hide": "非表示",
+        "enabled": "有効",
+        "disabled": "無効",
+        "updating": "更新中...",
+        "error": "エラー：{message}",
+        "unknownError": "不明なエラー",
+        "username": "ユーザー名",
+        "password": "パスワード",
+        "role": "ロール",
+        "actions": "操作",
+        "name": "名前",
+        "event": "イベント",
+        "entities": "エンティティ",
+        "users": "ユーザー",
+        "searchUser": "ユーザーを検索…"
+    },
+    "language": {
+        "label": "言語"
+    },
+    "login": {
+        "submit": "ログイン"
+    },
+    "nav": {
+        "toggle": "ナビゲーションを表示",
+        "configuration": "設定",
+        "users": "ユーザー",
+        "acl": "ACL",
+        "schema": "スキーマ",
+        "hooks": "フック",
+        "browse": "閲覧",
+        "hello": "こんにちは、{username} さん",
+        "logout": "ログアウト"
+    },
+    "home": {
+        "title": "ホーム"
+    },
+    "configuration": {
+        "entry": "{label}：{value}",
+        "sections": {
+            "store": "ストレージ",
+            "server": "サーバー",
+            "logging": "ログ",
+            "security": "セキュリティ",
+            "stats": "統計",
+            "api": "API",
+            "adminUI": "管理画面"
+        },
+        "fields": {
+            "folder": "フォルダー",
+            "shards": "シャード",
+            "flushInterval": "書き込み間隔",
+            "crashRecovery": "クラッシュリカバリー",
+            "maxLogMB": "ログの最大サイズ (MB)",
+            "http": "HTTP",
+            "tcp": "TCP",
+            "host": "ホスト",
+            "port": "ポート",
+            "authenticationEnabled": "認証を有効化",
+            "mode": "モード",
+            "enabled": "有効",
+            "indexWorkers": "インデックスワーカー",
+            "cache": "キャッシュ",
+            "cleanupInterval": "クリーンアップ間隔",
+            "schema": "スキーマ",
+            "strict": "厳格"
+        }
+    },
+    "users": {
+        "create": "ユーザーを作成",
+        "changePassword": "パスワードを変更",
+        "confirmDelete": "ユーザー「{username}」を削除しますか？",
+        "editTitle": "ユーザーを編集",
+        "createTitle": "ユーザーを作成",
+        "passwordRequired": "パスワードを入力してください。",
+        "created": "ユーザーを作成しました",
+        "createFailed": "ユーザーの作成に失敗しました",
+        "passwordChanged": "ユーザーのパスワードを変更しました",
+        "passwordChangeFailed": "ユーザーのパスワードの変更に失敗しました",
+        "roleChanged": "ユーザーのロールを変更しました",
+        "roleChangeFailed": "ユーザーのロールの変更に失敗しました",
+        "deleted": "ユーザーを削除しました",
+        "deleteFailed": "ユーザーの削除に失敗しました"
+    },
+    "acl": {
+        "searchEntity": "エンティティを検索…",
+        "update": "ACL を更新",
+        "restore": "デフォルトに戻す",
+        "confirmRestore": "「{username}」のデフォルトの権限に戻しますか？",
+        "updated": "「{username}」の ACL を更新しました（エンティティ：{count}）",
+        "updateFailed": "「{username}」の ACL の更新に失敗しました",
+        "restored": "「{username}」のデフォルトの ACL に戻しました",
+        "restoreFailed": "「{username}」のデフォルトの ACL に戻せませんでした",
+        "overview": "権限の概要",
+        "permissions": {
+            "read": "エンティティのすべてのレコードの読み取りを許可します。",
+            "create": "エンティティへの新しいレコードの作成を許可します。",
+            "update": "エンティティの任意のレコードの更新を許可します。",
+            "delete": "エンティティの任意のレコードの削除を許可します。",
+            "owning_read": "ユーザーが所有するレコードの読み取りのみを許可します。",
+            "owning_write": "ユーザーが所有するレコードの作成を許可します。",
+            "owning_update": "ユーザーが所有するレコードの更新のみを許可します。",
+            "owning_delete": "ユーザーが所有するレコードの削除のみを許可します。"
+        }
+    },
+    "schema": {
+        "createTitle": "エンティティタイプを作成",
+        "namePlaceholder": "エンティティ名",
+        "manual": "手動",
+        "autoManaged": "自動管理",
+        "addField": "+ フィールドを追加",
+        "update": "スキーマを更新",
+        "drop": "エンティティタイプを削除",
+        "confirmDrop": "エンティティタイプ「{entity}」を削除しますか？",
+        "required": "必須",
+        "created": "エンティティ「{entity}」を作成しました",
+        "createFailed": "エンティティ「{entity}」の作成に失敗しました",
+        "dropped": "エンティティ「{entity}」を削除しました",
+        "dropFailed": "「{entity}」の削除に失敗しました",
+        "updated": "「{entity}」のスキーマを更新しました",
+        "updateFailed": "「{entity}」のスキーマの更新に失敗しました"
+    },
+    "hooks": {
+        "createTitle": "フックを作成",
+        "off": "オフ",
+        "title": "フック",
+        "options": "オプション",
+        "bypassAcl": "ACL をバイパス",
+        "language": "スクリプト言語",
+        "priority": "優先度",
+        "script": "スクリプト",
+        "mustStartWith": "{event} フックは次で始める必要があります：{signature}",
+        "created": "「{entity}」にフック「{name}」を作成しました",
+        "createFailed": "「{entity}」のフックの作成に失敗しました",
+        "saved": "フック「{name}」を保存しました",
+        "saveFailed": "フックの保存に失敗しました"
+    },
+    "browse": {
+        "query": "クエリ",
+        "search": "検索",
+        "invalidQuery": "無効な JSON クエリ",
+        "queryError": "クエリの実行中にエラーが発生しました",
+        "document": "ドキュメント",
+        "confirmDelete": "エンティティ「{id}」を削除しますか？",
+        "deleted": "エンティティ「{id}」を削除しました",
+        "deleteFailed": "「{id}」の削除に失敗しました",
+        "help": {
+            "filters": "フィルター",
+            "sort": "並べ替え",
+            "pagination": "ページネーション"
+        }
+    }
+}

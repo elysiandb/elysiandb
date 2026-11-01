@@ -1,0 +1,160 @@
+{
+    "common": {
+        "loading": "불러오는 중...",
+        "cancel": "취소",
+        "save": "저장",
+        "create": "만들기",
+        "delete": "삭제",
+        "show": "표시",
+        "hide": "숨기기",
+        "enabled": "사용",
+        "disabled": "사용 안 함",
+        "updating": "업데이트 중...",
+        "error": "오류: {message}",
+        "unknownError": "알 수 없는 오류",
+        "username": "사용자 이름",
+        "password": "비밀번호",
+        "role": "역할",
+        "actions": "작업",
+        "name": "이름",
+        "event": "이벤트",
+        "entities": "엔터티",
+        "users": "사용자",
+        "searchUser": "사용자 검색…"
+    },
+    "language": {
+        "label": "언어"
+    },
+    "login": {
+        "submit": "로그인"
+    },
+    "nav": {
+        "toggle": "탐색 메뉴 표시",
+        "configuration": "설정",
+        "users": "사용자",
+        "acl": "ACL",
+        "schema": "스키마",
+        "hooks": "훅",
+        "browse": "탐색",
+        "hello": "안녕하세요, {username}님",
+        "logout": "로그아웃"
+    },
+    "home": {
+        "title": "홈"
+    },
+    "configuration": {
+        "entry": "{label}: {value}",
+        "sections": {
+            "store": "저장소",
+            "server": "서버",
+            "logging": "로깅",
+            "security": "보안",
+            "stats": "통계",
+            "api": "API",
+            "adminUI": "관리 UI"
+        },
+        "fields": {
+            "folder": "폴더",
+            "shards": "샤드",
+            "flushInterval": "쓰기 간격",
+            "crashRecovery": "충돌 복구",
+            "maxLogMB": "최대 로그 크기 (MB)",
+            "http": "HTTP",
+            "tcp": "TCP",
+            "host": "호스트",
+            "port": "포트",
+            "authenticationEnabled": "인증 사용",
+            "mode": "모드",
+            "enabled": "사용",
+            "indexWorkers": "인덱스 워커",
+            "cache": "캐시",
+            "cleanupInterval": "정리 간격",
+            "schema": "스키마",
+            "strict": "엄격"
+        }
+    },
+    "users": {
+        "create": "사용자 만들기",
+        "changePassword": "비밀번호 변경",
+        "confirmDelete": "사용자 “{username}”을(를) 삭제하시겠습니까?",
+        "editTitle": "사용자 편집",
+        "createTitle": "사용자 만들기",
+        "passwordRequired": "비밀번호를 입력하세요.",
+        "created": "사용자를 만들었습니다",
+        "createFailed": "사용자를 만들지 못했습니다",
+        "passwordChanged": "사용자 비밀번호를 변경했습니다",
+        "passwordChangeFailed": "사용자 비밀번호를 변경하지 못했습니다",
+        "roleChanged": "사용자 역할을 변경했습니다",
+        "roleChangeFailed": "사용자 역할을 변경하지 못했습니다",
+        "deleted": "사용자를 삭제했습니다",
+        "deleteFailed": "사용자를 삭제하지 못했습니다"
+    },
+    "acl": {
+        "searchEntity": "엔터티 검색…",
+        "update": "ACL 업데이트",
+        "restore": "기본값 복원",
+        "confirmRestore": "“{username}”의 기본 권한을 복원하시겠습니까?",
+        "updated": "“{username}”의 ACL을 업데이트했습니다 (엔터티: {count})",
+        "updateFailed": "“{username}”의 ACL을 업데이트하지 못했습니다",
+        "restored": "“{username}”의 기본 ACL을 복원했습니다",
+        "restoreFailed": "“{username}”의 기본 ACL을 복원하지 못했습니다",
+        "overview": "권한 개요",
+        "permissions": {
+            "read": "엔터티의 모든 레코드를 읽을 수 있습니다.",
+            "create": "엔터티에 새 레코드를 만들 수 있습니다.",
+            "update": "엔터티의 모든 레코드를 수정할 수 있습니다.",
+            "delete": "엔터티의 모든 레코드를 삭제할 수 있습니다.",
+            "owning_read": "사용자가 소유한 레코드만 읽을 수 있습니다.",
+            "owning_write": "사용자가 소유하는 레코드를 만들 수 있습니다.",
+            "owning_update": "사용자가 소유한 레코드만 수정할 수 있습니다.",
+            "owning_delete": "사용자가 소유한 레코드만 삭제할 수 있습니다."
+        }
+    },
+    "schema": {
+        "createTitle": "엔터티 유형 만들기",
+        "namePlaceholder": "엔터티 이름",
+        "manual": "수동",
+        "autoManaged": "자동 관리",
+        "addField": "+ 필드 추가",
+        "update": "스키마 업데이트",
+        "drop": "엔터티 유형 삭제",
+        "confirmDrop": "엔터티 유형 “{entity}”을(를) 삭제하시겠습니까?",
+        "required": "필수",
+        "created": "엔터티 “{entity}”을(를) 만들었습니다",
+        "createFailed": "엔터티 “{entity}”을(를) 만들지 못했습니다",
+        "dropped": "엔터티 “{entity}”을(를) 삭제했습니다",
+        "dropFailed": "“{entity}”을(를) 삭제하지 못했습니다",
+        "updated": "“{entity}”의 스키마를 업데이트했습니다",
+        "updateFailed": "“{entity}”의 스키마를 업데이트하지 못했습니다"
+    },
+    "hooks": {
+        "createTitle": "훅 만들기",
+        "off": "꺼짐",
+        "title": "훅",
+        "options": "옵션",
+        "bypassAcl": "ACL 무시",
+        "language": "스크립트 언어",
+        "priority": "우선순위",
+        "script": "스크립트",
+        "mustStartWith": "{event} 훅은 다음으로 시작해야 합니다: {signature}",
+        "created": "“{entity}”에 훅 “{name}”을(를) 만들었습니다",
+        "createFailed": "“{entity}”에 훅을 만들지 못했습니다",
+        "saved": "훅 “{name}”을(를) 저장했습니다",
+        "saveFailed": "훅을 저장하지 못했습니다"
+    },
+    "browse": {
+        "query": "쿼리",
+        "search": "검색",
+        "invalidQuery": "잘못된 JSON 쿼리",
+        "queryError": "쿼리를 실행하는 중 오류가 발생했습니다",
+        "document": "문서",
+        "confirmDelete": "엔터티 “{id}”을(를) 삭제하시겠습니까?",
+        "deleted": "엔터티 “{id}”을(를) 삭제했습니다",
+        "deleteFailed": "“{id}”을(를) 삭제하지 못했습니다",
+        "help": {
+            "filters": "필터",
+            "sort": "정렬",
+            "pagination": "페이지 매김"
+        }
+    }
+}
