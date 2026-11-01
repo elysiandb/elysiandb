@@ -13,7 +13,10 @@ func Audit(ctx *fasthttp.RequestCtx, msg string, args ...any) {
 		"actor", security.Actor(ctx),
 		"source", "http",
 		"remote_addr", security.LoginSourceFromRequest(ctx).String(),
-		"request_id", RequestID(ctx),
+	}
+
+	if id := RequestID(ctx); id != "" {
+		base = append(base, "request_id", id)
 	}
 
 	auditLog.Info(msg, append(base, args...)...)

@@ -245,11 +245,40 @@ func DeleteByKey(key string) {
 func ResetStore() {
 	cfg := globals.GetConfig()
 
-	mainStore.reset()
-	expirationContainer.reset()
+	rootMu.RLock()
+	ms := mainStore
+	ec := expirationContainer
+	rootMu.RUnlock()
+
+	kept := map[string][]byte{}
+	ms.Iterate(func(k string, v []byte) {
+		if globals.IsApiKey(k) {
+			kept[k] = v
+		}
+	})
+
+	keptExpirations := map[int64][]string{}
+	for k := range kept {
+		if ts, ok := ec.expiration(k); ok {
+			keptExpirations[ts] = append(keptExpirations[ts], k)
+		}
+	}
+
+	ms.reset()
+	ec.reset()
+
+	for k, v := range kept {
+		ms.put(k, v)
+	}
+
+	for ts, keys := range keptExpirations {
+		ec.put(ts, keys)
+	}
 
 	if cfg.Stats.Enabled {
 		stat.Stats.Reset()
+		stat.Stats.SetKeysCount(ms.CountTotalKeys())
+		stat.Stats.SetExpirationKeysCount(ec.CountTotalKeys())
 	}
 }
 
@@ -282,6 +311,20 @@ func CountKeys() (uint64, uint64) {
 	}
 
 	return ms.CountTotalKeys(), ec.CountTotalKeys()
+}
+
+func ListJsonKeys() []string {
+	js := mainJsonStore.Load()
+	if js == nil {
+		return nil
+	}
+
+	keys := []string{}
+	js.Iterate(func(k string, _ map[string]any) {
+		keys = append(keys, k)
+	})
+
+	return keys
 }
 
 func CountJsonDocuments() uint64 {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/engine"
@@ -68,6 +69,17 @@ func InitDB() {
 
 		recovery.ReplayStoreRecoveryLog(storage.PutKeyValueWithExpiration, storage.DeleteByKey)
 		recovery.ActivateStoreRecoveryLog(storage.WriteStoreDB)
+	}
+
+	if engine.IsEngineInternal() {
+		if repair := api_storage.RepairIndexes(); repair.Changed() {
+			storageLog.Warn("rest api indexes repaired",
+				"entity_types_restored", repair.EntityTypes,
+				"ids_added", repair.IDsAdded,
+				"ids_removed", repair.IDsRemoved,
+				"hint", "the list of entity types or the id indexes did not match the documents, for example after a RESET with a previous version",
+			)
+		}
 	}
 
 	keys, withTTL := storage.CountKeys()

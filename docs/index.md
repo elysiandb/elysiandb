@@ -416,6 +416,8 @@ From this version on, take a backup with `elysiandb backup` before each upgrade,
 * The startup and shutdown messages (`Storage`, `Ready`, `HTTP`, `TCP`, `Admin dashboard`, `Persisted`, `Goodbye`) are now log lines, and the banner is only printed when the output is a terminal.
 * A failed flush to disk now keeps the recovery log instead of clearing it, and is reported as an error.
 * Every HTTP answer carries an `X-Request-Id` header.
+* `RESET` and `POST /reset` delete the KV keys but keep the REST API indexes and the list of entity types. They used to delete them too, which emptied every list and stopped ACLs from being created for new entity types (the second document of a new type got `403`).
+* At startup, ElysianDB rebuilds the list of entity types and the id indexes from the documents when they do not match, which repairs stores broken by a `RESET` of a previous version.
 * `GET /monitoring/...` endpoints are new, and `GET /metrics` when Prometheus is enabled.
 
 ---
@@ -2227,7 +2229,7 @@ The KV API is a minimal interface for basic key–value operations.
 | `GET`    | `/kv/mget?keys=key1,key2` | Retrieve multiple keys              |
 | `DELETE` | `/kv/{key}`               | Delete key(s)                       |
 | `POST`   | `/save`                   | Force flush to disk                 |
-| `POST`   | `/reset`                  | Reset all keys                      |
+| `POST`   | `/reset`                  | Delete every KV key (REST API documents and their indexes are kept) |
 | `GET`    | `/stats`                  | Return runtime metrics (if enabled) |
 | `GET`    | `/config`                 | Return the configuration, with secrets redacted |
 | `GET`    | `/health`                 | Liveness check, no credentials needed |
@@ -2261,7 +2263,7 @@ SET TTL=10 <key> <value> → OK (with expiration)
 GET <key>           → value
 MGET key1 key2 ...  → multiple values
 DEL <key>           → Deleted 1
-RESET               → OK (clears store)
+RESET               → OK (deletes every KV key, REST API documents are kept)
 SAVE                → OK (flush to disk)
 EXIT                → Goodbye! (closes the connection)
 ```
@@ -2280,7 +2282,7 @@ The password is everything after the first space, so it may contain spaces. With
 
 A connection that has not authenticated is closed when it sends no complete line for 30 seconds. Failed `AUTH` commands count as failed logins (see Failed logins), and the default admin password is only accepted from the loopback address.
 
-The KV store also holds the REST API indexes and the list of entity types: a `RESET` or `DEL` on internal keys breaks the REST API. Keep the TCP port private (bind it to `127.0.0.1` or disable `server.tcp`) unless clients need it.
+The KV store also holds the REST API indexes and the list of entity types, under keys that start with `api:entity:`. `RESET` and `POST /reset` keep them. A `DEL` or `SET` on one of them breaks the REST API until the next start: at startup, ElysianDB rebuilds the list of entity types and the id indexes from the documents, and logs `rest api indexes repaired` when it had to. Keep the TCP port private (bind it to `127.0.0.1` or disable `server.tcp`) unless clients need it.
 
 ### Example (telnet)
 
