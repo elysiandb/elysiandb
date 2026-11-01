@@ -2,7 +2,7 @@
 
 ElysianDB turns raw JSON into a complete backend instantly.
 
-It combines a pluggable storage engine, an auto-generated REST API, advanced querying, and optional KV/TCP interfaces into a single, high-performance Go binary. Depending on your needs, ElysianDB can run with its built-in internal engine or delegate persistence and scalability to MongoDB, without changing your API or application logic.
+It combines a pluggable storage engine, an auto-generated REST API, advanced querying, and optional KV/TCP interfaces into a single, high-performance Go binary. It runs on its built-in internal engine, the default and recommended one. A MongoDB engine is also available in beta: it is not yet fully functional, and switching to it can change behavior (see Storage Engine Selection below).
 
 This document explains how to use ElysianDB, its features, configuration, storage engines, and runtime behavior.
 
@@ -90,7 +90,7 @@ adminui:
 | **security.authentication.enabled**  | Enables authentication layer for all endpoints except `/health`                       |
 | **security.authentication.mode**     | Authentication mode (currently supports `basic`, `token` `user`)                      |
 | **security.authentication.token**    | Instance token used in `token` mode                                                   |
-| **engine.name**                      | Storage engine: `internal` (default) or `mongodb`                                     |
+| **engine.name**                      | Storage engine: `internal` (default, recommended) or `mongodb` (beta)                 |
 | **engine.uri**                       | Connection URI for the `mongodb` engine                                               |
 | **adminui.enabled**                  | Enables the admin web interface                                                       |
 
@@ -318,7 +318,9 @@ From this version on, take a backup with `elysiandb backup` before each upgrade,
 
 ElysianDB exposes a **pluggable storage engine abstraction** that allows the core database logic to run independently of the underlying storage implementation.
 
-This makes it possible to switch storage backends **without changing the API, query language, ACL rules, hooks, transactions, or Admin UI**. The same requests, payloads, and behaviors apply regardless of the engine in use.
+Its goal is to switch storage backends **without changing the API, query language, ACL rules, hooks, transactions, or Admin UI**, with the same requests, payloads, and behaviors regardless of the engine in use. This goal is not reached yet: the `mongodb` engine is in beta, and switching from `internal` to `mongodb` can change behavior.
+
+Use the `internal` engine, the default and recommended one.
 
 ---
 
@@ -337,9 +339,9 @@ Some engines may require additional configuration fields.
 
 ### Available Engines
 
-#### `internal` (default)
+#### `internal` (default, recommended)
 
-The `internal` engine is the built-in storage engine provided by ElysianDB.
+The `internal` engine is the built-in storage engine provided by ElysianDB, and the recommended one.
 
 It offers:
 
@@ -354,24 +356,22 @@ This engine is **production-ready** and requires no external dependencies. It is
 
 ---
 
-#### `mongodb`
+#### `mongodb` (beta)
 
-The `mongodb` engine allows ElysianDB to use **MongoDB as its persistence layer** while preserving the same API surface and developer experience.
+> **Beta.** The `mongodb` engine is not yet fully functional and is not interchangeable with the `internal` engine: some features are missing or behave differently, and part of the data still lives in the internal storage. Switching engines can change the behavior of your application. The remaining work is tracked in [#167](https://github.com/elysiandb/elysiandb/issues/167) and [#164](https://github.com/elysiandb/elysiandb/issues/164). Use the `internal` engine unless you are testing MongoDB support.
+
+The `mongodb` engine allows ElysianDB to use **MongoDB as its persistence layer**. It aims to offer the same API surface and developer experience as the `internal` engine.
 
 It provides:
 
 * External persistence backed by MongoDB
-* Improved durability and operational familiarity
-* Horizontal scalability through MongoDB tooling
-* Native BSON support and efficient document storage
-* Full compatibility with ElysianDB features (REST API, Query API, ACLs, hooks, includes, Admin UI)
+* Native BSON support and document storage
 
-This engine is ideal when you want:
+Once complete, it is meant for:
 
 * An external, battle-tested database
-* Easier backups and replication
+* Backups and replication handled by MongoDB
 * Shared storage across multiple instances
-* A smoother transition from prototypes to long-running services
 
 ##### Configuration Example
 
@@ -381,7 +381,7 @@ engine:
   uri: mongodb://elysian:elysian@localhost:27017/elysiandb
 ```
 
-Switching between `internal` and `mongodb` **does not require any API or payload changes**.
+Switching between `internal` and `mongodb` keeps the same API and payloads, but the `mongodb` engine does not behave like the `internal` engine in every case yet: requests can return different results.
 
 ---
 
@@ -395,16 +395,18 @@ The storage engine abstraction follows these principles:
 * Deterministic results regardless of backend
 * Minimal overhead for the default engine
 
-This design allows ElysianDB to scale from an embedded, single-binary backend to an externally backed system without rewriting application logic.
+The `internal` engine meets these goals. The `mongodb` engine does not meet them yet: identical API behavior and no feature loss when switching engines are the remaining work of [#167](https://github.com/elysiandb/elysiandb/issues/167) and [#164](https://github.com/elysiandb/elysiandb/issues/164).
+
+Once they are met, this design allows ElysianDB to scale from an embedded, single-binary backend to an externally backed system without rewriting application logic.
 
 ---
 
 ### Notes
 
-* If no engine is specified, `internal` is used by default
+* If no engine is specified, `internal` is used by default, and it is the recommended engine
 * Engine selection is evaluated at startup
 * Switching engines may require data migration
-* All engines share the same query model, schema rules, ACLs, and hooks
+* All engines are meant to share the same query model, schema rules, ACLs, and hooks; the `mongodb` engine, in beta, does not fully share them yet
 
 
 ---
