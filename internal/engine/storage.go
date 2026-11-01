@@ -379,18 +379,22 @@ func CountAllEntities() int {
 	return 0
 }
 
-func ImportAll(data map[string][]map[string]interface{}) {
+func ValidateImport(data map[string][]map[string]interface{}) []api_storage.ImportRejection {
+	return api_storage.ValidateImport(data, GetEntitySchema)
+}
+
+func ImportAll(data map[string][]map[string]interface{}) []api_storage.ImportRejection {
 	if IsEngineInternal() {
-		api_storage.ImportAll(data)
-		return
+		return api_storage.ImportAll(data)
 	}
 
 	if IsEngineMongoDB() {
-		mongodb.ImportAll(data)
-		return
+		return mongodb.ImportAll(data)
 	}
 
 	ThrowErrorIfNotValidEngine()
+
+	return nil
 }
 
 func IsEngineInternal() bool {

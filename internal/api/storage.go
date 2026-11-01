@@ -434,13 +434,58 @@ func CountAllEntities() int {
 	return counter
 }
 
-func ImportAll(data map[string][]map[string]any) {
-	for entity, items := range data {
-		storage.DeleteByWildcardKey(globals.ApiEntityIndexPatternKey(entity))
+type ImportRejection struct {
+	Entity string                   `json:"entity"`
+	Index  int                      `json:"index"`
+	ID     string                   `json:"id,omitempty"`
+	Errors []schema.ValidationError `json:"errors"`
+}
 
-		for _, item := range items {
+func ValidateImport(data map[string][]map[string]any, schemaFor func(entity string) map[string]any) []ImportRejection {
+	rejections := []ImportRejection{}
+	if !globals.GetConfig().Api.Schema.Enabled {
+		return rejections
+	}
+
+	for _, entity := range slices.Sorted(maps.Keys(data)) {
+		if entity == schema.SchemaEntity {
+			continue
+		}
+
+		schemaData := schemaFor(entity)
+		if !schema.IsManualSchema(entity, schemaData) {
+			continue
+		}
+
+		for index, item := range data[entity] {
+			if errs := schema.ValidateEntity(entity, item, schemaData); len(errs) > 0 {
+				rejections = append(rejections, NewImportRejection(entity, index, item, errs))
+			}
+		}
+	}
+
+	return rejections
+}
+
+func NewImportRejection(entity string, index int, item map[string]any, errs []schema.ValidationError) ImportRejection {
+	id, _ := item["id"].(string)
+
+	return ImportRejection{
+		Entity: entity,
+		Index:  index,
+		ID:     id,
+		Errors: errs,
+	}
+}
+
+func ImportAll(data map[string][]map[string]any) []ImportRejection {
+	rejections := []ImportRejection{}
+	for _, entity := range slices.Sorted(maps.Keys(data)) {
+		DeleteEntityDocuments(entity)
+
+		for index, item := range data[entity] {
 			if errs := writeEntity(entity, item, false); len(errs) > 0 {
-				log.Error(fmt.Sprintf("Error importing entity %s: %+v", entity, errs))
+				rejections = append(rejections, NewImportRejection(entity, index, item, errs))
 			}
 		}
 
@@ -448,4 +493,11 @@ func ImportAll(data map[string][]map[string]any) {
 	}
 
 	log.Info("All entities have been imported")
+
+	return rejections
+}
+
+func DeleteEntityDocuments(entity string) {
+	storage.DeleteJsonByPrefix(globals.ApiSingleEntityKey(entity, ""))
+	RemoveEntityIndexes(entity)
 }
