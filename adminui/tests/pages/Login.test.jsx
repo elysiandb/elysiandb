@@ -15,6 +15,15 @@ describe("Login", () => {
         expectNoRawTranslationKeys();
     });
 
+    it("starts with empty credentials", () => {
+        renderWithProviders(<Login />);
+
+        expect(screen.getByLabelText("Username")).toHaveValue("");
+        expect(screen.getByLabelText("Password")).toHaveValue("");
+        expect(screen.getByLabelText("Username")).toHaveAttribute("autocomplete", "username");
+        expect(screen.getByLabelText("Password")).toHaveAttribute("autocomplete", "current-password");
+    });
+
     it("is displayed in French", () => {
         renderWithProviders(<Login />, { language: "fr" });
 
