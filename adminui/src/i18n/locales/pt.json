@@ -47,6 +47,7 @@
         "sections": {
             "store": "Armazenamento",
             "server": "Servidor",
+            "engine": "Motor",
             "logging": "Registro",
             "security": "Segurança",
             "stats": "Estatísticas",
@@ -55,6 +56,7 @@
         },
         "fields": {
             "folder": "Pasta",
+            "name": "Nome",
             "shards": "Shards",
             "flushInterval": "Intervalo de gravação",
             "crashRecovery": "Recuperação após falha",
@@ -270,7 +272,6 @@
         "noData": "Ainda não há dados",
         "sections": {
             "traffic": "Tráfego",
-            "latency": "Latência",
             "errors": "Erros e segurança",
             "kv": "Armazenamento KV",
             "documents": "Documentos",
@@ -279,6 +280,10 @@
             "connections": "Conexões",
             "hooks": "Hooks",
             "mongodb": "MongoDB"
+        },
+        "tabs": {
+            "data": "Dados",
+            "system": "Sistema"
         },
         "charts": {
             "requests": "Requisições por segundo",

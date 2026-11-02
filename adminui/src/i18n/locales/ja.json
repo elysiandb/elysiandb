@@ -47,6 +47,7 @@
         "sections": {
             "store": "ストレージ",
             "server": "サーバー",
+            "engine": "エンジン",
             "logging": "ログ",
             "security": "セキュリティ",
             "stats": "統計",
@@ -55,6 +56,7 @@
         },
         "fields": {
             "folder": "フォルダー",
+            "name": "名前",
             "shards": "シャード",
             "flushInterval": "書き込み間隔",
             "crashRecovery": "クラッシュリカバリー",
@@ -270,7 +272,6 @@
         "noData": "まだデータがありません",
         "sections": {
             "traffic": "トラフィック",
-            "latency": "レイテンシー",
             "errors": "エラーとセキュリティ",
             "kv": "KV ストア",
             "documents": "ドキュメント",
@@ -279,6 +280,10 @@
             "connections": "接続",
             "hooks": "フック",
             "mongodb": "MongoDB"
+        },
+        "tabs": {
+            "data": "データ",
+            "system": "システム"
         },
         "charts": {
             "requests": "毎秒のリクエスト数",

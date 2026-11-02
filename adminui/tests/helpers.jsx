@@ -61,3 +61,63 @@ export function expectNoRawTranslationKeys(container = document.body) {
 
     expect(text).not.toMatch(rawKeyPattern);
 }
+
+const BREAKPOINTS = ["xs", "sm", "md", "lg", "xl", "xxl"];
+
+function matchSpan(element, prefix, breakpoint) {
+    const infix = breakpoint === "xs" ? "" : `-${breakpoint}`;
+    const pattern = new RegExp(`^${prefix}${infix}-(\\d+)$`);
+    const match = [...element.classList].map((name) => name.match(pattern)).find(Boolean);
+    return match ? Number(match[1]) : null;
+}
+
+function columnSpan(column, row, breakpoint) {
+    for (let index = BREAKPOINTS.indexOf(breakpoint); index >= 0; index--) {
+        const own = matchSpan(column, "col", BREAKPOINTS[index]);
+        if (own !== null) {
+            return own;
+        }
+        const perRow = matchSpan(row, "row-cols", BREAKPOINTS[index]);
+        if (perRow !== null) {
+            return 12 / perRow;
+        }
+    }
+    return 12;
+}
+
+export function gridLines(row, breakpoint) {
+    const lines = [];
+    let current = [];
+    let width = 0;
+
+    for (const column of row.children) {
+        const span = columnSpan(column, row, breakpoint);
+        if (width + span > 12) {
+            lines.push({ width, columns: current });
+            current = [];
+            width = 0;
+        }
+        current.push(column);
+        width += span;
+    }
+    if (current.length > 0) {
+        lines.push({ width, columns: current });
+    }
+
+    return lines;
+}
+
+export function expectFullRows(container = document.body) {
+    const rows = [...container.querySelectorAll(".row")].filter((row) =>
+        [...row.children].some((column) => column.querySelector(".card"))
+    );
+
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+        for (const breakpoint of BREAKPOINTS) {
+            for (const line of gridLines(row, breakpoint)) {
+                expect(line.width, `${breakpoint}: ${line.columns.map((column) => column.textContent.slice(0, 40)).join(" | ")}`).toBe(12);
+            }
+        }
+    }
+}

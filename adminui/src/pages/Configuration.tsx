@@ -34,7 +34,7 @@ export default function Configuration() {
     const Section = ({ title, children }: any) => (
         <Card className="h-100">
             <Card.Header>{title}</Card.Header>
-            <ListGroup variant="flush">{children}</ListGroup>
+            <ListGroup variant="flush" className="text-break">{children}</ListGroup>
         </Card>
     );
 
@@ -53,8 +53,7 @@ export default function Configuration() {
     return (
         <Container className="py-4">
             {data && (
-                <Row xs={1} md={2} className="g-4">
-
+                <Row xs={1} md={2} xl={4} className="g-4">
                     <Col>
                         <Section title={t("configuration.sections.store")}>
                             <ListGroup.Item>{entry("folder", data.Store.Folder)}</ListGroup.Item>
@@ -77,8 +76,12 @@ export default function Configuration() {
                     </Col>
 
                     <Col>
-                        <Section title={t("configuration.sections.logging")}>
-                            <ListGroup.Item>{entry("flushInterval", `${data.Log.FlushIntervalSeconds}s`)}</ListGroup.Item>
+                        <Section title={t("configuration.sections.api")}>
+                            <ListGroup.Item>{entry("indexWorkers", data.Api.Index.Workers)}</ListGroup.Item>
+                            <ListGroup.Item>{entry("cache", status(data.Api.Cache.Enabled))}</ListGroup.Item>
+                            <ListGroup.Item>{entry("cleanupInterval", `${data.Api.Cache.CleanupIntervalSeconds}s`)}</ListGroup.Item>
+                            <ListGroup.Item>{entry("schema", status(data.Api.Schema.Enabled))}</ListGroup.Item>
+                            <ListGroup.Item>{entry("strict", String(data.Api.Schema.Strict))}</ListGroup.Item>
                         </Section>
                     </Col>
 
@@ -90,18 +93,20 @@ export default function Configuration() {
                     </Col>
 
                     <Col>
-                        <Section title={t("configuration.sections.stats")}>
-                            <ListGroup.Item>{entry("enabled", String(data.Stats.Enabled))}</ListGroup.Item>
+                        <Section title={t("configuration.sections.engine")}>
+                            <ListGroup.Item>{entry("name", data.Engine?.Name || "internal")}</ListGroup.Item>
                         </Section>
                     </Col>
 
                     <Col>
-                        <Section title={t("configuration.sections.api")}>
-                            <ListGroup.Item>{entry("indexWorkers", data.Api.Index.Workers)}</ListGroup.Item>
-                            <ListGroup.Item>{entry("cache", status(data.Api.Cache.Enabled))}</ListGroup.Item>
-                            <ListGroup.Item>{entry("cleanupInterval", `${data.Api.Cache.CleanupIntervalSeconds}s`)}</ListGroup.Item>
-                            <ListGroup.Item>{entry("schema", status(data.Api.Schema.Enabled))}</ListGroup.Item>
-                            <ListGroup.Item>{entry("strict", String(data.Api.Schema.Strict))}</ListGroup.Item>
+                        <Section title={t("configuration.sections.logging")}>
+                            <ListGroup.Item>{entry("flushInterval", `${data.Log.FlushIntervalSeconds}s`)}</ListGroup.Item>
+                        </Section>
+                    </Col>
+
+                    <Col>
+                        <Section title={t("configuration.sections.stats")}>
+                            <ListGroup.Item>{entry("enabled", String(data.Stats.Enabled))}</ListGroup.Item>
                         </Section>
                     </Col>
 
@@ -110,7 +115,6 @@ export default function Configuration() {
                             <ListGroup.Item>{entry("enabled", String(data.AdminUI.Enabled))}</ListGroup.Item>
                         </Section>
                     </Col>
-
                 </Row>
             )}
         </Container>

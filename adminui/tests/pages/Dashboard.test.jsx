@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import Dashboard from "../../src/pages/Dashboard.jsx";
-import { expectNoRawTranslationKeys, mockApi, renderWithProviders, requestsTo } from "../helpers.jsx";
+import { expectFullRows, expectNoRawTranslationKeys, mockApi, renderWithProviders, requestsTo } from "../helpers.jsx";
 import { AUDIT_ENTRIES, LOG_ENTRIES, OVERVIEW, logsResponse, series } from "../fixtures/monitoring.js";
 
 function routes(overrides = {}) {
@@ -57,6 +57,7 @@ describe("Dashboard", () => {
         const logRequests = requestsTo(fetchMock, "GET", "/monitoring/logs").map(([url]) => Object.fromEntries(new URL(url).searchParams));
         expect(logRequests).toEqual(expect.arrayContaining([{ level: "warn", limit: "5" }, { component: "audit", limit: "5" }]));
         expect(requestsTo(fetchMock, "GET", "/monitoring/series").map(([url]) => new URL(url).searchParams.get("range"))).toEqual(["15m"]);
+        expectFullRows();
         expectNoRawTranslationKeys();
     });
 

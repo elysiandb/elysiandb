@@ -47,6 +47,7 @@
         "sections": {
             "store": "Stockage",
             "server": "Serveur",
+            "engine": "Moteur",
             "logging": "Journalisation",
             "security": "Sécurité",
             "stats": "Statistiques",
@@ -55,6 +56,7 @@
         },
         "fields": {
             "folder": "Dossier",
+            "name": "Nom",
             "shards": "Shards",
             "flushInterval": "Intervalle d'écriture",
             "crashRecovery": "Reprise après incident",
@@ -270,7 +272,6 @@
         "noData": "Pas encore de données",
         "sections": {
             "traffic": "Trafic",
-            "latency": "Latence",
             "errors": "Erreurs et sécurité",
             "kv": "Stockage KV",
             "documents": "Documents",
@@ -279,6 +280,10 @@
             "connections": "Connexions",
             "hooks": "Hooks",
             "mongodb": "MongoDB"
+        },
+        "tabs": {
+            "data": "Données",
+            "system": "Système"
         },
         "charts": {
             "requests": "Requêtes par seconde",

@@ -47,6 +47,7 @@
         "sections": {
             "store": "저장소",
             "server": "서버",
+            "engine": "엔진",
             "logging": "로깅",
             "security": "보안",
             "stats": "통계",
@@ -55,6 +56,7 @@
         },
         "fields": {
             "folder": "폴더",
+            "name": "이름",
             "shards": "샤드",
             "flushInterval": "쓰기 간격",
             "crashRecovery": "충돌 복구",
@@ -270,7 +272,6 @@
         "noData": "아직 데이터가 없습니다",
         "sections": {
             "traffic": "트래픽",
-            "latency": "지연 시간",
             "errors": "오류 및 보안",
             "kv": "KV 저장소",
             "documents": "문서",
@@ -279,6 +280,10 @@
             "connections": "연결",
             "hooks": "훅",
             "mongodb": "MongoDB"
+        },
+        "tabs": {
+            "data": "데이터",
+            "system": "시스템"
         },
         "charts": {
             "requests": "초당 요청 수",

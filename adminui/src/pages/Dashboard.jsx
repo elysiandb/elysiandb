@@ -146,7 +146,7 @@ function InstanceCard({ instance }) {
     const address = (server) => (server?.enabled ? server.address : t("common.disabled"));
 
     return (
-        <Card className="monitoring-card">
+        <Card className="h-100 monitoring-card">
             <Card.Header className="d-flex justify-content-between align-items-center">
                 <span>{t("dashboard.instance.title")}</span>
                 <Link to="/admin/configuration" className="monitoring-link small">{t("nav.configuration")} →</Link>
@@ -333,7 +333,7 @@ export default function Dashboard() {
                     />
                 </Col>
 
-                <Col xs={12} lg={4}>
+                <Col xs={12} lg={6}>
                     <RecentList
                         title={t("dashboard.recentProblems")}
                         entries={data.problems}
@@ -342,7 +342,7 @@ export default function Dashboard() {
                         showLevel
                     />
                 </Col>
-                <Col xs={12} lg={4}>
+                <Col xs={12} lg={6}>
                     <RecentList
                         title={t("dashboard.adminActivity")}
                         entries={data.activity}
@@ -350,12 +350,12 @@ export default function Dashboard() {
                         link="/admin/logs?component=audit"
                     />
                 </Col>
-                <Col xs={12} lg={4}>
-                    <DataCard data={overview?.data} />
-                </Col>
 
-                <Col xs={12}>
+                <Col xs={12} xl={8}>
                     <InstanceCard instance={overview?.instance} />
+                </Col>
+                <Col xs={12} xl={4}>
+                    <DataCard data={overview?.data} />
                 </Col>
             </Row>
         </Container>

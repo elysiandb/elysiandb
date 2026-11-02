@@ -2,7 +2,7 @@ import { act, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import Configuration from "../../src/pages/Configuration.tsx";
 import { useLanguageStore } from "../../src/i18n/store.js";
-import { expectNoRawTranslationKeys, mockApi, renderWithProviders, requestsTo } from "../helpers.jsx";
+import { expectFullRows, expectNoRawTranslationKeys, mockApi, renderWithProviders, requestsTo } from "../helpers.jsx";
 
 const CONFIG = {
     Store: { Folder: "/data", Shards: 64, FlushIntervalSeconds: 5, CrashRecovery: { Enabled: true, MaxLogMB: 100 } },
@@ -19,6 +19,7 @@ const CONFIG = {
         Schema: { Enabled: false, Strict: true },
     },
     AdminUI: { Enabled: true },
+    Engine: { Name: "mongodb" },
 };
 
 describe("Configuration", () => {
@@ -27,7 +28,7 @@ describe("Configuration", () => {
         renderWithProviders(<Configuration />);
 
         expect(await screen.findByText("Folder: /data")).toBeInTheDocument();
-        for (const title of ["Store", "Server", "Logging", "Security", "Stats", "API", "Admin UI"]) {
+        for (const title of ["Store", "Server", "Engine", "Logging", "Security", "Stats", "API", "Admin UI"]) {
             expect(screen.getByText(title)).toBeInTheDocument();
         }
         for (const text of [
@@ -51,10 +52,21 @@ describe("Configuration", () => {
             "Schema: Disabled",
             "Strict: true",
             "Enabled: true",
+            "Name: mongodb",
         ]) {
             expect(screen.getByText(text)).toBeInTheDocument();
         }
+        expectFullRows();
         expectNoRawTranslationKeys();
+    });
+
+    it("shows the internal engine when none is configured", async () => {
+        const withoutEngine = { ...CONFIG };
+        delete withoutEngine.Engine;
+        mockApi({ "GET /config": withoutEngine });
+        renderWithProviders(<Configuration />);
+
+        expect(await screen.findByText("Name: internal")).toBeInTheDocument();
     });
 
     it("is displayed in French", async () => {
@@ -62,7 +74,7 @@ describe("Configuration", () => {
         renderWithProviders(<Configuration />, { language: "fr" });
 
         expect(await screen.findByText("Dossier : /data")).toBeInTheDocument();
-        for (const title of ["Stockage", "Serveur", "Journalisation", "Sécurité", "Statistiques", "API", "Interface d'administration"]) {
+        for (const title of ["Stockage", "Serveur", "Moteur", "Journalisation", "Sécurité", "Statistiques", "API", "Interface d'administration"]) {
             expect(screen.getByText(title)).toBeInTheDocument();
         }
         for (const text of [

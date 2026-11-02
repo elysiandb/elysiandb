@@ -55,4 +55,8 @@ export type ElysianConfiguration = {
     AdminUI: {
         Enabled: boolean;
     };
+
+    Engine?: {
+        Name: string;
+    };
 };

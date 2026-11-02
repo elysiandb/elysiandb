@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import Monitoring from "../../src/pages/Monitoring.jsx";
 import { ToastProvider } from "../../src/components/notification/ToastProvider.jsx";
 import { useLanguageStore } from "../../src/i18n/store.js";
-import { expectNoRawTranslationKeys, mockApi, requestsTo } from "../helpers.jsx";
+import { expectFullRows, expectNoRawTranslationKeys, mockApi, requestsTo } from "../helpers.jsx";
 import { OVERVIEW, series } from "../fixtures/monitoring.js";
 
 const DETAILS = {
@@ -45,31 +45,94 @@ function routes(overview = OVERVIEW) {
 }
 
 describe("Monitoring", () => {
-    it("shows every section with its charts and tables", async () => {
+    it("opens on the traffic tab with its charts and routes", async () => {
         mockApi(routes());
         renderMonitoring();
 
-        expect(await screen.findByRole("heading", { name: "Traffic" })).toBeInTheDocument();
-        for (const section of ["Latency", "Errors and security", "KV store", "Documents", "Persistence", "Runtime", "Connections", "Hooks"]) {
-            expect(screen.getByRole("heading", { name: section })).toBeInTheDocument();
+        expect(await screen.findByRole("tab", { name: "Traffic" })).toHaveAttribute("aria-selected", "true");
+        expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+            "Traffic", "Errors and security", "Data", "Persistence", "System", "Hooks",
+        ]);
+        expect(screen.getByRole("tabpanel", { name: "Traffic" })).toBeInTheDocument();
+        for (const chart of ["Requests per second", "HTTP responses by status", "TCP commands per second", "HTTP latency", "TCP latency", "Slow requests per minute"]) {
+            expect(screen.getByRole("img", { name: chart })).toBeInTheDocument();
         }
-        expect(screen.queryByRole("heading", { name: "MongoDB" })).not.toBeInTheDocument();
-        expect(screen.getByRole("img", { name: "Requests per second" })).toBeInTheDocument();
-        expect(screen.getByRole("img", { name: "HTTP latency" })).toBeInTheDocument();
         expect(screen.getByRole("cell", { name: "/api/{entity}" })).toBeInTheDocument();
         expect(screen.getByRole("cell", { name: "/api/query" })).toBeInTheDocument();
-        expect(screen.getByRole("cell", { name: "21,004" })).toBeInTheDocument();
-        expect(screen.getByRole("cell", { name: "Post-read" })).toBeInTheDocument();
+        expect(screen.queryByRole("img", { name: "Memory" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("heading", { level: 3 })).not.toBeInTheDocument();
         expect(screen.getByRole("button", { name: "15 min" })).toHaveAttribute("aria-pressed", "true");
         expectNoRawTranslationKeys();
     });
 
-    it("shows the MongoDB section with the MongoDB engine", async () => {
+    it("switches tabs and keeps the tab in the URL", async () => {
+        const user = userEvent.setup();
+        mockApi(routes());
+        renderMonitoring("/admin/monitoring?range=1h");
+
+        await user.click(await screen.findByRole("tab", { name: "Data" }));
+
+        expect(screen.getByTestId("location")).toHaveTextContent("range=1h&tab=data");
+        expect(screen.getByRole("tab", { name: "Data" })).toHaveAttribute("aria-selected", "true");
+        expect(screen.getByRole("tab", { name: "Traffic" })).toHaveAttribute("aria-selected", "false");
+        expect(screen.getByRole("heading", { name: "KV store" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Documents" })).toBeInTheDocument();
+        expect(screen.getByRole("img", { name: "API cache hit ratio" })).toBeInTheDocument();
+        expect(screen.getByRole("cell", { name: "21,004" })).toBeInTheDocument();
+        expect(screen.queryByRole("img", { name: "Requests per second" })).not.toBeInTheDocument();
+    });
+
+    it.each([
+        ["errors", ["Server errors (5xx) per second", "Authentication failures per minute", "Hook errors per minute", "Warnings and errors logged per minute"], []],
+        ["persistence", ["Flush duration", "Failed and forced flushes per minute", "Recovery log size", "Data folder size"], ["Last successful flush"]],
+        ["system", ["Memory", "Goroutines", "GC pause (p99)", "GC cycles per minute", "Process CPU", "Open file descriptors", "Open connections", "Admin sessions", "Open transactions", "Oldest open transaction"], ["Runtime", "Connections"]],
+        ["hooks", ["Hook executions per second", "Hook duration (p95)"], ["Post-read"]],
+    ])("opens the %s tab from the URL", async (tab, charts, texts) => {
+        mockApi(routes());
+        renderMonitoring(`/admin/monitoring?tab=${tab}`);
+
+        expect(await screen.findByRole("img", { name: charts[0] })).toBeInTheDocument();
+        for (const chart of charts) {
+            expect(screen.getByRole("img", { name: chart })).toBeInTheDocument();
+        }
+        for (const text of texts) {
+            expect(screen.getByText(text)).toBeInTheDocument();
+        }
+        expect(screen.queryByRole("img", { name: "Requests per second" })).not.toBeInTheDocument();
+        expectNoRawTranslationKeys();
+    });
+
+    it("fills every line of every tab", async () => {
+        const user = userEvent.setup();
+        mockApi(routes({ ...OVERVIEW, instance: { ...OVERVIEW.instance, engine: "mongodb" } }));
+        const { container } = renderMonitoring();
+
+        await screen.findByRole("tab", { name: "MongoDB" });
+        for (const tab of screen.getAllByRole("tab")) {
+            await user.click(tab);
+            expect(tab).toHaveAttribute("aria-selected", "true");
+            expectFullRows(container);
+        }
+    });
+
+    it("shows the MongoDB tab with the MongoDB engine", async () => {
+        const user = userEvent.setup();
         mockApi(routes({ ...OVERVIEW, instance: { ...OVERVIEW.instance, engine: "mongodb" } }));
         renderMonitoring();
 
-        expect(await screen.findByRole("heading", { name: "MongoDB" })).toBeInTheDocument();
+        await user.click(await screen.findByRole("tab", { name: "MongoDB" }));
+
         expect(screen.getByRole("img", { name: "MongoDB ping" })).toBeInTheDocument();
+        expect(screen.getByRole("img", { name: "MongoDB pool connections in use" })).toBeInTheDocument();
+    });
+
+    it("falls back to the traffic tab when the MongoDB tab is not available", async () => {
+        mockApi(routes());
+        renderMonitoring("/admin/monitoring?tab=mongodb");
+
+        expect(await screen.findByRole("tab", { name: "Traffic" })).toHaveAttribute("aria-selected", "true");
+        expect(screen.queryByRole("tab", { name: "MongoDB" })).not.toBeInTheDocument();
+        expect(screen.getByRole("img", { name: "Requests per second" })).toBeInTheDocument();
     });
 
     it("changes the time range and keeps it in the URL", async () => {
@@ -77,7 +140,7 @@ describe("Monitoring", () => {
         const fetchMock = mockApi(routes());
         renderMonitoring();
 
-        await screen.findByRole("heading", { name: "Traffic" });
+        await screen.findByRole("tab", { name: "Traffic" });
         await user.click(screen.getByRole("button", { name: "24 hr" }));
 
         expect(screen.getByTestId("location")).toHaveTextContent("range=24h");
@@ -92,7 +155,7 @@ describe("Monitoring", () => {
         mockApi(routes());
         renderMonitoring("/admin/monitoring?range=15m");
 
-        await screen.findByRole("heading", { name: "Traffic" });
+        await screen.findByRole("tab", { name: "Traffic" });
         expect(screen.getByRole("combobox", { name: "Refresh interval" })).toHaveValue("2000");
     });
 
@@ -101,7 +164,10 @@ describe("Monitoring", () => {
         renderMonitoring("/admin/monitoring?range=1h", "fr");
 
         expect(await screen.findByRole("heading", { name: "Supervision" })).toBeInTheDocument();
-        expect(screen.getByRole("heading", { name: "Erreurs et sécurité" })).toBeInTheDocument();
+        expect(await screen.findByRole("tab", { name: "Trafic" })).toHaveAttribute("aria-selected", "true");
+        for (const tab of ["Erreurs et sécurité", "Données", "Persistance", "Système", "Hooks"]) {
+            expect(screen.getByRole("tab", { name: tab })).toBeInTheDocument();
+        }
         expect(screen.getByRole("img", { name: "Requêtes par seconde" })).toBeInTheDocument();
         expect(screen.getByRole("combobox", { name: "Intervalle de rafraîchissement" })).toHaveValue("30000");
         expectNoRawTranslationKeys();

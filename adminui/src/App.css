@@ -1087,6 +1087,53 @@ button:hover, .btn:hover {
     margin-bottom: 12px;
 }
 
+.monitoring-tabs {
+    gap: 0 1.5rem;
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.10);
+}
+
+.monitoring-tabs .nav-link {
+    margin-left: 0;
+    padding: 8px 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 0 !important;
+    backdrop-filter: none;
+}
+
+.monitoring-tabs .nav-link:hover {
+    background: transparent !important;
+    transform: none;
+}
+
+.monitoring-tabs .nav-link.active {
+    border-bottom-color: var(--accent) !important;
+}
+
+.monitoring-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 24px;
+    margin-bottom: 12px;
+}
+
+.monitoring-summary > div {
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+}
+
+.monitoring-summary dt {
+    color: var(--text-dim);
+    font-weight: 400;
+}
+
+.monitoring-summary dd {
+    margin: 0;
+    color: var(--text-main);
+}
+
 .monitoring-card .card-body.monitoring-card-body {
     padding: 10px 12px;
 }
@@ -1218,13 +1265,8 @@ button:hover, .btn:hover {
     grid-template-columns: max-content 1fr max-content 1fr;
 }
 
-.monitoring-facts-wide dd,
-.monitoring-facts-inline dd {
+.monitoring-facts-wide dd {
     text-align: left;
-}
-
-.monitoring-facts-inline {
-    grid-template-columns: max-content 1fr max-content 1fr max-content 1fr;
 }
 
 .monitoring-bar-row {
@@ -1273,6 +1315,18 @@ button:hover, .btn:hover {
 .monitoring-table {
     font-size: 0.85rem;
     margin-bottom: 0;
+}
+
+.monitoring-table-scroll {
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.monitoring-table-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg-section) !important;
 }
 
 .monitoring-table th {
