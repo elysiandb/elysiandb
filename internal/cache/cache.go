@@ -28,13 +28,20 @@ type cacheStore struct {
 	ttl      time.Duration
 }
 
-var CacheStore *cacheStore
+var (
+	CacheStore *cacheStore
+	currentMu  sync.RWMutex
+)
 
 func InitCache(ttl time.Duration) {
-	CacheStore = &cacheStore{
+	store := &cacheStore{
 		entities: make(map[string]*cacheEntity),
 		ttl:      ttl,
 	}
+
+	currentMu.Lock()
+	CacheStore = store
+	currentMu.Unlock()
 
 	log.Debug("api cache initialized", "component", "cache", "ttl", ttl)
 }
@@ -229,6 +236,16 @@ func HashQuery(
 	sum := sha256.Sum256(b)
 
 	return sum[:]
+}
+
+func CleanExpiredEntries() {
+	currentMu.RLock()
+	store := CacheStore
+	currentMu.RUnlock()
+
+	if store != nil {
+		store.CleanExpired()
+	}
 }
 
 func (s *cacheStore) CleanExpired() {

@@ -6,7 +6,6 @@ import (
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/metrics"
-	"github.com/taymour/elysiandb/internal/recovery"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/storage"
 	"github.com/taymour/elysiandb/internal/transaction"
@@ -17,8 +16,8 @@ func MonitoringSources() metrics.Sources {
 		DataFolder:      func() string { return globals.GetConfig().Store.Folder },
 		KVKeys:          storage.CountKeys,
 		EntityCounts:    engine.CountEntitiesPerType,
-		IndexBacklog:    api_storage.DirtyFieldsCount,
-		RecoverySizes:   recovery.LogSizes,
+		IndexBacklog:    api_storage.IndexBacklog,
+		RecoverySizes:   storageLogSizes,
 		Transactions:    transaction.OpenTransactions,
 		HTTPConnections: HTTPConnections,
 		CacheEntries: func() int {
@@ -68,4 +67,13 @@ func WarnIfAuthenticationIsOffOnPublicAddress() {
 			"hint", "anyone who can reach these addresses can read and change all the data: enable security.authentication",
 		)
 	}
+}
+
+func storageLogSizes() (int64, int64) {
+	e := storage.Engine()
+	if e == nil {
+		return 0, 0
+	}
+
+	return 0, e.LogSinceCheckpoint()
 }

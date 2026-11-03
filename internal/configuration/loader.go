@@ -70,6 +70,12 @@ type StoreConfig struct {
 	Shards               int                 `yaml:"shards"`
 	FlushIntervalSeconds int                 `yaml:"flushIntervalSeconds"`
 	CrashRecovery        CrashRecoveryConfig `yaml:"crashRecovery"`
+	Durability           string              `yaml:"durability"`
+	Memory               StoreMemoryConfig   `yaml:"memory"`
+}
+
+type StoreMemoryConfig struct {
+	LimitMB int64 `yaml:"limitMB"`
 }
 
 type StatsConfig struct {

@@ -1,30 +1,25 @@
 package api_storage
 
 import (
+	"github.com/taymour/elysiandb/internal/docpath"
 	"github.com/taymour/elysiandb/internal/query"
 )
 
 func ExecuteQuery(q query.Query) ([]map[string]any, error) {
-	sortField, sortAsc := q.PrimarySort()
+	return PlanQuery(q, false).Decode(), nil
+}
 
-	data := ListEntities(
-		q.Entity,
-		0,
-		0,
-		sortField,
-		sortAsc,
-		nil,
-		"",
-		"",
-	)
+func PlanQuery(q query.Query, countOnly bool) *ListResult {
+	filter := q.Filter
 
-	if sorts := q.OrderedSorts(); len(sorts) > 1 {
-		SortEntities(data, sorts)
-	}
-
-	filtered := ApplyQueryFilter(data, q.Filter)
-
-	return applyOffsetLimit(filtered, q.Offset, q.Limit), nil
+	return Plan(ListQuery{
+		Entity:    q.Entity,
+		Offset:    q.Offset,
+		Limit:     q.Limit,
+		Sorts:     q.OrderedSorts(),
+		Node:      &filter,
+		CountOnly: countOnly,
+	})
 }
 
 func ApplyQueryFilter(data []map[string]any, filter query.FilterNode) []map[string]any {
@@ -135,51 +130,5 @@ func matchValue(val any, ops map[string]string) bool {
 }
 
 func resolveValues(data any, path string) []any {
-	parts := splitPath(path)
-	return resolveRecursive(data, parts)
-}
-
-func resolveRecursive(current any, parts []string) []any {
-	if len(parts) == 0 {
-		return []any{current}
-	}
-
-	switch v := current.(type) {
-	case map[string]any:
-		next, ok := v[parts[0]]
-		if !ok {
-			return nil
-		}
-
-		return resolveRecursive(next, parts[1:])
-	case []any:
-		var out []any
-		for _, item := range v {
-			out = append(out, resolveRecursive(item, parts)...)
-		}
-
-		return out
-	case []map[string]any:
-		var out []any
-		for _, item := range v {
-			out = append(out, resolveRecursive(item, parts)...)
-		}
-
-		return out
-	default:
-		return nil
-	}
-}
-
-func splitPath(path string) []string {
-	out := []string{}
-	start := 0
-	for i := 0; i <= len(path); i++ {
-		if i == len(path) || path[i] == '.' {
-			out = append(out, path[start:i])
-			start = i + 1
-		}
-	}
-
-	return out
+	return docpath.ResolveValues(data, path)
 }

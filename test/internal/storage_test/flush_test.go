@@ -3,7 +3,6 @@ package storage_test
 import (
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -11,11 +10,10 @@ import (
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/metrics"
-	"github.com/taymour/elysiandb/internal/recovery"
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
-func TestFailedFlushKeepsTheRecoveryLogAndIsReported(t *testing.T) {
+func TestFailedCheckpointIsReportedAndRetried(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores file permissions")
 	}
@@ -35,32 +33,24 @@ func TestFailedFlushKeepsTheRecoveryLogAndIsReported(t *testing.T) {
 	log.SetOutput(&strings.Builder{}, false)
 	metrics.Reset()
 	t.Cleanup(func() {
+		_ = os.Chmod(dir, 0o700)
+		_ = storage.Close()
 		log.SetOutput(nil, false)
 		_ = log.Configure(log.Options{})
 		metrics.Reset()
 	})
 
 	storage.LoadDB()
-	storage.LoadJsonDB()
-	recovery.ActivateStoreRecoveryLog(storage.WriteStoreDB)
-
 	if err := storage.PutKeyValue("k", []byte("v")); err != nil {
 		t.Fatal(err)
 	}
 
-	recoveryPath := filepath.Join(dir, recovery.StoreRecoveryFile)
-	dataPath := filepath.Join(dir, storage.DataFile)
-	if _, err := os.Stat(recoveryPath); err != nil {
-		t.Fatalf("expected a recovery log: %v", err)
-	}
-
-	if err := os.Chmod(dataPath, 0o400); err != nil {
+	if err := os.Chmod(dir, 0o500); err != nil {
 		t.Fatal(err)
 	}
-	storage.WriteStoreDB()
 
-	if _, err := os.Stat(recoveryPath); err != nil {
-		t.Fatalf("a failed flush must keep the recovery log: %v", err)
+	if err := storage.Checkpoint(); err == nil {
+		t.Fatalf("a checkpoint in a read-only folder must fail")
 	}
 
 	failures := log.Logs(log.Query{MinLevel: slog.LevelError}).Entries
@@ -71,18 +61,17 @@ func TestFailedFlushKeepsTheRecoveryLogAndIsReported(t *testing.T) {
 		t.Fatalf("the failure must be visible in the metrics: %+v", p)
 	}
 
-	storage.WriteStoreDB()
+	_ = storage.Checkpoint()
 	if got := log.Logs(log.Query{MinLevel: slog.LevelError}).Entries; len(got) != 1 {
 		t.Fatalf("repeated failures are throttled, got %d lines", len(got))
 	}
 
-	if err := os.Chmod(dataPath, 0o600); err != nil {
+	if err := os.Chmod(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	storage.WriteStoreDB()
 
-	if _, err := os.Stat(recoveryPath); !os.IsNotExist(err) {
-		t.Fatalf("a successful flush clears the recovery log, got %v", err)
+	if err := storage.Checkpoint(); err != nil {
+		t.Fatal(err)
 	}
 
 	recovered := log.Logs(log.Query{Text: "flush working again"}).Entries
@@ -90,12 +79,16 @@ func TestFailedFlushKeepsTheRecoveryLogAndIsReported(t *testing.T) {
 		t.Fatalf("expected a recovery line with 2 failures, got %+v", recovered)
 	}
 
-	data, err := os.ReadFile(dataPath)
-	if err != nil || !strings.Contains(string(data), `"k"`) {
-		t.Fatalf("the key should be on disk: %s %v", data, err)
-	}
-
 	if p := metrics.Persistence(); !p.LastFlushOK || p.LastSuccessAt == nil {
 		t.Fatalf("persistence should be ok again: %+v", p)
+	}
+
+	if err := storage.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	storage.LoadDB()
+	if v, err := storage.GetByKey("k"); err != nil || string(v) != "v" {
+		t.Fatalf("the key survives a restart: %q %v", v, err)
 	}
 }

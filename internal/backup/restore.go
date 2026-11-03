@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/taymour/elysiandb/internal/acl"
-	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
@@ -296,10 +295,6 @@ func finishRestore() error {
 	}
 
 	hook.InitHooks()
-
-	if engine.IsEngineInternal() {
-		api_storage.RebuildAllIndexes()
-	}
 
 	storage.WriteToDB()
 

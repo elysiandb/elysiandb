@@ -3,30 +3,62 @@ package api_storage
 import (
 	"io"
 
-	"github.com/taymour/elysiandb/internal/globals"
-	"github.com/taymour/elysiandb/internal/storage"
+	"github.com/taymour/elysiandb/internal/datastore"
 )
 
-func IterateEntities(entity string, fn func(data map[string]any) error) error {
-	idList, _ := GetListOfIds(entity, "", true)
-	for _, id := range decodeIDs(idList) {
-		data := ReadEntityById(entity, id)
-		if data == nil {
-			continue
-		}
+const restoreBatch = 1000
 
-		if err := fn(data); err != nil {
-			return err
-		}
+func IterateEntities(entity string, fn func(data map[string]any) error) error {
+	e := db()
+	if e == nil {
+		return nil
 	}
 
-	return nil
+	return IterateSnapshot(e.Snapshot(entity), fn)
+}
+
+func IterateSnapshot(snap *datastore.Snapshot, fn func(data map[string]any) error) error {
+	var err error
+	snap.Ascend(0, func(d datastore.Doc) bool {
+		data, decodeErr := d.Decode()
+		if decodeErr != nil {
+			return true
+		}
+
+		err = fn(data)
+
+		return err == nil
+	})
+
+	return err
 }
 
 func RestoreEntities(entity string, next func() (map[string]any, error)) (int, error) {
 	AddEntityType(entity)
 
-	ids := make([]string, 0)
+	count := 0
+	batch := []map[string]any{}
+	flush := func() error {
+		if len(batch) == 0 {
+			return nil
+		}
+
+		err := update(func(tx *datastore.Tx) error {
+			for _, data := range batch {
+				id, _ := data["id"].(string)
+				if err := tx.Put(entity, id, data); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+
+		count += len(batch)
+		batch = batch[:0]
+
+		return err
+	}
+
 	for {
 		data, err := next()
 		if err == io.EOF {
@@ -34,17 +66,20 @@ func RestoreEntities(entity string, next func() (map[string]any, error)) (int, e
 		}
 
 		if err != nil {
-			return len(ids), err
+			if flushErr := flush(); flushErr != nil {
+				return count, flushErr
+			}
+
+			return count, err
 		}
 
-		id, _ := data["id"].(string)
-		storage.PutJsonValue(globals.ApiSingleEntityKey(entity, id), data)
-		ids = append(ids, id)
+		batch = append(batch, data)
+		if len(batch) >= restoreBatch {
+			if err := flush(); err != nil {
+				return count, err
+			}
+		}
 	}
 
-	if len(ids) > 0 {
-		storage.PutKeyValue(globals.ApiEntityIndexIdKey(entity), encodeIDs(ids))
-	}
-
-	return len(ids), nil
+	return count, flush()
 }

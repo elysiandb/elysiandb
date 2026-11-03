@@ -1,12 +1,16 @@
 package api_storage
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/taymour/elysiandb/internal/datastore"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/schema"
@@ -15,15 +19,82 @@ import (
 
 const CoreEntityTypePrefix = "_elysiandb_core_"
 
-func WriteEntity(entity string, data map[string]any) []schema.ValidationError {
-	return writeEntity(entity, data, true)
+var (
+	errValidation = errors.New("validation failed")
+	errNotOpen    = errors.New("storage is not open")
+	apiLog        = log.For("api")
+)
+
+func db() *datastore.Engine {
+	return storage.Engine()
 }
 
-func writeEntity(entity string, data map[string]any, checkInferredSchema bool) []schema.ValidationError {
-	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity && (checkInferredSchema || schema.IsManualSchema(entity, nil)) {
-		errors := schema.ValidateEntity(entity, data, nil)
-		if len(errors) > 0 {
-			return errors
+func update(fn func(tx *datastore.Tx) error) error {
+	e := db()
+	if e == nil {
+		return errNotOpen
+	}
+
+	return e.Update(fn)
+}
+
+func logWriteError(op, entity string, err error) {
+	if err != nil && !errors.Is(err, errValidation) {
+		apiLog.Error("write failed", "op", op, "entity", entity, "err", err)
+	}
+}
+
+func replaceContents(dst, src map[string]any) {
+	for k := range dst {
+		delete(dst, k)
+	}
+
+	maps.Copy(dst, src)
+}
+
+func WriteEntity(entity string, data map[string]any) []schema.ValidationError {
+	var errs []schema.ValidationError
+	var result map[string]any
+
+	err := update(func(tx *datastore.Tx) error {
+		attempt := storage.DeepCopyDocument(data)
+		errs = writeEntity(tx, entity, attempt, true)
+		if len(errs) > 0 {
+			return errValidation
+		}
+
+		result = attempt
+
+		return nil
+	})
+
+	if errors.Is(err, errValidation) {
+		return errs
+	}
+
+	logWriteError("write", entity, err)
+	if result != nil {
+		replaceContents(data, result)
+	}
+
+	return []schema.ValidationError{}
+}
+
+func schemaFor(tx *datastore.Tx, entity string) map[string]any {
+	if tx == nil {
+		return GetEntitySchema(entity)
+	}
+
+	return tx.Read(schema.SchemaEntity, entity)
+}
+
+func writeEntity(tx *datastore.Tx, entity string, data map[string]any, checkInferredSchema bool) []schema.ValidationError {
+	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
+		current := schemaFor(tx, entity)
+		if current != nil && (checkInferredSchema || schema.IsManualSchema(entity, current)) {
+			if errors := schema.ValidateEntity(entity, data, current); len(errors) > 0 {
+				return errors
+			}
 		}
 	}
 
@@ -31,21 +102,21 @@ func writeEntity(entity string, data map[string]any, checkInferredSchema bool) [
 		data["id"] = uuid.New().String()
 	}
 
-	writeSubEntities(entity, data)
+	writeSubEntities(tx, entity, data)
 
-	persistEntity(entity, data)
-	updateSchemaIfNeeded(entity, data)
+	persistEntity(tx, entity, data)
+	updateSchemaIfNeeded(tx, entity, data)
 
 	return []schema.ValidationError{}
 }
 
-func writeSubEntities(entity string, data map[string]any) {
+func writeSubEntities(tx *datastore.Tx, entity string, data map[string]any) {
 	subs := ExtractSubEntities(entity, data)
 	for _, sub := range subs {
 		subEntity := sub["@entity"].(string)
 		delete(sub, "@entity")
 		id, _ := sub["id"].(string)
-		writeEntity(subEntity, MergeWithExisting(sub, ReadEntityById(subEntity, id)), false)
+		writeEntity(tx, subEntity, MergeWithExisting(sub, tx.Read(subEntity, id)), false)
 	}
 }
 
@@ -81,74 +152,79 @@ func DeleteEntityType(entity string) error {
 	}
 
 	DeleteAllEntities(entity)
-	RemoveEntityIndexes(entity)
-
-	key := globals.ApiAllEntityTypesListKey()
-	data, _ := storage.GetByKey(key)
-	types := decodeIDs(data)
-	newTypes := make([]string, 0, len(types))
-	for _, t := range types {
-		if t != entity {
-			newTypes = append(newTypes, t)
-		}
-	}
-
-	storage.PutKeyValue(key, encodeIDs(newTypes))
 
 	return nil
 }
 
-func persistEntity(entity string, data map[string]any) {
+func persistEntity(tx *datastore.Tx, entity string, data map[string]any) {
 	id, _ := data["id"].(string)
-	key := globals.ApiSingleEntityKey(entity, id)
-	old := ReadEntityById(entity, id)
-	storage.PutJsonValue(key, data)
-	AddIdToindexes(entity, id)
-	AddEntityType(entity)
-
-	if old != nil {
-		UpdateIndexesForEntity(entity, id, old, data)
-	} else {
-		for k := range data {
-			if k != "id" {
-				markFieldAndNestedDirty(entity, k, data[k])
-			}
-		}
+	if err := tx.Put(entity, id, data); err != nil {
+		apiLog.Error("cannot encode a document", "entity", entity, "id", id, "err", err)
+		return
 	}
+
+	tx.EnsureType(entity)
 }
 
-func updateSchemaIfNeeded(entity string, data map[string]any) {
+func updateSchemaIfNeeded(tx *datastore.Tx, entity string, data map[string]any) {
 	if !globals.GetConfig().Api.Schema.Enabled || entity == schema.SchemaEntity {
 		return
 	}
 
-	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, nil) {
+	current := tx.Read(schema.SchemaEntity, entity)
+	if globals.GetConfig().Api.Schema.Strict && current != nil && schema.IsManualSchema(entity, current) {
 		return
 	}
 
-	merged := schema.MergeAnalyzedSchema(entity, GetEntitySchema(entity), data)
-	WriteEntity(schema.SchemaEntity, merged)
+	merged := schema.MergeAnalyzedSchema(entity, current, data)
+	if current != nil {
+		encoded, err := json.Marshal(merged)
+		if stored, ok := tx.ReadBytes(schema.SchemaEntity, entity); err == nil && ok && bytes.Equal(encoded, stored) {
+			return
+		}
+	}
+
+	writeEntity(tx, schema.SchemaEntity, merged, true)
 }
 
 func WriteListOfEntities(entity string, list []map[string]any) [][]schema.ValidationError {
-	errors := [][]schema.ValidationError{}
-	for _, data := range list {
-		errors = append(errors, WriteEntity(entity, data))
+	var errors [][]schema.ValidationError
+	var results []map[string]any
+
+	err := update(func(tx *datastore.Tx) error {
+		errors = [][]schema.ValidationError{}
+		results = make([]map[string]any, len(list))
+		for i, data := range list {
+			attempt := storage.DeepCopyDocument(data)
+			errs := writeEntity(tx, entity, attempt, true)
+			errors = append(errors, errs)
+			if len(errs) == 0 {
+				results[i] = attempt
+			}
+		}
+
+		return nil
+	})
+
+	logWriteError("write_list", entity, err)
+	for i, result := range results {
+		if result != nil {
+			replaceContents(list[i], result)
+		}
 	}
 
 	return errors
 }
 
 func AddEntityType(entity string) {
-	key := globals.ApiAllEntityTypesListKey()
-	data, _ := storage.GetByKey(key)
-	types := decodeIDs(data)
-	found := slices.Contains(types, entity)
-
-	if !found {
-		types = append(types, entity)
-		storage.PutKeyValue(key, encodeIDs(types))
+	if EntityTypeExists(entity) {
+		return
 	}
+
+	logWriteError("add_type", entity, update(func(tx *datastore.Tx) error {
+		tx.EnsureType(entity)
+		return nil
+	}))
 }
 
 func GetEntitySchema(entity string) map[string]any {
@@ -161,18 +237,17 @@ func GetEntitySchema(entity string) map[string]any {
 }
 
 func EntityTypeExists(entity string) bool {
-	for _, t := range ListEntityTypes() {
-		if t == entity {
-			return true
-		}
-	}
-
-	return false
+	e := db()
+	return e != nil && e.TypeExists(entity)
 }
 
 func ListEntityTypes() []string {
-	data, _ := storage.GetByKey(globals.ApiAllEntityTypesListKey())
-	return decodeIDs(data)
+	e := db()
+	if e == nil {
+		return nil
+	}
+
+	return e.Types()
 }
 
 func IsCoreEntityType(entity string) bool {
@@ -180,8 +255,7 @@ func IsCoreEntityType(entity string) bool {
 }
 
 func ListPublicEntityTypes() []string {
-	data, _ := storage.GetByKey(globals.ApiAllEntityTypesListKey())
-	allEntityTypes := decodeIDs(data)
+	allEntityTypes := ListEntityTypes()
 
 	publicEntityTypes := make([]string, 0, len(allEntityTypes))
 	for _, entityType := range allEntityTypes {
@@ -194,10 +268,38 @@ func ListPublicEntityTypes() []string {
 }
 
 func ReadEntityById(entity, id string) map[string]any {
-	key := globals.ApiSingleEntityKey(entity, id)
-	data, _ := storage.GetJsonByKey(key)
+	e := db()
+	if e == nil {
+		return nil
+	}
+
+	doc, ok := e.Snapshot(entity).Get(id)
+	if !ok {
+		return nil
+	}
+
+	data, err := doc.Decode()
+	if err != nil {
+		return nil
+	}
 
 	return data
+}
+
+func ReadEntityBytesById(entity, id string) ([]byte, bool) {
+	e := db()
+	if e == nil {
+		return nil, false
+	}
+
+	doc, ok := e.Snapshot(entity).Get(id)
+	if !ok {
+		return nil, false
+	}
+
+	b, err := doc.Bytes()
+
+	return b, err == nil
 }
 
 func ListEntities(
@@ -210,47 +312,24 @@ func ListEntities(
 	search string,
 	includesParam string,
 ) []map[string]any {
-	idList, err := GetListOfIds(entity, sortField, sortAscending)
-	if err != nil {
-		return []map[string]any{}
+	includes := MergeIncludes(includesParam, ExtractAutoIncludes(filters))
+	res := Plan(ListQuery{
+		Entity:    entity,
+		Limit:     limit,
+		Offset:    offset,
+		SortField: sortField,
+		SortAsc:   sortAscending,
+		Filters:   filters,
+		Search:    search,
+		Includes:  includes,
+	})
+
+	out := res.Decode()
+	if includes != "" && len(out) > 0 {
+		out = applyIncludesWith(out, includes, res.reader())
 	}
 
-	ids := decodeIDs(idList)
-	if len(ids) == 0 {
-		return []map[string]any{}
-	}
-
-	if len(filters) == 0 && search == "" {
-		ids = applyOffsetLimit(ids, offset, limit)
-	}
-
-	all := make([]map[string]any, 0, len(ids))
-	for _, id := range ids {
-		entityData := ReadEntityById(entity, id)
-		if entityData != nil {
-			all = append(all, entityData)
-		}
-	}
-
-	autoInc := ExtractAutoIncludes(filters)
-	includesParam = MergeIncludes(includesParam, autoInc)
-
-	if includesParam != "" {
-		all = ApplyIncludes(all, includesParam)
-	}
-
-	filtered := make([]map[string]any, 0, len(all))
-	for _, e := range all {
-		if FiltersMatchEntity(e, filters) && (search == "" || SearchMatchesEntity(e, search)) {
-			filtered = append(filtered, e)
-		}
-	}
-
-	if len(filters) > 0 || search != "" {
-		return applyOffsetLimit(filtered, offset, limit)
-	}
-
-	return filtered
+	return out
 }
 
 func ApplyFiltersToList(
@@ -310,96 +389,99 @@ func applyOffsetLimit[T any](in []T, offset, limit int) []T {
 }
 
 func GetListOfIds(entity, sortField string, sortAscending bool) ([]byte, error) {
-	if sortField == "" {
-		idIndexKey := globals.ApiEntityIndexIdKey(entity)
-		return storage.GetByKey(idIndexKey)
-	}
+	res := Plan(ListQuery{Entity: entity, SortField: sortField, SortAsc: sortAscending})
+	ids := res.IDs()
+	if len(ids) == 0 {
+		if sortField == "" {
+			return nil, fmt.Errorf("key not found: %s", globals.ApiEntityIndexIdKey(entity))
+		}
 
-	ensureFieldIndexFresh(entity, sortField)
-	if !IndexExistsForField(entity, sortField) {
 		return []byte{}, nil
 	}
 
-	if sortAscending {
-		return storage.GetByKey(
-			globals.ApiEntityIndexFieldSortAscKey(entity, sortField),
-		)
-	}
-
-	return storage.GetByKey(
-		globals.ApiEntityIndexFieldSortDescKey(entity, sortField),
-	)
+	return []byte(strings.Join(ids, "\n")), nil
 }
 
 func DeleteEntityById(entity, id string) {
-	key := globals.ApiSingleEntityKey(entity, id)
-	storage.DeleteJsonByKey(key)
-	RemoveIdFromIndexes(entity, id)
+	logWriteError("delete", entity, update(func(tx *datastore.Tx) error {
+		tx.Delete(entity, id)
+		return nil
+	}))
+}
+
+func deleteAllEntities(tx *datastore.Tx, entity string) {
+	if !schema.IsManualSchema(entity, tx.Read(schema.SchemaEntity, entity)) {
+		tx.Delete(schema.SchemaEntity, entity)
+	}
+
+	tx.ResetEntity(entity)
+	tx.DropType(entity)
 }
 
 func DeleteAllEntities(entity string) {
-	if !schema.IsManualSchema(entity, nil) {
-		DeleteEntityById(schema.SchemaEntity, entity)
-	}
-
-	prefix := globals.ApiEntitiesAllKey(entity)
-	storage.DeleteJsonByPrefix(prefix)
-	RemoveEntityIndexes(entity)
-	key := globals.ApiAllEntityTypesListKey()
-	data, _ := storage.GetByKey(key)
-	types := decodeIDs(data)
-	newTypes := make([]string, 0, len(types))
-	for _, t := range types {
-		if t != entity {
-			newTypes = append(newTypes, t)
-		}
-	}
-
-	storage.PutKeyValue(key, encodeIDs(newTypes))
+	logWriteError("delete_all", entity, update(func(tx *datastore.Tx) error {
+		deleteAllEntities(tx, entity)
+		return nil
+	}))
 }
 
 func DeleteAll() {
-	entities := ListEntityTypes()
-
-	for _, entity := range entities {
-		DeleteAllEntities(entity)
-	}
+	logWriteError("delete_all", "*", update(func(tx *datastore.Tx) error {
+		for _, entity := range ListEntityTypes() {
+			deleteAllEntities(tx, entity)
+		}
+		return nil
+	}))
 }
 
 func UpdateEntityById(entity, id string, updated map[string]any) map[string]any {
-	existing := ReadEntityById(entity, id)
+	var result map[string]any
+	err := update(func(tx *datastore.Tx) error {
+		result = updateEntityById(tx, entity, id, updated)
+		return nil
+	})
+
+	logWriteError("update", entity, err)
+
+	return result
+}
+
+func updateEntityById(tx *datastore.Tx, entity, id string, updated map[string]any) map[string]any {
+	existing := tx.Read(entity, id)
 	if existing == nil {
 		return nil
 	}
 
-	old := make(map[string]any, len(existing))
-	maps.Copy(old, existing)
-
-	maps.Copy(existing, updated)
+	maps.Copy(existing, storage.DeepCopyDocument(updated))
 	existing["id"] = id
 
-	writeSubEntities(entity, existing)
+	writeSubEntities(tx, entity, existing)
 
-	persistEntity(entity, existing)
-	UpdateIndexesForEntity(entity, id, old, existing)
-	updateSchemaIfNeeded(entity, existing)
+	persistEntity(tx, entity, existing)
+	updateSchemaIfNeeded(tx, entity, existing)
 
 	return existing
 }
 
 func UpdateListOfEntities(entity string, updates []map[string]any) []map[string]any {
-	results := make([]map[string]any, 0, len(updates))
-	for _, upd := range updates {
-		id, ok := upd["id"].(string)
-		if !ok || id == "" {
-			continue
+	var results []map[string]any
+	err := update(func(tx *datastore.Tx) error {
+		results = make([]map[string]any, 0, len(updates))
+		for _, upd := range updates {
+			id, ok := upd["id"].(string)
+			if !ok || id == "" {
+				continue
+			}
+
+			if res := updateEntityById(tx, entity, id, upd); res != nil {
+				results = append(results, res)
+			}
 		}
 
-		res := UpdateEntityById(entity, id, upd)
-		if res != nil {
-			results = append(results, res)
-		}
-	}
+		return nil
+	})
+
+	logWriteError("update_list", entity, err)
 
 	return results
 }
@@ -420,30 +502,23 @@ func DumpAll() map[string]any {
 }
 
 func EntityExists(entity, id string) bool {
-	return ReadEntityById(entity, id) != nil
+	e := db()
+	if e == nil {
+		return false
+	}
+
+	_, ok := e.Snapshot(entity).Get(id)
+
+	return ok
 }
 
 func CountEntities(entity string) int {
-	raw, err := storage.GetByKey(globals.ApiEntityIndexIdKey(entity))
-	if err != nil {
+	e := db()
+	if e == nil {
 		return 0
 	}
 
-	count := 0
-	inID := false
-	for _, b := range raw {
-		if b == '\n' {
-			inID = false
-			continue
-		}
-
-		if !inID {
-			count++
-			inID = true
-		}
-	}
-
-	return count
+	return e.Snapshot(entity).Len()
 }
 
 func CountEntitiesPerType() map[string]int {
@@ -457,14 +532,12 @@ func CountEntitiesPerType() map[string]int {
 
 func CountAllEntities() int {
 	counter := 0
-	entities := ListEntityTypes()
-
-	for _, entity := range entities {
+	for _, entity := range ListEntityTypes() {
 		if entity == schema.SchemaEntity {
 			continue
 		}
 
-		counter += len(ListEntities(entity, 0, 0, "", true, nil, "", ""))
+		counter += CountEntities(entity)
 	}
 
 	return counter
@@ -514,15 +587,31 @@ func NewImportRejection(entity string, index int, item map[string]any, errs []sc
 	}
 }
 
+const importBatch = 1000
+
 func ImportAll(data map[string][]map[string]any) []ImportRejection {
 	rejections := []ImportRejection{}
 	for _, entity := range slices.Sorted(maps.Keys(data)) {
 		DeleteEntityDocuments(entity)
 
-		for index, item := range data[entity] {
-			if errs := writeEntity(entity, item, false); len(errs) > 0 {
-				rejections = append(rejections, NewImportRejection(entity, index, item, errs))
-			}
+		items := data[entity]
+		for start := 0; start < len(items); start += importBatch {
+			end := min(start+importBatch, len(items))
+			var batch []ImportRejection
+			err := update(func(tx *datastore.Tx) error {
+				batch = nil
+				for index := start; index < end; index++ {
+					attempt := storage.DeepCopyDocument(items[index])
+					if errs := writeEntity(tx, entity, attempt, false); len(errs) > 0 {
+						batch = append(batch, NewImportRejection(entity, index, items[index], errs))
+						continue
+					}
+					replaceContents(items[index], attempt)
+				}
+				return nil
+			})
+			logWriteError("import", entity, err)
+			rejections = append(rejections, batch...)
 		}
 
 		log.Debug("entity type imported", "component", "api", "entity", entity, "documents", len(data[entity]))
@@ -532,6 +621,8 @@ func ImportAll(data map[string][]map[string]any) []ImportRejection {
 }
 
 func DeleteEntityDocuments(entity string) {
-	storage.DeleteJsonByPrefix(globals.ApiSingleEntityKey(entity, ""))
-	RemoveEntityIndexes(entity)
+	logWriteError("delete_documents", entity, update(func(tx *datastore.Tx) error {
+		tx.ResetEntity(entity)
+		return nil
+	}))
 }

@@ -4,14 +4,12 @@ import (
 	"fmt"
 	"time"
 
-	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/metrics"
-	"github.com/taymour/elysiandb/internal/recovery"
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
@@ -60,40 +58,11 @@ func InitDB() {
 	}
 
 	start := time.Now()
-	storage.LoadDB()
-	storage.LoadJsonDB()
-
-	if cfg.Store.CrashRecovery.Enabled {
-		recovery.ReplayJsonRecoveryLog(storage.PutJsonValue, storage.DeleteJsonByKey)
-		recovery.ActivateJsonRecoveryLog(storage.WriteJsonDB)
-
-		recovery.ReplayStoreRecoveryLog(storage.PutKeyValueWithExpiration, storage.DeleteByKey)
-		recovery.ActivateStoreRecoveryLog(storage.WriteStoreDB)
+	if err := storage.Open(storage.ModeServer); err != nil {
+		log.Fatal("cannot open the data folder", "component", "storage", "folder", cfg.Store.Folder, "err", err)
 	}
 
-	if engine.IsEngineInternal() {
-		if repair := api_storage.RepairIndexes(); repair.Changed() {
-			storageLog.Warn("rest api indexes repaired",
-				"entity_types_restored", repair.EntityTypes,
-				"ids_added", repair.IDsAdded,
-				"ids_removed", repair.IDsRemoved,
-				"hint", "the list of entity types or the id indexes did not match the documents, for example after a RESET with a previous version",
-			)
-		}
-	}
-
-	keys, withTTL := storage.CountKeys()
-	storageLog.Info("storage loaded",
-		"folder", cfg.Store.Folder,
-		"kv_keys", keys,
-		"kv_keys_with_ttl", withTTL,
-		"documents", storage.CountJsonDocuments(),
-		"duration_ms", log.Since(start),
-	)
-
-	BootSaver()
-	BootExpirationHandler()
-	BootLazyIndexRebuilder()
+	logStorageLoaded(cfg, start)
 
 	switch {
 	case engine.IsEngineMongoDB():
@@ -106,4 +75,31 @@ func InitDB() {
 	BootACL()
 	BootHooks()
 	BootApiCacheCleaner()
+}
+
+func InitTool() {
+	cfg := globals.GetConfig()
+
+	start := time.Now()
+	if err := storage.Open(storage.ModeTool); err != nil {
+		log.Fatal("cannot open the data folder", "component", "storage", "folder", cfg.Store.Folder, "err", err,
+			"hint", "stop the server first, or use GET /api/backup on the running server")
+	}
+
+	logStorageLoaded(cfg, start)
+
+	if engine.IsEngineMongoDB() {
+		InitMongoDBConnection()
+	}
+}
+
+func logStorageLoaded(cfg *configuration.Config, start time.Time) {
+	keys, withTTL := storage.CountKeys()
+	storageLog.Info("storage loaded",
+		"folder", cfg.Store.Folder,
+		"kv_keys", keys,
+		"kv_keys_with_ttl", withTTL,
+		"documents", storage.CountJsonDocuments(),
+		"duration_ms", log.Since(start),
+	)
 }

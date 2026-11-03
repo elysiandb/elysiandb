@@ -12,11 +12,11 @@ import (
 	"github.com/fasthttp/router"
 	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/boot"
-	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/taymour/elysiandb/internal/routing"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/storage"
 	tcprouting "github.com/taymour/elysiandb/internal/transport/tcp/tcp_routing"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttputil"
@@ -68,7 +68,6 @@ func startServerOnFolder(t *testing.T, folder string, crashRecovery bool) *corpu
 	globals.SetConfig(cfg)
 	security.ResetLoginAttempts()
 	boot.InitDB()
-	cache.InitCache(10 * time.Second)
 	hook.InitHooks()
 
 	if err := security.InitAdminUserIfNotExists(); err != nil {
@@ -338,4 +337,6 @@ func writeLegacyVariant(t *testing.T, variant, target string) {
 	}
 }
 
-func shutdownEngine() {}
+func shutdownEngine() {
+	_ = storage.Close()
+}
