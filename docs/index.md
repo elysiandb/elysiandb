@@ -35,6 +35,9 @@ store:
   shards: 512
   flushIntervalSeconds: 5
   crashRecovery: { enabled: true, maxLogMB: 100 }
+  durability: default     # default | fsync
+  memory:
+    limitMB: 0            # 0 = auto: 75 % of the container memory limit if any, otherwise unlimited
 server:
   http:
     enabled: true
@@ -42,6 +45,8 @@ server:
     port: 8089
     cors:
       allowedOrigins: ["https://app.example.com"]
+    readTimeoutSeconds: 3
+    writeTimeoutSeconds: 3
   tcp:  { enabled: true,  host: 127.0.0.1, port: 8088 }
 log:
   level: info
@@ -65,27 +70,44 @@ api:
   cache:
     enabled: true
     cleanupIntervalSeconds: 10
+    maxMB: 128
+    maxEntryKB: 1024
   hooks:
     enabled: true
+    timeoutMs: 2000
+    requestBudgetMs: 0
+  query:
+    workers: 0            # size of the heavy lane, 0 = GOMAXPROCS
+    timeoutMs: 0          # 0 = no deadline
+  response:
+    spoolMB: 8
 adminui:
   enabled: true
 monitoring:
   prometheus:
     enabled: false
+  pprof:
+    enabled: false
 ```
+
+Every key added after 0.2.4 is optional, and its default keeps the 0.2.4 behavior.
 
 ### Configuration Fields
 
 | Key                                  | Description                                                                           |
 | ------------------------------------ | ------------------------------------------------------------------------------------- |
-| **store.folder**                     | Path where data is persisted to disk                                                  |
-| **store.shards**                     | Number of memory shards (must be a power of two)                                      |
-| **store.flushIntervalSeconds**       | Interval for automatic persistence to disk                                            |
-| **store.crashRecovery.enabled**      | Enables crash recovery logs for durability                                            |
-| **store.crashRecovery.maxLogMB**     | Maximum size of recovery logs before flush                                            |
+| **store.folder**                     | Path where data is persisted to disk. One ElysianDB process at a time can open it (see Storage engine internals) |
+| **store.shards**                     | Number of shards of the KV keys and of the write locks (rounded up to a power of two) |
+| **store.flushIntervalSeconds**       | Period of the checkpoints, and of the log writes when crash recovery is off. `0` writes only at `/save`, `SAVE` and shutdown |
+| **store.crashRecovery.enabled**      | Writes each change to the log before answering, so that it survives a `kill -9` |
+| **store.crashRecovery.maxLogMB**     | Log written since the last checkpoint that triggers a new checkpoint                  |
+| **store.durability**                 | `default`, or `fsync` to sync the log once per group of writes, so that acknowledged writes survive a power cut |
+| **store.memory.limitMB**             | Memory budget. `0` (default) uses 75 % of the container memory limit when there is one, and no limit otherwise. It sets `GOMEMLIMIT`; when set explicitly, half of it holds the documents read most often and the others are read from the log on demand |
 | **server.http**                      | Enables and configures the HTTP REST/KV interface                                     |
 | **server.http.cors.allowedOrigins**  | Origins allowed to call the HTTP API from a browser (see CORS below). Empty by default |
 | **server.http.trustedProxies**       | Addresses or CIDR ranges of the reverse proxies in front of ElysianDB (see Reverse proxy below). Empty by default |
+| **server.http.readTimeoutSeconds**   | HTTP read timeout. Default `3`                                                        |
+| **server.http.writeTimeoutSeconds**  | HTTP write timeout. Default `3`                                                       |
 | **server.tcp**                       | Enables and configures the TCP text protocol interface (see TCP Protocol below) |
 | **log.level**                        | Minimum level written: `debug`, `info` (default), `warn` or `error` (see Logging below) |
 | **log.format**                       | `text` (default, logfmt) or `json`                                                    |
@@ -94,12 +116,19 @@ monitoring:
 | **log.bufferLines**                  | Log lines kept in memory for the Admin UI Logs page. Default `5000`, `0` turns the page off |
 | **log.flushIntervalSeconds**         | Deprecated and ignored: logs are written immediately                                  |
 | **stats.enabled**                    | Enables runtime metrics and `/stats` endpoint                                         |
-| **api.index.workers**                | Number of workers that rebuild dirty indexes                                          |
+| **api.index.workers**                | Number of index builds that run at the same time in the background                    |
 | **api.cache.enabled**                | Enables REST API caching for repeated queries                                         |
+| **api.cache.maxMB**                  | Size limit of the API cache. Default `128`                                            |
+| **api.cache.maxEntryKB**             | Responses larger than this are not cached. Default `1024`                             |
+| **api.query.workers**                | Requests that must check many documents run at most this many at a time. `0` (default) uses the number of threads (`GOMAXPROCS`) |
+| **api.query.timeoutMs**              | Deadline of a request that checks documents; past it the answer is `503` `{"error":"request deadline exceeded"}`. `0` (default) means no deadline |
+| **api.response.spoolMB**             | A response built by hooks, includes or `fields` is kept in memory up to this size, then in a temporary file, and sent once complete. Default `8` |
 | **api.schema.enabled**               | Enables automatic schema inference and validation                                     |
 | **api.schema.strict**                | If true and schema is manual, new fields are rejected and deep validation is enforced |
 | **api.cache.cleanupIntervalSeconds** | Interval for cache expiration cleanup                                                 |
 | **api.hooks.enabled**                | Enables JavaScript hooks (see Hooks below)                                        |
+| **api.hooks.timeoutMs**              | A hook script is stopped after this time. Default `2000`                              |
+| **api.hooks.requestBudgetMs**        | Total hook time allowed for one request; past it, the remaining hooks of the request are skipped and a warning is logged. `0` (default) means no budget |
 | **security.authentication.enabled**  | Enables authentication layer for all endpoints except `/health`                       |
 | **security.authentication.mode**     | Authentication mode: `basic`, `token` or `user`. Any other value, or no value, stops ElysianDB at startup |
 | **security.authentication.token**    | Instance token used in `token` mode                                                   |
@@ -108,6 +137,7 @@ monitoring:
 | **adminui.enabled**                  | Enables the admin web interface                                                       |
 | **monitoring.prometheus.enabled**    | Serves `GET /metrics` in the Prometheus text format (see Monitoring below). Off by default |
 | **monitoring.prometheus.token**      | Bearer token for `GET /metrics`. Without it, `/metrics` takes the same credentials as the admin endpoints |
+| **monitoring.pprof.enabled**         | Serves the Go profiler under `GET /debug/pprof/` for admins. Off by default           |
 
 Keys that ElysianDB does not know are ignored, and a warning listing them is printed at startup (for example `field authentication not found in type configuration.Config` when `authentication:` is written at the root instead of under `security:`).
 
@@ -166,22 +196,26 @@ The status is `healthy`, `warning` or `critical`, with these problems:
 
 | Code | Severity | Condition |
 | ---- | -------- | --------- |
-| `flush_failing` | critical | The last flush to disk failed |
-| `recovery_write_failing` | critical | A recovery log write failed in the last 5 minutes |
+| `flush_failing` | critical | The last checkpoint failed |
+| `recovery_write_failing` | critical | A log write failed in the last 5 minutes. The change stays in memory and the write is retried |
 | `mongodb_unreachable` | critical | The MongoDB ping fails |
 | `error_rate_high` | warning | More than 1 % of at least 20 HTTP requests answered `5xx` over 5 minutes |
 | `latency_high` | warning | p95 above `log.slowRequestMs` over 5 minutes |
 | `hook_failing` | warning | A hook script failed in the last 5 minutes |
 | `auth_failures` | warning | More than 20 failed logins or `401` in a minute from one address |
-| `index_backlog` | warning | The lazy index backlog has not been empty for more than a minute |
+| `index_backlog` | warning | Indexes have been building for more than a minute |
 | `old_transaction` | warning | A transaction has been open for more than 10 minutes |
 | `default_admin_password` | warning | `admin`/`admin` still works |
 | `auth_disabled_public` | warning | Authentication is off on a non-loopback address |
-| `unclean_shutdown` | info | The recovery log was replayed at startup (shown for one hour) |
+| `unclean_shutdown` | info | The log was replayed at startup, after a crash or a `kill -9` (shown for one hour) |
 
 With `monitoring.prometheus.enabled: true`, `GET /metrics` serves the counters, gauges and latency histograms in the Prometheus text format, for example `elysiandb_http_requests_total{status_class="5xx"}`, `elysiandb_http_request_duration_seconds`, `elysiandb_tcp_commands_total{command="GET"}`, `elysiandb_kv_keys` and `elysiandb_entities{entity_type="books"}`. Set `monitoring.prometheus.token` to let Prometheus authenticate with `Authorization: Bearer <token>`, since a scraper cannot log in with a session cookie in `user` mode.
 
-`GET /stats` and `stats.enabled` work as before.
+The CPU series are given two ways: `cpu_percent` is a share of all the threads the process may use (`gomaxprocs`), so 100 % means every thread is busy, and `cpu_cores` is the number of busy threads. The engine adds `log_since_checkpoint_bytes`, `log_bytes` (log on disk), `live_bytes` (data the log still holds), `checkpoint_ms`, `value_cache_hit_ratio` and `resident_bytes`, the heavy lane adds `heavy_queries_rps` and `heavy_queued_rps`, and `tcp_auth_p95_ms` is the duration of TCP `AUTH`. Hook statistics give the number of `ctx.query` calls, the rows they read and their cache hits.
+
+With `monitoring.pprof.enabled: true`, admins can profile a running instance, for example `go tool pprof http://localhost:8089/debug/pprof/profile?seconds=30`.
+
+`GET /stats` and `stats.enabled` work as before. `total_requests` counts every HTTP request and every TCP command, `keys_count` counts the KV keys, and `expiration_keys_count` the KV keys with a TTL.
 
 ---
 
@@ -329,7 +363,7 @@ curl -b cookies --data-binary @elysiandb-backup-20261101T091400Z.tar.gz http://l
 
 `GET /api/backup` answers `application/gzip` with `Content-Disposition: attachment; filename="elysiandb-backup-20261101T091400Z.tar.gz"`. `POST /api/restore` takes the archive as the request body, or as the file of a `multipart/form-data` upload. Any file name is accepted: the date, version and content of an archive come from its manifest, never from its name.
 
-From the command line, while ElysianDB is stopped (this is the upgrade path):
+From the command line, while ElysianDB is stopped (this is the upgrade path). A command cannot open a data folder that a running server holds: use `GET /api/backup` on a running server.
 
 ```bash
 elysiandb backup --output /backups
@@ -390,6 +424,43 @@ The backup is staged in the system temporary folder (`TMPDIR`), which needs as m
 
 ## Upgrading
 
+### Upgrading from 0.2.4
+
+This version replaces the storage engine (see Storage engine internals). Take a backup with `elysiandb backup` before the upgrade, as for every upgrade.
+
+At the first start on a 0.2.4 data folder (`elysiandb.json`, `elysiandbjson.json`, `elysiandb.expiration.json` and the recovery logs), ElysianDB migrates it:
+
+1. it checks that the disk has at least twice the size of the 0.2.4 files free;
+2. it reads them as 0.2.4 does: it replays the recovery logs when `store.crashRecovery.enabled` is true, drops the keys that expired, and repairs the list of entity types and the id indexes;
+3. it writes everything into the new engine in the `.migration` sub-folder, documents in the order of the 0.2.4 lists;
+4. it reads the result back and compares every document, KV key and expiration date; any difference stops the start and leaves the folder untouched;
+5. it switches to the new files, moves the 0.2.4 files to `legacy-0.2.4/` (they are never deleted), and logs `storage migrated` with the counts.
+
+`users.key` and `sessions.json` keep their place and format. Backup archives keep format v1: archives of 0.2.4 restore on this version, and archives of this version restore on 0.2.4.
+
+To go back to 0.2.4:
+
+* without the writes made since the upgrade: stop ElysianDB, move the files of `legacy-0.2.4/` back to the data folder, remove `MANIFEST`, `log/` and the `checkpoint-*` file, and start 0.2.4;
+* with them: run `elysiandb backup` and restore the archive with 0.2.4, or run `elysiandb export-legacy --output <empty folder>`, which writes a 0.2.4 data folder (with `users.key` and `sessions.json`), and start 0.2.4 with `store.folder` set to it.
+
+#### Behavior changes since 0.2.4
+
+All of them fix defects of 0.2.4:
+
+* Documents written at the same time on one entity are no longer missing from lists, counts and sorted lists, and a write made while a sort index is built is no longer missing from it.
+* Sorts give ties in insertion order and put documents without the sorted field last, in both directions. Values of different types are ordered like the Query API sorts them: numbers, dates, strings, booleans, then other values.
+* The `api:entity:*` keys are no longer KV keys. `GET` and `MGET` on `api:entity:types:list` and on the id index of an entity (`api:entity:<entity>:internal:index:id`) still answer in the same format, built from the engine; wildcard listings no longer return them, and `SET` and `DEL` on them are ignored instead of breaking the REST API.
+* `/stats`: `total_requests` counts every HTTP request and TCP command, and `keys_count` counts the KV keys only.
+* API cache entries expire at their TTL, the cache holds at most `api.cache.maxMB`, and a cached response that includes documents is invalidated when one of the entities involved changes.
+* A transaction is written as one batch: after a crash, either all of its changes are there or none.
+* Writes made during a flush or a shutdown are no longer lost, and a crash during a write to disk no longer prevents the next start.
+* `countOnly` no longer runs `post_read` hooks, which cannot change a count.
+* Sessions are kept in memory and `sessions.json` is written when they change. Expired sessions are removed at the next session change instead of during a request, and a change made to `sessions.json` by hand needs a restart.
+* The `elysiandb` commands open the data folder without background work and close it cleanly, so the next start no longer reports an unclean shutdown. They cannot run on the folder of a running server.
+* The REST API filters through references (for example `filter[author.name]`) and the sort indexes use the referenced documents' current values.
+
+### Upgrading from 0.2.1
+
 From this version on, take a backup with `elysiandb backup` before each upgrade, and keep the archive until the new version runs. ElysianDB 0.2.1 has no backup command: to upgrade from it, stop ElysianDB, copy the data folder, `users.key` included, then start the new version on the same folder.
 
 ### Behavior changes since 0.2.1
@@ -449,16 +520,17 @@ Some engines may require additional configuration fields.
 
 #### `internal` (default, recommended)
 
-The `internal` engine is the built-in storage engine provided by ElysianDB, and the recommended one.
+The `internal` engine is the built-in storage engine provided by ElysianDB, and the recommended one. It is designed together with the API: it knows entities, insertion order, references, schemas, the filter language and hooks.
 
 It offers:
 
-* In-memory sharded storage
-* Periodic disk persistence
-* Crash recovery via write-ahead logs
-* Lazy indexing
-* Deterministic query execution
+* An append-only log that holds the data, with group commit and checkpoints
+* Copy-on-write entity state, so that reads never wait for writes
+* Indexes for sorts, filters, search and references, built when first needed
+* A memory budget
 * Full compatibility with all ElysianDB features (REST API, Query API, ACLs, hooks, transactions, Admin UI)
+
+See Storage engine internals below.
 
 This engine is **production-ready** and requires no external dependencies. It is well suited for prototyping, embedded deployments, internal tools, and high-performance read-heavy workloads.
 
@@ -516,6 +588,37 @@ Once they are met, this design allows ElysianDB to scale from an embedded, singl
 * Switching engines may require data migration
 * All engines are meant to share the same query model, schema rules, ACLs, and hooks; the `mongodb` engine, in beta, does not fully share them yet
 
+
+---
+
+### Storage engine internals
+
+This section describes the `internal` engine.
+
+**The log is the data.** Every document and KV change is appended once to log segments (`log/000001.seg`, …, sealed at 64 MB), as the exact JSON the API returns. The changes of one request or of one transaction form a batch with a CRC32-C checksum, which a replay applies entirely or not at all. One writer writes the batches of every waiting request together (group commit).
+
+**Entity state.** For each entity, the engine keeps in memory the position of each document in the log, its insertion order, the id directory and the indexes, as persistent trees. A write builds new versions of the few nodes it touches and publishes them at once: a reader works on a consistent snapshot without any lock, and a write locks only its entity for a few microseconds. Deleting a document costs the same at 1,000 or 1,000,000 documents, and `DELETE /api/<entity>` is immediate. Writes that read a document first (updates, sub-entity merges) are checked at commit and replayed if another write changed that document meanwhile, so no update is lost.
+
+**Indexes.** A field gets a sort index the first time it is sorted on, and a filter index the first time it is filtered on. Indexes are built in the background while queries keep working without them, then kept up to date by every write. They only narrow the candidates: the same filter functions as before decide which documents match, so results do not depend on the indexes. Search uses an index of three-character sequences, and filters through references (`filter[author.name]`) use the index of the referenced entity and the reverse references.
+
+**Checkpoints and restarts.** Every `store.flushIntervalSeconds`, or when `store.crashRecovery.maxLogMB` of log has been written, the engine writes a checkpoint of its structures (never the documents again) and switches `MANIFEST` to it. A restart loads the last checkpoint and replays the log written after it, so its time depends on the recent writes, not on the size of the database. A torn last batch, left by a crash, is dropped.
+
+**Compaction.** In the background, a segment with less than half of live data is rewritten into the current one, and segments that no longer hold live data are deleted after a checkpoint.
+
+**Durability.** The settings keep their meaning:
+
+| Setting | Guarantee |
+| ------- | --------- |
+| `store.crashRecovery.enabled: true` | A change is written to the log before the answer: it survives a `kill -9`, not a power cut |
+| `store.crashRecovery.enabled: false` | Changes are written in the background every `store.flushIntervalSeconds`: up to that window is lost in a crash |
+| `store.durability: fsync` | The log is synced once per group of writes before the answer: it survives a power cut |
+| `POST /save`, TCP `SAVE` | Writes a checkpoint and syncs it, without blocking other requests |
+
+**Memory.** Documents are kept as bytes, with no pointers for the garbage collector to scan. With `store.memory.limitMB` set, only the most read documents stay in memory and the others are read from the log on demand. Large lists are streamed: their memory does not grow with their size.
+
+**One process per folder.** The engine locks `elysiandb.lock` in the data folder. A second process on the same folder, `elysiandb backup` on the folder of a running server for example, stops with an error.
+
+**Shutdown.** On `SIGTERM`, ElysianDB stops accepting requests, lets the requests in flight finish (up to 10 seconds), writes a checkpoint and closes the log.
 
 ---
 
@@ -1427,7 +1530,16 @@ server:
     trustedProxies: ["127.0.0.1", "10.0.0.0/8"]
 ```
 
-For a request coming from a listed proxy, the client address is read from `X-Forwarded-For`: it is the last address of the header that is not a listed proxy. The proxy must append the client address to that header (for example `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` with nginx). Without `trustedProxies`, ElysianDB ignores `X-Forwarded-For`, and every client of the proxy shares the proxy address for failed logins. A request that carries a forwarding header (`X-Forwarded-For`, `X-Real-IP` or `Forwarded`) never counts as coming from the local machine, so the default admin password is refused through a proxy that is not listed.
+For a request coming from a listed proxy, the client address is read from `X-Forwarded-For`: it is the last address of the header that is not a listed proxy. When the proxy sends no `X-Forwarded-For`, the client address is read from `X-Real-IP`. The proxy must append the client address to that header, for example with nginx:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8089;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+```
+ Without `trustedProxies`, ElysianDB ignores `X-Forwarded-For`, and every client of the proxy shares the proxy address for failed logins. A request that carries a forwarding header (`X-Forwarded-For`, `X-Real-IP` or `Forwarded`) never counts as coming from the local machine, so the default admin password is refused through a proxy that is not listed.
 
 ### HTTP response headers
 
@@ -2280,6 +2392,8 @@ When `security.authentication.enabled` is true, every command except `PING`, `EX
 
 The password is everything after the first space, so it may contain spaces. With authentication disabled, `AUTH` answers `OK` and is not needed.
 
+In `basic` and `user` mode, `AUTH` checks a bcrypt hash, which takes tens of milliseconds by design. Authenticate once per connection and keep the connection: to measure the latency of `PING` or of any command, use a connection that is already authenticated. The duration of `AUTH` is shown in monitoring (`tcp_auth_p95_ms`).
+
 A connection that has not authenticated is closed when it sends no complete line for 30 seconds. Failed `AUTH` commands count as failed logins (see Failed logins), and the default admin password is only accepted from the loopback address.
 
 The KV store also holds the REST API indexes and the list of entity types, under keys that start with `api:entity:`. `RESET` and `POST /reset` keep them. A `DEL` or `SET` on one of them breaks the REST API until the next start: at startup, ElysianDB rebuilds the list of entity types and the id indexes from the documents, and logs `rest api indexes repaired` when it had to. Keep the TCP port private (bind it to `127.0.0.1` or disable `server.tcp`) unless clients need it.
@@ -2394,7 +2508,7 @@ make api_benchmark # requires installing k6
 
 ## Command-Line Interface (CLI)
 
-ElysianDB provides a command-line interface with eight commands. `elysiandb help` lists them. Options of the binary, such as `--config`, go before the command: `elysiandb --config elysian.yaml backup`.
+ElysianDB provides a command-line interface with nine commands. `elysiandb help` lists them. Options of the binary, such as `--config`, go before the command: `elysiandb --config elysian.yaml backup`.
 
 ### 1. `server` (default)
 
@@ -2496,7 +2610,19 @@ The command asks for a typed `yes`, then exits without deleting anything unless 
 
 ---
 
-### 8. `help`
+### 8. `export-legacy`
+
+Writes the data as a 0.2.4 data folder, to go back to 0.2.4 with the writes made since the upgrade (see Upgrading from 0.2.4).
+
+```bash
+elysiandb export-legacy --output /tmp/elysiandb-0.2.4
+```
+
+The folder must be empty or not exist. It receives `elysiandb.json`, `elysiandbjson.json`, `elysiandb.expiration.json`, `users.key` and `sessions.json`. Run it while ElysianDB is stopped.
+
+---
+
+### 9. `help`
 
 Lists the available commands.
 

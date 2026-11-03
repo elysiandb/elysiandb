@@ -41,12 +41,12 @@ engine:
 
 **internal (default, recommended)**
 
-The `internal` engine is the original storage engine shipped with ElysianDB. It provides:
+The `internal` engine is the storage engine shipped with ElysianDB, designed together with its API. It provides:
 
-* Sharded in-memory storage
-* Periodic disk persistence
-* Crash recovery via write-ahead logs
-* Lazy index creation
+* An append-only log that holds the data, with group commit, checkpoints and background compaction
+* Copy-on-write entity state: reads never wait for writes
+* Indexes for sorts, filters, search and references, built when first needed
+* Streamed responses and a memory budget
 * Very high throughput and low latency
 * Full compatibility with all ElysianDB features
 
@@ -137,7 +137,7 @@ Queries are deterministic, type-aware, and executed predictably, making them eas
 
 ElysianDB is designed for low latency and high throughput.
 
-With the internal engine, the system relies on sharded in-memory storage, minimal allocations, and cache-friendly data structures.
+With the internal engine, paged, filtered, sorted, counted and searched requests use indexes and cost about the same on 1,000 or 60,000 documents, and writes are grouped into a few disk writes.
 
 On a MacBook Pro M4, mixed workloads with CRUD, filtering, sorting, nested writes, and includes reach tens of thousands of requests per second with sub-millisecond latencies under moderate load.
 
