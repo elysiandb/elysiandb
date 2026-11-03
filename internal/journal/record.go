@@ -101,6 +101,43 @@ var (
 	ErrBadSegment = errors.New("journal: not a segment file")
 )
 
+func batchSize(recs []Record) int {
+	size := batchHeaderSize
+	for i := range recs {
+		size += recordSize(&recs[i])
+	}
+
+	return size
+}
+
+func appendBatch(dst []byte, recs []Record, firstLSN uint64, base uint32, segment uint32) []byte {
+	start := len(dst)
+	dst = append(dst, make([]byte, batchHeaderSize)...)
+	for i := range recs {
+		r := &recs[i]
+		r.LSN = firstLSN + uint64(i)
+		dst = append(dst, byte(r.Kind))
+		dst = binary.LittleEndian.AppendUint64(dst, r.LSN)
+		dst = binary.AppendUvarint(dst, r.Gen)
+		dst = binary.AppendVarint(dst, r.ExpiresAt)
+		dst = binary.AppendUvarint(dst, uint64(len(r.Entity)))
+		dst = append(dst, r.Entity...)
+		dst = binary.AppendUvarint(dst, uint64(len(r.Key)))
+		dst = append(dst, r.Key...)
+		dst = binary.AppendUvarint(dst, uint64(len(r.Value)))
+		r.Loc = Location{Segment: segment, Offset: base + uint32(len(dst)-start), Length: uint32(len(r.Value))}
+		dst = append(dst, r.Value...)
+	}
+
+	payload := dst[start+batchHeaderSize:]
+	binary.LittleEndian.PutUint32(dst[start:], batchMagic)
+	binary.LittleEndian.PutUint32(dst[start+4:], uint32(len(payload)))
+	binary.LittleEndian.PutUint32(dst[start+8:], crc32.Checksum(payload, castagnoli))
+	binary.LittleEndian.PutUint32(dst[start+12:], uint32(len(recs)))
+
+	return dst
+}
+
 type encodedBatch struct {
 	data       []byte
 	lsnOffsets []int

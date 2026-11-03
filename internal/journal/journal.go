@@ -166,9 +166,9 @@ func (j *Journal) Append(recs []Record) (Ticket, error) {
 		return Ticket{}, nil
 	}
 
-	b := encodeBatch(recs)
-	if int64(len(b.data)) > int64(^uint32(0))-segmentHeaderSize {
-		return Ticket{}, fmt.Errorf("journal: batch of %d bytes is too large", len(b.data))
+	size := batchSize(recs)
+	if int64(size) > int64(^uint32(0))-segmentHeaderSize {
+		return Ticket{}, fmt.Errorf("journal: batch of %d bytes is too large", size)
 	}
 
 	j.mu.Lock()
@@ -177,19 +177,18 @@ func (j *Journal) Append(recs []Record) (Ticket, error) {
 		return Ticket{}, ErrClosed
 	}
 
-	if j.active == 0 || (int64(j.activeSize)+int64(len(b.data)) > j.opts.SegmentSize && j.activeSize > segmentHeaderSize) {
+	if j.active == 0 || (int64(j.activeSize)+int64(size) > j.opts.SegmentSize && j.activeSize > segmentHeaderSize) {
 		j.rotateLocked()
 	}
 
-	sealBatch(b, recs, j.nextLSN)
+	c := j.tailChunkLocked(size)
+	before := len(c.data)
+	c.data = appendBatch(c.data, recs, j.nextLSN, j.activeSize, j.active)
+	written := len(c.data) - before
 	j.nextLSN += uint64(len(recs))
-
-	base := j.activeSize
-	for i := range recs {
-		recs[i].Loc = Location{Segment: j.active, Offset: base + uint32(b.valOffsets[i]), Length: uint32(len(recs[i].Value))}
-	}
-
-	j.appendBytesLocked(b.data, false)
+	j.activeSize += uint32(written)
+	j.appended += uint64(written)
+	j.pendingLen += written
 	t := Ticket{j: j, at: j.appended}
 	urgent := j.opts.Mode != ModeBackground || j.pendingLen >= j.opts.MaxPending
 	j.mu.Unlock()
@@ -207,12 +206,47 @@ func (j *Journal) rotateLocked() {
 	j.appendBytesLocked(segmentHeader(j.active), true)
 }
 
+var chunkBuffers = sync.Pool{New: func() any { return make([]byte, 0, chunkBufferSize) }}
+
+const chunkBufferSize = 64 << 10
+
+func newChunkBuffer(size int) []byte {
+	if size > chunkBufferSize {
+		return make([]byte, 0, size)
+	}
+
+	return chunkBuffers.Get().([]byte)[:0]
+}
+
+func releaseChunks(chunks []*chunk) {
+	for _, c := range chunks {
+		if cap(c.data) == chunkBufferSize {
+			chunkBuffers.Put(c.data[:0])
+		}
+		c.data = nil
+	}
+}
+
+func (j *Journal) tailChunkLocked(size int) *chunk {
+	last := len(j.pending) - 1
+	if last >= 0 && j.pending[last].segment == j.active && j.pending[last].offset+uint32(len(j.pending[last].data)) == j.activeSize {
+		if c := j.pending[last]; cap(c.data)-len(c.data) >= size {
+			return c
+		}
+	}
+
+	c := &chunk{segment: j.active, offset: j.activeSize, data: newChunkBuffer(size)}
+	j.pending = append(j.pending, c)
+
+	return c
+}
+
 func (j *Journal) appendBytesLocked(data []byte, fresh bool) {
 	last := len(j.pending) - 1
 	if !fresh && last >= 0 && j.pending[last].segment == j.active && j.pending[last].offset+uint32(len(j.pending[last].data)) == j.activeSize {
 		j.pending[last].data = append(j.pending[last].data, data...)
 	} else {
-		c := &chunk{segment: j.active, offset: j.activeSize, fresh: fresh, data: append(make([]byte, 0, max(len(data), 64<<10)), data...)}
+		c := &chunk{segment: j.active, offset: j.activeSize, fresh: fresh, data: append(newChunkBuffer(len(data)), data...)}
 		j.pending = append(j.pending, c)
 	}
 
@@ -372,6 +406,8 @@ func (j *Journal) writeOnce() error {
 	j.flushed.Store(uint64(last.segment)<<32 | uint64(last.offset+uint32(len(last.data))))
 	j.done.Broadcast()
 	j.mu.Unlock()
+
+	releaseChunks(chunks)
 
 	return nil
 }

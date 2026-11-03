@@ -677,6 +677,8 @@ func Plan(q ListQuery) *ListResult {
 
 	if q.CountOnly && len(q.Sorts) == 0 && q.SortField == "" && q.Limit == 0 && q.Offset == 0 {
 		res.Total = countMatches(snap, cand, needsMatch, everythingExact, verify)
+	} else if docs, total, ok := p.directPageIf(!needsMatch, q); ok {
+		res.Docs, res.Total = docs, total
 	} else {
 		order := p.orderFor(q, cand, needsMatch, verify)
 		res.Docs, res.Total = paginate(order, q.Offset, q.Limit, q.CountOnly)
@@ -769,6 +771,58 @@ func DeadlineFromConfig() time.Time {
 	return time.Time{}
 }
 
+func (p *planner) directPageIf(enabled bool, q ListQuery) ([]datastore.Doc, int, bool) {
+	if !enabled {
+		return nil, 0, false
+	}
+
+	return p.directPage(q)
+}
+
+func (p *planner) directPage(q ListQuery) ([]datastore.Doc, int, bool) {
+	sorts := q.Sorts
+	if len(sorts) == 0 && q.SortField != "" {
+		sorts = []query.Sort{{Field: q.SortField, Ascending: q.SortAsc}}
+	}
+
+	if len(sorts) > 1 || q.Offset < 0 {
+		return nil, 0, false
+	}
+
+	snap := p.snap
+	total := snap.Len()
+	docs := []datastore.Doc{}
+	take := func(d datastore.Doc) bool {
+		docs = append(docs, d)
+		return q.Limit <= 0 || len(docs) < q.Limit
+	}
+
+	if len(sorts) == 0 {
+		snap.Ascend(q.Offset, take)
+		return docs, total, true
+	}
+
+	if len(p.refs) > 0 && p.sortPathCrossesReference(sorts[0].Field) {
+		return nil, 0, false
+	}
+
+	view, ok := p.index(datastore.IndexSpec{Kind: datastore.IndexSort, Field: sorts[0].Field})
+	if !ok {
+		return nil, 0, false
+	}
+
+	snap = p.snap
+	walkSortIndexFrom(view, sorts[0].Ascending, q.Offset, func(seq uint32) bool {
+		d, ok := snap.BySeq(seq)
+		if !ok {
+			return true
+		}
+		return take(d)
+	})
+
+	return docs, snap.Len(), true
+}
+
 func countMatches(snap *datastore.Snapshot, cand candidates, needsMatch, everythingExact bool, verify func(datastore.Doc) bool) int {
 	if !needsMatch || everythingExact {
 		return snap.Len()
@@ -854,16 +908,50 @@ func (p *planner) orderFor(q ListQuery, cand candidates, needsMatch bool, verify
 
 	primary := sorts[0]
 	sortAffected := len(p.refs) > 0 && p.sortPathCrossesReference(primary.Field)
-	if len(sorts) == 1 && !sortAffected {
+	if !sortAffected {
 		if view, ok := p.index(datastore.IndexSpec{Kind: datastore.IndexSort, Field: primary.Field}); ok {
 			snap = p.snap
+			accept := func(seq uint32) (datastore.Doc, bool) {
+				if needsMatch && !cand.all && !cand.set.Has(seq) {
+					return datastore.Doc{}, false
+				}
+
+				d, ok := snap.BySeq(seq)
+				if !ok || (needsMatch && !verify(d)) {
+					return datastore.Doc{}, false
+				}
+
+				return d, true
+			}
+
+			if len(sorts) == 1 {
+				return func(fn func(datastore.Doc) bool) {
+					walkSortIndex(view, primary.Ascending, func(seq uint32) bool {
+						d, ok := accept(seq)
+						if !ok {
+							return true
+						}
+						return fn(d)
+					})
+				}
+			}
+
 			return func(fn func(datastore.Doc) bool) {
-				walkSortIndex(view, primary.Ascending, func(seq uint32) bool {
-					d, ok := snap.BySeq(seq)
-					if !ok || (needsMatch && !verify(d)) {
-						return true
+				walkSortGroups(view, primary.Ascending, func(seqs []uint32) bool {
+					docs := make([]datastore.Doc, 0, len(seqs))
+					for _, seq := range seqs {
+						if d, ok := accept(seq); ok {
+							docs = append(docs, d)
+						}
 					}
-					return fn(d)
+
+					for _, d := range sortGroup(docs, sorts[1:]) {
+						if !fn(d) {
+							return false
+						}
+					}
+
+					return true
 				})
 			}
 		}
@@ -936,6 +1024,63 @@ func (p *planner) orderFor(q ListQuery, cand candidates, needsMatch bool, verify
 	}
 }
 
+func sortGroup(docs []datastore.Doc, sorts []query.Sort) []datastore.Doc {
+	if len(docs) < 2 || len(sorts) == 0 {
+		return docs
+	}
+
+	type row struct {
+		doc  datastore.Doc
+		vals []any
+	}
+
+	rows := make([]row, 0, len(docs))
+	for _, d := range docs {
+		data, err := d.Decode()
+		if err != nil {
+			continue
+		}
+
+		r := row{doc: d}
+		for _, s := range sorts {
+			r.vals = append(r.vals, docpath.SortValue(data, s.Field))
+		}
+		rows = append(rows, r)
+	}
+
+	sort.SliceStable(rows, func(i, j int) bool {
+		for k, s := range sorts {
+			a, b := rows[i].vals[k], rows[j].vals[k]
+			if a == nil || b == nil {
+				if a == nil && b == nil {
+					continue
+				}
+				return b == nil
+			}
+
+			c := compareSortValues(a, b)
+			if c == 0 {
+				continue
+			}
+
+			if s.Ascending {
+				return c < 0
+			}
+
+			return c > 0
+		}
+
+		return false
+	})
+
+	out := make([]datastore.Doc, len(rows))
+	for i, r := range rows {
+		out[i] = r.doc
+	}
+
+	return out
+}
+
 func (p *planner) sortPathCrossesReference(field string) bool {
 	for _, ref := range p.refs {
 		if field == ref.Path+".id" || field == ref.Path+".@entity" {
@@ -950,47 +1095,111 @@ func (p *planner) sortPathCrossesReference(field string) bool {
 	return false
 }
 
-func walkSortIndex(view *datastore.IndexView, ascending bool, fn func(seq uint32) bool) {
+func groupEnd(view *datastore.IndexView, i int) int {
+	key, _, ok := view.At(i)
+	if !ok {
+		return i
+	}
+
+	return view.Rank([]byte(datastore.KeyPayload(key)+"\xff\xff\xff\xff\xff")) - 1
+}
+
+func groupStart(view *datastore.IndexView, i int) int {
+	key, _, ok := view.At(i)
+	if !ok {
+		return i
+	}
+
+	return view.Rank([]byte(datastore.KeyPayload(key)))
+}
+
+func emitRange(view *datastore.IndexView, start, end int, fn func(seq uint32) bool) bool {
+	i := start
+	stopped := false
+	view.AscendAt(start, func(_ string, seq uint32) bool {
+		if i > end {
+			return false
+		}
+		i++
+		if !fn(seq) {
+			stopped = true
+			return false
+		}
+		return true
+	})
+
+	return !stopped
+}
+
+func walkSortIndexFrom(view *datastore.IndexView, ascending bool, skip int, fn func(seq uint32) bool) {
 	missingStart := view.Rank([]byte{datastore.SortRankMissing})
 	total := view.Len()
 
 	if ascending {
-		view.AscendAt(0, func(_ string, seq uint32) bool { return fn(seq) })
+		view.AscendAt(skip, func(_ string, seq uint32) bool { return fn(seq) })
 		return
 	}
 
 	end := missingStart - 1
 	for end >= 0 {
-		key, _, ok := view.At(end)
-		if !ok {
-			break
+		start := groupStart(view, end)
+		size := end - start + 1
+		if skip >= size {
+			skip -= size
+			end = start - 1
+			continue
 		}
 
-		payload := datastore.KeyPayload(key)
-		start := view.Rank([]byte(payload))
-		stopped := false
-		i := start
-		view.AscendAt(start, func(k string, seq uint32) bool {
-			if i > end {
-				return false
-			}
-			i++
-			if !fn(seq) {
-				stopped = true
-				return false
-			}
-			return true
-		})
-
-		if stopped {
+		if !emitRange(view, start+skip, end, fn) {
 			return
 		}
 
+		skip = 0
 		end = start - 1
 	}
 
+	if missingStart+skip < total {
+		view.AscendAt(missingStart+skip, func(_ string, seq uint32) bool { return fn(seq) })
+	}
+}
+
+func walkSortIndex(view *datastore.IndexView, ascending bool, fn func(seq uint32) bool) {
+	walkSortIndexFrom(view, ascending, 0, fn)
+}
+
+func walkSortGroups(view *datastore.IndexView, ascending bool, fn func(seqs []uint32) bool) {
+	missingStart := view.Rank([]byte{datastore.SortRankMissing})
+	total := view.Len()
+
+	group := func(start, end int) bool {
+		seqs := make([]uint32, 0, end-start+1)
+		emitRange(view, start, end, func(seq uint32) bool {
+			seqs = append(seqs, seq)
+			return true
+		})
+		return fn(seqs)
+	}
+
+	if ascending {
+		for i := 0; i < missingStart; {
+			end := groupEnd(view, i)
+			if !group(i, end) {
+				return
+			}
+			i = end + 1
+		}
+	} else {
+		for end := missingStart - 1; end >= 0; {
+			start := groupStart(view, end)
+			if !group(start, end) {
+				return
+			}
+			end = start - 1
+		}
+	}
+
 	if missingStart < total {
-		view.AscendAt(missingStart, func(_ string, seq uint32) bool { return fn(seq) })
+		group(missingStart, total-1)
 	}
 }
 

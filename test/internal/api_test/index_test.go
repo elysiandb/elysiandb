@@ -519,3 +519,62 @@ func TestFiltersThroughReferencesMatchTheScan(t *testing.T) {
 		}
 	}
 }
+
+func TestSortedPagesMatchTheQueryAPIComparator(t *testing.T) {
+	initIdxTestStore(t)
+
+	r := rand.New(rand.NewSource(9))
+	values := []any{1.0, 2.0, 2.0, "a", "b", "B", true, false, "2024-01-01", "2023-06-01T10:00:00+02:00", map[string]any{"x": 1.0}, nil}
+	docs := []map[string]any{}
+	for i := 0; i < 400; i++ {
+		doc := map[string]any{"id": fmt.Sprintf("s%03d", i), "g": float64(r.Intn(4))}
+		if v := values[r.Intn(len(values))]; v != nil || r.Intn(2) == 0 {
+			doc["v"] = v
+		}
+		if r.Intn(5) > 0 {
+			doc["w"] = float64(r.Intn(10))
+		}
+		docs = append(docs, doc)
+	}
+	api_storage.WriteListOfEntities("sorts", docs)
+	all := api_storage.ListEntities("sorts", 0, 0, "", true, nil, "", "")
+
+	for _, sorts := range [][]query.Sort{
+		{{Field: "v", Ascending: true}},
+		{{Field: "v", Ascending: false}},
+		{{Field: "g", Ascending: true}, {Field: "w", Ascending: false}},
+		{{Field: "g", Ascending: false}, {Field: "v", Ascending: true}, {Field: "w", Ascending: true}},
+		{{Field: "w", Ascending: true}, {Field: "g", Ascending: true}},
+	} {
+		want := append([]map[string]any(nil), all...)
+		api_storage.SortEntities(want, sorts)
+		wantIDs := ids(want)
+
+		for _, page := range [][2]int{{0, 0}, {0, 10}, {37, 25}, {390, 50}, {500, 10}} {
+			res := api_storage.Plan(api_storage.ListQuery{Entity: "sorts", Sorts: sorts, Offset: page[0], Limit: page[1]})
+			start := min(page[0], len(wantIDs))
+			end := len(wantIDs)
+			if page[1] > 0 {
+				end = min(start+page[1], len(wantIDs))
+			}
+
+			if got := res.IDs(); !reflect.DeepEqual(got, wantIDs[start:end]) && !(len(got) == 0 && start == end) {
+				t.Fatalf("sorts %+v page %v: got %v, want %v", sorts, page, got, wantIDs[start:end])
+			}
+		}
+
+		filters := map[string]map[string]string{"g": {"lt": "3"}}
+		filtered := []string{}
+		for _, doc := range want {
+			if api_storage.FiltersMatchEntity(doc, filters) {
+				filtered = append(filtered, doc["id"].(string))
+			}
+		}
+
+		node := query.FilterNode{Leaf: filters}
+		res := api_storage.Plan(api_storage.ListQuery{Entity: "sorts", Sorts: sorts, Node: &node, Offset: 5, Limit: 30})
+		if got := res.IDs(); !reflect.DeepEqual(got, filtered[5:min(35, len(filtered))]) {
+			t.Fatalf("filtered sorts %+v: got %v, want %v", sorts, got, filtered[5:min(35, len(filtered))])
+		}
+	}
+}
