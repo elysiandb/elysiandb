@@ -626,3 +626,36 @@ func DeleteEntityDocuments(entity string) {
 		return nil
 	}))
 }
+
+type BatchOperation struct {
+	Kind   string
+	Entity string
+	ID     string
+	Data   map[string]any
+}
+
+var (
+	ErrBatchValidation = errors.New("validation error")
+	ErrBatchUpdate     = errors.New("update failed")
+)
+
+func CommitBatch(ops []BatchOperation) error {
+	return update(func(tx *datastore.Tx) error {
+		for _, op := range ops {
+			switch op.Kind {
+			case "write":
+				if errs := writeEntity(tx, op.Entity, storage.DeepCopyDocument(op.Data), true); len(errs) > 0 {
+					return ErrBatchValidation
+				}
+			case "update":
+				if updateEntityById(tx, op.Entity, op.ID, op.Data) == nil {
+					return ErrBatchUpdate
+				}
+			case "delete":
+				tx.Delete(op.Entity, op.ID)
+			}
+		}
+
+		return nil
+	})
+}
