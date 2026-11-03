@@ -24,8 +24,8 @@ export function Login() {
           </label>
           <input
             id="login-username"
-            defaultValue="admin"
             type="text"
+            autoComplete="username"
             className="form-control"
             name="username"
           />
@@ -36,8 +36,8 @@ export function Login() {
           </label>
           <input
             id="login-password"
-            defaultValue="admin"
             type="password"
+            autoComplete="current-password"
             className="form-control"
             name="password"
           />

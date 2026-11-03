@@ -47,6 +47,7 @@
         "sections": {
             "store": "Speicher",
             "server": "Server",
+            "engine": "Engine",
             "logging": "Protokollierung",
             "security": "Sicherheit",
             "stats": "Statistiken",
@@ -55,6 +56,7 @@
         },
         "fields": {
             "folder": "Ordner",
+            "name": "Name",
             "shards": "Shards",
             "flushInterval": "Schreibintervall",
             "crashRecovery": "Wiederherstellung nach Absturz",
@@ -270,7 +272,6 @@
         "noData": "Noch keine Daten",
         "sections": {
             "traffic": "Datenverkehr",
-            "latency": "Latenz",
             "errors": "Fehler und Sicherheit",
             "kv": "KV-Speicher",
             "documents": "Dokumente",
@@ -279,6 +280,10 @@
             "connections": "Verbindungen",
             "hooks": "Hooks",
             "mongodb": "MongoDB"
+        },
+        "tabs": {
+            "data": "Daten",
+            "system": "System"
         },
         "charts": {
             "requests": "Anfragen pro Sekunde",

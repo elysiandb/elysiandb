@@ -47,6 +47,7 @@
         "sections": {
             "store": "Almacenamiento",
             "server": "Servidor",
+            "engine": "Motor",
             "logging": "Registro",
             "security": "Seguridad",
             "stats": "Estadísticas",
@@ -55,6 +56,7 @@
         },
         "fields": {
             "folder": "Carpeta",
+            "name": "Nombre",
             "shards": "Shards",
             "flushInterval": "Intervalo de escritura",
             "crashRecovery": "Recuperación tras fallos",
@@ -270,7 +272,6 @@
         "noData": "Aún no hay datos",
         "sections": {
             "traffic": "Tráfico",
-            "latency": "Latencia",
             "errors": "Errores y seguridad",
             "kv": "Almacén KV",
             "documents": "Documentos",
@@ -279,6 +280,10 @@
             "connections": "Conexiones",
             "hooks": "Hooks",
             "mongodb": "MongoDB"
+        },
+        "tabs": {
+            "data": "Datos",
+            "system": "Sistema"
         },
         "charts": {
             "requests": "Solicitudes por segundo",

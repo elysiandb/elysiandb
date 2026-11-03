@@ -1,4 +1,4 @@
-import { Button, Container, Row, Spinner, Table, Form } from "react-bootstrap";
+import { Button, Container, Spinner, Table, Form } from "react-bootstrap";
 import { useEffect, useMemo, useState } from "react";
 import { useUsers } from "../hooks/user/useUsers.js";
 import UserLine from "../components/user/UserLine.jsx";
@@ -53,23 +53,21 @@ export default function UsersList() {
 
     return (
         <Container fluid className="py-4 entity-types-layout">
-            <Row className="align-items-center mb-3">
-                <div className="d-flex justify-content-between align-items-center w-100">
-                    <Button size="sm" onClick={openCreate}>
-                        {t("users.create")}
-                    </Button>
+            <div className="d-flex justify-content-between align-items-center gap-3 mb-4">
+                <Button size="sm" className="text-nowrap" onClick={openCreate}>
+                    {t("users.create")}
+                </Button>
 
-                    <Form.Control
-                        placeholder={t("common.searchUser")}
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="users-search-input"
-                    />
-                </div>
-            </Row>
+                <Form.Control
+                    placeholder={t("common.searchUser")}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="users-search-input"
+                />
+            </div>
 
-            <Row className="g-4 mt-1">
-                <Table className="users-table align-middle">
+            <div className="users-table-scroll">
+                <Table className="users-table align-middle mb-0">
                     <thead>
                     <tr>
                         <th>{t("common.username")}</th>
@@ -89,7 +87,7 @@ export default function UsersList() {
                     ))}
                     </tbody>
                 </Table>
-            </Row>
+            </div>
 
             <UserModal
                 showModal={showModal}

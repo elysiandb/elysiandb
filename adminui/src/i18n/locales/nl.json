@@ -47,6 +47,7 @@
         "sections": {
             "store": "Opslag",
             "server": "Server",
+            "engine": "Engine",
             "logging": "Logboek",
             "security": "Beveiliging",
             "stats": "Statistieken",
@@ -55,6 +56,7 @@
         },
         "fields": {
             "folder": "Map",
+            "name": "Naam",
             "shards": "Shards",
             "flushInterval": "Schrijfinterval",
             "crashRecovery": "Herstel na crash",
@@ -270,7 +272,6 @@
         "noData": "Nog geen gegevens",
         "sections": {
             "traffic": "Verkeer",
-            "latency": "Latentie",
             "errors": "Fouten en beveiliging",
             "kv": "KV-opslag",
             "documents": "Documenten",
@@ -279,6 +280,10 @@
             "connections": "Verbindingen",
             "hooks": "Hooks",
             "mongodb": "MongoDB"
+        },
+        "tabs": {
+            "data": "Gegevens",
+            "system": "Systeem"
         },
         "charts": {
             "requests": "Verzoeken per seconde",

@@ -80,7 +80,7 @@ export default function EntityHooksList({ entity, onSelect }) {
     return (
         <>
             <Row className="g-4">
-                <Col xs={3}>
+                <Col xs={12} xl={3}>
                     {EVENTS.map(evt => (
                         <Card key={evt} className="entity-sidebar mb-3">
                             <Card.Header className="d-flex align-items-center justify-content-between">
@@ -126,7 +126,7 @@ export default function EntityHooksList({ entity, onSelect }) {
                     ))}
                 </Col>
 
-                <Col xs={9}>
+                <Col xs={12} xl={9}>
                     {hook && (
                         <HookEditor
                             hook={hook}

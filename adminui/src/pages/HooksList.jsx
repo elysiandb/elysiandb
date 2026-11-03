@@ -41,7 +41,7 @@ export default function HooksList() {
     return (
         <Container fluid className="py-4 entity-types-layout">
             <Row className="g-4">
-                <Col xs={3}>
+                <Col xs={12} md={4} lg={3}>
                     <Card className="entity-sidebar">
                         <Card.Header className="text-warning fw-bold">
                             {t("common.entities")}
@@ -64,7 +64,7 @@ export default function HooksList() {
                     </Card>
                 </Col>
 
-                <Col xs={9}>
+                <Col xs={12} md={8} lg={9}>
                     {selected && (
                         <EntityHooksList entity={selected} />
                     )}

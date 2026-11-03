@@ -47,6 +47,7 @@
         "sections": {
             "store": "存储",
             "server": "服务器",
+            "engine": "引擎",
             "logging": "日志",
             "security": "安全",
             "stats": "统计",
@@ -55,6 +56,7 @@
         },
         "fields": {
             "folder": "文件夹",
+            "name": "名称",
             "shards": "分片",
             "flushInterval": "写入间隔",
             "crashRecovery": "崩溃恢复",
@@ -270,7 +272,6 @@
         "noData": "暂无数据",
         "sections": {
             "traffic": "流量",
-            "latency": "延迟",
             "errors": "错误与安全",
             "kv": "KV 存储",
             "documents": "文档",
@@ -279,6 +280,10 @@
             "connections": "连接",
             "hooks": "钩子",
             "mongodb": "MongoDB"
+        },
+        "tabs": {
+            "data": "数据",
+            "system": "系统"
         },
         "charts": {
             "requests": "每秒请求数",
