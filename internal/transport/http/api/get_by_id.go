@@ -74,7 +74,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if cacheable {
-		cache.CacheStore.SetById(entity, id, response)
+		cache.CacheStore.SetByIdWithDeps(entity, id, response, []string{entity})
 	}
 
 	ctx.Response.Header.Set("Content-Type", "application/json")

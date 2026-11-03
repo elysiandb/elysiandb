@@ -14,8 +14,43 @@ import (
 )
 
 type cacheItem struct {
-	v   []byte
-	exp int64
+	v    []byte
+	exp  int64
+	deps []dependency
+}
+
+type dependency struct {
+	entity  string
+	version string
+}
+
+var VersionOf func(entity string) string
+
+func captureDeps(entities []string) []dependency {
+	if VersionOf == nil || len(entities) == 0 {
+		return nil
+	}
+
+	deps := make([]dependency, 0, len(entities))
+	for _, entity := range entities {
+		deps = append(deps, dependency{entity: entity, version: VersionOf(entity)})
+	}
+
+	return deps
+}
+
+func (it cacheItem) fresh(now int64) bool {
+	if now > it.exp {
+		return false
+	}
+
+	for _, d := range it.deps {
+		if VersionOf(d.entity) != d.version {
+			return false
+		}
+	}
+
+	return true
 }
 
 type cacheEntity struct {
@@ -116,7 +151,7 @@ func (s *cacheStore) Get(entity string, hash []byte) []byte {
 	it, ok := e.data[key]
 	e.mu.RUnlock()
 
-	if !ok || time.Now().UnixNano() > it.exp {
+	if !ok || !it.fresh(time.Now().UnixNano()) {
 		metrics.CacheMiss()
 		return nil
 	}
@@ -186,6 +221,10 @@ func (s *cacheStore) Bytes() int64 {
 }
 
 func (s *cacheStore) Set(entity string, hash, value []byte) {
+	s.SetWithDeps(entity, hash, value, nil)
+}
+
+func (s *cacheStore) SetWithDeps(entity string, hash, value []byte, entities []string) {
 	if len(hash) != 32 {
 		return
 	}
@@ -207,11 +246,12 @@ func (s *cacheStore) Set(entity string, hash, value []byte) {
 	}
 
 	exp := time.Now().Add(s.ttl).UnixNano()
+	deps := captureDeps(entities)
 	e.mu.Lock()
 	if old, ok := e.data[key]; ok {
 		s.bytes.Add(-int64(len(old.v)))
 	}
-	e.data[key] = cacheItem{v: value, exp: exp}
+	e.data[key] = cacheItem{v: value, exp: exp, deps: deps}
 	e.mu.Unlock()
 }
 
@@ -228,7 +268,7 @@ func (s *cacheStore) GetById(entity, id string) []byte {
 	it, ok := e.ids[id]
 	e.mu.RUnlock()
 
-	if !ok || time.Now().UnixNano() > it.exp {
+	if !ok || !it.fresh(time.Now().UnixNano()) {
 		return nil
 	}
 
@@ -236,6 +276,10 @@ func (s *cacheStore) GetById(entity, id string) []byte {
 }
 
 func (s *cacheStore) SetById(entity, id string, value []byte) {
+	s.SetByIdWithDeps(entity, id, value, nil)
+}
+
+func (s *cacheStore) SetByIdWithDeps(entity, id string, value []byte, entities []string) {
 	s.mu.Lock()
 	e, exists := s.entities[entity]
 	if !exists {
@@ -250,11 +294,12 @@ func (s *cacheStore) SetById(entity, id string, value []byte) {
 	}
 
 	exp := time.Now().Add(s.ttl).UnixNano()
+	deps := captureDeps(entities)
 	e.mu.Lock()
 	if old, ok := e.ids[id]; ok {
 		s.bytes.Add(-int64(len(old.v)))
 	}
-	e.ids[id] = cacheItem{v: value, exp: exp}
+	e.ids[id] = cacheItem{v: value, exp: exp, deps: deps}
 	e.mu.Unlock()
 }
 

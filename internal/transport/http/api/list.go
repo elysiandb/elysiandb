@@ -79,8 +79,13 @@ func ListController(ctx *fasthttp.RequestCtx) {
 				Search:    search,
 				Includes:  includes,
 				CountOnly: mode != acl.ReadOwned,
+				Deadline:  api_storage.DeadlineFromConfig(),
 			})
-			writeCount(ctx, countPlanned(res, limit > 0 || offset > 0 || sortField != "", mode, currentUser), entity, hash)
+			if res.Err != nil {
+				sendDeadlineExceeded(ctx)
+				return
+			}
+			writeCount(ctx, countPlanned(res, limit > 0 || offset > 0 || sortField != "", mode, currentUser), entity, hash, cacheDeps(entity, includes))
 			return
 		}
 
@@ -93,9 +98,14 @@ func ListController(ctx *fasthttp.RequestCtx) {
 				SortAsc:   sortAscending,
 				Filters:   filters,
 				Search:    search,
+				Deadline:  api_storage.DeadlineFromConfig(),
 			})
+			if res.Err != nil {
+				sendDeadlineExceeded(ctx)
+				return
+			}
 
-			if err := writeDocuments(ctx, res.Docs, entity, hash, true); err != nil {
+			if err := writeDocuments(ctx, res.Docs, entity, hash, true, cacheDeps(entity, "")); err != nil {
 				observe.SetError(ctx, err)
 				ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 				ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
@@ -137,8 +147,9 @@ func ListController(ctx *fasthttp.RequestCtx) {
 		data = engine.ApplyFiltersToList(data, filters)
 	}
 
+	includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
 	if countOnlyParam {
-		writeCount(ctx, len(data), entity, hash)
+		writeCount(ctx, len(data), entity, hash, cacheDeps(entity, includes))
 		return
 	}
 
@@ -171,7 +182,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	ctx.SetBody(response)
 
 	if globals.GetConfig().Api.Cache.Enabled && hash != nil {
-		cache.CacheStore.Set(entity, hash, response)
+		cache.CacheStore.SetWithDeps(entity, hash, response, cacheDeps(entity, includes))
 	}
 }
 

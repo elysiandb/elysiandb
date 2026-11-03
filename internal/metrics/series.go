@@ -75,6 +75,8 @@ const (
 	sResidentBytes
 	sCheckpointMs
 	sTCPAuthP95
+	sHeavyQueriesRps
+	sHeavyQueuedRps
 	numSeries
 )
 
@@ -149,6 +151,8 @@ var seriesNames = [numSeries]string{
 	sResidentBytes:           "resident_bytes",
 	sCheckpointMs:            "checkpoint_ms",
 	sTCPAuthP95:              "tcp_auth_p95_ms",
+	sHeavyQueriesRps:         "heavy_queries_rps",
+	sHeavyQueuedRps:          "heavy_queued_rps",
 }
 
 func SeriesNames() []string {
@@ -176,6 +180,8 @@ var rateSeries = map[int]int{
 	sForbiddenRps:      cForbidden,
 	sFailedLoginsRps:   cFailedLogins,
 	sHookErrorsRps:     cHookErrors,
+	sHeavyQueriesRps:   cHeavyQueries,
+	sHeavyQueuedRps:    cHeavyQueued,
 	sKVGetsRps:         cKVGets,
 	sKVSetsRps:         cKVSets,
 	sKVDeletesRps:      cKVDeletes,

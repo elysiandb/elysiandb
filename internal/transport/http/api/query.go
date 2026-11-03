@@ -213,14 +213,23 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 	if engine.IsEngineInternal() && !filterAfterHooks {
 		mode := acl.ReadModeFor(currentUser, payload.Entity)
 		if payload.CountOnly {
-			res := api_storage.PlanQuery(q, mode != acl.ReadOwned)
-			writeCount(ctx, countPlanned(res, q.Offset > 0 || q.Limit > 0 || len(q.OrderedSorts()) > 0, mode, currentUser), payload.Entity, hash)
+			res := api_storage.PlanQueryUntil(q, mode != acl.ReadOwned, api_storage.DeadlineFromConfig())
+			if res.Err != nil {
+				sendDeadlineExceeded(ctx)
+				return
+			}
+			writeCount(ctx, countPlanned(res, q.Offset > 0 || q.Limit > 0 || len(q.OrderedSorts()) > 0, mode, currentUser), payload.Entity, hash, cacheDeps(payload.Entity, ""))
 			return
 		}
 
 		if len(fields) == 0 && !preReadHooks && !postReadHooks && mode == acl.ReadAll {
-			res := api_storage.PlanQuery(q, false)
-			if err := writeDocuments(ctx, res.Docs, payload.Entity, hash, false); err != nil {
+			res := api_storage.PlanQueryUntil(q, false, api_storage.DeadlineFromConfig())
+			if res.Err != nil {
+				sendDeadlineExceeded(ctx)
+				return
+			}
+
+			if err := writeDocuments(ctx, res.Docs, payload.Entity, hash, false, cacheDeps(payload.Entity, "")); err != nil {
 				observe.SetError(ctx, err)
 				ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 			}
@@ -277,7 +286,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 
 func finishQuery(ctx *fasthttp.RequestCtx, payload QueryPayload, data []map[string]any, hooks *hook.Request, postReadHooks bool, fields []string, hash []byte) {
 	if payload.CountOnly {
-		writeCount(ctx, len(data), payload.Entity, hash)
+		writeCount(ctx, len(data), payload.Entity, hash, cacheDeps(payload.Entity, ""))
 		return
 	}
 
@@ -305,7 +314,7 @@ func finishQuery(ctx *fasthttp.RequestCtx, payload QueryPayload, data []map[stri
 	ctx.SetStatusCode(fasthttp.StatusOK)
 
 	if globals.GetConfig().Api.Cache.Enabled && hash != nil {
-		cache.CacheStore.Set(payload.Entity, hash, responseBody)
+		cache.CacheStore.SetWithDeps(payload.Entity, hash, responseBody, cacheDeps(payload.Entity, ""))
 	}
 }
 

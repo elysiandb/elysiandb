@@ -1,8 +1,10 @@
 package api_storage
 
 import (
+	"strconv"
 	"strings"
 
+	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/datastore"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/storage"
@@ -10,7 +12,53 @@ import (
 
 func init() {
 	storage.ApiKeyResolver = resolveApiKey
+	cache.VersionOf = entityVersion
 }
+
+func entityVersion(entity string) string {
+	e := db()
+	if e == nil {
+		return ""
+	}
+
+	snap := e.Snapshot(entity)
+
+	return strconv.FormatUint(snap.Generation(), 36) + "." + strconv.FormatUint(snap.Version(), 36)
+}
+
+func CacheDependencies(entity, includes string, withACL bool) []string {
+	deps := []string{entity}
+	if withACL {
+		deps = append(deps, aclEntity)
+	}
+
+	if includes == "" {
+		return deps
+	}
+
+	e := db()
+	if e == nil {
+		return deps
+	}
+
+	seen := map[string]bool{entity: true}
+	queue := []string{entity}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		for _, ref := range e.Snapshot(current).Refs() {
+			if !seen[ref.Target] && !IsCoreEntityType(ref.Target) {
+				seen[ref.Target] = true
+				deps = append(deps, ref.Target)
+				queue = append(queue, ref.Target)
+			}
+		}
+	}
+
+	return deps
+}
+
+const aclEntity = "_elysiandb_core_acl"
 
 func sortSpec(field string) datastore.IndexSpec {
 	return datastore.IndexSpec{Kind: datastore.IndexSort, Field: field}

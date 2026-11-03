@@ -450,3 +450,72 @@ func TestUnfilteredPagesAndCountsUseTheLiveSet(t *testing.T) {
 		t.Fatalf("the live set iterates in insertion order")
 	}
 }
+
+func TestFiltersThroughReferencesMatchTheScan(t *testing.T) {
+	initIdxTestStore(t)
+
+	r := rand.New(rand.NewSource(5))
+	names := []string{"Ada", "ada lovelace", "Bob", "Chiang", "Dune", "Émile"}
+	for i := 0; i < 40; i++ {
+		api_storage.WriteEntity("person", map[string]any{"id": fmt.Sprintf("p%02d", i), "name": names[r.Intn(len(names))], "age": float64(20 + r.Intn(50)), "city": map[string]any{"@entity": "city", "id": fmt.Sprintf("c%d", r.Intn(5))}})
+	}
+	for i := 0; i < 5; i++ {
+		api_storage.WriteEntity("city", map[string]any{"id": fmt.Sprintf("c%d", i), "label": []string{"Paris", "Lyon", "paris", "Oslo", "Rome"}[i]})
+	}
+
+	docs := []map[string]any{}
+	for i := 0; i < 300; i++ {
+		doc := map[string]any{"id": fmt.Sprintf("b%03d", i), "title": names[r.Intn(len(names))]}
+		switch r.Intn(4) {
+		case 0:
+			doc["author"] = map[string]any{"@entity": "person", "id": fmt.Sprintf("p%02d", r.Intn(45))}
+		case 1:
+			doc["author"] = map[string]any{"name": names[r.Intn(len(names))], "age": float64(r.Intn(90))}
+		case 2:
+			doc["authors"] = []any{map[string]any{"@entity": "person", "id": fmt.Sprintf("p%02d", r.Intn(40))}, map[string]any{"@entity": "person", "id": fmt.Sprintf("p%02d", r.Intn(40))}}
+		}
+		docs = append(docs, doc)
+	}
+	api_storage.WriteListOfEntities("bk", docs)
+
+	filters := []map[string]map[string]string{
+		{"author.name": {"eq": "ada*"}},
+		{"author.name": {"contains": "chi"}},
+		{"author.age": {"gt": "40"}},
+		{"authors.name": {"eq": "Bob"}},
+		{"authors.age": {"lte": "30"}, "title": {"eq": "dune"}},
+		{"author.city.label": {"eq": "paris"}},
+		{"authors.city.id": {"eq": "c2"}},
+		{"author.name": {"neq": "Bob"}},
+		{"author.id": {"eq": "p03"}},
+	}
+
+	for _, f := range filters {
+		includes := api_storage.ExtractAutoIncludes(f)
+		all := api_storage.ListEntities("bk", 0, 0, "", true, nil, "", includes)
+		want := []string{}
+		for _, doc := range all {
+			if api_storage.FiltersMatchEntity(doc, f) {
+				want = append(want, doc["id"].(string))
+			}
+		}
+
+		got := ids(api_storage.ListEntities("bk", 0, 0, "", true, f, "", ""))
+		if !reflect.DeepEqual(got, want) && !(len(got) == 0 && len(want) == 0) {
+			t.Fatalf("filters %v: planner %v, scan %v", f, got, want)
+		}
+
+		if res := api_storage.Plan(api_storage.ListQuery{Entity: "bk", Filters: f, Includes: includes, CountOnly: true}); res.Total != len(want) {
+			t.Fatalf("filters %v: count %d, scan %d", f, res.Total, len(want))
+		}
+	}
+
+	api_storage.UpdateEntityById("person", "p03", map[string]any{"name": "Zed"})
+	f := map[string]map[string]string{"author.name": {"eq": "zed"}}
+	got := api_storage.ListEntities("bk", 0, 0, "", true, f, "", "")
+	for _, doc := range got {
+		if doc["author"].(map[string]any)["id"] != "p03" {
+			t.Fatalf("an update of the target is seen through the reference, got %v", doc)
+		}
+	}
+}

@@ -1,6 +1,8 @@
 package api_storage
 
 import (
+	"time"
+
 	"github.com/taymour/elysiandb/internal/docpath"
 	"github.com/taymour/elysiandb/internal/query"
 )
@@ -10,6 +12,10 @@ func ExecuteQuery(q query.Query) ([]map[string]any, error) {
 }
 
 func PlanQuery(q query.Query, countOnly bool) *ListResult {
+	return PlanQueryUntil(q, countOnly, time.Time{})
+}
+
+func PlanQueryUntil(q query.Query, countOnly bool, deadline time.Time) *ListResult {
 	filter := q.Filter
 
 	return Plan(ListQuery{
@@ -19,6 +25,7 @@ func PlanQuery(q query.Query, countOnly bool) *ListResult {
 		Sorts:     q.OrderedSorts(),
 		Node:      &filter,
 		CountOnly: countOnly,
+		Deadline:  deadline,
 	})
 }
 

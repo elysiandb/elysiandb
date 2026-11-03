@@ -1,10 +1,16 @@
 package api_storage
 
 import (
+	"errors"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/metrics"
 
 	"github.com/taymour/elysiandb/internal/datastore"
 	"github.com/taymour/elysiandb/internal/docpath"
@@ -26,12 +32,14 @@ type ListQuery struct {
 	Includes  string
 	CountOnly bool
 	Snapshot  *datastore.Snapshot
+	Deadline  time.Time
 }
 
 type ListResult struct {
 	snap  *datastore.Snapshot
 	Docs  []datastore.Doc
 	Total int
+	Err   error
 }
 
 func (r *ListResult) Snapshot() *datastore.Snapshot {
@@ -185,10 +193,11 @@ func orExact(a, b *datastore.Bitset) *datastore.Bitset {
 }
 
 type planner struct {
-	e    *datastore.Engine
-	snap *datastore.Snapshot
-	refs []datastore.RefPath
-	inc  bool
+	e     *datastore.Engine
+	snap  *datastore.Snapshot
+	refs  []datastore.RefPath
+	inc   bool
+	depth int
 }
 
 func (p *planner) affectedByIncludes(path string) bool {
@@ -225,8 +234,12 @@ func (p *planner) index(spec datastore.IndexSpec) (*datastore.IndexView, bool) {
 }
 
 func (p *planner) leaf(field string, ops map[string]string) candidates {
-	if p.affectedByIncludes(field) || len(ops) == 0 {
+	if len(ops) == 0 {
 		return universe()
+	}
+
+	if p.affectedByIncludes(field) {
+		return p.throughReferences(field, ops)
 	}
 
 	view, ok := p.index(datastore.IndexSpec{Kind: datastore.IndexFilter, Field: field})
@@ -251,6 +264,70 @@ func (p *planner) leaf(field string, ops map[string]string) candidates {
 	}
 
 	return result
+}
+
+const maxReferenceDepth = 4
+
+func (p *planner) throughReferences(field string, ops map[string]string) candidates {
+	if p.depth >= maxReferenceDepth {
+		return universe()
+	}
+
+	var path string
+	for _, ref := range p.refs {
+		if strings.HasPrefix(field, ref.Path+".") && (path == "" || len(ref.Path) < len(path)) {
+			path = ref.Path
+		}
+	}
+
+	rest := strings.TrimPrefix(field, path+".")
+	if path == "" || rest == "" || rest == "id" || rest == "@entity" {
+		return universe()
+	}
+
+	refsView, ok := p.index(datastore.IndexSpec{Kind: datastore.IndexRefs})
+	if !ok {
+		return universe()
+	}
+
+	result := &datastore.Bitset{}
+	if direct, ok := p.index(datastore.IndexSpec{Kind: datastore.IndexFilter, Field: field}); ok {
+		key := []byte{datastore.KeyPresent}
+		collect(direct, key, afterTerm(key), result, nil)
+	} else {
+		return universe()
+	}
+
+	for _, ref := range p.refs {
+		if ref.Path != path || IsCoreEntityType(ref.Target) {
+			continue
+		}
+
+		targetSnap := p.e.Snapshot(ref.Target)
+		target := &planner{e: p.e, snap: targetSnap, refs: targetSnap.Refs(), inc: true, depth: p.depth + 1}
+		matched := target.leaf(rest, ops)
+		if matched.all {
+			return universe()
+		}
+
+		prefix := datastore.RefPrefix(path, ref.Target)
+		matched.set.ForEach(func(seq uint32) bool {
+			d, ok := target.snap.BySeq(seq)
+			if !ok {
+				return true
+			}
+
+			key := datastore.AppendTerminated(append([]byte(nil), prefix...), d.ID())
+			refsView.ScanPrefix(key, func(_ string, source uint32) bool {
+				result.Set(source)
+				return true
+			})
+
+			return true
+		})
+	}
+
+	return candidates{set: result}
 }
 
 func unescapePayload(key string) string {
@@ -556,9 +633,20 @@ func Plan(q ListQuery) *ListResult {
 	res := &ListResult{snap: snap}
 	reader := includeReader()
 
+	if needsMatch && heavyPlan(snap, cand, evalIncludes) {
+		release, err := acquireHeavyLane(q.Deadline)
+		if err != nil {
+			res.Err = err
+			return res
+		}
+		defer release()
+	}
+
+	verified := 0
+	expired := false
 	verify := func(d datastore.Doc) bool {
-		if match == nil {
-			return true
+		if match == nil || expired {
+			return !expired
 		}
 
 		if !cand.all && !cand.set.Has(d.Seq()) {
@@ -567,6 +655,12 @@ func Plan(q ListQuery) *ListResult {
 
 		if cand.exact != nil && cand.exact.Has(d.Seq()) {
 			return true
+		}
+
+		verified++
+		if verified%128 == 0 && !q.Deadline.IsZero() && time.Now().After(q.Deadline) {
+			expired = true
+			return false
 		}
 
 		doc, err := d.Decode()
@@ -583,13 +677,96 @@ func Plan(q ListQuery) *ListResult {
 
 	if q.CountOnly && len(q.Sorts) == 0 && q.SortField == "" && q.Limit == 0 && q.Offset == 0 {
 		res.Total = countMatches(snap, cand, needsMatch, everythingExact, verify)
-		return res
+	} else {
+		order := p.orderFor(q, cand, needsMatch, verify)
+		res.Docs, res.Total = paginate(order, q.Offset, q.Limit, q.CountOnly)
 	}
 
-	order := p.orderFor(q, cand, needsMatch, verify)
-	res.Docs, res.Total = paginate(order, q.Offset, q.Limit, q.CountOnly)
+	if expired {
+		res.Err = ErrDeadline
+		res.Docs, res.Total = nil, 0
+	}
 
 	return res
+}
+
+var ErrDeadline = errors.New("request deadline exceeded")
+
+const heavyCandidates = 2048
+
+var (
+	heavyMu    sync.Mutex
+	heavySlots chan struct{}
+	heavySize  int
+)
+
+func heavyLane() chan struct{} {
+	size := runtime.GOMAXPROCS(0)
+	if cfg := globals.GetConfig(); cfg != nil && cfg.Api.Query.Workers > 0 {
+		size = cfg.Api.Query.Workers
+	}
+
+	heavyMu.Lock()
+	defer heavyMu.Unlock()
+
+	if heavySlots == nil || heavySize != size {
+		heavySlots = make(chan struct{}, size)
+		heavySize = size
+	}
+
+	return heavySlots
+}
+
+func heavyPlan(snap *datastore.Snapshot, cand candidates, evalIncludes string) bool {
+	if evalIncludes != "" {
+		return snap.Len() > heavyCandidates/8
+	}
+
+	if cand.all {
+		return snap.Len() > heavyCandidates
+	}
+
+	maybe := cand.set.Count()
+	if cand.exact != nil {
+		maybe -= cand.exact.Count()
+	}
+
+	return maybe > heavyCandidates
+}
+
+func acquireHeavyLane(deadline time.Time) (func(), error) {
+	slots := heavyLane()
+	start := time.Now()
+
+	select {
+	case slots <- struct{}{}:
+	default:
+		if deadline.IsZero() {
+			slots <- struct{}{}
+			break
+		}
+
+		timer := time.NewTimer(time.Until(deadline))
+		defer timer.Stop()
+
+		select {
+		case slots <- struct{}{}:
+		case <-timer.C:
+			return nil, ErrDeadline
+		}
+	}
+
+	metrics.HeavyQuery(time.Since(start))
+
+	return func() { <-slots }, nil
+}
+
+func DeadlineFromConfig() time.Time {
+	if cfg := globals.GetConfig(); cfg != nil && cfg.Api.Query.TimeoutMs > 0 {
+		return time.Now().Add(time.Duration(cfg.Api.Query.TimeoutMs) * time.Millisecond)
+	}
+
+	return time.Time{}
 }
 
 func countMatches(snap *datastore.Snapshot, cand candidates, needsMatch, everythingExact bool, verify func(datastore.Doc) bool) int {

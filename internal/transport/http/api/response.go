@@ -10,10 +10,17 @@ import (
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/datastore"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
 
 const streamThreshold = 1 << 20
+
+func sendDeadlineExceeded(ctx *fasthttp.RequestCtx) {
+	ctx.Response.Header.Set("Content-Type", "application/json")
+	ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
+	ctx.SetBodyString(`{"error":"request deadline exceeded"}`)
+}
 
 func countPlanned(res *api_storage.ListResult, paged bool, mode acl.ReadMode, username string) int {
 	switch mode {
@@ -36,7 +43,11 @@ func countPlanned(res *api_storage.ListResult, paged bool, mode acl.ReadMode, us
 	return res.Total
 }
 
-func writeCount(ctx *fasthttp.RequestCtx, count int, cacheEntity string, hash []byte) {
+func cacheDeps(entity, includes string) []string {
+	return api_storage.CacheDependencies(entity, includes, security.UserAuthenticationIsEnabled())
+}
+
+func writeCount(ctx *fasthttp.RequestCtx, count int, cacheEntity string, hash []byte, deps []string) {
 	response := []byte(`{"count":` + fmt.Sprintf("%d", count) + `}`)
 
 	ctx.Response.Header.Set("Content-Type", "application/json")
@@ -45,7 +56,7 @@ func writeCount(ctx *fasthttp.RequestCtx, count int, cacheEntity string, hash []
 	ctx.SetBody(response)
 
 	if globals.GetConfig().Api.Cache.Enabled && hash != nil {
-		cache.CacheStore.Set(cacheEntity, hash, response)
+		cache.CacheStore.SetWithDeps(cacheEntity, hash, response, deps)
 	}
 }
 
@@ -65,7 +76,7 @@ func documentBytes(docs []datastore.Doc) ([][]byte, int, error) {
 	return parts, size, nil
 }
 
-func writeDocuments(ctx *fasthttp.RequestCtx, docs []datastore.Doc, cacheEntity string, hash []byte, cacheHeader bool) error {
+func writeDocuments(ctx *fasthttp.RequestCtx, docs []datastore.Doc, cacheEntity string, hash []byte, cacheHeader bool, deps []string) error {
 	parts, size, err := documentBytes(docs)
 	if err != nil {
 		return err
@@ -109,7 +120,7 @@ func writeDocuments(ctx *fasthttp.RequestCtx, docs []datastore.Doc, cacheEntity 
 
 	ctx.SetBody(body.Bytes())
 	if cacheable {
-		cache.CacheStore.Set(cacheEntity, hash, body.Bytes())
+		cache.CacheStore.SetWithDeps(cacheEntity, hash, body.Bytes(), deps)
 	}
 
 	return nil

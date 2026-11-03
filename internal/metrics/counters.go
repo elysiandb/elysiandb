@@ -26,6 +26,8 @@ const (
 	cFailedLogins
 	cHookExecutions
 	cHookErrors
+	cHeavyQueries
+	cHeavyQueued
 	cKVGets
 	cKVSets
 	cKVDeletes
@@ -150,6 +152,13 @@ func ObserveTCP(command string, d time.Duration) {
 	tcpLatency.Observe(d)
 	if command == "AUTH" {
 		tcpAuth.Observe(d)
+	}
+}
+
+func HeavyQuery(wait time.Duration) {
+	add(cHeavyQueries, 1)
+	if wait > time.Millisecond {
+		add(cHeavyQueued, 1)
 	}
 }
 
