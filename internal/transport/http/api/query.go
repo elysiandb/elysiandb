@@ -303,10 +303,20 @@ func finishQuery(ctx *fasthttp.RequestCtx, payload QueryPayload, data []map[stri
 		data = filteredData
 	}
 
-	responseBody, err := json.Marshal(data)
+	encoded, err := encodeList(data)
 	if err != nil {
 		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		return
+	}
+
+	responseBody, inMemory := encoded.inMemory()
+	if !inMemory {
+		ctx.SetStatusCode(fasthttp.StatusOK)
+		if err := encoded.send(ctx); err != nil {
+			observe.SetError(ctx, err)
+			ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+		}
 		return
 	}
 

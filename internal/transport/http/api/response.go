@@ -3,7 +3,10 @@ package api
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
@@ -122,6 +125,103 @@ func writeDocuments(ctx *fasthttp.RequestCtx, docs []datastore.Doc, cacheEntity 
 	if cacheable {
 		cache.CacheStore.SetWithDeps(cacheEntity, hash, body.Bytes(), deps)
 	}
+
+	return nil
+}
+
+const defaultSpoolMB = 8
+
+func spoolLimit() int {
+	if cfg := globals.GetConfig(); cfg != nil && cfg.Api.Response.SpoolMB > 0 {
+		return cfg.Api.Response.SpoolMB << 20
+	}
+
+	return defaultSpoolMB << 20
+}
+
+type spool struct {
+	buf   bytes.Buffer
+	file  *os.File
+	size  int
+	limit int
+}
+
+func (s *spool) Write(p []byte) (int, error) {
+	s.size += len(p)
+	if s.file == nil && s.buf.Len()+len(p) > s.limit {
+		f, err := os.CreateTemp("", "elysiandb-response-*")
+		if err != nil {
+			return 0, err
+		}
+
+		_ = os.Remove(f.Name())
+		if _, err := f.Write(s.buf.Bytes()); err != nil {
+			_ = f.Close()
+			return 0, err
+		}
+
+		s.file = f
+		s.buf = bytes.Buffer{}
+	}
+
+	if s.file != nil {
+		return s.file.Write(p)
+	}
+
+	return s.buf.Write(p)
+}
+
+func encodeList(data []map[string]any) (*spool, error) {
+	s := &spool{limit: spoolLimit()}
+	if _, err := s.Write([]byte{'['}); err != nil {
+		return nil, err
+	}
+
+	for i, item := range data {
+		b, err := json.Marshal(item)
+		if err != nil {
+			s.close()
+			return nil, err
+		}
+
+		if i > 0 {
+			if _, err := s.Write([]byte{','}); err != nil {
+				s.close()
+				return nil, err
+			}
+		}
+
+		if _, err := s.Write(b); err != nil {
+			s.close()
+			return nil, err
+		}
+	}
+
+	if _, err := s.Write([]byte{']'}); err != nil {
+		s.close()
+		return nil, err
+	}
+
+	return s, nil
+}
+
+func (s *spool) close() {
+	if s.file != nil {
+		_ = s.file.Close()
+	}
+}
+
+func (s *spool) inMemory() ([]byte, bool) {
+	return s.buf.Bytes(), s.file == nil
+}
+
+func (s *spool) send(ctx *fasthttp.RequestCtx) error {
+	if _, err := s.file.Seek(0, io.SeekStart); err != nil {
+		s.close()
+		return err
+	}
+
+	ctx.SetBodyStream(s.file, s.size)
 
 	return nil
 }

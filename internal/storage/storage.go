@@ -94,6 +94,10 @@ func Open(mode OpenMode) error {
 
 	current.Store(e)
 
+	if n := e.ReplayedRecords(); n > 0 {
+		metrics.RecoveryReplayed(int(n))
+	}
+
 	return nil
 }
 

@@ -159,3 +159,37 @@ func TestConcurrentWritersAndReadersOnOneEntity(t *testing.T) {
 		t.Fatalf("the sorted list holds every document, got %d", len(sorted))
 	}
 }
+
+func TestHookedResponsesLargerThanTheSpoolAreSentWhole(t *testing.T) {
+	s := startAdminSession(t, func(cfg *configuration.Config) {
+		cfg.Api.Schema.Strict = false
+		cfg.Api.Response.SpoolMB = 1
+	})
+
+	list := make([]map[string]any, 0, 3000)
+	for i := 0; i < 3000; i++ {
+		list = append(list, map[string]any{"id": fmt.Sprintf("h%04d", i), "text": strings.Repeat("x", 400)})
+	}
+	body, _ := json.Marshal(list)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/spooled", string(body))
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/hook/spooled", `{"name":"mark","event":"post_read","language":"javascript","enabled":true,"script":"function postRead(ctx){ ctx.entity.seen = true }"}`)
+
+	resp := s.mustDo(fasthttp.StatusOK, "GET", "/api/spooled", "")
+	if len(resp.body) < 1<<20 {
+		t.Fatalf("expected a response larger than the spool, got %d bytes", len(resp.body))
+	}
+
+	var decoded []map[string]any
+	if err := json.Unmarshal(resp.body, &decoded); err != nil {
+		t.Fatalf("a spooled response must be complete JSON: %v", err)
+	}
+
+	if len(decoded) != 3000 || decoded[2999]["seen"] != true {
+		t.Fatalf("every document goes through the hook, got %d", len(decoded))
+	}
+
+	again, _ := json.Marshal(decoded)
+	if string(again) != string(resp.body) {
+		t.Fatalf("a spooled response is byte for byte what json.Marshal gives")
+	}
+}

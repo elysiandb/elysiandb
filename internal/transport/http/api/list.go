@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/taymour/elysiandb/internal/acl"
@@ -167,7 +166,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 		data = filteredData
 	}
 
-	response, err := json.Marshal(data)
+	encoded, err := encodeList(data)
 	if err != nil {
 		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
@@ -179,6 +178,17 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 	ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
 	ctx.SetStatusCode(fasthttp.StatusOK)
+
+	response, inMemory := encoded.inMemory()
+	if !inMemory {
+		if err := encoded.send(ctx); err != nil {
+			observe.SetError(ctx, err)
+			ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+			ctx.SetBodyString("Error processing request")
+		}
+		return
+	}
+
 	ctx.SetBody(response)
 
 	if globals.GetConfig().Api.Cache.Enabled && hash != nil {

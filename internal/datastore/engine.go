@@ -166,6 +166,10 @@ func (e *Engine) Folder() string {
 	return e.dir
 }
 
+func (e *Engine) ReplayedRecords() int64 {
+	return e.stats.replayedRecords.Load()
+}
+
 func (e *Engine) Migration() *MigrationReport {
 	return e.migrated
 }
@@ -223,7 +227,7 @@ func (e *Engine) load() error {
 	}
 
 	if stats.Records > 0 {
-		engineLog.Info("log replayed", "batches", stats.Batches, "records", stats.Records)
+		engineLog.Warn("unclean shutdown detected, log replayed", "batches", stats.Batches, "records", stats.Records)
 	}
 
 	e.j.Start()
