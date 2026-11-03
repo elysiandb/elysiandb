@@ -293,10 +293,12 @@ function RoutesTable({ title, routes }) {
     const { t } = useTranslation();
     const format = useFormatters();
 
+    const empty = (routes ?? []).length === 0;
+
     return (
-        <Card className="h-100 monitoring-card">
+        <Card className={empty ? "h-100 monitoring-card" : "h-100 monitoring-card monitoring-table-card"}>
             <Card.Header>{title}</Card.Header>
-            {(routes ?? []).length === 0
+            {empty
                 ? <Card.Body className="text-secondary small">{t("monitoring.noData")}</Card.Body>
                 : (
                     <Table size="sm" responsive className="monitoring-table mb-0">
@@ -330,10 +332,12 @@ function EntitiesTable({ entityTypes }) {
     const { t } = useTranslation();
     const format = useFormatters();
 
+    const empty = (entityTypes ?? []).length === 0;
+
     return (
-        <Card className="h-100 monitoring-card">
+        <Card className={empty ? "h-100 monitoring-card" : "h-100 monitoring-card monitoring-table-card"}>
             <Card.Header>{t("monitoring.entities.title")}</Card.Header>
-            {(entityTypes ?? []).length === 0
+            {empty
                 ? <Card.Body className="text-secondary small">{t("monitoring.noData")}</Card.Body>
                 : (
                     <div className="monitoring-table-scroll">
@@ -363,10 +367,12 @@ function HooksTable({ hooks }) {
     const { t } = useTranslation();
     const format = useFormatters();
 
+    const empty = (hooks ?? []).length === 0;
+
     return (
-        <Card className="monitoring-card">
+        <Card className={empty ? "monitoring-card" : "monitoring-card monitoring-table-card"}>
             <Card.Header>{t("monitoring.hooks.title")}</Card.Header>
-            {(hooks ?? []).length === 0
+            {empty
                 ? <Card.Body className="text-secondary small">{t("monitoring.noData")}</Card.Body>
                 : (
                     <Table size="sm" responsive className="monitoring-table mb-0">

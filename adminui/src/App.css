@@ -147,6 +147,7 @@ button.navbar-toggler {
    CARDS
 ----------------------------------- */
 .card {
+    --bs-card-spacer-x: 18px;
     background: var(--bg-card) !important;
     border-radius: var(--radius) !important;
     border: 1px solid rgba(255,255,255,0.06) !important;
@@ -383,6 +384,13 @@ button.navbar-toggler {
     background-color: var(--accent) !important;
     color: #000 !important;
     font-weight: 600;
+}
+
+@media (max-width: 767.98px) {
+    .entity-sidebar > .list-group {
+        max-height: 220px;
+        overflow-y: auto;
+    }
 }
 
 .entity-sidebar .card-header {
@@ -760,8 +768,13 @@ button:hover, .btn:hover {
     color: #ffd6d6;
 }
 
+.users-table-scroll {
+    overflow-x: auto;
+}
+
 .users-search-input {
     width: 260px !important;
+    min-width: 0;
     background: rgba(255,255,255,0.08) !important;
     border: 1px solid rgba(255,255,255,0.18) !important;
     border-radius: 10px !important;
@@ -1158,7 +1171,7 @@ button:hover, .btn:hover {
 }
 
 .monitoring-kpi .card-body {
-    padding: 14px 16px 8px;
+    padding: 14px 18px 8px;
 }
 
 .monitoring-kpi-title {
@@ -1304,7 +1317,7 @@ button:hover, .btn:hover {
 
 .monitoring-recent .list-group-item {
     font-size: 0.85rem;
-    padding: 6px 14px;
+    padding: 6px 18px !important;
 }
 
 .monitoring-actor {
@@ -1312,14 +1325,37 @@ button:hover, .btn:hover {
     white-space: nowrap;
 }
 
+.monitoring-table-card {
+    padding-bottom: 6px;
+    overflow: hidden;
+}
+
 .monitoring-table {
     font-size: 0.85rem;
     margin-bottom: 0;
 }
 
+.table.monitoring-table > :not(caption) > * > * {
+    padding: 6px 10px;
+}
+
+.table.monitoring-table > :not(caption) > * > :first-child {
+    padding-left: 18px;
+}
+
+.table.monitoring-table > :not(caption) > * > :last-child {
+    padding-right: 18px;
+}
+
+.table.monitoring-table > tbody > tr:last-child > * {
+    border-bottom-width: 0;
+}
+
 .monitoring-table-scroll {
     max-height: 220px;
     overflow-y: auto;
+    padding-bottom: 16px;
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
 }
 
 .monitoring-table-scroll thead th {
@@ -1342,6 +1378,10 @@ button:hover, .btn:hover {
     border-color: rgba(255, 255, 255, 0.06) !important;
 }
 
+.logs-filters .monitoring-select {
+    width: 100% !important;
+}
+
 .logs-filters .form-label {
     color: var(--text-dim);
     font-size: 0.8rem;
@@ -1362,7 +1402,7 @@ button:hover, .btn:hover {
 
 .logs-row {
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    padding: 4px 12px;
+    padding: 4px 18px;
 }
 
 .logs-row[data-level="error"] {
@@ -1419,6 +1459,7 @@ button:hover, .btn:hover {
 .logs-chip {
     display: inline-block;
     padding: 1px 8px;
+    border: 1px solid transparent;
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.07);
     color: var(--text-dim);
@@ -1427,13 +1468,22 @@ button:hover, .btn:hover {
 }
 
 button.logs-chip.logs-chip-filter {
-    border: 1px solid rgba(247, 214, 74, 0.35);
-    color: var(--accent);
+    padding: 1px 8px !important;
+    border: 1px solid rgba(247, 214, 74, 0.35) !important;
+    border-radius: 10px !important;
+    background: rgba(255, 255, 255, 0.07) !important;
+    color: var(--accent) !important;
     box-shadow: none;
     transform: none;
+    backdrop-filter: none;
     font: inherit;
     font-size: 0.75rem;
-    padding: 1px 8px;
+    text-align: left;
+}
+
+button.logs-chip.logs-chip-filter:hover {
+    border-color: var(--accent) !important;
+    background: rgba(247, 214, 74, 0.12) !important;
 }
 
 .logs-details pre {
