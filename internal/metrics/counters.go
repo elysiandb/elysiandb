@@ -67,6 +67,7 @@ var (
 	counters      [numCounters]atomic.Uint64
 	httpLatency   Histogram
 	tcpLatency    Histogram
+	tcpAuth       Histogram
 	hookLatency   Histogram
 	tcpOpen       atomic.Int64
 	startedAt     = time.Now()
@@ -147,6 +148,9 @@ func ObserveTCP(command string, d time.Duration) {
 	}
 
 	tcpLatency.Observe(d)
+	if command == "AUTH" {
+		tcpAuth.Observe(d)
+	}
 }
 
 func SlowRequest() {

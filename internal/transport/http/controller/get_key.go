@@ -19,11 +19,6 @@ type getEntry struct {
 }
 
 func GetKeyController(ctx *fasthttp.RequestCtx) {
-	cfg := globals.GetConfig()
-	if cfg.Stats.Enabled {
-		stat.Stats.IncrementTotalRequests()
-	}
-
 	ctx.SetContentType("text/plain; charset=utf-8")
 
 	key := ctx.UserValue("key").(string)

@@ -132,6 +132,7 @@ func Prometheus() []byte {
 
 	writeHistogram(&b, "elysiandb_http_request_duration_seconds", "HTTP request duration.", &httpLatency)
 	writeHistogram(&b, "elysiandb_tcp_command_duration_seconds", "TCP command duration.", &tcpLatency)
+	writeHistogram(&b, "elysiandb_tcp_auth_duration_seconds", "TCP AUTH duration, which includes a bcrypt comparison.", &tcpAuth)
 	writeHistogram(&b, "elysiandb_hook_duration_seconds", "Hook script duration.", &hookLatency)
 
 	return b.Bytes()

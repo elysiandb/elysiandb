@@ -27,6 +27,17 @@ type Sources struct {
 	MongoPing            func() (time.Duration, error)
 	MongoPoolInUse       func() int
 	DefaultAdminPassword func() bool
+	Engine               func() EngineSample
+}
+
+type EngineSample struct {
+	LogSinceCheckpoint int64
+	LogBytes           int64
+	LiveBytes          int64
+	ValueCacheHits     int64
+	ValueCacheMisses   int64
+	ResidentBytes      int64
+	CheckpointMs       float64
 }
 
 type resolution struct {
@@ -43,6 +54,7 @@ type snapshot struct {
 	counters    [numCounters]uint64
 	http        hist
 	tcp         hist
+	auth        hist
 	hook        hist
 	logWarnings uint64
 	logErrors   uint64
@@ -51,6 +63,9 @@ type snapshot struct {
 	cpuSeconds  float64
 	procs       int
 	gauges      map[int]float64
+
+	valueCacheHits   int64
+	valueCacheMisses int64
 }
 
 type slowValues struct {
@@ -172,6 +187,7 @@ func Reset() {
 	}
 	httpLatency = Histogram{}
 	tcpLatency = Histogram{}
+	tcpAuth = Histogram{}
 	hookLatency = Histogram{}
 	tcpOpen.Store(0)
 	routeStats = sync.Map{}
@@ -310,6 +326,7 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 		at:     now,
 		http:   httpLatency.snapshot(),
 		tcp:    tcpLatency.snapshot(),
+		auth:   tcpAuth.snapshot(),
 		hook:   hookLatency.snapshot(),
 		procs:  runtime.GOMAXPROCS(0),
 		gauges: map[int]float64{},
@@ -374,6 +391,17 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 	}
 	if src.MongoPoolInUse != nil {
 		s.gauges[sMongoPoolInUse] = float64(src.MongoPoolInUse())
+	}
+
+	if src.Engine != nil {
+		eng := src.Engine()
+		s.gauges[sLogSinceCheckpointBytes] = float64(eng.LogSinceCheckpoint)
+		s.gauges[sLogBytes] = float64(eng.LogBytes)
+		s.gauges[sLiveBytes] = float64(eng.LiveBytes)
+		s.gauges[sResidentBytes] = float64(eng.ResidentBytes)
+		s.gauges[sCheckpointMs] = eng.CheckpointMs
+		s.valueCacheHits = eng.ValueCacheHits
+		s.valueCacheMisses = eng.ValueCacheMisses
 	}
 
 	s.gauges[sTCPConns] = float64(tcpOpen.Load())

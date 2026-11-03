@@ -18,6 +18,7 @@ func MonitoringSources() metrics.Sources {
 		EntityCounts:    engine.CountEntitiesPerType,
 		IndexBacklog:    api_storage.IndexBacklog,
 		RecoverySizes:   storageLogSizes,
+		Engine:          engineSample,
 		Transactions:    transaction.OpenTransactions,
 		HTTPConnections: HTTPConnections,
 		CacheEntries: func() int {
@@ -76,4 +77,23 @@ func storageLogSizes() (int64, int64) {
 	}
 
 	return 0, e.LogSinceCheckpoint()
+}
+
+func engineSample() metrics.EngineSample {
+	e := storage.Engine()
+	if e == nil {
+		return metrics.EngineSample{}
+	}
+
+	st := e.Stats()
+
+	return metrics.EngineSample{
+		LogSinceCheckpoint: st.LogSinceCheckpoint,
+		LogBytes:           st.LogBytes,
+		LiveBytes:          st.LiveBytes,
+		ValueCacheHits:     st.ValueCacheHits,
+		ValueCacheMisses:   st.ValueCacheMisses,
+		ResidentBytes:      st.ResidentStructBytes,
+		CheckpointMs:       st.LastCheckpointMs,
+	}
 }

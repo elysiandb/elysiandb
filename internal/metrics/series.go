@@ -66,6 +66,15 @@ const (
 	sMongoPingMs
 	sMongoErrorsRps
 	sMongoPoolInUse
+	sCPUCores
+	sGOMAXPROCS
+	sLogSinceCheckpointBytes
+	sLogBytes
+	sLiveBytes
+	sValueCacheHitRatio
+	sResidentBytes
+	sCheckpointMs
+	sTCPAuthP95
 	numSeries
 )
 
@@ -130,6 +139,16 @@ var seriesNames = [numSeries]string{
 	sMongoPingMs:        "mongo_ping_ms",
 	sMongoErrorsRps:     "mongo_errors_rps",
 	sMongoPoolInUse:     "mongo_pool_in_use",
+	sCPUCores:           "cpu_cores",
+	sGOMAXPROCS:         "gomaxprocs",
+
+	sLogSinceCheckpointBytes: "log_since_checkpoint_bytes",
+	sLogBytes:                "log_bytes",
+	sLiveBytes:               "live_bytes",
+	sValueCacheHitRatio:      "value_cache_hit_ratio",
+	sResidentBytes:           "resident_bytes",
+	sCheckpointMs:            "checkpoint_ms",
+	sTCPAuthP95:              "tcp_auth_p95_ms",
 }
 
 func SeriesNames() []string {
@@ -210,6 +229,7 @@ func derive(prev, cur *snapshot) Point {
 	p.V[sTCPP99] = tcpHist.quantile(0.99)
 
 	p.V[sHookP95] = cur.hook.sub(prev.hook).quantile(0.95)
+	p.V[sTCPAuthP95] = cur.auth.sub(prev.auth).quantile(0.95)
 
 	if hits, misses := delta(cKVHits), delta(cKVMisses); hits+misses > 0 {
 		p.V[sKVHitRatio] = hits / (hits + misses)
@@ -238,7 +258,15 @@ func derive(prev, cur *snapshot) Point {
 	}
 
 	if cur.cpuSeconds >= 0 && prev.cpuSeconds >= 0 && cur.cpuSeconds >= prev.cpuSeconds && cur.procs > 0 {
-		p.V[sCPUPercent] = (cur.cpuSeconds - prev.cpuSeconds) / elapsed / float64(cur.procs) * 100
+		cores := (cur.cpuSeconds - prev.cpuSeconds) / elapsed
+		p.V[sCPUPercent] = cores / float64(cur.procs) * 100
+		p.V[sCPUCores] = cores
+	}
+
+	p.V[sGOMAXPROCS] = float64(cur.procs)
+
+	if hits, misses := cur.valueCacheHits-prev.valueCacheHits, cur.valueCacheMisses-prev.valueCacheMisses; cur.valueCacheHits >= prev.valueCacheHits && cur.valueCacheMisses >= prev.valueCacheMisses && hits+misses > 0 {
+		p.V[sValueCacheHitRatio] = float64(hits) / float64(hits+misses)
 	}
 
 	for s, v := range cur.gauges {

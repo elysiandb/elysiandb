@@ -84,8 +84,8 @@ describe("Monitoring", () => {
 
     it.each([
         ["errors", ["Server errors (5xx) per second", "Authentication failures per minute", "Hook errors per minute", "Warnings and errors logged per minute"], []],
-        ["persistence", ["Flush duration", "Failed and forced flushes per minute", "Recovery log size", "Data folder size"], ["Last successful flush"]],
-        ["system", ["Memory", "Goroutines", "GC pause (p99)", "GC cycles per minute", "Process CPU", "Open file descriptors", "Open connections", "Admin sessions", "Open transactions", "Oldest open transaction"], ["Runtime", "Connections"]],
+        ["persistence", ["Flush duration", "Failed and forced flushes per minute", "Log size", "Data folder size"], ["Last successful flush"]],
+        ["system", ["Memory", "Goroutines", "GC pause (p99)", "GC cycles per minute", "Process CPU (% of all threads)", "Open file descriptors", "Open connections", "Admin sessions", "Open transactions", "Oldest open transaction"], ["Runtime", "Connections"]],
         ["hooks", ["Hook executions per second", "Hook duration (p95)"], ["Post-read"]],
     ])("opens the %s tab from the URL", async (tab, charts, texts) => {
         mockApi(routes());

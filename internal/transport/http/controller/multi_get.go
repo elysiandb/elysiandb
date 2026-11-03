@@ -20,11 +20,6 @@ type multiGetEntry struct {
 }
 
 func MultiGetController(ctx *fasthttp.RequestCtx) {
-	cfg := globals.GetConfig()
-	if cfg.Stats.Enabled {
-		stat.Stats.IncrementTotalRequests()
-	}
-
 	ctx.SetContentType("application/json; charset=utf-8")
 
 	raw := strings.TrimSpace(string(ctx.QueryArgs().Peek("keys")))

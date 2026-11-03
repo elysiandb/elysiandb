@@ -1,6 +1,7 @@
 package boot
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync/atomic"
@@ -50,8 +51,8 @@ func StartHTTP() {
 		ReadBufferSize:  64 << 10,
 		WriteBufferSize: 64 << 10,
 
-		ReadTimeout:  3 * time.Second,
-		WriteTimeout: 3 * time.Second,
+		ReadTimeout:  secondsOr(cfg.Server.HTTP.ReadTimeoutSeconds, defaultHTTPTimeout),
+		WriteTimeout: secondsOr(cfg.Server.HTTP.WriteTimeoutSeconds, defaultHTTPTimeout),
 		IdleTimeout:  30 * time.Second,
 	}
 
@@ -63,8 +64,35 @@ func StartHTTP() {
 	httpServer.Store(srv)
 	httpLog.Info("http listening", "addr", addr)
 
-	if err := srv.Serve(ln); err != nil {
+	if err := srv.Serve(ln); err != nil && !stopping.Load() {
 		log.Fatal("http server stopped", "component", "http", "addr", addr, "err", err)
+	}
+}
+
+const defaultHTTPTimeout = 3 * time.Second
+
+var stopping atomic.Bool
+
+func secondsOr(seconds int, fallback time.Duration) time.Duration {
+	if seconds > 0 {
+		return time.Duration(seconds) * time.Second
+	}
+
+	return fallback
+}
+
+func StopHTTP(timeout time.Duration) {
+	srv := httpServer.Load()
+	if srv == nil {
+		return
+	}
+
+	stopping.Store(true)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if err := srv.ShutdownWithContext(ctx); err != nil {
+		httpLog.Warn("http requests still running at shutdown", "err", err)
 	}
 }
 

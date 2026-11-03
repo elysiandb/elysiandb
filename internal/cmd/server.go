@@ -19,7 +19,10 @@ import (
 
 var serverLog = log.For("boot")
 
-const mongoDisconnectTimeout = 5 * time.Second
+const (
+	mongoDisconnectTimeout = 5 * time.Second
+	shutdownDrainTimeout   = 10 * time.Second
+)
 
 func StartServer() {
 	cfg := globals.GetConfig()
@@ -53,8 +56,16 @@ func StartServer() {
 	serverLog.Info("shutdown requested", "signal", received.String())
 
 	start := time.Now()
-	storage.WriteToDB()
-	serverLog.Info("data flushed on shutdown", "duration_ms", log.Since(start))
+	boot.StopHTTP(shutdownDrainTimeout)
+	boot.StopTCP(shutdownDrainTimeout)
+	serverLog.Info("requests drained", "duration_ms", log.Since(start))
+
+	start = time.Now()
+	if err := storage.Close(); err != nil {
+		serverLog.Error("cannot close the data folder cleanly", "err", err)
+	} else {
+		serverLog.Info("data flushed on shutdown", "duration_ms", log.Since(start))
+	}
 
 	if globals.MongoClient != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), mongoDisconnectTimeout)

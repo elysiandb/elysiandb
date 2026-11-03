@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/metrics"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/stat"
 	"github.com/taymour/elysiandb/internal/transport/tcp/handler"
 	"github.com/taymour/elysiandb/internal/transport/tcp/parsing"
 )
@@ -37,6 +39,9 @@ func (s *Session) IsAuthenticated() bool {
 
 func RouteLine(line []byte, c net.Conn, session *Session) []byte {
 	cmd, query := parsing.FirstWordBytes(line)
+	if cfg := globals.GetConfig(); cfg != nil && cfg.Stats.Enabled {
+		stat.Stats.IncrementTotalRequests()
+	}
 
 	switch {
 	case parsing.EqASCII(cmd, []byte("PING")):

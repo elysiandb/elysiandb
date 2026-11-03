@@ -150,8 +150,9 @@ const TABS = [
                         { name: "forced_flushes_rps", label: "monitoring.series.forcedFlushes", color: "accent" },
                     ] },
                     { title: "monitoring.charts.recoveryLogs", unit: "bytes", series: [
-                        { name: "recovery_json_bytes", label: "monitoring.series.recoveryJson", color: "accent" },
-                        { name: "recovery_store_bytes", label: "monitoring.series.recoveryStore", color: "cyan" },
+                        { name: "log_since_checkpoint_bytes", label: "monitoring.series.logSinceCheckpoint", color: "accent" },
+                        { name: "log_bytes", label: "monitoring.series.logBytes", color: "cyan" },
+                        { name: "live_bytes", label: "monitoring.series.liveBytes", color: "green" },
                     ] },
                     { title: "monitoring.charts.diskSize", unit: "bytes", series: [
                         { name: "disk_bytes", label: "monitoring.series.disk", color: "purple" },
@@ -183,6 +184,10 @@ const TABS = [
                     ] },
                     { title: "monitoring.charts.cpu", unit: "percent", scale: 0.01, series: [
                         { name: "cpu_percent", label: "monitoring.series.cpu", color: "red" },
+                    ] },
+                    { title: "monitoring.charts.cpuCores", unit: "count", series: [
+                        { name: "cpu_cores", label: "monitoring.series.cpuCores", color: "red" },
+                        { name: "gomaxprocs", label: "monitoring.series.gomaxprocs", color: "teal" },
                     ] },
                     { title: "monitoring.charts.openFds", unit: "count", series: [
                         { name: "open_fds", label: "monitoring.series.openFds", color: "teal" },
