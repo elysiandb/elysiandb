@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/schema"
@@ -108,11 +109,13 @@ func collect(s *spool, now time.Time) (*Manifest, error) {
 		return nil, err
 	}
 
-	if err := collectSchemas(s, manifest); err != nil {
+	iterate, types := snapshotReaders()
+
+	if err := collectSchemas(s, manifest, iterate); err != nil {
 		return nil, err
 	}
 
-	if err := collectEntities(s, manifest); err != nil {
+	if err := collectEntities(s, manifest, iterate, types); err != nil {
 		return nil, err
 	}
 
@@ -125,8 +128,29 @@ func collect(s *spool, now time.Time) (*Manifest, error) {
 	return manifest, nil
 }
 
-func collectSchemas(s *spool, manifest *Manifest) error {
-	return engine.IterateEntities(schema.SchemaEntity, func(data map[string]any) error {
+type entityIterator func(entity string, fn func(data map[string]any) error) error
+
+func snapshotReaders() (entityIterator, []string) {
+	e := storage.Engine()
+	if !engine.IsEngineInternal() || e == nil {
+		return engine.IterateEntities, engine.ListEntityTypes()
+	}
+
+	snaps := e.SnapshotAll()
+	types := e.Types()
+
+	return func(entity string, fn func(data map[string]any) error) error {
+		snap, ok := snaps[entity]
+		if !ok {
+			return nil
+		}
+
+		return api_storage.IterateSnapshot(snap, fn)
+	}, types
+}
+
+func collectSchemas(s *spool, manifest *Manifest, iterate entityIterator) error {
+	return iterate(schema.SchemaEntity, func(data map[string]any) error {
 		entity, _ := data["id"].(string)
 		if entity == "" {
 			return nil
@@ -140,9 +164,9 @@ func collectSchemas(s *spool, manifest *Manifest) error {
 	})
 }
 
-func collectEntities(s *spool, manifest *Manifest) error {
+func collectEntities(s *spool, manifest *Manifest, iterate entityIterator, types []string) error {
 	seen := map[string]bool{}
-	for _, entity := range engine.ListEntityTypes() {
+	for _, entity := range types {
 		if entity == schema.SchemaEntity || seen[entity] {
 			continue
 		}
@@ -152,7 +176,7 @@ func collectEntities(s *spool, manifest *Manifest) error {
 
 		err := s.add(EntityPath(entity), func(w io.Writer) error {
 			encoder := newEncoder(w)
-			return engine.IterateEntities(entity, func(data map[string]any) error {
+			return iterate(entity, func(data map[string]any) error {
 				if id, _ := data["id"].(string); id == "" {
 					return nil
 				}

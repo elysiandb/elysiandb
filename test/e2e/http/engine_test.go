@@ -123,6 +123,8 @@ func TestLargeListsAreStreamedByteForByte(t *testing.T) {
 
 func TestConcurrentWritersAndReadersOnOneEntity(t *testing.T) {
 	s := startAdminSession(t, withoutStrictSchema)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/par", `{"id":"seed","rank":-1}`)
+	s.mustDo(fasthttp.StatusNoContent, "DELETE", "/api/par/seed", "")
 
 	var wg sync.WaitGroup
 	for g := 0; g < 8; g++ {
