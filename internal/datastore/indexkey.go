@@ -49,6 +49,7 @@ const (
 	KeyRaw     byte = 'r'
 	KeyBool    byte = 'b'
 	KeyElement byte = 'a'
+	KeyPresent byte = 'p'
 )
 
 const (
@@ -135,8 +136,13 @@ func FilterKeys(doc map[string]any, field string) [][]byte {
 		return nil
 	}
 
-	var keys [][]byte
-	for _, value := range docpath.ResolveValues(doc, field) {
+	values := docpath.ResolveValues(doc, field)
+	if len(values) == 0 {
+		return nil
+	}
+
+	keys := [][]byte{{KeyPresent}}
+	for _, value := range values {
 		keys = appendValueKeys(keys, value)
 	}
 

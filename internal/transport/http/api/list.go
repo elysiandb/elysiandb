@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/taymour/elysiandb/internal/acl"
@@ -58,11 +57,64 @@ func ListController(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
-	preReadHooks := globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPreReadHooks(entity)
+	hooksEnabled := globals.GetConfig().Api.Hooks.Enabled
+	preReadHooks := hooksEnabled && hook.EntityHasPreReadHooks(entity)
+	postReadHooks := hooksEnabled && hook.EntityHasPostReadHooks(entity)
+	paginateAfterHooks := preReadHooks && len(filters) > 0
+	hooks := hook.NewRequest(currentUser)
+
+	if engine.IsEngineInternal() && !paginateAfterHooks {
+		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
+		fields := api_storage.ParseFieldsParam(fieldsParam)
+		mode := acl.ReadModeFor(currentUser, entity)
+
+		if countOnlyParam {
+			res := api_storage.Plan(api_storage.ListQuery{
+				Entity:    entity,
+				Limit:     limit,
+				Offset:    offset,
+				SortField: sortField,
+				SortAsc:   sortAscending,
+				Filters:   filters,
+				Search:    search,
+				Includes:  includes,
+				CountOnly: mode != acl.ReadOwned,
+			})
+			writeCount(ctx, countPlanned(res, limit > 0 || offset > 0 || sortField != "", mode, currentUser), entity, hash)
+			return
+		}
+
+		if includes == "" && len(fields) == 0 && !preReadHooks && !postReadHooks && mode == acl.ReadAll {
+			res := api_storage.Plan(api_storage.ListQuery{
+				Entity:    entity,
+				Limit:     limit,
+				Offset:    offset,
+				SortField: sortField,
+				SortAsc:   sortAscending,
+				Filters:   filters,
+				Search:    search,
+			})
+
+			if err := writeDocuments(ctx, res.Docs, entity, hash, true); err != nil {
+				observe.SetError(ctx, err)
+				ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+				ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
+				ctx.SetBodyString("Error processing request")
+			}
+
+			return
+		}
+	}
 
 	var data []map[string]any
-	paginateAfterHooks := preReadHooks && len(filters) > 0
-	if paginateAfterHooks {
+	if paginateAfterHooks && engine.IsEngineInternal() {
+		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
+		res := api_storage.Plan(api_storage.ListQuery{Entity: entity, SortField: sortField, SortAsc: sortAscending, Search: search, Includes: includes})
+		stored := func(item map[string]any) bool { return api_storage.StoredFiltersMatchEntity(item, filters) }
+		matches := func(item map[string]any) bool { return api_storage.FiltersMatchEntity(item, filters) }
+		candidates := api_storage.StoredCandidates(res.Snapshot(), filters, nil, includes)
+		data = lazyPreReadPage(hooks, entity, res, includes, stored, candidates, acl.ReadModeFor(currentUser, entity), currentUser, matches, offset, limit)
+	} else if paginateAfterHooks {
 		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
 		data = engine.ListEntities(entity, 0, 0, sortField, sortAscending, nil, search, includes)
 		data = api_storage.ApplyStoredFiltersToList(data, filters, 0, 0)
@@ -70,39 +122,28 @@ func ListController(ctx *fasthttp.RequestCtx) {
 		data = engine.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
 	}
 
-	data = acl.FilterListOfEntities(currentUser, entity, data)
+	if !paginateAfterHooks || !engine.IsEngineInternal() {
+		data = acl.FilterListOfEntities(currentUser, entity, data)
+	}
 
-	if paginateAfterHooks {
+	if paginateAfterHooks && !engine.IsEngineInternal() {
 		matches := func(item map[string]any) bool { return api_storage.FiltersMatchEntity(item, filters) }
-		data = applyPreReadHooksAndFilter(currentUser, entity, data, matches, offset, limit)
+		data = applyPreReadHooksAndFilter(hooks, entity, data, matches, offset, limit)
 	} else if preReadHooks {
 		for i, item := range data {
-			data[i] = hook.ApplyPreReadHooksForEntity(currentUser, entity, item)
+			data[i] = hooks.PreRead(entity, item)
 		}
 
 		data = engine.ApplyFiltersToList(data, filters)
 	}
 
-	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(entity) {
-		for i, item := range data {
-			data[i] = hook.ApplyPostReadHooksForEntity(currentUser, entity, item)
-		}
+	if countOnlyParam {
+		writeCount(ctx, len(data), entity, hash)
+		return
 	}
 
-	if countOnlyParam {
-		countResult := int64(len(data))
-		response := []byte(`{"count":` + fmt.Sprintf("%d", countResult) + `}`)
-
-		ctx.Response.Header.Set("Content-Type", "application/json")
-		ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
-		ctx.SetStatusCode(fasthttp.StatusOK)
-		ctx.SetBody(response)
-
-		if globals.GetConfig().Api.Cache.Enabled {
-			cache.CacheStore.Set(entity, hash, response)
-		}
-
-		return
+	if postReadHooks {
+		applyPostReadHooks(hooks, entity, data)
 	}
 
 	fields := api_storage.ParseFieldsParam(fieldsParam)
@@ -129,7 +170,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(response)
 
-	if globals.GetConfig().Api.Cache.Enabled {
+	if globals.GetConfig().Api.Cache.Enabled && hash != nil {
 		cache.CacheStore.Set(entity, hash, response)
 	}
 }

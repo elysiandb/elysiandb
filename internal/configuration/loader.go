@@ -95,7 +95,9 @@ type ApiConfig struct {
 }
 
 type HooksConfig struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled         bool `yaml:"enabled"`
+	TimeoutMs       int  `yaml:"timeoutMs"`
+	RequestBudgetMs int  `yaml:"requestBudgetMs"`
 }
 
 type ApiIndexConfig struct {
@@ -105,6 +107,8 @@ type ApiIndexConfig struct {
 type ApiCacheConfig struct {
 	Enabled                bool `yaml:"enabled"`
 	CleanupIntervalSeconds int  `yaml:"cleanupIntervalSeconds"`
+	MaxMB                  int  `yaml:"maxMB"`
+	MaxEntryKB             int  `yaml:"maxEntryKB"`
 }
 
 type EngineConfig struct {

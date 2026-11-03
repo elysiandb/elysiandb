@@ -196,3 +196,37 @@ func FilterListOfEntities(username, entity string, data []map[string]any) []map[
 
 	return filteredData
 }
+
+type ReadMode int
+
+const (
+	ReadAll ReadMode = iota
+	ReadNone
+	ReadOwned
+)
+
+func ReadModeFor(username, entity string) ReadMode {
+	if !security.UserAuthenticationIsEnabled() {
+		return ReadAll
+	}
+
+	acl := GetACLEntityForUsername(entity, username)
+	if acl == nil {
+		return ReadNone
+	}
+
+	if acl.Can(PermissionRead) {
+		return ReadAll
+	}
+
+	if acl.Can(PermissionOwningRead) {
+		return ReadOwned
+	}
+
+	return ReadNone
+}
+
+func OwnedBy(data map[string]any, username string) bool {
+	owner, ok := data[UsernameField].(string)
+	return ok && owner != "" && owner == username
+}

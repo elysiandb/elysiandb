@@ -4,40 +4,17 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/taymour/elysiandb/internal/docpath"
 	engine "github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 )
 
 func GetPostReadHooksForEntity(entity string) []Hook {
-	hooks, err := GetHooksForEntity(entity)
-	if err != nil {
-		return []Hook{}
-	}
-
-	postReadHooks := make([]Hook, 0)
-	for _, hook := range hooks {
-		if hook.Event == HookEventPostRead {
-			postReadHooks = append(postReadHooks, hook)
-		}
-	}
-
-	return postReadHooks
+	return hooksForEvent(entity, HookEventPostRead)
 }
 
 func GetPreReadHooksForEntity(entity string) []Hook {
-	hooks, err := GetHooksForEntity(entity)
-	if err != nil {
-		return []Hook{}
-	}
-
-	preReadHooks := make([]Hook, 0)
-	for _, hook := range hooks {
-		if hook.Event == HookEventPreRead {
-			preReadHooks = append(preReadHooks, hook)
-		}
-	}
-
-	return preReadHooks
+	return hooksForEvent(entity, HookEventPreRead)
 }
 
 func CreateHook(hook *Hook) error {
@@ -119,98 +96,29 @@ func EntityHasHooks(entity string) bool {
 		return false
 	}
 
-	filters := map[string]map[string]string{
-		"entity": {
-			"eq": entity,
-		},
+	return len(hooksForEntity(entity)) > 0
+}
+
+func entityHasHooksFor(entity, event string) bool {
+	for _, h := range hooksForEntity(entity) {
+		if docpath.MatchGlob(event, h.Event) {
+			return true
+		}
 	}
 
-	data := engine.ListEntities(
-		HookEntity,
-		0,
-		0,
-		"priority",
-		true,
-		filters,
-		"",
-		"",
-	)
-
-	return len(data) > 0
+	return false
 }
 
 func EntityHasPostReadHooks(entity string) bool {
-	filters := map[string]map[string]string{
-		"entity": {
-			"eq": entity,
-		},
-		"event": {
-			"eq": HookEventPostRead,
-		},
-	}
-
-	data := engine.ListEntities(
-		HookEntity,
-		0,
-		0,
-		"priority",
-		true,
-		filters,
-		"",
-		"",
-	)
-
-	return len(data) > 0
+	return entityHasHooksFor(entity, HookEventPostRead)
 }
 
 func EntityHasPreReadHooks(entity string) bool {
-	filters := map[string]map[string]string{
-		"entity": {
-			"eq": entity,
-		},
-		"event": {
-			"eq": HookEventPreRead,
-		},
-	}
-
-	data := engine.ListEntities(
-		HookEntity,
-		0,
-		0,
-		"priority",
-		true,
-		filters,
-		"",
-		"",
-	)
-
-	return len(data) > 0
+	return entityHasHooksFor(entity, HookEventPreRead)
 }
 
 func GetHooksForEntity(entity string) ([]Hook, error) {
-	filters := map[string]map[string]string{
-		"entity": {
-			"eq": entity,
-		},
-	}
+	list := hooksForEntity(entity)
 
-	data := engine.ListEntities(
-		HookEntity,
-		0,
-		0,
-		"priority",
-		true,
-		filters,
-		"",
-		"",
-	)
-
-	hooks := make([]Hook, 0, len(data))
-	for _, item := range data {
-		var hook Hook
-		hook.FromDataMap(item)
-		hooks = append(hooks, hook)
-	}
-
-	return hooks, nil
+	return append(make([]Hook, 0, len(list)), list...), nil
 }

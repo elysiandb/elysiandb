@@ -193,7 +193,10 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	preReadHooks := globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPreReadHooks(payload.Entity)
+	hooksEnabled := globals.GetConfig().Api.Hooks.Enabled
+	preReadHooks := hooksEnabled && hook.EntityHasPreReadHooks(payload.Entity)
+	postReadHooks := hooksEnabled && hook.EntityHasPostReadHooks(payload.Entity)
+	hooks := hook.NewRequest(currentUser)
 
 	q := query.Query{
 		Entity:    payload.Entity,
@@ -205,6 +208,42 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 	}
 
 	filterAfterHooks := preReadHooks && !api_storage.QueryFilterIsEmpty(filter)
+	fields := api_storage.ParseFieldsParam(payload.Fields)
+
+	if engine.IsEngineInternal() && !filterAfterHooks {
+		mode := acl.ReadModeFor(currentUser, payload.Entity)
+		if payload.CountOnly {
+			res := api_storage.PlanQuery(q, mode != acl.ReadOwned)
+			writeCount(ctx, countPlanned(res, q.Offset > 0 || q.Limit > 0 || len(q.OrderedSorts()) > 0, mode, currentUser), payload.Entity, hash)
+			return
+		}
+
+		if len(fields) == 0 && !preReadHooks && !postReadHooks && mode == acl.ReadAll {
+			res := api_storage.PlanQuery(q, false)
+			if err := writeDocuments(ctx, res.Docs, payload.Entity, hash, false); err != nil {
+				observe.SetError(ctx, err)
+				ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+			}
+
+			return
+		}
+	}
+
+	if filterAfterHooks && engine.IsEngineInternal() {
+		all := q
+		all.Offset, all.Limit = 0, 0
+		all.Filter = query.FilterNode{Leaf: map[string]map[string]string{}}
+		res := api_storage.PlanQuery(all, false)
+		stored := func(item map[string]any) bool {
+			return len(api_storage.ApplyStoredQueryFilter([]map[string]any{item}, filter)) == 1
+		}
+		matches := func(item map[string]any) bool { return api_storage.QueryFilterMatchesEntity(filter, item) }
+		candidates := api_storage.StoredCandidates(res.Snapshot(), nil, &filter, "")
+		data := lazyPreReadPage(hooks, payload.Entity, res, "", stored, candidates, acl.ReadModeFor(currentUser, payload.Entity), currentUser, matches, payload.Offset, payload.Limit)
+		finishQuery(ctx, payload, data, hooks, postReadHooks, fields, hash)
+		return
+	}
+
 	if filterAfterHooks {
 		q.Offset = 0
 		q.Limit = 0
@@ -226,36 +265,26 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 
 	if filterAfterHooks {
 		matches := func(item map[string]any) bool { return api_storage.QueryFilterMatchesEntity(filter, item) }
-		data = applyPreReadHooksAndFilter(currentUser, payload.Entity, data, matches, payload.Offset, payload.Limit)
-	} else if preReadHooks {
+		data = applyPreReadHooksAndFilter(hooks, payload.Entity, data, matches, payload.Offset, payload.Limit)
+	} else if preReadHooks && !payload.CountOnly {
 		for i, item := range data {
-			data[i] = hook.ApplyPreReadHooksForEntity(currentUser, payload.Entity, item)
+			data[i] = hooks.PreRead(payload.Entity, item)
 		}
 	}
 
-	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(payload.Entity) {
-		for i, item := range data {
-			data[i] = hook.ApplyPostReadHooksForEntity(currentUser, payload.Entity, item)
-		}
-	}
+	finishQuery(ctx, payload, data, hooks, postReadHooks, fields, hash)
+}
 
+func finishQuery(ctx *fasthttp.RequestCtx, payload QueryPayload, data []map[string]any, hooks *hook.Request, postReadHooks bool, fields []string, hash []byte) {
 	if payload.CountOnly {
-		countResult := int64(len(data))
-		response := []byte(`{"count":` + fmt.Sprintf("%d", countResult) + `}`)
-
-		ctx.Response.Header.Set("Content-Type", "application/json")
-		ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
-		ctx.SetStatusCode(fasthttp.StatusOK)
-		ctx.SetBody(response)
-
-		if globals.GetConfig().Api.Cache.Enabled {
-			cache.CacheStore.Set(payload.Entity, hash, response)
-		}
-
+		writeCount(ctx, len(data), payload.Entity, hash)
 		return
 	}
 
-	fields := api_storage.ParseFieldsParam(payload.Fields)
+	if postReadHooks {
+		applyPostReadHooks(hooks, payload.Entity, data)
+	}
+
 	if len(fields) > 0 {
 		filteredData := make([]map[string]any, len(data))
 		for i, item := range data {
@@ -275,7 +304,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 	ctx.SetBody(responseBody)
 	ctx.SetStatusCode(fasthttp.StatusOK)
 
-	if globals.GetConfig().Api.Cache.Enabled {
+	if globals.GetConfig().Api.Cache.Enabled && hash != nil {
 		cache.CacheStore.Set(payload.Entity, hash, responseBody)
 	}
 }

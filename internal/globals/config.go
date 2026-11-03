@@ -1,28 +1,19 @@
 package globals
 
 import (
-	"sync"
+	"sync/atomic"
 
 	"github.com/taymour/elysiandb/internal/configuration"
 )
 
-var (
-	mu  sync.RWMutex
-	cfg *configuration.Config
-)
+var cfg atomic.Pointer[configuration.Config]
 
 func SetConfig(c *configuration.Config) {
-	mu.Lock()
-	cfg = c
-	mu.Unlock()
+	cfg.Store(c)
 }
 
 func GetConfig() *configuration.Config {
-	mu.RLock()
-	c := cfg
-	mu.RUnlock()
-
-	return c
+	return cfg.Load()
 }
 
 func GetEngine() string {

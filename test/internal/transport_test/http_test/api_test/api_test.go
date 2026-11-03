@@ -31,7 +31,7 @@ func setup(t *testing.T) {
 	storage.LoadDB()
 	storage.LoadJsonDB()
 
-	cache.InitCache(30)
+	cache.InitCache(30 * time.Second)
 	api_storage.DeleteAll()
 }
 

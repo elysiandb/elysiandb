@@ -825,3 +825,106 @@ func decodeMap(b []byte) map[string]any {
 
 	return doc
 }
+
+type SeqFilter func(seq uint32) bool
+
+func (p *planner) storedLeaf(field string, ops map[string]string) SeqFilter {
+	if p.affectedByIncludes(field) {
+		return nil
+	}
+
+	view, ok := p.index(datastore.IndexSpec{Kind: datastore.IndexFilter, Field: field})
+	if !ok {
+		return nil
+	}
+
+	present := &datastore.Bitset{}
+	key := []byte{datastore.KeyPresent}
+	collect(view, key, afterTerm(key), present, nil)
+
+	c := p.leaf(field, ops)
+	if c.all {
+		return nil
+	}
+
+	return func(seq uint32) bool {
+		return !present.Has(seq) || c.set.Has(seq)
+	}
+}
+
+func (p *planner) storedFields(filters map[string]map[string]string) SeqFilter {
+	var parts []SeqFilter
+	for field, ops := range filters {
+		if f := p.storedLeaf(field, ops); f != nil {
+			parts = append(parts, f)
+		}
+	}
+
+	if len(parts) == 0 {
+		return nil
+	}
+
+	return func(seq uint32) bool {
+		for _, f := range parts {
+			if !f(seq) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func (p *planner) storedNode(n query.FilterNode) SeqFilter {
+	if n.Leaf != nil {
+		return p.storedFields(n.Leaf)
+	}
+
+	children := n.And
+	isAnd := true
+	if len(children) == 0 {
+		children = n.Or
+		isAnd = false
+	}
+
+	if len(children) == 0 {
+		return func(uint32) bool { return false }
+	}
+
+	parts := make([]SeqFilter, 0, len(children))
+	for _, child := range children {
+		f := p.storedNode(child)
+		if f == nil && !isAnd {
+			return nil
+		}
+		if f != nil {
+			parts = append(parts, f)
+		}
+	}
+
+	if len(parts) == 0 {
+		return nil
+	}
+
+	return func(seq uint32) bool {
+		for _, f := range parts {
+			if f(seq) == !isAnd {
+				return !isAnd
+			}
+		}
+		return isAnd
+	}
+}
+
+func StoredCandidates(snap *datastore.Snapshot, filters map[string]map[string]string, node *query.FilterNode, includes string) SeqFilter {
+	e := db()
+	if e == nil || snap == nil {
+		return nil
+	}
+
+	p := &planner{e: e, snap: snap, refs: snap.Refs(), inc: includes != ""}
+	if node != nil {
+		return p.storedNode(*node)
+	}
+
+	return p.storedFields(filters)
+}

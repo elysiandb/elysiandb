@@ -231,6 +231,17 @@ func ObserveHook(id, entity, phase string, d time.Duration, err error) {
 	}
 }
 
+func ObserveHookQuery(id, entity, phase string, rows int, cacheHit bool) {
+	v, _ := hookStats.LoadOrStore(id, &hookStat{id: id, entity: entity, phase: phase})
+
+	hs := v.(*hookStat)
+	hs.queries.Add(1)
+	hs.rowsRead.Add(uint64(rows))
+	if cacheHit {
+		hs.cacheHits.Add(1)
+	}
+}
+
 type persistenceState struct {
 	mu            sync.Mutex
 	targets       map[string]bool
@@ -448,6 +459,9 @@ type hookStat struct {
 	entity      string
 	phase       string
 	executions  atomic.Uint64
+	queries     atomic.Uint64
+	rowsRead    atomic.Uint64
+	cacheHits   atomic.Uint64
 	errors      atomic.Uint64
 	totalNanos  atomic.Uint64
 	latency     Histogram
@@ -461,6 +475,9 @@ type HookSummary struct {
 	Entity      string     `json:"entity"`
 	Phase       string     `json:"phase"`
 	Executions  uint64     `json:"executions"`
+	Queries     uint64     `json:"queries"`
+	RowsRead    uint64     `json:"rows_read"`
+	CacheHits   uint64     `json:"query_cache_hits"`
 	Errors      uint64     `json:"errors"`
 	AvgMs       *Number    `json:"avg_ms"`
 	P95Ms       *Number    `json:"p95_ms"`
@@ -478,6 +495,9 @@ func hookSummaries() []HookSummary {
 			Entity:     h.entity,
 			Phase:      h.phase,
 			Executions: executions,
+			Queries:    h.queries.Load(),
+			RowsRead:   h.rowsRead.Load(),
+			CacheHits:  h.cacheHits.Load(),
 			Errors:     h.errors.Load(),
 			P95Ms:      num(h.latency.snapshot().quantile(0.95)),
 		}
