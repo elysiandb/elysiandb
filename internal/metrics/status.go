@@ -117,12 +117,7 @@ func (s *sampler) evaluate(now time.Time) []Problem {
 	slow := s.slow
 	backlogFrom := s.backlogFrom
 	prev, cur := s.window(recentFailureWindow)
-	sources := s.sources
 	s.mu.RUnlock()
-
-	if sources.MongoPing != nil && slow.mongoErr != nil {
-		problems = append(problems, Problem{Code: "mongodb_unreachable", Severity: SeverityCritical})
-	}
 
 	if prev != nil && cur != nil {
 		requests := counterDelta(prev, cur, cHTTP)

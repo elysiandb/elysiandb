@@ -8,7 +8,7 @@
 
 ElysianDB is a self-contained backend engine that turns raw JSON into a usable, queryable API in seconds.
 
-It combines automatic REST API generation, advanced querying and indexing, authentication, ACLs, hooks, and optional KV and TCP interfaces into a single fast Go binary, while supporting multiple storage backends through a pluggable engine system.
+It combines automatic REST API generation, advanced querying and indexing, authentication, ACLs, hooks, and optional KV and TCP interfaces into a single fast Go binary, with an embedded storage engine built on Pebble.
 
 The goal is simple: remove backend boilerplate so you can focus on shipping features instead of infrastructure.
 
@@ -26,63 +26,17 @@ Here is a related and explicative article https://dev.to/taymour/why-i-built-ely
 
 ## Storage Engine
 
-ElysianDB uses a **pluggable storage engine abstraction** that cleanly separates API logic from the underlying persistence layer.
-
-Its goal is for the REST API, Query API, ACLs, hooks, transactions, and Admin UI to work identically regardless of the selected engine. The `internal` engine is the default and recommended one. The `mongodb` engine is in beta and does not reach that goal yet.
-
-The storage engine is selected at startup via configuration:
-
-```yaml
-engine:
-  name: internal
-```
-
-### Available Engines
-
-**internal (default, recommended)**
-
-The `internal` engine is the storage engine shipped with ElysianDB, designed together with its API. It provides:
-
-* An append-only log that holds the data, with group commit, checkpoints and background compaction
-* Copy-on-write entity state: reads never wait for writes
-* Indexes for sorts, filters, search and references, built when first needed
-* Streamed responses and a memory budget
-* Very high throughput and low latency
-* Full compatibility with all ElysianDB features
-
-This engine is production-ready and optimized for speed, prototyping, and controlled workloads. It is the recommended engine.
-
-**mongodb (beta)**
-
-> **Beta.** The `mongodb` engine is not yet fully functional and is not interchangeable with the `internal` engine: switching engines can change behavior. The remaining work is tracked in [#167](https://github.com/elysiandb/elysiandb/issues/167) and [#164](https://github.com/elysiandb/elysiandb/issues/164). Use the `internal` engine unless you are testing MongoDB support.
-
-The `mongodb` engine allows ElysianDB to run on top of MongoDB. It aims to offer the same API surface and behavior as the `internal` engine.
+ElysianDB stores everything in its `internal` engine, designed together with its API: it knows entities, insertion order, references, schemas, the filter language and hooks. The engine keeps this design and delegates the disk and memory mechanics to [Pebble](https://github.com/cockroachdb/pebble), the embedded key-value store of CockroachDB, written in pure Go: the binary stays a single static file, with no service to run next to it.
 
 It provides:
 
-* Persistence backed by MongoDB
-* Durability and scalability handled by MongoDB deployments
+* Documents in insertion order, an id directory, and indexes for sorts, filters, search and references, built when first needed and kept up to date by every write
+* Atomic writes: a request, a transaction or a batch of documents is one Pebble batch, written to the write-ahead log before the answer
+* Snapshot reads that never wait for writes, and updates checked for conflicts so that no update is lost
+* A memory budget that bounds the whole process: Pebble's block cache and memtables, index builds, request memory and the API cache
+* Full compatibility with all ElysianDB features (REST API, Query API, ACLs, hooks, transactions, Admin UI)
 
-Example configuration:
-
-```yaml
-engine:
-  name: mongodb
-  uri: mongodb://elysian:elysian@localhost:27017/elysiandb
-```
-
-The MongoDB engine is designed for users who want ElysianDB’s API and query model while relying on an external database for storage, replication, or operational constraints.
-
-### Future Engines
-
-The engine abstraction is designed to support additional backends in the future, such as:
-
-* Alternative persistence models
-* Embedded databases
-* Specialized engines optimized for specific workloads
-* Experimental or in-memory–only backends
-
-All engines are selected using the same configuration mechanism.
+Data folders written by ElysianDB 0.2.4 and by earlier builds of the internal engine are migrated at the first start, without any action. The MongoDB engine has been removed. See [Migrating to the Pebble storage](docs/migration-pebble.md).
 
 ## What You Get Out of the Box
 
@@ -137,11 +91,9 @@ Queries are deterministic, type-aware, and executed predictably, making them eas
 
 ElysianDB is designed for low latency and high throughput.
 
-With the internal engine, paged, filtered, sorted, counted and searched requests use indexes and cost about the same on 1,000 or 60,000 documents, and writes are grouped into a few disk writes.
+Paged, filtered, sorted, counted and searched requests use indexes and cost about the same on 1,000 or 60,000 documents, and writes are grouped into a few disk writes.
 
 On a MacBook Pro M4, mixed workloads with CRUD, filtering, sorting, nested writes, and includes reach tens of thousands of requests per second with sub-millisecond latencies under moderate load.
-
-With the MongoDB engine, which is in beta, performance is bounded by MongoDB and network latency.
 
 These are real API scenarios, not synthetic microbenchmarks.
 
@@ -207,7 +159,7 @@ go run elysiandb.go server
 
 * With `security.authentication.enabled`, every HTTP route except `/health` and every TCP command except `PING`, `EXIT` and `AUTH` requires credentials. TCP clients authenticate with `AUTH <token>` or `AUTH <username> <password>`.
 * Browsers on another origin can only call the API when that origin is listed in `server.http.cors.allowedOrigins` (empty by default).
-* `GET /config` redacts the token and the database password.
+* `GET /config` redacts the token and the password of `engine.uri`.
 
 See the [documentation](docs/index.md) for the details.
 
@@ -225,6 +177,6 @@ What you send is what you get.
 
 ElysianDB is actively developed and evolving.
 
-The internal engine is the recommended one. The MongoDB engine is in beta: it is not yet fully functional, and the work to make it interchangeable with the internal engine is tracked in [#167](https://github.com/elysiandb/elysiandb/issues/167) and [#164](https://github.com/elysiandb/elysiandb/issues/164).
+Upgrading from an earlier version needs no change: see [Migrating to the Pebble storage](docs/migration-pebble.md).
 
 Feedback, issues, and contributions are welcome.

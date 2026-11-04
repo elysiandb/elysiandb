@@ -6,7 +6,8 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/taymour/elysiandb/internal/engine"
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/schema"
@@ -140,12 +141,12 @@ func ACLEntitySchema() map[string]any {
 }
 
 func InitACLStorage() {
-	if !engine.EntityTypeExists(ACLEntity) {
-		engine.AddEntityType(ACLEntity)
+	if !api_storage.EntityTypeExists(ACLEntity) {
+		api_storage.AddEntityType(ACLEntity)
 	}
 
-	if !schema.IsManualSchema(ACLEntity, engine.GetEntitySchema(ACLEntity)) {
-		engine.UpdateEntitySchema(ACLEntity, ACLEntitySchema())
+	if !schema.IsManualSchema(ACLEntity, api_storage.GetEntitySchema(ACLEntity)) {
+		api_storage.UpdateEntitySchema(ACLEntity, ACLEntitySchema())
 	}
 }
 
@@ -153,13 +154,13 @@ var lastSignature atomic.Value
 
 func aclSignature() string {
 	e := storage.Engine()
-	if e == nil || !engine.IsEngineInternal() {
+	if e == nil {
 		return ""
 	}
 
 	version := func(entity string) string {
-		snap := e.Snapshot(entity)
-		return fmt.Sprintf("%d.%d", snap.Generation(), snap.Version())
+		gen, ver := e.EntityVersion(entity)
+		return fmt.Sprintf("%d.%d", gen, ver)
 	}
 
 	return e.Folder() + "|" + version(security.UserEntity) + "|" + version(ACLEntity) + "|" + version(schema.SchemaEntity) + "|" + strings.Join(e.Types(), "\x00")
@@ -191,7 +192,7 @@ func saveACLList(acls []ACL) error {
 	var errs []error
 	for _, acl := range acls {
 		id := GetACLEntityId(acl.Username, acl.Entity)
-		if engine.EntityExists(ACLEntity, id) {
+		if api_storage.EntityExists(ACLEntity, id) {
 			continue
 		}
 
@@ -204,7 +205,7 @@ func saveACLList(acls []ACL) error {
 }
 
 func writeACL(a *ACL) error {
-	validationErrors := engine.WriteEntity(ACLEntity, a.ToDataMap())
+	validationErrors := api_storage.WriteEntity(ACLEntity, a.ToDataMap())
 	if len(validationErrors) == 0 {
 		return nil
 	}
@@ -225,7 +226,7 @@ func GenerateACLFoAllrEntities() []ACL {
 		return acls
 	}
 
-	entities := engine.ListPublicEntityTypes()
+	entities := api_storage.ListPublicEntityTypes()
 
 	for _, user := range users {
 		username, ok1 := user["username"].(string)
@@ -253,7 +254,7 @@ func GetACLEntityId(username, entity string) string {
 }
 
 func GetACLEntityForUsername(entity, username string) *ACL {
-	data := engine.ReadEntityById(ACLEntity, GetACLEntityId(username, entity))
+	data := api_storage.ReadEntityById(ACLEntity, GetACLEntityId(username, entity))
 	if data == nil {
 		return nil
 	}
@@ -306,12 +307,12 @@ func StringToPermission(s string) (Permission, bool) {
 }
 
 func DeleteUserACls(username string) error {
-	entities := engine.ListPublicEntityTypes()
+	entities := api_storage.ListPublicEntityTypes()
 
 	for _, entity := range entities {
 		id := GetACLEntityId(username, entity)
-		if engine.EntityExists(ACLEntity, id) {
-			engine.DeleteEntityById(ACLEntity, id)
+		if api_storage.EntityExists(ACLEntity, id) {
+			api_storage.DeleteEntityById(ACLEntity, id)
 		}
 	}
 
@@ -331,8 +332,8 @@ func DeleteACLForEntityType(entity string) error {
 		}
 
 		id := GetACLEntityId(username, entity)
-		if engine.EntityExists(ACLEntity, id) {
-			engine.DeleteEntityById(ACLEntity, id)
+		if api_storage.EntityExists(ACLEntity, id) {
+			api_storage.DeleteEntityById(ACLEntity, id)
 		}
 	}
 

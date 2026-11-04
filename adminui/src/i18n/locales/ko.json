@@ -190,7 +190,6 @@
         "problems": {
             "flush_failing": "마지막 디스크 쓰기에 실패했습니다",
             "recovery_write_failing": "최근 5분 동안 복구 로그 쓰기에 실패했습니다",
-            "mongodb_unreachable": "MongoDB에 연결할 수 없습니다",
             "error_rate_high": "최근 5분 동안 요청의 1% 이상이 실패했습니다",
             "latency_high": "p95 지연 시간이 5분 동안 느린 요청 임계값을 넘었습니다",
             "hook_failing": "훅 {hook_id}이(가) 최근 5분 동안 실패했습니다",
@@ -246,8 +245,7 @@
             "dataFolder": "데이터 폴더"
         },
         "engines": {
-            "internal": "내부",
-            "mongodb": "MongoDB (베타)"
+            "internal": "내부"
         },
         "features": {
             "cache": "API 캐시",
@@ -278,8 +276,7 @@
             "persistence": "영속성",
             "runtime": "런타임",
             "connections": "연결",
-            "hooks": "훅",
-            "mongodb": "MongoDB"
+            "hooks": "훅"
         },
         "tabs": {
             "data": "데이터",
@@ -320,10 +317,7 @@
             "transactions": "열린 트랜잭션",
             "oldestTransaction": "가장 오래된 열린 트랜잭션",
             "hookExecutions": "초당 훅 실행 수",
-            "hookDuration": "훅 실행 시간 (p95)",
-            "mongoPing": "MongoDB ping",
-            "mongoErrors": "분당 MongoDB 오류 수",
-            "mongoPool": "사용 중인 MongoDB 풀 연결"
+            "hookDuration": "훅 실행 시간 (p95)"
         },
         "series": {
             "http": "HTTP",
@@ -377,8 +371,6 @@
             "openTransactions": "트랜잭션",
             "oldestTransaction": "경과 시간",
             "executions": "실행 수",
-            "ping": "Ping",
-            "poolInUse": "사용 중",
             "logSinceCheckpoint": "마지막 체크포인트 이후",
             "logBytes": "디스크의 로그",
             "liveBytes": "유효한 데이터"

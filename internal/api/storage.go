@@ -278,17 +278,12 @@ func ReadEntityById(entity, id string) map[string]any {
 		return nil
 	}
 
-	doc, ok := e.Snapshot(entity).Get(id)
+	b, ok := e.Read(entity, id)
 	if !ok {
 		return nil
 	}
 
-	data, err := doc.Decode()
-	if err != nil {
-		return nil
-	}
-
-	return data
+	return decodeMap(b)
 }
 
 func ReadEntityBytesById(entity, id string) ([]byte, bool) {
@@ -297,14 +292,7 @@ func ReadEntityBytesById(entity, id string) ([]byte, bool) {
 		return nil, false
 	}
 
-	doc, ok := e.Snapshot(entity).Get(id)
-	if !ok {
-		return nil, false
-	}
-
-	b, err := doc.Bytes()
-
-	return b, err == nil
+	return e.Read(entity, id)
 }
 
 func ListEntities(
@@ -374,22 +362,6 @@ func ApplyFiltersToList(
 	}
 
 	return filtered
-}
-
-func ApplyStoredFiltersToList(
-	entities []map[string]any,
-	filters map[string]map[string]string,
-	offset int,
-	limit int,
-) []map[string]any {
-	filtered := make([]map[string]any, 0, len(entities))
-	for _, e := range entities {
-		if StoredFiltersMatchEntity(e, filters) {
-			filtered = append(filtered, e)
-		}
-	}
-
-	return applyOffsetLimit(filtered, offset, limit)
 }
 
 func Paginate(entities []map[string]any, offset, limit int) []map[string]any {
@@ -533,7 +505,7 @@ func EntityExists(entity, id string) bool {
 		return false
 	}
 
-	_, ok := e.Snapshot(entity).Get(id)
+	_, ok := e.Read(entity, id)
 
 	return ok
 }
@@ -544,7 +516,7 @@ func CountEntities(entity string) int {
 		return 0
 	}
 
-	return e.Snapshot(entity).Len()
+	return e.Count(entity)
 }
 
 func CountEntitiesPerType() map[string]int {
@@ -682,6 +654,13 @@ func CommitBatch(ops []BatchOperation) error {
 			}
 		}
 
+		return nil
+	})
+}
+
+func WipeAll() error {
+	return update(func(tx *datastore.Tx) error {
+		tx.ClearAll()
 		return nil
 	})
 }

@@ -1,10 +1,12 @@
 package datastore
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sort"
 	"sync"
@@ -12,14 +14,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/taymour/elysiandb/internal/journal"
+	"github.com/cockroachdb/pebble/v2"
+	"github.com/cockroachdb/pebble/v2/bloom"
 	"github.com/taymour/elysiandb/internal/log"
 )
 
 const (
 	LockFile     = "elysiandb.lock"
-	LogFolder    = "log"
-	ManifestFile = "MANIFEST"
+	PebbleFolder = "pebble"
+	storeFormat  = 3
 )
 
 var (
@@ -29,23 +32,35 @@ var (
 	engineLog   = log.For("storage")
 )
 
+type Durability int
+
+const (
+	DurabilityBackground Durability = iota
+	DurabilityWrite
+	DurabilitySync
+)
+
+const (
+	defaultCacheBytes    = 256 << 20
+	defaultMemTableBytes = 64 << 20
+	minMemTableBytes     = 4 << 20
+	defaultBuildBytes    = 16 << 20
+)
+
 type Options struct {
-	Folder          string
-	Shards          int
-	Durability      journal.Mode
-	FlushInterval   time.Duration
-	CheckpointEvery time.Duration
-	MaxLogBytes     int64
-	CacheBytes      int64
-	PageCacheBytes  int64
-	PageSegmentSize int64
-	IndexWorkers    int
-	Background      bool
-	SegmentSize     int64
-	FS              journal.FS
-	LegacyRecovery  bool
-	OnKVExpired     func(n int)
-	OnWriteError    func(err error)
+	Folder         string
+	Shards         int
+	Durability     Durability
+	FlushInterval  time.Duration
+	CacheBytes     int64
+	MemTableBytes  int64
+	BuildBytes     int64
+	IndexWorkers   int
+	Background     bool
+	LegacyRecovery bool
+	OnKVExpired    func(n int)
+	OnWriteError   func(err error)
+	MemoryPressure func() bool
 }
 
 var engineInstances atomic.Uint64
@@ -55,45 +70,50 @@ type Engine struct {
 	opts     Options
 	dir      string
 	lock     *os.File
-	j        *journal.Journal
-	inline   bool
-	cache    *valueCache
-	pages    *pageStore
-	live     liveBytes
+	db       *pebble.DB
+	fs       *walFS
+	cache    *pebble.Cache
 
 	catalogMu sync.RWMutex
 	entities  map[string]*entity
 	types     []string
 	typesMu   sync.Mutex
+	nextID    atomic.Uint32
+	lsn       atomic.Uint64
+	commits   atomic.Uint64
 
-	kv *kvStore
+	kv *kvState
 
-	ckptMu          sync.Mutex
-	ckState         atomic.Pointer[checkpointState]
-	checkpointBytes atomic.Int64
-	segmentLive     atomic.Pointer[map[uint32]int64]
+	pinsMu  sync.Mutex
+	pins    map[*pin]struct{}
+	current *pin
 
-	builds       chan *entity
-	buildOrder   atomic.Uint64
-	upgradeFrom  int
-	pageRemoval  []uint32
-	lastPageWalk time.Time
-	stop         chan struct{}
-	wg           sync.WaitGroup
-	closed       atomic.Bool
-	writers      sync.WaitGroup
-	migrated     *MigrationReport
+	builds     chan *entity
+	buildOrder atomic.Uint64
+	compacts   chan [2][]byte
+	stop       chan struct{}
+	wg         sync.WaitGroup
+	closed     atomic.Bool
+	writers    gate
+	ctx        context.Context
+	cancel     context.CancelFunc
+	migrated   *MigrationReport
+	unclean    bool
+	walBytes   int64
 
 	stats engineStats
 }
 
 type engineStats struct {
-	checkpoints       atomic.Int64
-	checkpointNanos   atomic.Int64
-	compactedSegments atomic.Int64
-	compactedBytes    atomic.Int64
-	conflicts         atomic.Int64
-	replayedRecords   atomic.Int64
+	conflicts      atomic.Int64
+	flushes        atomic.Int64
+	flushNanos     atomic.Int64
+	writeStalls    atomic.Int64
+	stalled        atomic.Bool
+	stallStart     atomic.Int64
+	stallNanos     atomic.Int64
+	builtDocs      atomic.Int64
+	backgroundErrs atomic.Int64
 }
 
 func Open(opts Options) (*Engine, error) {
@@ -103,6 +123,19 @@ func Open(opts Options) (*Engine, error) {
 
 	if opts.IndexWorkers <= 0 {
 		opts.IndexWorkers = 1
+	}
+
+	if opts.CacheBytes <= 0 {
+		opts.CacheBytes = defaultCacheBytes
+	}
+
+	if opts.MemTableBytes <= 0 {
+		opts.MemTableBytes = defaultMemTableBytes
+	}
+	opts.MemTableBytes = max(opts.MemTableBytes, minMemTableBytes)
+
+	if opts.BuildBytes <= 0 {
+		opts.BuildBytes = defaultBuildBytes
 	}
 
 	if err := os.MkdirAll(opts.Folder, 0o755); err != nil {
@@ -119,42 +152,35 @@ func Open(opts Options) (*Engine, error) {
 		opts:     opts,
 		dir:      opts.Folder,
 		lock:     lock,
-		inline:   opts.CacheBytes <= 0,
-		cache:    newValueCache(valueCacheLimit(opts.CacheBytes), 64),
 		entities: map[string]*entity{},
-		kv:       newKVStore(opts.Shards),
+		kv:       newKVState(opts.Shards),
+		pins:     map[*pin]struct{}{},
 		builds:   make(chan *entity, 1024),
+		compacts: make(chan [2][]byte, 64),
 		stop:     make(chan struct{}),
+	}
+	e.ctx, e.cancel = context.WithCancel(context.Background())
+
+	fail := func(err error) (*Engine, error) {
+		e.cancel()
+		e.unlock()
+		return nil, err
 	}
 
 	start := time.Now()
 	report, err := e.migrateIfNeeded()
 	if err != nil {
-		e.unlock()
-		return nil, err
+		return fail(err)
 	}
 	e.migrated = report
 
-	pages, err := openPageStore(filepath.Join(opts.Folder, PagesFolder), opts.PageCacheBytes, opts.PageSegmentSize)
-	if err != nil {
-		e.unlock()
-		return nil, err
+	if err := e.openDB(filepath.Join(opts.Folder, PebbleFolder)); err != nil {
+		return fail(err)
 	}
-	e.pages = pages
 
 	if err := e.load(); err != nil {
-		e.pages.close()
-		e.unlock()
-		return nil, err
-	}
-
-	if e.upgradeFrom != 0 {
-		if err := e.finishUpgrade(); err != nil {
-			e.j.Abandon()
-			e.pages.close()
-			e.unlock()
-			return nil, err
-		}
+		_ = e.closeDB()
+		return fail(err)
 	}
 
 	if opts.Background {
@@ -165,6 +191,8 @@ func Open(opts Options) (*Engine, error) {
 
 	return e, nil
 }
+
+const openMark = "open\n"
 
 func lockFolder(folder string) (*os.File, error) {
 	f, err := os.OpenFile(filepath.Join(folder, LockFile), os.O_CREATE|os.O_RDWR, 0o600)
@@ -177,7 +205,30 @@ func lockFolder(folder string) (*os.File, error) {
 		return nil, fmt.Errorf("%w (%s)", ErrLocked, folder)
 	}
 
+	_ = f.Chmod(0o600)
+
 	return f, nil
+}
+
+func (e *Engine) markOpen() (bool, error) {
+	buf := make([]byte, len(openMark))
+	n, _ := e.lock.ReadAt(buf, 0)
+	unclean := string(buf[:n]) == openMark
+
+	if _, err := e.lock.WriteAt([]byte(openMark), 0); err != nil {
+		return unclean, err
+	}
+
+	return unclean, e.lock.Sync()
+}
+
+func (e *Engine) markClosed() {
+	if e.lock == nil {
+		return
+	}
+
+	_ = e.lock.Truncate(0)
+	_ = e.lock.Sync()
 }
 
 func (e *Engine) unlock() {
@@ -188,88 +239,245 @@ func (e *Engine) unlock() {
 	}
 }
 
-func (e *Engine) Instance() uint64 {
-	return e.instance
+type pebbleLogger struct{}
+
+func (pebbleLogger) Infof(format string, args ...any) {
+	engineLog.Debug("pebble", "event", fmt.Sprintf(format, args...))
 }
 
-func (e *Engine) Folder() string {
-	return e.dir
+func (pebbleLogger) Errorf(format string, args ...any) {
+	engineLog.Error("pebble", "err", fmt.Sprintf(format, args...))
 }
 
-func (e *Engine) ReplayedRecords() int64 {
-	return e.stats.replayedRecords.Load()
+func (pebbleLogger) Fatalf(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	engineLog.Error("storage engine failure", "err", msg)
+	panic(msg)
 }
 
-func (e *Engine) Migration() *MigrationReport {
-	return e.migrated
+func pebbleOptions(e *Engine, cache *pebble.Cache, fs *walFS) *pebble.Options {
+	procs := runtime.GOMAXPROCS(0)
+	o := &pebble.Options{
+		Cache:                       cache,
+		FS:                          fs,
+		Merger:                      postingsMerger,
+		MemTableSize:                uint64(e.opts.MemTableBytes),
+		MemTableStopWritesThreshold: 4,
+		L0CompactionThreshold:       4,
+		L0StopWritesThreshold:       24,
+		LBaseMaxBytes:               64 << 20,
+		FormatMajorVersion:          pebble.FormatNewest,
+		Logger:                      pebbleLogger{},
+		CompactionConcurrencyRange: func() (int, int) {
+			return 1, max(2, procs/4)
+		},
+		EventListener: &pebble.EventListener{
+			FlushEnd:        e.onFlush,
+			BackgroundError: e.onBackgroundError,
+			WriteStallBegin: e.onStallBegin,
+			WriteStallEnd:   e.onStallEnd,
+			DiskSlow: func(info pebble.DiskSlowInfo) {
+				engineLog.Warn("slow disk", "path", info.Path, "duration_ms", info.Duration.Milliseconds())
+			},
+		},
+	}
+
+	for i := range o.Levels {
+		o.Levels[i].FilterPolicy = bloom.FilterPolicy(10)
+		o.Levels[i].FilterType = pebble.TableFilter
+	}
+
+	return o
 }
 
-func (e *Engine) journalOptions() journal.Options {
-	return journal.Options{
-		Mode:          e.opts.Durability,
-		FlushInterval: e.opts.FlushInterval,
-		SegmentSize:   e.opts.SegmentSize,
-		FS:            e.opts.FS,
-		OnWriteError:  e.opts.OnWriteError,
+func (e *Engine) openDB(dir string) error {
+	e.fs = newWALFS(e.opts.Durability != DurabilitySync)
+	e.cache = pebble.NewCache(e.opts.CacheBytes)
+	e.walBytes = walSize(dir)
+
+	db, err := pebble.Open(dir, pebbleOptions(e, e.cache, e.fs))
+	if err != nil {
+		e.cache.Unref()
+		return fmt.Errorf("cannot open the store in %s: %w", dir, err)
+	}
+	e.db = db
+	ownerOnlyTree(dir)
+
+	return nil
+}
+
+func walSize(dir string) int64 {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0
+	}
+
+	var n int64
+	for _, entry := range entries {
+		if filepath.Ext(entry.Name()) != ".log" {
+			continue
+		}
+		if info, err := entry.Info(); err == nil {
+			n += info.Size()
+		}
+	}
+
+	return n
+}
+
+func (e *Engine) closeDB() error {
+	e.closePins()
+	err := e.db.Close()
+	e.cache.Unref()
+
+	return err
+}
+
+func (e *Engine) onFlush(info pebble.FlushInfo) {
+	if info.Err != nil || info.Ingest {
+		return
+	}
+
+	e.stats.flushes.Add(1)
+	e.stats.flushNanos.Store(int64(info.TotalDuration))
+}
+
+func (e *Engine) onBackgroundError(err error) {
+	e.stats.backgroundErrs.Add(1)
+	if e.opts.OnWriteError != nil {
+		e.opts.OnWriteError(err)
+		return
+	}
+
+	engineLog.Error("background write failed", "err", err)
+}
+
+func (e *Engine) onStallBegin(pebble.WriteStallBeginInfo) {
+	e.stats.writeStalls.Add(1)
+	e.stats.stalled.Store(true)
+	e.stats.stallStart.Store(time.Now().UnixNano())
+}
+
+func (e *Engine) onStallEnd() {
+	if e.stats.stalled.Swap(false) {
+		e.stats.stallNanos.Add(time.Now().UnixNano() - e.stats.stallStart.Load())
 	}
 }
 
 func (e *Engine) load() error {
-	j, err := journal.Open(filepath.Join(e.dir, LogFolder), e.journalOptions())
-	if err != nil {
-		return err
-	}
-	e.j = j
-
-	m, err := readManifest(e.dir)
-	if err != nil {
-		return err
-	}
-
-	from := journal.Position{Segment: 1}
+	format, closer, err := e.db.Get(metaKey(metaFormat))
 	switch {
-	case m != nil && m.Format == manifestFormatPages:
-		if err := e.restorePages(m); err != nil {
+	case errors.Is(err, pebble.ErrNotFound):
+		if err := e.db.Set(metaKey(metaFormat), []byte{storeFormat}, pebble.Sync); err != nil {
 			return err
 		}
-
-		from = journal.Position{Segment: m.Segment, Offset: m.Offset}
-		e.ckState.Store(&checkpointState{pos: from, lsn: m.LSN})
-		e.j.SetNextLSN(m.LSN + 1)
-	case m != nil:
-		ck, err := readCheckpoint(filepath.Join(e.dir, m.Checkpoint))
-		if err != nil {
-			return fmt.Errorf("cannot read the checkpoint %s: %w", m.Checkpoint, err)
-		}
-
-		if err := e.restore(ck); err != nil {
+		if err := e.db.Flush(); err != nil {
 			return err
 		}
-
-		from = ck.pos
-		e.upgradeFrom = m.Format
-		e.ckState.Store(&checkpointState{pos: ck.pos, lsn: ck.lastLSN})
-		e.j.SetNextLSN(ck.lastLSN + 1)
+	case err != nil:
+		return err
+	default:
+		v := byte(0)
+		if len(format) > 0 {
+			v = format[0]
+		}
+		_ = closer.Close()
+		if v != storeFormat {
+			return fmt.Errorf("the store has format %d, this version reads format %d", v, storeFormat)
+		}
 	}
 
-	stats, err := e.j.Replay(from, func(recs []journal.Record) error {
-		e.applyBatch(recs, nil, true)
-		return nil
-	})
+	if raw, closer, err := e.db.Get(metaKey(metaTypes)); err == nil {
+		types, decodeErr := decodeTypes(raw)
+		_ = closer.Close()
+		if decodeErr != nil {
+			return decodeErr
+		}
+		e.types = types
+	} else if !errors.Is(err, pebble.ErrNotFound) {
+		return err
+	}
+
+	if err := e.loadEntities(); err != nil {
+		return err
+	}
+
+	if err := e.kv.load(e.db); err != nil {
+		return err
+	}
+
+	unclean, err := e.markOpen()
 	if err != nil {
-		return fmt.Errorf("cannot replay the log: %w", err)
+		return err
 	}
 
-	e.stats.replayedRecords.Store(int64(stats.Records))
-	if stats.Truncated > 0 {
-		engineLog.Warn("torn batch dropped at the end of the log", "bytes", stats.Truncated)
+	if unclean {
+		e.unclean = true
+		engineLog.Warn("unclean shutdown detected, log replayed", "wal_bytes", e.walBytes)
 	}
 
-	if stats.Records > 0 {
-		engineLog.Warn("unclean shutdown detected, log replayed", "batches", stats.Batches, "records", stats.Records)
+	return nil
+}
+
+func (e *Engine) loadEntities() error {
+	lower := []byte{familyMeta, metaEntity}
+	it, err := e.db.NewIter(&pebble.IterOptions{LowerBound: lower, UpperBound: prefixEnd(lower)})
+	if err != nil {
+		return err
 	}
 
-	e.j.Start()
+	var reset *pebble.Batch
+	maxID := uint32(0)
+	for it.First(); it.Valid(); it.Next() {
+		name := string(it.Key()[2:])
+		rec, err := decodeRecord(it.Value())
+		if err != nil {
+			_ = it.Close()
+			return fmt.Errorf("entity %q: %w", name, err)
+		}
+
+		changed := false
+		for _, m := range rec.indexes {
+			if m.state != stateBuilding {
+				continue
+			}
+
+			if reset == nil {
+				reset = e.db.NewBatch()
+			}
+			lo, hi := indexRange(rec.id, m.no)
+			_ = reset.DeleteRange(lo, hi, nil)
+			m.state = stateDormant
+			m.clear()
+			changed = true
+		}
+
+		if changed {
+			_ = reset.Set(entityMetaKey(name), encodeRecord(rec), nil)
+		}
+
+		ent := newEntity(name)
+		ent.rec.Store(rec)
+		e.entities[name] = ent
+		maxID = max(maxID, rec.id+1)
+		if rec.version > e.lsn.Load() {
+			e.lsn.Store(rec.version)
+		}
+	}
+
+	if err := it.Close(); err != nil {
+		return err
+	}
+
+	e.nextID.Store(maxID)
+
+	if reset != nil {
+		defer reset.Close()
+		if err := e.db.Apply(reset, pebble.Sync); err != nil {
+			return err
+		}
+		return e.db.Flush()
+	}
 
 	return nil
 }
@@ -279,10 +487,26 @@ func (e *Engine) startBackground() {
 	go e.expiryLoop()
 	go e.maintenanceLoop()
 	go e.buildLoop()
+}
 
-	if e.inline {
-		go e.warmValues()
-	}
+func (e *Engine) Instance() uint64 {
+	return e.instance
+}
+
+func (e *Engine) Folder() string {
+	return e.dir
+}
+
+func (e *Engine) Settings() Options {
+	return e.opts
+}
+
+func (e *Engine) UncleanShutdown() bool {
+	return e.unclean
+}
+
+func (e *Engine) Migration() *MigrationReport {
+	return e.migrated
 }
 
 func (e *Engine) Close() error {
@@ -291,25 +515,41 @@ func (e *Engine) Close() error {
 	}
 
 	close(e.stop)
+	e.cancel()
 	e.wg.Wait()
-	e.writers.Wait()
+	e.writers.shutAndWait()
 
 	var errs []error
-	if err := e.checkpoint(true); err != nil {
+	if _, err := os.Stat(filepath.Join(e.dir, PebbleFolder)); err != nil {
+		e.closeLost()
+		e.unlock()
+		return fmt.Errorf("the data folder %s is gone: %w", e.dir, err)
+	}
+
+	if err := e.db.Flush(); err != nil {
 		errs = append(errs, err)
 	}
 
-	if err := e.j.Close(); err != nil {
+	if err := e.closeDB(); err != nil {
 		errs = append(errs, err)
 	}
 
-	if err := e.pages.close(); err != nil {
-		errs = append(errs, err)
+	if len(errs) == 0 {
+		e.markClosed()
 	}
-
 	e.unlock()
 
 	return errors.Join(errs...)
+}
+
+func (e *Engine) closeLost() {
+	defer func() {
+		if r := recover(); r != nil {
+			engineLog.Debug("store closed after its folder was removed", "err", r)
+		}
+	}()
+
+	_ = e.closeDB()
 }
 
 func (e *Engine) Abandon() {
@@ -318,10 +558,52 @@ func (e *Engine) Abandon() {
 	}
 
 	close(e.stop)
+	e.cancel()
 	e.wg.Wait()
-	e.j.Abandon()
-	e.pages.close()
+	e.writers.shutAndWait()
+	e.closeLost()
 	e.unlock()
+}
+
+func (e *Engine) Checkpoint() error {
+	if !e.enter() {
+		return ErrClosed
+	}
+	defer e.leave()
+
+	if err := probeFolder(e.dir); err != nil {
+		return err
+	}
+
+	return e.syncLog()
+}
+
+func (e *Engine) syncLog() error {
+	if err := e.db.LogData(nil, pebble.Sync); err != nil {
+		return err
+	}
+
+	return e.fs.syncAll()
+}
+
+func probeFolder(dir string) error {
+	f, err := os.CreateTemp(dir, ".checkpoint-*")
+	if err != nil {
+		return fmt.Errorf("the data folder is not writable: %w", err)
+	}
+
+	name := f.Name()
+	_, err = f.Write([]byte{1})
+
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+
+	if removeErr := os.Remove(name); err == nil {
+		err = removeErr
+	}
+
+	return err
 }
 
 func (e *Engine) entity(name string, create bool) *entity {
@@ -336,11 +618,24 @@ func (e *Engine) entity(name string, create bool) *entity {
 	defer e.catalogMu.Unlock()
 
 	if ent = e.entities[name]; ent == nil {
-		ent = e.newEntity(name)
+		ent = newEntity(name)
 		e.entities[name] = ent
 	}
 
 	return ent
+}
+
+func (e *Engine) allEntities() []*entity {
+	e.catalogMu.RLock()
+	ents := make([]*entity, 0, len(e.entities))
+	for _, ent := range e.entities {
+		ents = append(ents, ent)
+	}
+	e.catalogMu.RUnlock()
+
+	sort.Slice(ents, func(i, j int) bool { return ents[i].name < ents[j].name })
+
+	return ents
 }
 
 func (e *Engine) Types() []string {
@@ -357,399 +652,260 @@ func (e *Engine) TypeExists(name string) bool {
 	return slices.Contains(e.types, name)
 }
 
-func (e *Engine) addTypeLocked(name string) {
-	if !slices.Contains(e.types, name) {
-		e.types = append(append([]string(nil), e.types...), name)
+func (e *Engine) Count(name string) int {
+	ent := e.entity(name, false)
+	if ent == nil {
+		return 0
 	}
+
+	if rec := ent.rec.Load(); rec != nil {
+		return int(rec.count)
+	}
+
+	return 0
 }
 
-func (e *Engine) dropTypeLocked(name string) {
-	kept := make([]string, 0, len(e.types))
-	for _, t := range e.types {
-		if t != name {
-			kept = append(kept, t)
-		}
+func (e *Engine) EntityVersion(name string) (uint64, uint64) {
+	ent := e.entity(name, false)
+	if ent == nil {
+		return 0, 0
 	}
-	e.types = kept
+
+	rec := ent.rec.Load()
+	if rec == nil {
+		return 0, 0
+	}
+
+	return rec.gen, rec.version
 }
 
-func (e *Engine) applyBatch(recs []journal.Record, docs []map[string]any, replay bool) {
-	drafts := map[string]*draft{}
-	order := []string{}
-	get := func(name string) *draft {
-		if d := drafts[name]; d != nil {
-			return d
-		}
-
-		d := e.newDraft(e.entity(name, true))
-		drafts[name] = d
-		order = append(order, name)
-
-		return d
-	}
-
-	for i := range recs {
-		rec := &recs[i]
-		var doc map[string]any
-		if docs != nil {
-			doc = docs[i]
-		}
-
-		switch rec.Kind {
-		case journal.KindDocPut, journal.KindDocMove:
-			get(rec.Entity).put(rec, doc, replay)
-		case journal.KindDocDelete:
-			get(rec.Entity).del(rec, replay)
-		case journal.KindEntityReset:
-			get(rec.Entity).reset(rec)
-		case journal.KindEntityCreate:
-			e.catalogMu.Lock()
-			e.addTypeLocked(rec.Entity)
-			e.catalogMu.Unlock()
-		case journal.KindEntityDrop:
-			e.catalogMu.Lock()
-			e.dropTypeLocked(rec.Entity)
-			e.catalogMu.Unlock()
-		case journal.KindKVPut, journal.KindKVMove:
-			e.kv.applyPut(rec, replay)
-		case journal.KindKVDelete, journal.KindKVExpire:
-			e.kv.applyDelete(rec.Key)
-		case journal.KindKVReset:
-			e.kv.clearLocked(rec.LSN)
-		}
-	}
-
-	for _, name := range order {
-		drafts[name].publish()
-		if released := drafts[name].released; len(released) > 0 {
-			e.releaseValues(released)
-		}
-	}
-}
-
-type Snapshot struct {
+type applied struct {
+	b    *pebble.Batch
+	wait bool
 	e    *Engine
-	ent  *entity
-	r    *root
-	name string
 }
 
-func (e *Engine) Snapshot(name string) *Snapshot {
-	ent := e.entity(name, false)
-	if ent == nil {
-		return &Snapshot{e: e, name: name, r: e.emptyRoot(0, 0)}
+func (e *Engine) apply(b *pebble.Batch, durable bool) (applied, error) {
+	var err error
+	wait := durable && e.opts.Durability != DurabilityBackground
+	if wait {
+		err = e.db.ApplyNoSyncWait(b, pebble.Sync)
+	} else {
+		err = e.db.Apply(b, pebble.NoSync)
 	}
 
-	return &Snapshot{e: e, ent: ent, r: ent.root.Load(), name: name}
-}
-
-func (e *Engine) SnapshotAll() map[string]*Snapshot {
-	e.catalogMu.RLock()
-	ents := make([]*entity, 0, len(e.entities))
-	for _, ent := range e.entities {
-		ents = append(ents, ent)
-	}
-	e.catalogMu.RUnlock()
-
-	sort.Slice(ents, func(i, j int) bool { return ents[i].name < ents[j].name })
-	for _, ent := range ents {
-		ent.apply.Lock()
-	}
-
-	out := make(map[string]*Snapshot, len(ents))
-	for _, ent := range ents {
-		out[ent.name] = &Snapshot{e: e, ent: ent, r: ent.root.Load(), name: ent.name}
-	}
-
-	for i := len(ents) - 1; i >= 0; i-- {
-		ents[i].apply.Unlock()
-	}
-
-	return out
-}
-
-func (s *Snapshot) Name() string {
-	return s.name
-}
-
-func (s *Snapshot) Len() int {
-	return s.r.slots.Len()
-}
-
-func (s *Snapshot) Version() uint64 {
-	return s.r.version
-}
-
-func (s *Snapshot) Generation() uint64 {
-	return s.r.gen
-}
-
-func (s *Snapshot) NextSeq() uint32 {
-	return s.r.nextSeq
-}
-
-func (s *Snapshot) Refs() []RefPath {
-	return s.r.refs
-}
-
-type Doc struct {
-	s    *Snapshot
-	slot slot
-	lazy bool
-}
-
-func (d Doc) resolved() slot {
-	if !d.lazy {
-		return d.slot
-	}
-
-	sl, _ := d.s.r.slotBySeq(d.slot.seq, true)
-
-	return sl
-}
-
-func (d Doc) ID() string {
-	return d.resolved().id
-}
-
-func (d Doc) Seq() uint32 {
-	return d.slot.seq
-}
-
-func (d Doc) LSN() uint64 {
-	return d.resolved().lsn
-}
-
-func (d Doc) Bytes() ([]byte, error) {
-	return d.s.e.slotBytes(d.resolved())
-}
-
-func (d Doc) Decode() (map[string]any, error) {
-	sl := d.resolved()
-	b, err := d.s.e.slotBytes(sl)
 	if err != nil {
-		return nil, err
+		_ = b.Close()
+		return applied{}, err
 	}
 
-	doc := decodeDoc(b)
-	if doc == nil {
-		return nil, fmt.Errorf("document %s is not a JSON object", sl.id)
-	}
+	e.commits.Add(1)
 
-	return doc, nil
+	return applied{b: b, wait: wait, e: e}, nil
 }
 
-func (s *Snapshot) Indexed(seq uint32) Doc {
-	return Doc{s: s, slot: slot{seq: seq}, lazy: true}
-}
-
-func (s *Snapshot) Get(id string) (Doc, bool) {
-	sl, ok := s.r.slotByID(id, true)
-	if !ok {
-		return Doc{}, false
-	}
-
-	return Doc{s: s, slot: sl}, true
-}
-
-func (s *Snapshot) BySeq(seq uint32) (Doc, bool) {
-	sl, ok := s.r.slotBySeq(seq, true)
-	if !ok {
-		return Doc{}, false
-	}
-
-	return Doc{s: s, slot: sl}, true
-}
-
-func (s *Snapshot) At(i int) (Doc, bool) {
-	k, v, ok := s.r.slots.At(i)
-	if !ok {
-		return Doc{}, false
-	}
-
-	return Doc{s: s, slot: decodeSlotValue(keySeq(k), v, true)}, true
-}
-
-func (s *Snapshot) Ascend(offset int, fn func(Doc) bool) {
-	s.r.slots.AscendAt(offset, func(k string, v []byte) bool {
-		return fn(Doc{s: s, slot: decodeSlotValue(keySeq(k), v, true)})
-	})
-}
-
-func (s *Snapshot) RankOfSeq(seq uint32) int {
-	return s.r.slots.Rank(seqKey(seq))
-}
-
-type IndexView struct {
-	s   *Snapshot
-	idx *index
-}
-
-func (s *Snapshot) Index(spec IndexSpec) (*IndexView, bool) {
-	name := spec.Name()
-	idx, ok := s.r.indexes[name]
-	if !ok || !idx.ready {
-		return nil, false
-	}
-
-	if s.ent != nil {
-		s.ent.touch(name)
-	}
-
-	return &IndexView{s: s, idx: idx}, true
-}
-
-func (s *Snapshot) HasIndex(spec IndexSpec) bool {
-	_, ok := s.r.indexes[spec.Name()]
-	return ok
-}
-
-func (s *Snapshot) IndexDormant(spec IndexSpec) bool {
-	idx, ok := s.r.indexes[spec.Name()]
-	return ok && idx.dormant
-}
-
-func (v *IndexView) Len() int {
-	return v.idx.tree.Len()
-}
-
-func (v *IndexView) Rank(prefix []byte) int {
-	return v.idx.tree.Rank(string(prefix))
-}
-
-func (v *IndexView) ScanPrefix(prefix []byte, fn func(key string, seq uint32) bool) {
-	p := string(prefix)
-	v.idx.tree.AscendFrom(p, func(k string, _ []byte) bool {
-		if len(k) < len(p)+4 || k[:len(p)] != p {
-			return false
-		}
-
-		return fn(k, keySeq(k))
-	})
-}
-
-func (v *IndexView) ScanRange(lo, hi []byte, fn func(key string, seq uint32) bool) {
-	h := string(hi)
-	v.idx.tree.AscendFrom(string(lo), func(k string, _ []byte) bool {
-		if hi != nil && k >= h {
-			return false
-		}
-
-		return fn(k, keySeq(k))
-	})
-}
-
-func (v *IndexView) AscendAt(i int, fn func(key string, seq uint32) bool) {
-	v.idx.tree.AscendAt(i, func(k string, _ []byte) bool {
-		return fn(k, keySeq(k))
-	})
-}
-
-func (v *IndexView) At(i int) (string, uint32, bool) {
-	k, _, ok := v.idx.tree.At(i)
-	if !ok {
-		return "", 0, false
-	}
-
-	return k, keySeq(k), true
-}
-
-func (e *Engine) EnsureIndex(name string, spec IndexSpec) bool {
-	key := spec.Name()
-	ent := e.entity(name, true)
-	r := ent.root.Load()
-	if idx, ok := r.indexes[key]; ok && !idx.dormant {
-		return idx.ready
-	}
-
-	ent.apply.Lock()
-	r = ent.root.Load()
-	if idx, ok := r.indexes[key]; ok && !idx.dormant {
-		ent.apply.Unlock()
-		return idx.ready
-	}
-
-	ent.touch(key)
-	nr := *r
-	nr.indexes = cloneIndexes(r.indexes)
-	if r.slots.Len() == 0 {
-		nr.indexes[key] = &index{spec: spec, ready: true}
-		ent.root.Store(&nr)
-		ent.apply.Unlock()
-		return true
-	}
-
-	nr.indexes[key] = &index{spec: spec}
-	ent.building[key] = &buildState{order: e.buildOrder.Add(1)}
-	ent.root.Store(&nr)
-	small := r.slots.Len() <= smallEntityDocs
-	ent.apply.Unlock()
-
-	if !small && e.schedule(ent) {
-		return false
-	}
-
-	e.buildEntity(ent, false)
-
-	idx, ok := ent.root.Load().indexes[key]
-
-	return ok && idx.ready
-}
-
-func cloneIndexes(m map[string]*index) map[string]*index {
-	out := make(map[string]*index, len(m)+1)
-	for k, v := range m {
-		out[k] = v
-	}
-
-	return out
-}
-
-func (e *Engine) DropIndexes(name string) {
-	ent := e.entity(name, false)
-	if ent == nil {
-		return
-	}
-
-	ent.apply.Lock()
-	r := *ent.root.Load()
-	r.indexes = map[string]*index{}
-	ent.building = map[string]*buildState{}
-	ent.root.Store(&r)
-	ent.apply.Unlock()
-}
-
-func (e *Engine) IndexNames(name string) []string {
-	ent := e.entity(name, false)
-	if ent == nil {
+func (a applied) finish() error {
+	if a.b == nil {
 		return nil
 	}
 
-	names := []string{}
-	for n := range ent.root.Load().indexes {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-
-	return names
-}
-
-func (e *Engine) IndexBacklog() int {
-	e.catalogMu.RLock()
-	ents := make([]*entity, 0, len(e.entities))
-	for _, ent := range e.entities {
-		ents = append(ents, ent)
-	}
-	e.catalogMu.RUnlock()
-
-	n := 0
-	for _, ent := range ents {
-		for _, idx := range ent.root.Load().indexes {
-			if !idx.ready && !idx.dormant {
-				n++
+	var err error
+	if a.wait {
+		if err = a.b.SyncWait(); err != nil {
+			if a.e.opts.OnWriteError != nil {
+				a.e.opts.OnWriteError(err)
+			} else {
+				engineLog.Error("log write failed", "err", err)
 			}
 		}
 	}
 
-	return n
+	_ = a.b.Close()
+
+	return err
+}
+
+type pin struct {
+	e      *Engine
+	ps     *pebble.Snapshot
+	refs   atomic.Int64
+	at     uint64
+	closed atomic.Bool
+}
+
+func (e *Engine) acquirePin() *pin {
+	if !e.enter() {
+		return nil
+	}
+	defer e.leave()
+
+	e.pinsMu.Lock()
+	defer e.pinsMu.Unlock()
+
+	c := e.commits.Load()
+	if cur := e.current; cur != nil && cur.at == c && !cur.closed.Load() {
+		cur.refs.Add(1)
+		return cur
+	}
+
+	p := &pin{e: e, ps: e.db.NewSnapshot(), at: c}
+	p.refs.Store(2)
+	e.pins[p] = struct{}{}
+	if old := e.current; old != nil {
+		e.releaseLocked(old)
+	}
+	e.current = p
+
+	return p
+}
+
+func (p *pin) release() {
+	if p.refs.Add(-1) > 0 {
+		return
+	}
+
+	p.e.pinsMu.Lock()
+	p.e.closePinLocked(p)
+	p.e.pinsMu.Unlock()
+}
+
+func (e *Engine) releaseLocked(p *pin) {
+	if p.refs.Add(-1) == 0 {
+		e.closePinLocked(p)
+	}
+}
+
+func (e *Engine) closePinLocked(p *pin) {
+	if p.closed.Swap(true) {
+		return
+	}
+
+	_ = p.ps.Close()
+	delete(e.pins, p)
+	if e.current == p {
+		e.current = nil
+	}
+}
+
+func (e *Engine) closePins() {
+	e.pinsMu.Lock()
+	defer e.pinsMu.Unlock()
+
+	for p := range e.pins {
+		e.closePinLocked(p)
+	}
+	e.current = nil
+}
+
+func (p *pin) hold() bool {
+	for {
+		r := p.refs.Load()
+		if r <= 0 || p.closed.Load() {
+			return false
+		}
+
+		if p.refs.CompareAndSwap(r, r+1) {
+			return true
+		}
+	}
+}
+
+func (p *pin) use() (func(), bool) {
+	if p == nil || !p.e.enter() {
+		return nil, false
+	}
+
+	if !p.hold() {
+		p.e.leave()
+		return nil, false
+	}
+
+	return func() {
+		p.release()
+		p.e.leave()
+	}, true
+}
+
+func (p *pin) get(key []byte) ([]byte, bool, error) {
+	done, ok := p.use()
+	if !ok {
+		return nil, false, ErrClosed
+	}
+	defer done()
+
+	v, closer, err := p.ps.Get(key)
+	if errors.Is(err, pebble.ErrNotFound) {
+		return nil, false, nil
+	}
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	out := append([]byte(nil), v...)
+	_ = closer.Close()
+
+	return out, true, nil
+}
+
+type scanner struct {
+	*pebble.Iterator
+	done func()
+}
+
+func (s *scanner) Close() error {
+	err := s.Iterator.Close()
+	s.done()
+
+	return err
+}
+
+func (p *pin) iter(lower, upper []byte) (*scanner, error) {
+	done, ok := p.use()
+	if !ok {
+		return nil, ErrClosed
+	}
+
+	it, err := p.ps.NewIter(&pebble.IterOptions{LowerBound: lower, UpperBound: upper})
+	if err != nil {
+		done()
+		return nil, err
+	}
+
+	return &scanner{Iterator: it, done: done}, nil
+}
+
+func (e *Engine) iter(lower, upper []byte) (*scanner, error) {
+	if !e.enter() {
+		return nil, ErrClosed
+	}
+
+	it, err := e.db.NewIter(&pebble.IterOptions{LowerBound: lower, UpperBound: upper})
+	if err != nil {
+		e.leave()
+		return nil, err
+	}
+
+	return &scanner{Iterator: it, done: e.leave}, nil
+}
+
+func (e *Engine) get(key []byte) ([]byte, bool, error) {
+	if !e.enter() {
+		return nil, false, ErrClosed
+	}
+	defer e.leave()
+
+	v, closer, err := e.db.Get(key)
+	if errors.Is(err, pebble.ErrNotFound) {
+		return nil, false, nil
+	}
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	out := append([]byte(nil), v...)
+	_ = closer.Close()
+
+	return out, true, nil
 }

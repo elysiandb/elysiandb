@@ -14,7 +14,7 @@ const evalMinPending = 64
 var zeroTime = time.Time{}
 
 func kindCount(view *datastore.IndexView, kind byte) int {
-	return view.Rank([]byte{kind + 1}) - view.Rank([]byte{kind})
+	return view.CountKind(kind)
 }
 
 func pendingCount(view *datastore.IndexView, c candidates) int {

@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/taymour/elysiandb/internal/datastore"
-	"github.com/taymour/elysiandb/internal/journal"
 )
 
 type model struct {
@@ -71,7 +70,7 @@ func (m *model) reset(entity string) {
 }
 
 func options(dir string) datastore.Options {
-	return datastore.Options{Folder: dir, Shards: 8, Durability: journal.ModeWrite, SegmentSize: 8 << 10}
+	return datastore.Options{Folder: dir, Shards: 8, Durability: datastore.DurabilityWrite, CacheBytes: 8 << 20, MemTableBytes: 4 << 20}
 }
 
 func compare(t *testing.T, step int, e *datastore.Engine, m *model) {
@@ -127,13 +126,16 @@ func compare(t *testing.T, step int, e *datastore.Engine, m *model) {
 }
 
 func TestRandomOperationsAgainstAModel(t *testing.T) {
-	for _, c := range []struct{ cache, pages, segment int64 }{{0, 0, 0}, {4 << 10, 0, 0}, {4 << 10, 16 << 10, 64 << 10}} {
-		t.Run(fmt.Sprintf("cache=%d/pages=%d", c.cache, c.pages), func(t *testing.T) {
+	for _, c := range []struct {
+		name       string
+		cache      int64
+		durability datastore.Durability
+	}{{"write", 8 << 20, datastore.DurabilityWrite}, {"tiny-cache", 64 << 10, datastore.DurabilityWrite}, {"fsync", 8 << 20, datastore.DurabilitySync}, {"background", 8 << 20, datastore.DurabilityBackground}} {
+		t.Run(c.name, func(t *testing.T) {
 			dir := t.TempDir()
 			opts := options(dir)
 			opts.CacheBytes = c.cache
-			opts.PageCacheBytes = c.pages
-			opts.PageSegmentSize = c.segment
+			opts.Durability = c.durability
 			e, err := datastore.Open(opts)
 			if err != nil {
 				t.Fatal(err)
@@ -176,14 +178,8 @@ func TestRandomOperationsAgainstAModel(t *testing.T) {
 					key := fmt.Sprintf("k%02d", r.Intn(40))
 					e.KVDelete(key)
 					delete(m.kv, key)
-				case op < 92:
-					if step%3 == 0 {
-						_, err = e.CompactPages()
-					} else {
-						err = e.Checkpoint()
-					}
 				case op < 95:
-					_, err = e.Compact(4)
+					err = e.Checkpoint()
 				case op < 98:
 					err = e.Close()
 					if err == nil {
@@ -214,28 +210,37 @@ func TestRandomOperationsAgainstAModel(t *testing.T) {
 			}
 			compare(t, -2, e, m)
 
-			stats := e.Stats()
-			if stats.Segments == 0 {
-				t.Fatalf("expected log segments")
+			if stats := e.Stats(); stats.DiskBytes == 0 {
+				t.Fatalf("expected data on disk")
 			}
 			_ = e.Close()
 		})
 	}
 }
 
-func TestCompactionRemovesDeadSegments(t *testing.T) {
-	dir := t.TempDir()
-	e, err := datastore.Open(options(dir))
+func TestResetEntityIsReclaimedOnDisk(t *testing.T) {
+	opts := options(t.TempDir())
+	opts.Background = true
+	e, err := datastore.Open(opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer e.Close()
 
-	for round := 0; round < 30; round++ {
+	r := rand.New(rand.NewSource(7))
+	noise := func() string {
+		b := make([]byte, 200)
+		for i := range b {
+			b[i] = byte('a' + r.Intn(26))
+		}
+		return string(b)
+	}
+
+	for round := 0; round < 20; round++ {
 		if err := e.Update(func(tx *datastore.Tx) error {
 			tx.EnsureType("a")
-			for i := 0; i < 20; i++ {
-				if err := tx.Put("a", fmt.Sprintf("d%02d", i), map[string]any{"v": strings.Repeat("y", 100), "round": round}); err != nil {
+			for i := 0; i < 500; i++ {
+				if err := tx.Put("a", fmt.Sprintf("d%02d-%03d", round, i), map[string]any{"v": noise(), "round": round}); err != nil {
 					return err
 				}
 			}
@@ -249,38 +254,41 @@ func TestCompactionRemovesDeadSegments(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	before := e.Stats()
-	if err := e.Checkpoint(); err != nil {
+	deadline := time.Now().Add(10 * time.Second)
+	for e.Stats().LiveBytes < 1<<20 {
+		if time.Now().After(deadline) {
+			t.Fatalf("the documents should reach the tables, live %d bytes", e.Stats().LiveBytes)
+		}
+		_ = e.Checkpoint()
+		time.Sleep(20 * time.Millisecond)
+	}
+	before := e.Stats().LiveBytes
+
+	start := time.Now()
+	if err := e.Update(func(tx *datastore.Tx) error {
+		tx.ResetEntity("a")
+		return nil
+	}); err != nil {
 		t.Fatal(err)
 	}
+	if took := time.Since(start); took > time.Second {
+		t.Fatalf("a reset takes constant time, took %s", took)
+	}
 
-	for i := 0; i < 10; i++ {
-		if _, err := e.Compact(10); err != nil {
-			t.Fatal(err)
+	if e.Snapshot("a").Len() != 0 {
+		t.Fatalf("the reset entity is empty")
+	}
+
+	deadline = time.Now().Add(20 * time.Second)
+	for e.Stats().LiveBytes > before/4 {
+		if time.Now().After(deadline) {
+			t.Fatalf("the space of a reset entity is reclaimed: %d bytes before, %d after", before, e.Stats().LiveBytes)
 		}
-		if err := e.Checkpoint(); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	after := e.Stats()
-	if after.LogBytes >= before.LogBytes/2 {
-		t.Fatalf("compaction should reclaim most of the log: %d bytes before, %d after", before.LogBytes, after.LogBytes)
-	}
-
-	snap := e.Snapshot("a")
-	if snap.Len() != 20 {
-		t.Fatalf("documents survive compaction, got %d", snap.Len())
-	}
-
-	doc, _ := snap.Get("d05")
-	data, _ := doc.Decode()
-	if data["round"] != 29.0 {
-		t.Fatalf("the latest version survives compaction, got %v", data)
+		time.Sleep(20 * time.Millisecond)
 	}
 
 	if v, _, ok := e.KVGet("kept"); !ok || string(v) != "value" {
-		t.Fatalf("kv keys survive compaction")
+		t.Fatalf("other data survives the reset")
 	}
 }
 
@@ -393,7 +401,13 @@ func TestMain(m *testing.M) {
 }
 
 func crashChild(dir string) {
-	e, err := datastore.Open(options(dir))
+	opts := options(dir)
+	background := os.Getenv("ELYSIAN_CRASH_BACKGROUND") != ""
+	if background {
+		opts.Durability = datastore.DurabilityBackground
+	}
+
+	e, err := datastore.Open(opts)
 	if err != nil {
 		fmt.Println("ERR", err)
 		os.Exit(1)
@@ -419,6 +433,10 @@ func crashChild(dir string) {
 			os.Exit(1)
 		}
 
+		if background && e.Checkpoint() != nil {
+			os.Exit(1)
+		}
+
 		fmt.Fprintf(w, "ACK %s %d\n", id, i%7)
 		_ = w.Flush()
 
@@ -429,6 +447,14 @@ func crashChild(dir string) {
 }
 
 func TestKill9LosesNoAcknowledgedWrite(t *testing.T) {
+	kill9(t, "")
+}
+
+func TestKill9AfterASaveLosesNothingWithoutCrashRecovery(t *testing.T) {
+	kill9(t, "1")
+}
+
+func kill9(t *testing.T, background string) {
 	runs := 10
 	if v, err := strconv.Atoi(os.Getenv("ELYSIAN_KILL9_RUNS")); err == nil {
 		runs = v
@@ -441,7 +467,7 @@ func TestKill9LosesNoAcknowledgedWrite(t *testing.T) {
 
 	for run := 0; run < runs; run++ {
 		cmd := exec.Command(os.Args[0], "-test.run", "^$")
-		cmd.Env = append(os.Environ(), "ELYSIAN_CRASH_CHILD="+dir)
+		cmd.Env = append(os.Environ(), "ELYSIAN_CRASH_CHILD="+dir, "ELYSIAN_CRASH_BACKGROUND="+background)
 		stdout, _ := cmd.StdoutPipe()
 		if err := cmd.Start(); err != nil {
 			t.Fatal(err)

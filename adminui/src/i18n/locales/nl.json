@@ -190,7 +190,6 @@
         "problems": {
             "flush_failing": "De laatste schrijfactie naar schijf is mislukt",
             "recovery_write_failing": "Schrijven naar het herstellogboek is in de afgelopen 5 minuten mislukt",
-            "mongodb_unreachable": "MongoDB is onbereikbaar",
             "error_rate_high": "Meer dan 1 % van de verzoeken is in de afgelopen 5 minuten mislukt",
             "latency_high": "De p95-latentie ligt al 5 minuten boven de drempel voor trage verzoeken",
             "hook_failing": "Hook {hook_id} is in de afgelopen 5 minuten mislukt",
@@ -246,8 +245,7 @@
             "dataFolder": "Gegevensmap"
         },
         "engines": {
-            "internal": "Intern",
-            "mongodb": "MongoDB (bèta)"
+            "internal": "Intern"
         },
         "features": {
             "cache": "API-cache",
@@ -278,8 +276,7 @@
             "persistence": "Persistentie",
             "runtime": "Runtime",
             "connections": "Verbindingen",
-            "hooks": "Hooks",
-            "mongodb": "MongoDB"
+            "hooks": "Hooks"
         },
         "tabs": {
             "data": "Gegevens",
@@ -320,10 +317,7 @@
             "transactions": "Open transacties",
             "oldestTransaction": "Oudste open transactie",
             "hookExecutions": "Hookuitvoeringen per seconde",
-            "hookDuration": "Hookduur (p95)",
-            "mongoPing": "MongoDB-ping",
-            "mongoErrors": "MongoDB-fouten per minuut",
-            "mongoPool": "Gebruikte verbindingen in de MongoDB-pool"
+            "hookDuration": "Hookduur (p95)"
         },
         "series": {
             "http": "HTTP",
@@ -377,8 +371,6 @@
             "openTransactions": "Transacties",
             "oldestTransaction": "Leeftijd",
             "executions": "Uitvoeringen",
-            "ping": "Ping",
-            "poolInUse": "In gebruik",
             "logSinceCheckpoint": "Sinds het laatste checkpoint",
             "logBytes": "Log op schijf",
             "liveBytes": "Actieve gegevens"

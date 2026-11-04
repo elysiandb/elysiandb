@@ -19,7 +19,7 @@ const CONFIG = {
         Schema: { Enabled: false, Strict: true },
     },
     AdminUI: { Enabled: true },
-    Engine: { Name: "mongodb" },
+    Engine: { Name: "internal" },
 };
 
 describe("Configuration", () => {
@@ -52,7 +52,7 @@ describe("Configuration", () => {
             "Schema: Disabled",
             "Strict: true",
             "Enabled: true",
-            "Name: mongodb",
+            "Name: internal",
         ]) {
             expect(screen.getByText(text)).toBeInTheDocument();
         }

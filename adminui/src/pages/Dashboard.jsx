@@ -31,7 +31,6 @@ const FEATURES = {
 
 const ENGINES = {
     internal: "dashboard.engines.internal",
-    mongodb: "dashboard.engines.mongodb",
 };
 
 function createDashboardFetcher() {

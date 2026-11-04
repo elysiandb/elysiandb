@@ -6,7 +6,6 @@ import (
 	"time"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/schema"
 )
 
@@ -46,10 +45,6 @@ type BatchCommitter interface {
 }
 
 func (realStorage) CommitBatch(ops []TxOperation) (bool, error) {
-	if !engine.IsEngineInternal() {
-		return false, nil
-	}
-
 	batch := make([]api_storage.BatchOperation, 0, len(ops))
 	for _, op := range ops {
 		batch = append(batch, api_storage.BatchOperation{Kind: op.Kind, Entity: op.Entity, ID: op.ID, Data: op.Data})
@@ -61,7 +56,7 @@ func (realStorage) CommitBatch(ops []TxOperation) (bool, error) {
 type realStorage struct{}
 
 func (realStorage) Preflight(ops []TxOperation) error {
-	simulation := api_storage.NewWriteSimulation(engine.GetEntitySchema, engine.ReadEntityById)
+	simulation := api_storage.NewWriteSimulation(api_storage.GetEntitySchema, api_storage.ReadEntityById)
 
 	for _, op := range ops {
 		switch op.Kind {
@@ -82,15 +77,15 @@ func (realStorage) Preflight(ops []TxOperation) error {
 }
 
 func (realStorage) WriteEntity(e string, d map[string]any) []schema.ValidationError {
-	return engine.WriteEntity(e, d)
+	return api_storage.WriteEntity(e, d)
 }
 
 func (realStorage) UpdateEntityById(e, id string, d map[string]any) map[string]any {
-	return engine.UpdateEntityById(e, id, d)
+	return api_storage.UpdateEntityById(e, id, d)
 }
 
 func (realStorage) DeleteEntityById(e, id string) {
-	engine.DeleteEntityById(e, id)
+	api_storage.DeleteEntityById(e, id)
 }
 
 var storageImpl Storage = realStorage{}

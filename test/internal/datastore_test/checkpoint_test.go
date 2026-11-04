@@ -9,7 +9,6 @@ import (
 
 func TestStatsAnswerDuringACheckpoint(t *testing.T) {
 	opts := options(t.TempDir())
-	opts.SegmentSize = 0
 	e, err := datastore.Open(opts)
 	if err != nil {
 		t.Fatal(err)

@@ -2,7 +2,7 @@
 
 ElysianDB turns raw JSON into a complete backend instantly.
 
-It combines a pluggable storage engine, an auto-generated REST API, advanced querying, and optional KV/TCP interfaces into a single, high-performance Go binary. It runs on its built-in internal engine, the default and recommended one. A MongoDB engine is also available in beta: it is not yet fully functional, and switching to it can change behavior (see Storage Engine Selection below).
+It combines an embedded storage engine built on Pebble, an auto-generated REST API, advanced querying, and optional KV/TCP interfaces into a single, high-performance Go binary (see Storage engine internals below). Data folders of earlier versions are migrated at the first start, and the MongoDB engine has been removed: see [Migrating to the Pebble storage](migration-pebble.md).
 
 This document explains how to use ElysianDB, its features, configuration, storage engines, and runtime behavior.
 
@@ -37,7 +37,7 @@ store:
   crashRecovery: { enabled: true, maxLogMB: 100 }
   durability: default     # default | fsync
   memory:
-    limitMB: 0            # 0 = auto: 75 % of the container memory limit if any, otherwise unlimited
+    limitMB: 0            # 0 = auto: 75 % of the container memory limit if any, otherwise no budget
 server:
   http:
     enabled: true
@@ -100,12 +100,12 @@ Every key added after 0.2.4 is optional. Their defaults keep the 0.2.4 answers, 
 | Key                                  | Description                                                                           |
 | ------------------------------------ | ------------------------------------------------------------------------------------- |
 | **store.folder**                     | Path where data is persisted to disk. One ElysianDB process at a time can open it (see Storage engine internals) |
-| **store.shards**                     | Number of shards of the KV keys and of the write locks (rounded up to a power of two) |
-| **store.flushIntervalSeconds**       | Period of the checkpoints, and of the log writes when crash recovery is off. `0` writes only at `/save`, `SAVE` and shutdown |
-| **store.crashRecovery.enabled**      | Writes each change to the log before answering, so that it survives a `kill -9` |
-| **store.crashRecovery.maxLogMB**     | Log written since the last checkpoint that triggers a new checkpoint                  |
-| **store.durability**                 | `default`, or `fsync` to sync the log once per group of writes, so that acknowledged writes survive a power cut |
-| **store.memory.limitMB**             | Memory budget. `0` (default) uses 75 % of the container memory limit when there is one, and no limit otherwise. It sets `GOMEMLIMIT`; when set explicitly, 25 % of it holds the documents read most often, 25 % the pages of the engine structures used most often, and the rest is left for requests and the garbage collector, so that the whole process stays within it whatever the volume; the rest is read from disk on demand |
+| **store.shards**                     | Number of locks of the KV keys (rounded up to a power of two)                         |
+| **store.flushIntervalSeconds**       | Period at which the write-ahead log is synced to disk, which bounds what a power cut can lose. `0` syncs it only at `/save`, `SAVE`, shutdown and when a memtable is written to disk. Ignored with `store.durability: fsync`, which syncs every write |
+| **store.crashRecovery.enabled**      | Answers a write once it is in the write-ahead log, so that it survives a `kill -9`. With `false`, a write is answered as soon as it is queued for the log, and the log is written every `store.flushIntervalSeconds` |
+| **store.crashRecovery.maxLogMB**     | Largest memtable in MB, between 4 and 64: the write-ahead log written since the last memtable flush stays about this size |
+| **store.durability**                 | `default`, or `fsync` to sync the write-ahead log once per group of writes before answering, so that acknowledged writes survive a power cut |
+| **store.memory.limitMB**             | Memory budget of the whole process. `0` (default) uses 75 % of the container memory limit when there is one, and no budget otherwise. It sets `GOMEMLIMIT`, gives 30 % of it to the block cache of the store, up to 1/16 to its memtables, and keeps the rest for index builds, requests, hooks, the API cache and the garbage collector. Once it is reached, heavy requests wait or are answered `503` (see Memory below) |
 | **server.http**                      | Enables and configures the HTTP REST/KV interface                                     |
 | **server.http.cors.allowedOrigins**  | Origins allowed to call the HTTP API from a browser (see CORS below). Empty by default |
 | **server.http.trustedProxies**       | Addresses or CIDR ranges of the reverse proxies in front of ElysianDB (see Reverse proxy below). Empty by default |
@@ -138,8 +138,8 @@ Every key added after 0.2.4 is optional. Their defaults keep the 0.2.4 answers, 
 | **security.authentication.enabled**  | Enables authentication layer for all endpoints except `/health`                       |
 | **security.authentication.mode**     | Authentication mode: `basic`, `token` or `user`. Any other value, or no value, stops ElysianDB at startup |
 | **security.authentication.token**    | Instance token used in `token` mode                                                   |
-| **engine.name**                      | Storage engine: `internal` (default, recommended) or `mongodb` (beta)                 |
-| **engine.uri**                       | Connection URI for the `mongodb` engine                                               |
+| **engine.name**                      | Storage engine: `internal` (default, and the only one). The `mongodb` engine was removed: ElysianDB stops at startup with `engine.name: mongodb` (see [Migrating to the Pebble storage](migration-pebble.md)) |
+| **engine.uri**                       | Accepted and ignored, with an `info` line at startup                                  |
 | **adminui.enabled**                  | Enables the admin web interface                                                       |
 | **monitoring.prometheus.enabled**    | Serves `GET /metrics` in the Prometheus text format (see Monitoring below). Off by default |
 | **monitoring.prometheus.token**      | Bearer token for `GET /metrics`. Without it, `/metrics` takes the same credentials as the admin endpoints |
@@ -174,7 +174,7 @@ When the configuration file cannot be read or is invalid, ElysianDB logs the rea
 
 ## Logging
 
-ElysianDB writes its logs to the standard output, one line per event, as soon as they happen. Each line has a time, a level, a fixed message and attributes. `component` tells which part of ElysianDB wrote it: `boot`, `storage`, `recovery`, `http`, `tcp`, `security`, `audit`, `hook`, `mongodb`, `cache`, `acl` or `api`.
+ElysianDB writes its logs to the standard output, one line per event, as soon as they happen. Each line has a time, a level, a fixed message and attributes. `component` tells which part of ElysianDB wrote it: `boot`, `storage`, `recovery`, `http`, `tcp`, `security`, `audit`, `hook`, `cache`, `acl` or `api`.
 
 ```text
 time=2026-11-01T12:00:00.123+01:00 level=INFO msg="storage loaded" component=storage folder=/data kv_keys=120394 kv_keys_with_ttl=812 documents=48211 duration_ms=412
@@ -187,18 +187,18 @@ At the default `info` level, the number of lines does not depend on the traffic:
 
 | Level   | Meaning | Examples |
 | ------- | ------- | -------- |
-| `error` | ElysianDB failed to do its job | `500` answers, handler panics, failed flushes and recovery log writes, failed MongoDB operations |
-| `warn`  | Handled, but abnormal or risky | recovery log replayed after an unclean shutdown, default admin password, authentication off on a public address, failed logins, `401` and `403` answers, slow requests, hook script errors |
+| `error` | ElysianDB failed to do its job | `500` answers, handler panics, failed flushes and write-ahead log writes |
+| `warn`  | Handled, but abnormal or risky | write-ahead log replayed after an unclean shutdown, slow disk, default admin password, authentication off on a public address, failed logins, `401` and `403` answers, slow requests, hook script errors |
 | `info`  | Lifecycle and admin actions | configuration and storage loaded, listening addresses, shutdown, admin actions (component `audit`) |
 | `debug` | Investigation | other `4xx` answers, TCP connections, flushes, cache, hook timings |
 
-Errors that can repeat (failed flushes, recovery log writes, failed logins and `401` per address, hook script errors per hook, MongoDB errors, slow requests per route) are logged once per minute at most; the next line carries a `suppressed` attribute with the number of lines left out.
+Errors that can repeat (failed flushes, write-ahead log writes, failed logins and `401` per address, hook script errors per hook, slow requests per route) are logged once per minute at most; the next line carries a `suppressed` attribute with the number of lines left out.
 
 Admin actions are logged at `info` with `component=audit`, the `actor`, the `source` (`http` or `tcp`) and the remote address: user, ACL, hook and schema changes, entity type creation and destruction, store reset, manual flush, import, migration, backup, restore and log level changes. The `elysiandb` commands print their own result and do not add log lines.
 
 Every HTTP answer carries an `X-Request-Id` header. ElysianDB keeps the value sent by the client when it is 1 to 64 letters, digits, `-`, `_` or `.`, and generates one otherwise. Log lines about a request carry it as `request_id`.
 
-Logs never contain passwords, tokens, session IDs, the `Authorization` header, the credentials of the MongoDB URI, document bodies or KV values.
+Logs never contain passwords, tokens, session IDs, the `Authorization` header, the credentials of `engine.uri`, document bodies or KV values.
 
 ## Monitoring
 
@@ -223,9 +223,8 @@ The status is `healthy`, `warning` or `critical`, with these problems:
 
 | Code | Severity | Condition |
 | ---- | -------- | --------- |
-| `flush_failing` | critical | The last checkpoint failed |
-| `recovery_write_failing` | critical | A log write failed in the last 5 minutes. The change stays in memory and the write is retried |
-| `mongodb_unreachable` | critical | The MongoDB ping fails |
+| `flush_failing` | critical | The last checkpoint (`/save`, `SAVE`) failed, for example because the data folder is not writable |
+| `recovery_write_failing` | critical | A write to the write-ahead log, or a background write of the store, failed in the last 5 minutes |
 | `error_rate_high` | warning | More than 1 % of at least 20 HTTP requests answered `5xx` over 5 minutes |
 | `latency_high` | warning | p95 above `log.slowRequestMs` over 5 minutes |
 | `hook_failing` | warning | A hook script failed in the last 5 minutes |
@@ -234,11 +233,11 @@ The status is `healthy`, `warning` or `critical`, with these problems:
 | `old_transaction` | warning | A transaction has been open for more than 10 minutes |
 | `default_admin_password` | warning | `admin`/`admin` still works |
 | `auth_disabled_public` | warning | Authentication is off on a non-loopback address |
-| `unclean_shutdown` | info | The log was replayed at startup, after a crash or a `kill -9` (shown for one hour) |
+| `unclean_shutdown` | info | The write-ahead log was replayed at startup, after a crash or a `kill -9` (shown for one hour) |
 
 With `monitoring.prometheus.enabled: true`, `GET /metrics` serves the counters, gauges and latency histograms in the Prometheus text format, for example `elysiandb_http_requests_total{status_class="5xx"}`, `elysiandb_http_request_duration_seconds`, `elysiandb_tcp_commands_total{command="GET"}`, `elysiandb_kv_keys` and `elysiandb_entities{entity_type="books"}`. Set `monitoring.prometheus.token` to let Prometheus authenticate with `Authorization: Bearer <token>`, since a scraper cannot log in with a session cookie in `user` mode.
 
-The CPU series are given two ways: `cpu_percent` is a share of all the threads the process may use (`gomaxprocs`), so 100 % means every thread is busy, and `cpu_cores` is the number of busy threads. The engine adds `log_since_checkpoint_bytes`, `log_bytes` (log on disk), `live_bytes` (data the log still holds), `checkpoint_ms`, `value_cache_hit_ratio` and `resident_bytes`, the heavy lane adds `heavy_queries_rps`, `heavy_queued_rps` (requests that waited for a slot), `heavy_waiting` (requests waiting now), `heavy_wait_p95_ms`, `heavy_rejected_rps` (answered `503` `server busy`) and `abandoned_rps` (requests stopped because their client left), and `tcp_auth_p95_ms` is the duration of TCP `AUTH`. Prometheus exports them as `elysiandb_heavy_queries_total`, `elysiandb_heavy_queued_total`, `elysiandb_heavy_rejected_total`, `elysiandb_requests_abandoned_total` and `elysiandb_heavy_waiting`. Hook statistics give the number of `ctx.query` calls, the rows they read and their cache hits.
+The CPU series are given two ways: `cpu_percent` is a share of all the threads the process may use (`gomaxprocs`), so 100 % means every thread is busy, and `cpu_cores` is the number of busy threads. The engine adds `log_since_checkpoint_bytes` (write-ahead log not yet written to tables), `log_bytes` (write-ahead log on disk), `live_bytes` (tables on disk), `checkpoint_ms` (duration of the last memtable flush), `value_cache_hit_ratio` (hit ratio of the block cache), `resident_bytes` (block cache and memtables), `block_cache_bytes`, `compaction_debt_bytes` (data the store still has to compact), `l0_files` and `open_snapshots`; the memory budget adds `memory_budget_bytes`, `memory_live_bytes` (live heap after the last garbage collection), `memory_pressure` (`0` under the budget, `1` when heavy requests wait, `2` when they are refused) and `memory_refused_rps`; the heavy lane adds `heavy_queries_rps`, `heavy_queued_rps` (requests that waited for a slot), `heavy_waiting` (requests waiting now), `heavy_wait_p95_ms`, `heavy_rejected_rps` (answered `503` `server busy`) and `abandoned_rps` (requests stopped because their client left), and `tcp_auth_p95_ms` is the duration of TCP `AUTH`. Prometheus exports them as `elysiandb_heavy_queries_total`, `elysiandb_heavy_queued_total`, `elysiandb_heavy_rejected_total`, `elysiandb_requests_abandoned_total`, `elysiandb_heavy_waiting`, `elysiandb_memory_refused_total`, `elysiandb_memory_budget_bytes`, `elysiandb_memory_live_bytes`, `elysiandb_memory_pressure`, `elysiandb_block_cache_bytes`, `elysiandb_compaction_debt_bytes` and `elysiandb_l0_files`. The `mongo_ping_ms`, `mongo_errors_rps` and `mongo_pool_in_use` series of the removed MongoDB engine stay in `/monitoring/series`, always empty or `0`, and `elysiandb_mongodb_errors_total` stays at `0`. Hook statistics give the number of `ctx.query` calls, the rows they read and their cache hits.
 
 With `monitoring.pprof.enabled: true`, admins can profile a running instance, for example `go tool pprof http://localhost:8089/debug/pprof/profile?seconds=30`.
 
@@ -419,7 +418,7 @@ Two backups of the same data hold the same files; only `created_at` in the manif
 ### Restore rules
 
 * The manifest and the SHA-256 of every file are checked, and every file is read, before anything is touched. An archive with a newer format version, a bad checksum, a missing or unexpected file, or an invalid line is refused with `400`, and the data is left as it was.
-* A restore replaces everything, without merging: documents, entity types, schemas and KV keys that are not in the archive no longer exist afterwards. With MongoDB, every collection of the `elysiandb` database is dropped.
+* A restore replaces everything, without merging: documents, entity types, schemas and KV keys that are not in the archive no longer exist afterwards.
 * The order is: `users.key`, then schemas, then documents, then KV keys. Keys that have already expired are skipped; the others keep their expiration date.
 * Documents are written as they are stored in the archive, without schema validation: the checksums guarantee that they are the documents of the backup.
 * Every session ends, the session that ran the restore included. Log in again with the accounts and passwords of the backup: the previous `admin` is replaced by the one in the archive.
@@ -429,7 +428,7 @@ Two backups of the same data hold the same files; only `created_at` in the manif
 { "status": "restore completed", "entities": { "book": 2, "empty": 0 }, "schemas": 3, "kv_keys": 12, "kv_keys_expired": 0 }
 ```
 
-If the data cannot be written once the restore has started (a MongoDB error, a full disk), the answer is `500` and the instance is left partly restored: run the restore again.
+If the data cannot be written once the restore has started (a full disk, for example), the answer is `500` and the instance is left partly restored: run the restore again.
 
 Stop the clients that write to ElysianDB during a restore: their writes would be lost or mixed with the restored data.
 
@@ -439,7 +438,7 @@ The archive holds `users.key` and the password hashes: it gives the same access 
 
 ### Engines and versions
 
-The manifest records the engine and the ElysianDB version, but the archive does not depend on the engine: a backup of the internal engine can be restored on MongoDB, and the other way around. The format version lets a newer ElysianDB read older archives; an ElysianDB refuses archives whose format is newer than its own.
+The manifest records the engine and the ElysianDB version, but the archive does not depend on the engine: archives of 0.2.4, of earlier builds of this version and of the removed MongoDB engine restore on this version, and archives of this version restore on 0.2.4. The format version lets a newer ElysianDB read older archives; an ElysianDB refuses archives whose format is newer than its own.
 
 ### Limits
 
@@ -459,16 +458,22 @@ At the first start on a 0.2.4 data folder (`elysiandb.json`, `elysiandbjson.json
 
 1. it checks that the disk has at least twice the size of the 0.2.4 files free;
 2. it reads them as 0.2.4 does: it replays the recovery logs when `store.crashRecovery.enabled` is true, drops the keys that expired, and repairs the list of entity types and the id indexes;
-3. it writes everything into the new engine in the `.migration` sub-folder, documents in the order of the 0.2.4 lists;
+3. it writes everything into a new store in the `.migration` sub-folder, documents in the order of the 0.2.4 lists;
 4. it reads the result back and compares every document, KV key and expiration date; any difference stops the start and leaves the folder untouched;
-5. it switches to the new files, moves the 0.2.4 files to `legacy-0.2.4/` (they are never deleted), and logs `storage migrated` with the counts.
+5. it switches to the new store, `pebble/`, moves the 0.2.4 files to `legacy-0.2.4/` (they are never deleted), and logs `storage migrated` with the counts.
 
 `users.key` and `sessions.json` keep their place and format. Backup archives keep format v1: archives of 0.2.4 restore on this version, and archives of this version restore on 0.2.4.
 
 To go back to 0.2.4:
 
-* without the writes made since the upgrade: stop ElysianDB, move the files of `legacy-0.2.4/` back to the data folder, remove `MANIFEST`, `log/`, `pages/`, the `kv-*` file and `legacy-checkpoint/`, and start 0.2.4;
+* without the writes made since the upgrade: stop ElysianDB, move the files of `legacy-0.2.4/` back to the data folder, remove `pebble/`, and start 0.2.4;
 * with them: run `elysiandb backup` and restore the archive with 0.2.4, or run `elysiandb export-legacy --output <empty folder>`, which writes a 0.2.4 data folder (with `users.key` and `sessions.json`), and start 0.2.4 with `store.folder` set to it.
+
+### Upgrading from an earlier build of this version
+
+Earlier builds of this version stored the data in log segments and trees of pages (`MANIFEST`, `log/`, `pages/`, `kv-*.ckpt`, and `checkpoint-*.ckpt` or `legacy-checkpoint/` for the first builds). At the first start on such a folder, ElysianDB migrates it the same way: it reads the last checkpoint and replays the log written after it, as these builds did after a crash, writes everything into a new store, compares every document, KV key and expiration date, then switches to `pebble/` and moves the previous files to `legacy-log-pages/`. Indexes are not carried over: they are built again at their first use. `users.key`, `sessions.json` and `legacy-0.2.4/` stay where they are.
+
+To go back to such a build without the writes made since the upgrade, stop ElysianDB, move the files of `legacy-log-pages/` back to the data folder, remove `pebble/`, and start the previous build. With the writes, use a backup archive or `elysiandb export-legacy`, as for 0.2.4.
 
 #### Behavior changes since 0.2.4
 
@@ -486,6 +491,8 @@ All of them fix defects of 0.2.4:
 * The `elysiandb` commands open the data folder without background work and close it cleanly, so the next start no longer reports an unclean shutdown. They cannot run on the folder of a running server.
 * The REST API filters through references (for example `filter[author.name]`) and the sort indexes use the referenced documents' current values.
 * Under overload, heavy requests beyond `api.query.maxQueued`, or waiting longer than `api.query.queueTimeoutMs`, are answered `503` `{"error":"server busy"}` with `Retry-After: 1` instead of waiting; set both to `-1` to wait as 0.2.4 did. The work of a request whose client left is stopped (`api.query.cancelOnDisconnect`).
+* With a memory budget, heavy requests wait while the process is close to it and are answered `503` `{"error":"server busy"}` when it is reached, instead of letting the process grow until the system stops it.
+* The MongoDB engine, in beta in 0.2.4, was removed: see [Migrating to the Pebble storage](migration-pebble.md).
 
 ### Upgrading from 0.2.1
 
@@ -521,132 +528,60 @@ From this version on, take a backup with `elysiandb backup` before each upgrade,
 
 ---
 
-## Storage Engine Selection
+## Storage Engine
 
-ElysianDB exposes a **pluggable storage engine abstraction** that allows the core database logic to run independently of the underlying storage implementation.
-
-Its goal is to switch storage backends **without changing the API, query language, ACL rules, hooks, transactions, or Admin UI**, with the same requests, payloads, and behaviors regardless of the engine in use. This goal is not reached yet: the `mongodb` engine is in beta, and switching from `internal` to `mongodb` can change behavior.
-
-Use the `internal` engine, the default and recommended one.
-
----
-
-### Engine Configuration
-
-The storage engine is selected in `elysian.yaml`:
+ElysianDB runs on its `internal` engine, the default and only one. It is designed together with the API: it knows entities, insertion order, references, schemas, the filter language and hooks, and it delegates the disk and memory mechanics to Pebble, an embedded key-value store written in pure Go.
 
 ```yaml
 engine:
   name: internal
 ```
 
-Some engines may require additional configuration fields.
-
----
-
-### Available Engines
-
-#### `internal` (default, recommended)
-
-The `internal` engine is the built-in storage engine provided by ElysianDB, and the recommended one. It is designed together with the API: it knows entities, insertion order, references, schemas, the filter language and hooks.
-
-It offers:
-
-* An append-only log that holds the data, with group commit and checkpoints
-* Copy-on-write entity state, so that reads never wait for writes
-* Indexes for sorts, filters, search and references, built when first needed
-* A memory budget
-* Full compatibility with all ElysianDB features (REST API, Query API, ACLs, hooks, transactions, Admin UI)
-
-See Storage engine internals below.
-
-This engine is **production-ready** and requires no external dependencies. It is well suited for prototyping, embedded deployments, internal tools, and high-performance read-heavy workloads.
-
----
-
-#### `mongodb` (beta)
-
-> **Beta.** The `mongodb` engine is not yet fully functional and is not interchangeable with the `internal` engine: some features are missing or behave differently, and part of the data still lives in the internal storage. Switching engines can change the behavior of your application. The remaining work is tracked in [#167](https://github.com/elysiandb/elysiandb/issues/167) and [#164](https://github.com/elysiandb/elysiandb/issues/164). Use the `internal` engine unless you are testing MongoDB support.
-
-The `mongodb` engine allows ElysianDB to use **MongoDB as its persistence layer**. It aims to offer the same API surface and developer experience as the `internal` engine.
-
-It provides:
-
-* External persistence backed by MongoDB
-* Native BSON support and document storage
-
-Once complete, it is meant for:
-
-* An external, battle-tested database
-* Backups and replication handled by MongoDB
-* Shared storage across multiple instances
-
-##### Configuration Example
-
-```yaml
-engine:
-  name: mongodb
-  uri: mongodb://elysian:elysian@localhost:27017/elysiandb
-```
-
-Switching between `internal` and `mongodb` keeps the same API and payloads, but the `mongodb` engine does not behave like the `internal` engine in every case yet: requests can return different results.
-
----
-
-### Design Goals
-
-The storage engine abstraction follows these principles:
-
-* Clear separation between **API logic** and **storage implementation**
-* Identical API behavior across engines
-* No feature loss when switching engines
-* Deterministic results regardless of backend
-* Minimal overhead for the default engine
-
-The `internal` engine meets these goals. The `mongodb` engine does not meet them yet: identical API behavior and no feature loss when switching engines are the remaining work of [#167](https://github.com/elysiandb/elysiandb/issues/167) and [#164](https://github.com/elysiandb/elysiandb/issues/164).
-
-Once they are met, this design allows ElysianDB to scale from an embedded, single-binary backend to an externally backed system without rewriting application logic.
-
----
-
-### Notes
-
-* If no engine is specified, `internal` is used by default, and it is the recommended engine
-* Engine selection is evaluated at startup
-* Switching engines may require data migration
-* All engines are meant to share the same query model, schema rules, ACLs, and hooks; the `mongodb` engine, in beta, does not fully share them yet
-
+The `mongodb` engine, in beta until 0.2.4, was removed. ElysianDB refuses to start with `engine.name: mongodb` and points to [Migrating to the Pebble storage](migration-pebble.md), which explains how to move its data with a backup archive. `engine.uri` is accepted and ignored.
 
 ---
 
 ### Storage engine internals
 
-This section describes the `internal` engine.
+**Pebble.** The `internal` engine stores everything in [Pebble](https://github.com/cockroachdb/pebble), in the `pebble/` sub-folder of `store.folder`: documents, KV keys and their expiration dates, accounts, ACLs, schemas, hooks and indexes. Pebble writes every change to a write-ahead log, keeps the recent changes in memtables, writes them to sorted tables and merges the tables in the background (compaction); a block cache keeps the blocks read most often. Pebble is a Go library: the binary stays a single static file, with no service to run next to it. `users.key` and `sessions.json` stay in `store.folder`.
 
-**The log is the data.** Every document and KV change is appended once to log segments (`log/000001.seg`, …, sealed at 64 MB), as the exact JSON the API returns. The changes of one request or of one transaction form a batch with a CRC32-C checksum, which a replay applies entirely or not at all. One writer writes the batches of every waiting request together (group commit).
+**Key families.** The engine keeps its own model and stores it in families of keys:
 
-**Entity state.** For each entity, the engine keeps the position of each document in the log, its insertion order, the id directory and the indexes as persistent trees of pages (`pages/000001.pgs`, …). Pages hold their keys and values as plain bytes, so the garbage collector does not walk them, and the pages used least are dropped from memory and read back from disk when the memory budget is reached. A write builds new versions of the few pages it touches, changes the pages it already copied in place within the same batch, and publishes them at once: a reader works on a consistent snapshot without any lock, and a write locks only its entity for a few microseconds. Deleting a document costs the same at 1,000 or 1,000,000 documents, and `DELETE /api/<entity>` is immediate. Writes that read a document first (updates, sub-entity merges) are checked at commit and replayed if another write changed that document meanwhile, so no update is lost.
+| Family | Key | Value |
+| ------ | --- | ----- |
+| Entity record | entity name | number, generation, next position, exact count of documents, version, references, state and counts of each index |
+| Documents | entity, position | the exact JSON the API returns; positions follow the insertion order |
+| Id directory | entity, document id | position |
+| Sort, filter and reference indexes | entity, index, index key, position | none |
+| Search | entity, three characters, block of 4,096 positions | the positions that contain the three characters |
+| KV | lowercase key, key | value and expiration date |
+| Expirations | expiration date, key | none |
+| Catalog | | entity types in creation order |
 
-**Indexes.** A field gets a sort index the first time it is sorted on, and a filter index the first time it is filtered on. Indexes are built in the background while queries keep working without them, then kept up to date by every write. The indexes an entity is waiting for are built together, in one pass over its documents, oldest request first; an entity of up to 512 documents gets its indexes at once. An index unused for an hour is released (its memory and its upkeep on writes) and rebuilt at its next use. Indexes never change results: a filter is answered from the index entries with the same filter functions as before (a day range on a date field, for example, is counted on the index without reading the documents), and the documents an index cannot decide on are checked one by one. Search uses an index of three-character sequences stored like the other indexes, and filters through references (`filter[author.name]`) use the index of the referenced entity and the reverse references.
+**Writes.** The changes of a request, of a transaction or of a batch of documents form one Pebble batch: after a crash, either all of them are there or none. A write locks only its entity, reads the documents it replaces, and updates the indexes and the exact count of the entity in the same batch, so a count never reads the documents. The search index is updated with Pebble merge operands, so a write adds or removes its positions without reading the lists of the other documents. Writes that read a document first (updates, sub-entity merges) are checked at commit and replayed if another write changed that document meanwhile, so no update is lost. Deleting a document costs the same at 1,000 or 1,000,000 documents, and `DELETE /api/<entity>` removes the whole entity at once with a range deletion; its space is given back by a compaction in the background.
 
-**Checkpoints and restarts.** Every `store.flushIntervalSeconds`, or when `store.crashRecovery.maxLogMB` of log has been written, the engine writes the pages changed since the previous checkpoint (never the documents again, never the unchanged pages) and switches `MANIFEST` to the new roots, without holding any lock that requests or the monitoring wait for. Its duration depends on the writes since the previous checkpoint, not on the size of the database. A checkpoint never starts sooner after the previous one than ten times its duration (at most five minutes), so that checkpoints take at most a tenth of the time under load. A restart opens the roots named in `MANIFEST`, reads pages on demand and replays the log written after the checkpoint, so its time depends on the recent writes, not on the size of the database. A torn last batch, left by a crash, is dropped. A folder written by an earlier build of this version (`MANIFEST` format 1) is upgraded at its first start; the previous checkpoint file is kept in `legacy-checkpoint/`.
+**Reads.** A list, a query, a count or an index build reads a Pebble snapshot: it never waits for writes and sees the documents and the indexes as they were at the same instant. Reading one document by id reads its latest version directly.
 
-**Compaction.** In the background, a log segment with less than half of live data is rewritten into the current one, and segments that no longer hold live data are deleted after a checkpoint. Page segments are cleaned the same way: the live pages of a page segment that is less than half used are copied by the next checkpoint, and the segment is deleted once no checkpoint uses it.
+**Indexes.** A field gets a sort index the first time it is sorted on, and a filter index the first time it is filtered on. Indexes are built in the background while queries keep working without them, then kept up to date by every write. A build reads the documents of a snapshot in batches of bounded memory, writes their entries as it goes, and takes into account the writes made meanwhile; `api.index.workers` builds run at the same time, the indexes an entity is waiting for are built together in one pass, oldest request first, and builds pause while the process is close to its memory budget. An entity of up to 512 documents gets its indexes at once. Indexes are kept on disk across restarts. An index unused for an hour is released (its entries and its upkeep on writes) and rebuilt at its next use. Indexes never change results: a filter is answered from the index entries with the same filter functions as before (a day range on a date field, for example, is counted on the index without reading the documents), and the documents an index cannot decide on are checked one by one. Search uses an index of three-character sequences, and filters through references (`filter[author.name]`) use the index of the referenced entity and the reverse references.
 
 **Durability.** The settings keep their meaning:
 
 | Setting | Guarantee |
 | ------- | --------- |
-| `store.crashRecovery.enabled: true` | A change is written to the log before the answer: it survives a `kill -9`, not a power cut |
-| `store.crashRecovery.enabled: false` | Changes are written in the background every `store.flushIntervalSeconds`: up to that window is lost in a crash |
-| `store.durability: fsync` | The log is synced once per group of writes before the answer: it survives a power cut |
-| `POST /save`, TCP `SAVE` | Writes a checkpoint and syncs it, without blocking other requests |
+| `store.crashRecovery.enabled: true` | A change is written to the write-ahead log before the answer: it survives a `kill -9`. The log is synced to disk every `store.flushIntervalSeconds`, which bounds what a power cut can lose |
+| `store.crashRecovery.enabled: false` | A change is answered as soon as it is queued for the write-ahead log, which is written and synced every `store.flushIntervalSeconds`: up to that window is lost in a crash |
+| `store.durability: fsync` | The write-ahead log is synced once per group of writes before the answer: acknowledged writes survive a power cut |
+| `POST /save`, TCP `SAVE` | Checks that the data folder is writable and syncs the write-ahead log, without blocking other requests |
 
-**Memory.** Documents and pages are kept as bytes, with no pointers for the garbage collector to scan. With `store.memory.limitMB` set, only the most read documents and pages stay in memory and the others are read from disk on demand, so the process stays within the budget at any volume. Without it, everything read stays in memory. After `DELETE /api/<entity>`, the memory of its documents is released and returned to the system. Large lists are streamed: their memory does not grow with their size.
+**Restarts.** On a clean shutdown, the memtables are written to disk, so the next start replays nothing. After a crash, Pebble replays the write-ahead log written since the last memtable flush, about the size of the memtables: the start time depends on the recent writes, not on the size of the database. A torn last batch, left by a crash, is dropped. ElysianDB then logs `unclean shutdown detected, log replayed`.
+
+**Memory.** Documents and indexes live on disk; memory holds Pebble's block cache, its memtables and the work of the requests. With a memory budget (`store.memory.limitMB`, or 75 % of the container limit), the whole process stays within it whatever the volume: 30 % of it goes to the block cache, up to 1/16 to the memtables, index builds use batches of at most 1/128 of it (between 4 and 64 MB), and the rest is left to requests, hooks, the API cache and the garbage collector, with `GOMEMLIMIT` set to the budget. ElysianDB measures the live heap every 50 ms: above 70 % of the budget, heavy requests wait for memory in the heavy lane (and are answered `503` `{"error":"server busy"}` after `api.query.queueTimeoutMs`) and index builds pause; above 85 %, the heavy requests and `ctx.query` calls in progress stop with `503` `{"error":"server busy"}`. Large lists are streamed: their memory does not grow with their size. After `DELETE /api/<entity>`, the blocks of the entity leave the block cache once the background compaction has removed them, and their memory is reused. Without a budget, the block cache holds up to 256 MB.
 
 **One process per folder.** The engine locks `elysiandb.lock` in the data folder. A second process on the same folder, `elysiandb backup` on the folder of a running server for example, stops with an error.
 
-**Shutdown.** On `SIGTERM`, ElysianDB stops accepting requests, lets the requests in flight finish (up to 10 seconds), writes a checkpoint and closes the log.
+**Shutdown.** On `SIGTERM`, ElysianDB stops accepting requests, lets the requests in flight finish (up to 10 seconds), writes the memtables to disk and closes the store.
+
+**Startup line.** `storage settings` gives how the settings were applied: durability (`write`, `background` or `fsync`), sync interval, memtable and block cache sizes, KV locks and index workers.
 
 ---
 
@@ -1525,7 +1460,7 @@ After repeated failed logins, the server answers `429 Too Many Requests` with a 
 * `GET /config` never returns secrets: the token is replaced with `***`, and the password of `engine.uri`, as well as its query parameters that hold secrets (passwords, keys, tokens, credentials), with `xxxxx`
 * Passwords set through the API, the Admin UI or the command line must be at least 8 characters long
 * Usernames have 1 to 128 characters, without spaces, control characters or `/`
-* `users.key`, `sessions.json`, the data files and the recovery logs are readable by their owner only (`0600`). Files of an existing store folder are switched to `0600` when ElysianDB starts
+* `users.key`, `sessions.json` and every file of the store, the write-ahead log included, are readable by their owner only (`0600`). Files of an existing store folder are switched to `0600` when ElysianDB starts
 * Every failed login is logged with the username and the client address
 
 ### Failed logins
@@ -2450,13 +2385,14 @@ You can also manually rebuild all indexes via the internal API or restart the da
 
 ## Persistence & Crash Recovery
 
-Data is automatically persisted:
+Every change is written to the write-ahead log of the store before the answer (see Durability in Storage engine internals). The log is synced to disk:
 
 1. **Periodically**, based on `store.flushIntervalSeconds`
-2. **On shutdown** (SIGTERM / SIGINT)
+2. **On shutdown** (SIGTERM / SIGINT), when the memtables are written to disk
 3. **On demand** via HTTP `/save` or TCP `SAVE`
+4. **Before every answer** with `store.durability: fsync`
 
-Crash recovery ensures data durability even if the process crashes mid-write. When the recovery log is replayed at startup, KV keys with a TTL keep their expiration date, and keys that expired in the meantime are skipped. Entries of any size are replayed. If a recovery log cannot be read, it is kept next to the data files with a `.failed` suffix (for example `elysiandb.store.recovery.log.failed`) instead of being deleted, and the error is logged.
+After a crash, the write-ahead log is replayed at startup: a batch is replayed entirely or not at all, KV keys with a TTL keep their expiration date, and keys that expired in the meantime are removed by the next expiration pass. The recovery logs of 0.2.4 are read once, by the migration (see Upgrading from 0.2.4); if one of them cannot be read, it is kept next to the data files with a `.failed` suffix (for example `elysiandb.store.recovery.log.failed`) instead of being deleted, and the error is logged.
 
 ---
 
@@ -2515,14 +2451,6 @@ Run tests:
 ```bash
 make test
 ```
-
-The MongoDB engine tests run only when `ELYSIAN_TEST_MONGODB_URI` points to a MongoDB server, for example with `docker compose -f docker/mongodb/docker-compose.yaml up -d`:
-
-```bash
-ELYSIAN_TEST_MONGODB_URI="mongodb://root:root@127.0.0.1:27017" make test
-```
-
-The CI starts a MongoDB service for them.
 
 Run performance benchmarks:
 
@@ -2628,7 +2556,7 @@ Run it while ElysianDB is stopped.
 
 ### 7. `reset`
 
-Deletes the data folder, schemas and users included. With MongoDB, it also drops the entity collections.
+Deletes the data folder, schemas and users included.
 
 ```bash
 elysiandb reset --force

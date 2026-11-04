@@ -11,9 +11,9 @@ import (
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/datastore"
 	"github.com/taymour/elysiandb/internal/globals"
-	"github.com/taymour/elysiandb/internal/journal"
 	"github.com/taymour/elysiandb/internal/legacy"
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/memory"
 	"github.com/taymour/elysiandb/internal/metrics"
 )
 
@@ -37,32 +37,32 @@ const (
 	ModeTool
 )
 
+func Durability(cfg *configuration.Config) datastore.Durability {
+	switch {
+	case strings.EqualFold(cfg.Store.Durability, "fsync"):
+		return datastore.DurabilitySync
+	case cfg.Store.CrashRecovery.Enabled:
+		return datastore.DurabilityWrite
+	}
+
+	return datastore.DurabilityBackground
+}
+
 func Options(cfg *configuration.Config, mode OpenMode) datastore.Options {
-	durability := journal.ModeBackground
-	if cfg.Store.CrashRecovery.Enabled {
-		durability = journal.ModeWrite
-	}
-
-	if strings.EqualFold(cfg.Store.Durability, "fsync") {
-		durability = journal.ModeSync
-	}
-
-	interval := time.Duration(cfg.Store.FlushIntervalSeconds) * time.Second
-
 	return datastore.Options{
-		Folder:          cfg.Store.Folder,
-		Shards:          cfg.Store.Shards,
-		Durability:      durability,
-		FlushInterval:   interval,
-		CheckpointEvery: interval,
-		MaxLogBytes:     cfg.Store.CrashRecovery.MaxLogMB * 1024 * 1024,
-		CacheBytes:      ValueCacheBytes(cfg),
-		PageCacheBytes:  PageCacheBytes(cfg),
-		IndexWorkers:    cfg.Api.Index.Workers,
-		Background:      mode == ModeServer,
-		LegacyRecovery:  cfg.Store.CrashRecovery.Enabled,
-		OnKVExpired:     metrics.KVExpired,
-		OnWriteError:    reportWriteError,
+		Folder:         cfg.Store.Folder,
+		Shards:         cfg.Store.Shards,
+		Durability:     Durability(cfg),
+		FlushInterval:  time.Duration(cfg.Store.FlushIntervalSeconds) * time.Second,
+		CacheBytes:     CacheBytes(cfg),
+		MemTableBytes:  MemTableBytes(cfg),
+		BuildBytes:     BuildBytes(cfg),
+		IndexWorkers:   cfg.Api.Index.Workers,
+		Background:     mode == ModeServer,
+		LegacyRecovery: cfg.Store.CrashRecovery.Enabled,
+		OnKVExpired:    metrics.KVExpired,
+		OnWriteError:   reportWriteError,
+		MemoryPressure: memory.UnderPressure,
 	}
 }
 
@@ -73,12 +73,35 @@ func reportWriteError(err error) {
 	}
 }
 
-var ValueCacheBytes = func(cfg *configuration.Config) int64 {
+const (
+	maxLogMemTable  = 64 << 20
+	minMemTable     = 4 << 20
+	defaultMemTable = 64 << 20
+)
+
+var CacheBytes = func(cfg *configuration.Config) int64 {
 	return 0
 }
 
-var PageCacheBytes = func(cfg *configuration.Config) int64 {
+var BuildBytes = func(cfg *configuration.Config) int64 {
 	return 0
+}
+
+var MemTableBytes = func(cfg *configuration.Config) int64 {
+	return logMemTable(cfg, defaultMemTable)
+}
+
+func logMemTable(cfg *configuration.Config, limit int64) int64 {
+	size := limit
+	if mb := cfg.Store.CrashRecovery.MaxLogMB; mb > 0 {
+		size = min(size, mb<<20)
+	}
+
+	return max(min(size, maxLogMemTable), minMemTable)
+}
+
+func LimitMemTable(cfg *configuration.Config, limit int64) int64 {
+	return logMemTable(cfg, limit)
 }
 
 func Open(mode OpenMode) error {
@@ -99,8 +122,8 @@ func Open(mode OpenMode) error {
 
 	current.Store(e)
 
-	if n := e.ReplayedRecords(); n > 0 {
-		metrics.RecoveryReplayed(int(n))
+	if e.UncleanShutdown() {
+		metrics.RecoveryReplayed(1)
 	}
 
 	return nil
@@ -167,14 +190,6 @@ func Checkpoint() error {
 const flushTarget = "store"
 
 func WriteToDB() {
-	_ = Checkpoint()
-}
-
-func WriteStoreDB() {
-	_ = Checkpoint()
-}
-
-func WriteJsonDB() {
 	_ = Checkpoint()
 }
 
@@ -321,20 +336,6 @@ func ResetStore() {
 	}
 }
 
-func ClearAll() {
-	e := current.Load()
-	if e == nil {
-		return
-	}
-
-	if err := e.Update(func(tx *datastore.Tx) error {
-		tx.ClearAll()
-		return nil
-	}); err != nil {
-		storageLog.Error("clear failed", "err", err)
-	}
-}
-
 func CountKeys() (uint64, uint64) {
 	e := current.Load()
 	if e == nil {
@@ -373,28 +374,13 @@ func KeyHasExpired(key string) bool {
 	return time.Now().Unix() >= exp
 }
 
-func CleanExpiratedKeys(now int64) {
-	if e := current.Load(); e != nil {
-		e.ExpireDue(now)
-	}
-}
-
-func CleanAllPastKeys() {
-	CleanExpiratedKeys(time.Now().Unix() - 1)
-}
-
 func CountJsonDocuments() uint64 {
 	e := current.Load()
 	if e == nil {
 		return 0
 	}
 
-	total := uint64(0)
-	for _, snap := range e.SnapshotAll() {
-		total += uint64(snap.Len())
-	}
-
-	return total
+	return uint64(e.Stats().Documents)
 }
 
 func ParseDocumentKey(key string) (string, string, bool) {
@@ -422,12 +408,17 @@ func GetJsonByKeyNoCopy(key string) (map[string]any, error) {
 		return nil, fmt.Errorf("key not found: %s", key)
 	}
 
-	doc, ok := e.Snapshot(entity).Get(id)
+	b, ok := e.Read(entity, id)
 	if !ok {
 		return nil, fmt.Errorf("key not found: %s", key)
 	}
 
-	return doc.Decode()
+	doc, err := datastore.DecodeMap(b)
+	if err == nil && doc == nil {
+		err = fmt.Errorf("document %s is not a JSON object", id)
+	}
+
+	return doc, err
 }
 
 var GetJsonByKey = GetJsonByKeyNoCopy
@@ -445,23 +436,6 @@ func PutJsonValue(key string, value map[string]any) error {
 
 	return e.Update(func(tx *datastore.Tx) error {
 		return tx.Put(entity, id, value)
-	})
-}
-
-func DeleteJsonByKey(key string) {
-	e := current.Load()
-	if e == nil {
-		return
-	}
-
-	entity, id, ok := ParseDocumentKey(key)
-	if !ok {
-		return
-	}
-
-	_ = e.Update(func(tx *datastore.Tx) error {
-		tx.Delete(entity, id)
-		return nil
 	})
 }
 

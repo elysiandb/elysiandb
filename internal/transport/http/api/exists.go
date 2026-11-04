@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/taymour/elysiandb/internal/engine"
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/valyala/fasthttp"
 )
 
@@ -10,7 +10,7 @@ func ExistsController(ctx *fasthttp.RequestCtx) {
 	id := ctx.UserValue("id").(string)
 	ctx.Response.Header.Set("Content-Type", "application/json")
 
-	exists := engine.EntityExists(entity, id)
+	exists := api_storage.EntityExists(entity, id)
 	response := []byte(`{"exists": false}`)
 	if exists {
 		response = []byte(`{"exists": true}`)

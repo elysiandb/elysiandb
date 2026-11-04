@@ -11,7 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/taymour/elysiandb/internal/engine"
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/valyala/fasthttp"
 )
@@ -103,7 +104,7 @@ func credentialsFingerprint(passwordHash string) string {
 }
 
 func storedUser(username string) (*BasicHashedUser, bool) {
-	data := engine.ReadEntityById(UserEntity, username)
+	data := api_storage.ReadEntityById(UserEntity, username)
 	if data == nil {
 		return nil, false
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
-	engine "github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/metrics"
 	"github.com/taymour/elysiandb/internal/storage"
@@ -140,13 +139,13 @@ func filtersKey(filters map[string]map[string]string) string {
 
 func entityVersion(entity string) string {
 	e := storage.Engine()
-	if e == nil || !engine.IsEngineInternal() {
+	if e == nil {
 		return ""
 	}
 
-	snap := e.Snapshot(entity)
+	gen, ver := e.EntityVersion(entity)
 
-	return fmt.Sprintf("%d.%d.%d", e.Instance(), snap.Generation(), snap.Version())
+	return fmt.Sprintf("%d.%d.%d", e.Instance(), gen, ver)
 }
 
 func copyRows(rows []map[string]any) []map[string]any {
@@ -159,10 +158,6 @@ func copyRows(rows []map[string]any) []map[string]any {
 }
 
 func listForHook(targetEntity string, filters map[string]map[string]string, guard *api_storage.Guard) ([]map[string]any, error) {
-	if !engine.IsEngineInternal() {
-		return engine.ListEntities(targetEntity, 0, 0, "", true, filters, "", ""), nil
-	}
-
 	return api_storage.ListEntitiesGuarded(targetEntity, 0, 0, "", true, filters, "", "", guard)
 }
 
@@ -268,7 +263,7 @@ func (r *Request) applyScript(h Hook, fnName string, entity map[string]any) erro
 			}
 
 			targetEntity := call.Arguments[0].String()
-			if engine.IsCoreEntityType(targetEntity) {
+			if api_storage.IsCoreEntityType(targetEntity) {
 				return vm.ToValue([]map[string]any{})
 			}
 

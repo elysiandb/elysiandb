@@ -2,8 +2,8 @@ package api
 
 import (
 	"github.com/taymour/elysiandb/internal/acl"
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/transport/http/observe"
@@ -19,7 +19,7 @@ func DestroyController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	engine.DeleteAllEntities(entity)
+	api_storage.DeleteAllEntities(entity)
 	acl.DeleteACLForEntityType(entity)
 	observe.Audit(ctx, "entities destroyed", "entity", entity)
 

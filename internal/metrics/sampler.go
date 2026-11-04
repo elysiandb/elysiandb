@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/memory"
 )
 
 type Sources struct {
@@ -24,8 +25,6 @@ type Sources struct {
 	AdminSessions        func() int
 	Transactions         func() (int, time.Duration)
 	HTTPConnections      func() int
-	MongoPing            func() (time.Duration, error)
-	MongoPoolInUse       func() int
 	DefaultAdminPassword func() bool
 	Engine               func() EngineSample
 	HeavyWaiting         func() int
@@ -40,6 +39,10 @@ type EngineSample struct {
 	ValueCacheMisses   int64
 	ResidentBytes      int64
 	CheckpointMs       float64
+	BlockCacheBytes    int64
+	CompactionDebt     int64
+	L0Files            int64
+	OpenSnapshots      int
 }
 
 type resolution struct {
@@ -78,8 +81,6 @@ type slowValues struct {
 	openFDs        float64
 	adminSessions  float64
 	diskBytes      float64
-	mongoPingMs    float64
-	mongoErr       error
 	defaultAdminPw bool
 }
 
@@ -120,7 +121,6 @@ func newSampler() *sampler {
 			openFDs:       math.NaN(),
 			adminSessions: math.NaN(),
 			diskBytes:     math.NaN(),
-			mongoPingMs:   math.NaN(),
 		},
 		problems: newProblemTracker(),
 	}
@@ -292,14 +292,6 @@ func (s *sampler) refreshSlow(src Sources, ticks int64) slowValues {
 		if src.AdminSessions != nil {
 			slow.adminSessions = float64(src.AdminSessions())
 		}
-		if src.MongoPing != nil {
-			d, err := src.MongoPing()
-			slow.mongoErr = err
-			slow.mongoPingMs = math.NaN()
-			if err == nil {
-				slow.mongoPingMs = float64(d) / float64(time.Millisecond)
-			}
-		}
 		slow.openFDs = openFileDescriptors()
 	}
 
@@ -394,9 +386,6 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 		s.gauges[sOpenTransactions] = float64(open)
 		s.gauges[sOldestTransaction] = oldest.Seconds()
 	}
-	if src.MongoPoolInUse != nil {
-		s.gauges[sMongoPoolInUse] = float64(src.MongoPoolInUse())
-	}
 
 	if src.HeavyWaiting != nil {
 		s.gauges[sHeavyWaiting] = float64(src.HeavyWaiting())
@@ -409,6 +398,10 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 		s.gauges[sLiveBytes] = float64(eng.LiveBytes)
 		s.gauges[sResidentBytes] = float64(eng.ResidentBytes)
 		s.gauges[sCheckpointMs] = eng.CheckpointMs
+		s.gauges[sBlockCacheBytes] = float64(eng.BlockCacheBytes)
+		s.gauges[sCompactionDebtBytes] = float64(eng.CompactionDebt)
+		s.gauges[sL0Files] = float64(eng.L0Files)
+		s.gauges[sOpenSnapshots] = float64(eng.OpenSnapshots)
 		s.valueCacheHits = eng.ValueCacheHits
 		s.valueCacheMisses = eng.ValueCacheMisses
 	}
@@ -419,7 +412,12 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 	s.gauges[sOpenFDs] = slow.openFDs
 	s.gauges[sAdminSessions] = slow.adminSessions
 	s.gauges[sDiskBytes] = slow.diskBytes
-	s.gauges[sMongoPingMs] = slow.mongoPingMs
+	s.gauges[sMongoPingMs] = math.NaN()
+
+	mem := memory.Snapshot()
+	s.gauges[sMemoryBudgetBytes] = float64(mem.Budget)
+	s.gauges[sMemoryLiveBytes] = float64(mem.Live)
+	s.gauges[sMemoryPressure] = float64(mem.Level)
 
 	return s
 }

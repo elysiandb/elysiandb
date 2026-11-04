@@ -6,12 +6,13 @@ import (
 	"slices"
 	"sort"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/taymour/elysiandb/internal/datastore"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/storage"
 
 	"github.com/taymour/elysiandb/internal/acl"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
@@ -25,12 +26,12 @@ func ExportController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 
-	if engine.IsEngineInternal() {
+	if true {
 		streamExport(ctx)
 		return
 	}
 
-	dump := engine.DumpAll()
+	dump := api_storage.DumpAll()
 	for _, entity := range accountEntities {
 		delete(dump, entity)
 	}

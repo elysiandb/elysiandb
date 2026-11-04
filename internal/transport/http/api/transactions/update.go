@@ -3,10 +3,10 @@ package api_transaction
 import (
 	"encoding/json"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/taymour/elysiandb/internal/acl"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
-	"github.com/taymour/elysiandb/internal/mongodb"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/transaction"
@@ -34,7 +34,7 @@ func UpdateTransactionController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	existing := engine.ReadEntityById(entity, id)
+	existing := api_storage.ReadEntityById(entity, id)
 	if existing == nil {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error":"entity not found"}`)
@@ -51,13 +51,6 @@ func UpdateTransactionController(ctx *fasthttp.RequestCtx) {
 
 	if globals.GetConfig().Api.Schema.Enabled && entity != schema.SchemaEntity {
 		var schemaData map[string]any
-
-		if engine.IsEngineMongoDB() {
-			schemaData = mongodb.GetEntitySchema(entity)
-		} else {
-			schemaData = nil
-		}
-
 		errors := schema.ValidateEntityUpdate(entity, existing, payload, schemaData)
 		if len(errors) > 0 {
 			ctx.SetStatusCode(fasthttp.StatusBadRequest)

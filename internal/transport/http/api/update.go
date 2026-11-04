@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"slices"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/taymour/elysiandb/internal/acl"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
-	"github.com/taymour/elysiandb/internal/mongodb"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
@@ -24,20 +24,13 @@ func UpdateByIdController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	stored := engine.ReadEntityById(entity, id)
+	stored := api_storage.ReadEntityById(entity, id)
 	if stored == nil {
 		sendEntityNotFound(ctx, nil)
 		return
 	}
 
 	var schemaData map[string]any
-
-	if engine.IsEngineMongoDB() {
-		schemaData = mongodb.GetEntitySchema(entity)
-	} else {
-		schemaData = nil
-	}
-
 	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, schemaData) {
 		var obj map[string]any
 		if json.Unmarshal(body, &obj) == nil {
@@ -83,13 +76,6 @@ func UpdateListController(ctx *fasthttp.RequestCtx) {
 	}
 
 	var schemaData map[string]any
-
-	if engine.IsEngineMongoDB() {
-		schemaData = mongodb.GetEntitySchema(entity)
-	} else {
-		schemaData = nil
-	}
-
 	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, schemaData) {
 		for _, obj := range list {
 			id, _ := obj["id"].(string)
@@ -118,7 +104,7 @@ func readEntitiesToUpdate(entity string, list []map[string]any) (map[string]map[
 			continue
 		}
 
-		data := engine.ReadEntityById(entity, id)
+		data := api_storage.ReadEntityById(entity, id)
 		if data == nil {
 			missing = append(missing, id)
 			continue
@@ -143,7 +129,7 @@ func handleSingleUpdate(ctx *fasthttp.RequestCtx, entity, id string, body []byte
 		return true
 	}
 
-	data := engine.UpdateEntityById(entity, id, single)
+	data := api_storage.UpdateEntityById(entity, id, single)
 
 	response, _ := json.Marshal(data)
 	sendJSONResponse(ctx, response)
@@ -159,7 +145,7 @@ func handleBatchUpdate(ctx *fasthttp.RequestCtx, entity string, list []map[strin
 		return
 	}
 
-	data := engine.UpdateListOfEntities(entity, list)
+	data := api_storage.UpdateListOfEntities(entity, list)
 	response, _ := json.Marshal(data)
 	sendJSONResponse(ctx, response)
 }

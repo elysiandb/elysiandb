@@ -104,10 +104,10 @@ describe("Monitoring", () => {
 
     it("fills every line of every tab", async () => {
         const user = userEvent.setup();
-        mockApi(routes({ ...OVERVIEW, instance: { ...OVERVIEW.instance, engine: "mongodb" } }));
+        mockApi(routes());
         const { container } = renderMonitoring();
 
-        await screen.findByRole("tab", { name: "MongoDB" });
+        await screen.findByRole("tab", { name: "Traffic" });
         for (const tab of screen.getAllByRole("tab")) {
             await user.click(tab);
             expect(tab).toHaveAttribute("aria-selected", "true");
@@ -115,18 +115,7 @@ describe("Monitoring", () => {
         }
     });
 
-    it("shows the MongoDB tab with the MongoDB engine", async () => {
-        const user = userEvent.setup();
-        mockApi(routes({ ...OVERVIEW, instance: { ...OVERVIEW.instance, engine: "mongodb" } }));
-        renderMonitoring();
-
-        await user.click(await screen.findByRole("tab", { name: "MongoDB" }));
-
-        expect(screen.getByRole("img", { name: "MongoDB ping" })).toBeInTheDocument();
-        expect(screen.getByRole("img", { name: "MongoDB pool connections in use" })).toBeInTheDocument();
-    });
-
-    it("falls back to the traffic tab when the MongoDB tab is not available", async () => {
+    it("falls back to the traffic tab for an unknown tab", async () => {
         mockApi(routes());
         renderMonitoring("/admin/monitoring?tab=mongodb");
 

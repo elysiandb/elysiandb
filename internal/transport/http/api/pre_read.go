@@ -23,34 +23,6 @@ func hookHelpers() chan struct{} {
 	return hookPool
 }
 
-func applyPreReadHooksAndFilter(
-	hooks *hook.Request,
-	entity string,
-	data []map[string]any,
-	matches func(map[string]any) bool,
-	offset int,
-	limit int,
-) []map[string]any {
-	selected := make([]map[string]any, 0)
-	for _, item := range data {
-		if hooks.Stopped() {
-			break
-		}
-
-		item = hooks.PreRead(entity, item)
-		if !matches(item) {
-			continue
-		}
-
-		selected = append(selected, item)
-		if limit > 0 && len(selected) >= offset+limit {
-			break
-		}
-	}
-
-	return api_storage.Paginate(selected, offset, limit)
-}
-
 func applyPostReadHooks(hooks *hook.Request, entity string, data []map[string]any) {
 	var next atomic.Int64
 	run := func() {

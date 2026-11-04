@@ -6,7 +6,6 @@ import (
 	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/taymour/elysiandb/internal/security"
@@ -63,7 +62,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	guard := requestGuard(ctx)
 	hooks := hook.NewRequest(currentUser).WithGuard(guard)
 
-	if engine.IsEngineInternal() && !paginateAfterHooks {
+	if !paginateAfterHooks {
 		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
 		fields := api_storage.ParseFieldsParam(fieldsParam)
 		mode := acl.ReadModeFor(currentUser, entity)
@@ -117,34 +116,27 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	}
 
 	var data []map[string]any
-	if paginateAfterHooks && engine.IsEngineInternal() {
+	if paginateAfterHooks {
 		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
 		res := api_storage.Plan(api_storage.ListQuery{Entity: entity, SortField: sortField, SortAsc: sortAscending, Search: search, Includes: includes, Guard: guard})
 		stored := func(item map[string]any) bool { return api_storage.StoredFiltersMatchEntity(item, filters) }
 		matches := func(item map[string]any) bool { return api_storage.FiltersMatchEntity(item, filters) }
 		candidates := api_storage.StoredCandidates(res.Snapshot(), filters, nil, includes)
 		data = lazyPreReadPage(hooks, entity, res, includes, stored, candidates, acl.ReadModeFor(currentUser, entity), currentUser, matches, offset, limit)
-	} else if paginateAfterHooks {
-		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
-		data = listEntities(guard, entity, 0, 0, sortField, sortAscending, nil, search, includes)
-		data = api_storage.ApplyStoredFiltersToList(data, filters, 0, 0)
 	} else {
 		data = listEntities(guard, entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
 	}
 
-	if !paginateAfterHooks || !engine.IsEngineInternal() {
+	if !paginateAfterHooks {
 		data = acl.FilterListOfEntities(currentUser, entity, data)
 	}
 
-	if paginateAfterHooks && !engine.IsEngineInternal() {
-		matches := func(item map[string]any) bool { return api_storage.FiltersMatchEntity(item, filters) }
-		data = applyPreReadHooksAndFilter(hooks, entity, data, matches, offset, limit)
-	} else if preReadHooks {
+	if preReadHooks {
 		for i, item := range data {
 			data[i] = hooks.PreRead(entity, item)
 		}
 
-		data = engine.ApplyFiltersToList(data, filters)
+		data = api_storage.ApplyFiltersToList(data, filters)
 	}
 
 	if guardStopped(ctx, guard) {
@@ -168,7 +160,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	if len(fields) > 0 {
 		filteredData := make([]map[string]interface{}, len(data))
 		for i, item := range data {
-			filteredData[i] = engine.FilterFields(item, fields)
+			filteredData[i] = api_storage.FilterFields(item, fields)
 		}
 
 		data = filteredData

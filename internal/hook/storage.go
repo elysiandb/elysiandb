@@ -3,9 +3,10 @@ package hook
 import (
 	"fmt"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/google/uuid"
 	"github.com/taymour/elysiandb/internal/docpath"
-	engine "github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 )
 
@@ -22,7 +23,7 @@ func CreateHook(hook *Hook) error {
 		hook.ID = uuid.New().String()
 	}
 
-	if engine.EntityExists(HookEntity, hook.ID) {
+	if api_storage.EntityExists(HookEntity, hook.ID) {
 		return fmt.Errorf("the hook '%s' already exists", hook.Name)
 	}
 
@@ -30,7 +31,7 @@ func CreateHook(hook *Hook) error {
 		hook.Script = defaultScriptForEvent(hook.Event)
 	}
 
-	err := engine.WriteEntity(HookEntity, hook.ToDataMap())
+	err := api_storage.WriteEntity(HookEntity, hook.ToDataMap())
 	if len(err) > 0 {
 		return fmt.Errorf("an error occurred while creating the hook: %v", err)
 	}
@@ -47,7 +48,7 @@ func UpdateHook(hook *Hook) error {
 		return err
 	}
 
-	if engine.UpdateEntityById(HookEntity, hook.ID, hook.ToDataMap()) == nil {
+	if api_storage.UpdateEntityById(HookEntity, hook.ID, hook.ToDataMap()) == nil {
 		return fmt.Errorf("the hook '%s' does not exist", hook.Name)
 	}
 
@@ -66,21 +67,21 @@ func defaultScriptForEvent(event string) string {
 }
 
 func DeleteHook(hookId string) error {
-	if !engine.EntityExists(HookEntity, hookId) {
+	if !api_storage.EntityExists(HookEntity, hookId) {
 		return fmt.Errorf("the hook with id '%s' does not exist", hookId)
 	}
 
-	engine.DeleteEntityById(HookEntity, hookId)
+	api_storage.DeleteEntityById(HookEntity, hookId)
 
 	return nil
 }
 
 func GetHookById(hookId string) (*Hook, error) {
-	if !engine.EntityExists(HookEntity, hookId) {
+	if !api_storage.EntityExists(HookEntity, hookId) {
 		return nil, fmt.Errorf("the hook with id '%s' does not exist", hookId)
 	}
 
-	data := engine.ReadEntityById(HookEntity, hookId)
+	data := api_storage.ReadEntityById(HookEntity, hookId)
 	if data == nil {
 		return nil, fmt.Errorf("an error occurred while retrieving the hook with id '%s'", hookId)
 	}

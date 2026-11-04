@@ -1,0 +1,249 @@
+{
+  "format": 2,
+  "kv": "kv-0000000000008038.ckpt",
+  "lsn": 8038,
+  "segment": 11,
+  "offset": 69920,
+  "created_at": "2026-11-04T15:50:06Z",
+  "types": [
+    "alpha",
+    "beta",
+    "gamma",
+    "delta"
+  ],
+  "entities": [
+    {
+      "name": "alpha",
+      "gen": 0,
+      "next_seq": 540,
+      "version": 7997,
+      "refs": [
+        {
+          "Path": "ref",
+          "Target": "alpha"
+        }
+      ],
+      "slots": {
+        "id": 68719521829,
+        "size": 210
+      },
+      "ids": {
+        "id": 73014445440,
+        "size": 253
+      },
+      "indexes": [
+        {
+          "name": "f:tags",
+          "root": {
+            "id": 73014457549,
+            "size": 605
+          }
+        },
+        {
+          "name": "f:title",
+          "root": {
+            "id": 73014478027,
+            "size": 751
+          }
+        },
+        {
+          "name": "g:",
+          "root": {
+            "id": 77309431429,
+            "size": 192
+          }
+        },
+        {
+          "name": "r:",
+          "root": {
+            "id": 77309433601,
+            "size": 77
+          }
+        },
+        {
+          "name": "s:n",
+          "root": {
+            "id": 77309438703,
+            "size": 202
+          }
+        }
+      ]
+    },
+    {
+      "name": "beta",
+      "gen": 0,
+      "next_seq": 632,
+      "version": 7991,
+      "refs": [
+        {
+          "Path": "ref",
+          "Target": "alpha"
+        }
+      ],
+      "slots": {
+        "id": 77309447947,
+        "size": 242
+      },
+      "ids": {
+        "id": 77309453489,
+        "size": 301
+      },
+      "indexes": [
+        {
+          "name": "f:tags",
+          "root": {
+            "id": 81604384703,
+            "size": 727
+          }
+        },
+        {
+          "name": "f:title",
+          "root": {
+            "id": 81604408593,
+            "size": 987
+          }
+        },
+        {
+          "name": "g:",
+          "root": {
+            "id": 85899367655,
+            "size": 192
+          }
+        },
+        {
+          "name": "r:",
+          "root": {
+            "id": 85899370136,
+            "size": 77
+          }
+        },
+        {
+          "name": "s:n",
+          "root": {
+            "id": 85899376362,
+            "size": 244
+          }
+        }
+      ]
+    },
+    {
+      "name": "delta",
+      "gen": 1,
+      "next_seq": 203,
+      "version": 8001,
+      "refs": [
+        {
+          "Path": "ref",
+          "Target": "alpha"
+        }
+      ],
+      "slots": {
+        "id": 85899379732,
+        "size": 66
+      },
+      "ids": {
+        "id": 85899381932,
+        "size": 105
+      },
+      "indexes": [
+        {
+          "name": "f:tags",
+          "root": {
+            "id": 85899386710,
+            "size": 234
+          }
+        },
+        {
+          "name": "f:title",
+          "root": {
+            "id": 90194313216,
+            "size": 336
+          }
+        },
+        {
+          "name": "g:",
+          "root": {
+            "id": 90194330673,
+            "size": 154
+          }
+        },
+        {
+          "name": "r:",
+          "root": {
+            "id": 90194330835,
+            "size": 868
+          }
+        },
+        {
+          "name": "s:n",
+          "root": {
+            "id": 90194333800,
+            "size": 77
+          }
+        }
+      ]
+    },
+    {
+      "name": "gamma",
+      "gen": 1,
+      "next_seq": 271,
+      "version": 7973,
+      "refs": [
+        {
+          "Path": "ref",
+          "Target": "alpha"
+        }
+      ],
+      "slots": {
+        "id": 90194338209,
+        "size": 114
+      },
+      "ids": {
+        "id": 90194340878,
+        "size": 147
+      },
+      "indexes": [
+        {
+          "name": "f:tags",
+          "root": {
+            "id": 90194347456,
+            "size": 308
+          }
+        },
+        {
+          "name": "f:title",
+          "root": {
+            "id": 90194358677,
+            "size": 433
+          }
+        },
+        {
+          "name": "g:",
+          "root": {
+            "id": 94489299620,
+            "size": 154
+          }
+        },
+        {
+          "name": "r:",
+          "root": {
+            "id": 94489299782,
+            "size": 1065
+          }
+        },
+        {
+          "name": "s:n",
+          "root": {
+            "id": 94489303732,
+            "size": 102
+          }
+        }
+      ]
+    }
+  ],
+  "live": {
+    "10": 52192,
+    "11": 35573,
+    "9": 57408
+  }
+}

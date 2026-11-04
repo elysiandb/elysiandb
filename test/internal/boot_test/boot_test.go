@@ -128,9 +128,6 @@ func TestMonitoringSources(t *testing.T) {
 	if sources.AdminSessions == nil || sources.DefaultAdminPassword == nil {
 		t.Fatalf("user mode reports sessions and the default password")
 	}
-	if sources.MongoPing != nil || sources.MongoPoolInUse != nil {
-		t.Fatalf("the internal engine has no MongoDB source")
-	}
 
 	if keys, _ := sources.KVKeys(); keys != 0 {
 		t.Fatalf("expected an empty store, got %d keys", keys)
@@ -189,25 +186,6 @@ func TestBootMonitoringStartsTheSampler(t *testing.T) {
 			t.Fatalf("the sampler did not record a point")
 		}
 		time.Sleep(50 * time.Millisecond)
-	}
-}
-
-func TestMongoHost(t *testing.T) {
-	cases := map[string]string{
-		"mongodb://user:secret@db.example.com:27017/elysiandb": "db.example.com:27017",
-		"mongodb://localhost:27017":                            "localhost:27017",
-		"not a uri %%":                                         "unknown",
-		"":                                                     "unknown",
-	}
-
-	for uri, want := range cases {
-		if got := boot.MongoHost(uri); got != want {
-			t.Fatalf("MongoHost(%q) = %q, want %q", uri, got, want)
-		}
-	}
-
-	if _, err := boot.MongoPing(); err == nil && globals.MongoClient == nil {
-		t.Fatalf("a ping without a client must fail")
 	}
 }
 

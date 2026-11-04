@@ -233,27 +233,6 @@ const TABS = [
             },
         ],
     },
-    {
-        id: "mongodb",
-        title: "monitoring.sections.mongodb",
-        mongodb: true,
-        sections: [
-            {
-                id: "mongodb",
-                charts: [
-                    { title: "monitoring.charts.mongoPing", unit: "ms", series: [
-                        { name: "mongo_ping_ms", label: "monitoring.series.ping", color: "green" },
-                    ] },
-                    { title: "monitoring.charts.mongoErrors", unit: "perMinute", scale: 60, series: [
-                        { name: "mongo_errors_rps", label: "monitoring.series.errors", color: "red" },
-                    ] },
-                    { title: "monitoring.charts.mongoPool", unit: "count", series: [
-                        { name: "mongo_pool_in_use", label: "monitoring.series.poolInUse", color: "cyan" },
-                    ] },
-                ],
-            },
-        ],
-    },
 ];
 
 const PHASES = {
@@ -498,8 +477,7 @@ export default function Monitoring() {
     const formatTime = (value) => format.time(value, { seconds: range === "15m" });
     const slowRequestMs = data?.series?.slow_request_ms;
     const threshold = slowRequestMs > 0 ? { value: slowRequestMs, label: t("monitoring.series.slowThreshold") } : undefined;
-    const isMongo = data?.overview?.instance?.engine === "mongodb";
-    const tabs = TABS.filter((item) => !item.mongodb || isMongo);
+    const tabs = TABS;
     const tab = tabs.find((item) => item.id === searchParams.get("tab")) ?? tabs[0];
 
     const chartCard = (chart) => (

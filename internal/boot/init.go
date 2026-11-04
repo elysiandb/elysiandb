@@ -2,11 +2,12 @@ package boot
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/configuration"
-	"github.com/taymour/elysiandb/internal/engine"
+	"github.com/taymour/elysiandb/internal/datastore"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/metrics"
@@ -50,8 +51,22 @@ func listener(server configuration.ServerConfig) string {
 	return fmt.Sprintf("%s:%d", server.Host, server.Port)
 }
 
+const migrationGuide = "docs/migration-pebble.md"
+
+func RequireInternalEngine(cfg *configuration.Config) {
+	switch cfg.Engine.Name {
+	case "", "internal":
+	case "mongodb":
+		log.Fatal("the mongodb engine was removed", "component", "boot", "engine", cfg.Engine.Name,
+			"hint", "set engine.name to internal and restore a backup taken with the previous version, see "+migrationGuide)
+	default:
+		log.Fatal("unsupported storage engine", "component", "boot", "engine", cfg.Engine.Name, "hint", "use internal, see "+migrationGuide)
+	}
+}
+
 func InitDB() {
 	cfg := globals.GetConfig()
+	RequireInternalEngine(cfg)
 
 	if cfg.Api.Cache.Enabled {
 		cache.InitCache(time.Duration(cfg.Api.Cache.CleanupIntervalSeconds) * time.Second)
@@ -63,14 +78,7 @@ func InitDB() {
 	}
 
 	logStorageLoaded(cfg, start)
-
-	switch {
-	case engine.IsEngineMongoDB():
-		InitMongoDBConnection()
-	case engine.IsEngineInternal():
-	default:
-		log.Fatal("unsupported storage engine", "component", "boot", "engine", cfg.Engine.Name, "hint", "use internal or mongodb")
-	}
+	logStorageSettings(cfg)
 
 	BootACL()
 	BootHooks()
@@ -79,6 +87,7 @@ func InitDB() {
 
 func InitTool() {
 	cfg := globals.GetConfig()
+	RequireInternalEngine(cfg)
 
 	start := time.Now()
 	if err := storage.Open(storage.ModeTool); err != nil {
@@ -87,9 +96,39 @@ func InitTool() {
 	}
 
 	logStorageLoaded(cfg, start)
+}
 
-	if engine.IsEngineMongoDB() {
-		InitMongoDBConnection()
+func durabilityName(d datastore.Durability) string {
+	switch d {
+	case datastore.DurabilitySync:
+		return "fsync"
+	case datastore.DurabilityWrite:
+		return "write"
+	}
+
+	return "background"
+}
+
+func logStorageSettings(cfg *configuration.Config) {
+	e := storage.Engine()
+	if e == nil {
+		return
+	}
+
+	opts := e.Settings()
+	storageLog.Info("storage settings",
+		"engine", "pebble",
+		"folder", filepath.Join(cfg.Store.Folder, datastore.PebbleFolder),
+		"durability", durabilityName(opts.Durability),
+		"wal_sync_interval_s", cfg.Store.FlushIntervalSeconds,
+		"memtable_mb", opts.MemTableBytes>>20,
+		"block_cache_mb", opts.CacheBytes>>20,
+		"kv_lock_shards", cfg.Store.Shards,
+		"index_workers", opts.IndexWorkers,
+	)
+
+	if cfg.Engine.URI != "" {
+		storageLog.Info("configuration key has no effect", "key", "engine.uri", "hint", "the internal engine does not use a connection URI")
 	}
 }
 

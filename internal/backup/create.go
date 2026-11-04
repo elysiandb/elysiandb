@@ -16,7 +16,6 @@ import (
 	"unicode/utf8"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/security"
@@ -132,8 +131,8 @@ type entityIterator func(entity string, fn func(data map[string]any) error) erro
 
 func snapshotReaders() (entityIterator, []string) {
 	e := storage.Engine()
-	if !engine.IsEngineInternal() || e == nil {
-		return engine.IterateEntities, engine.ListEntityTypes()
+	if e == nil {
+		return api_storage.IterateEntities, api_storage.ListEntityTypes()
 	}
 
 	snaps := e.SnapshotAll()

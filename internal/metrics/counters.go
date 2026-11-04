@@ -30,6 +30,7 @@ const (
 	cHeavyQueued
 	cHeavyRejected
 	cRequestsAbandoned
+	cMemoryRefused
 	cKVGets
 	cKVSets
 	cKVDeletes
@@ -170,6 +171,10 @@ func HeavyRejected() {
 	add(cHeavyRejected, 1)
 }
 
+func MemoryRefused() {
+	add(cMemoryRefused, 1)
+}
+
 func RequestAbandoned() {
 	add(cRequestsAbandoned, 1)
 }
@@ -220,10 +225,6 @@ func CacheMiss() {
 
 func ForcedFlush() {
 	add(cForcedFlushes, 1)
-}
-
-func MongoError() {
-	add(cMongoErrors, 1)
 }
 
 func RecoveryWriteFailed(err error) {

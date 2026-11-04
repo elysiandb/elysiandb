@@ -21,9 +21,9 @@ func entityVersion(entity string) string {
 		return ""
 	}
 
-	snap := e.Snapshot(entity)
+	gen, ver := e.EntityVersion(entity)
 
-	return strconv.FormatUint(e.Instance(), 36) + "." + strconv.FormatUint(snap.Generation(), 36) + "." + strconv.FormatUint(snap.Version(), 36)
+	return strconv.FormatUint(e.Instance(), 36) + "." + strconv.FormatUint(gen, 36) + "." + strconv.FormatUint(ver, 36)
 }
 
 func CacheDependencies(entity, includes string, withACL bool) []string {

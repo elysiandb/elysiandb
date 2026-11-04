@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/metrics"
 	"github.com/taymour/elysiandb/internal/query"
@@ -60,19 +59,11 @@ func guardStopped(ctx *fasthttp.RequestCtx, guard *api_storage.Guard) bool {
 }
 
 func listEntities(guard *api_storage.Guard, entity string, limit, offset int, sortField string, sortAscending bool, filters map[string]map[string]string, search, includes string) []map[string]any {
-	if !engine.IsEngineInternal() {
-		return engine.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includes)
-	}
-
 	data, _ := api_storage.ListEntitiesGuarded(entity, limit, offset, sortField, sortAscending, filters, search, includes, guard)
 
 	return data
 }
 
 func executeQuery(guard *api_storage.Guard, q query.Query) ([]map[string]any, error) {
-	if !engine.IsEngineInternal() {
-		return engine.ExecuteQuery(q)
-	}
-
 	return api_storage.ExecuteQueryGuarded(q, guard)
 }

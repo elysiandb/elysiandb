@@ -63,26 +63,24 @@ func writeCount(ctx *fasthttp.RequestCtx, count int, cacheEntity string, hash []
 	}
 }
 
-func documentBytes(docs []datastore.Doc) ([][]byte, int, error) {
-	parts := make([][]byte, 0, len(docs))
+func writeDocuments(ctx *fasthttp.RequestCtx, docs []datastore.Doc, cacheEntity string, hash []byte, cacheHeader bool, deps []string) error {
+	cacheOn := globals.GetConfig().Api.Cache.Enabled && hash != nil
+	parts := make([][]byte, 0, min(len(docs), 1024))
 	size := 2
-	for _, d := range docs {
-		b, err := d.Bytes()
+	read := 0
+	for read < len(docs) {
+		if size > streamThreshold && !(cacheOn && cache.CacheStore.Accepts(size)) {
+			break
+		}
+
+		b, err := docs[read].Bytes()
 		if err != nil {
-			return nil, 0, err
+			return err
 		}
 
 		parts = append(parts, b)
 		size += len(b) + 1
-	}
-
-	return parts, size, nil
-}
-
-func writeDocuments(ctx *fasthttp.RequestCtx, docs []datastore.Doc, cacheEntity string, hash []byte, cacheHeader bool, deps []string) error {
-	parts, size, err := documentBytes(docs)
-	if err != nil {
-		return err
+		read++
 	}
 
 	ctx.Response.Header.Set("Content-Type", "application/json")
@@ -91,18 +89,32 @@ func writeDocuments(ctx *fasthttp.RequestCtx, docs []datastore.Doc, cacheEntity 
 	}
 	ctx.SetStatusCode(fasthttp.StatusOK)
 
-	cacheable := globals.GetConfig().Api.Cache.Enabled && hash != nil && cache.CacheStore.Accepts(size)
+	cacheable := cacheOn && read == len(docs) && cache.CacheStore.Accepts(size)
 	if !cacheable && size > streamThreshold {
+		rest := docs[read:]
 		ctx.SetBodyStreamWriter(func(w *bufio.Writer) {
-			_ = w.WriteByte('[')
-			for i, p := range parts {
-				if i > 0 {
+			n := 0
+			emit := func(p []byte) {
+				if n > 0 {
 					_ = w.WriteByte(',')
 				}
 				_, _ = w.Write(p)
-				if i%64 == 63 {
+				if n%64 == 63 {
 					_ = w.Flush()
 				}
+				n++
+			}
+
+			_ = w.WriteByte('[')
+			for _, p := range parts {
+				emit(p)
+			}
+			for _, d := range rest {
+				b, err := d.Bytes()
+				if err != nil {
+					break
+				}
+				emit(b)
 			}
 			_ = w.WriteByte(']')
 		})

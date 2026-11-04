@@ -39,6 +39,7 @@ var promCounters = []promCounter{
 	{"elysiandb_heavy_queued_total", "Heavy requests that waited for a slot.", cHeavyQueued, ""},
 	{"elysiandb_heavy_rejected_total", "Heavy requests rejected because the queue was full or too slow.", cHeavyRejected, ""},
 	{"elysiandb_requests_abandoned_total", "Requests stopped because the client closed the connection.", cRequestsAbandoned, ""},
+	{"elysiandb_memory_refused_total", "Heavy requests refused or stopped because the memory budget was reached.", cMemoryRefused, ""},
 	{"elysiandb_kv_operations_total", "KV operations by kind.", cKVGets, `op="get"`},
 	{"elysiandb_kv_operations_total", "", cKVSets, `op="set"`},
 	{"elysiandb_kv_operations_total", "", cKVDeletes, `op="delete"`},
@@ -79,8 +80,12 @@ var promGauges = []struct {
 	{"elysiandb_admin_sessions", "Active Admin UI sessions.", sAdminSessions},
 	{"elysiandb_open_transactions", "Open transactions.", sOpenTransactions},
 	{"elysiandb_oldest_transaction_seconds", "Age of the oldest open transaction.", sOldestTransaction},
-	{"elysiandb_mongodb_ping_seconds", "MongoDB ping latency.", sMongoPingMs},
-	{"elysiandb_mongodb_pool_in_use", "MongoDB pool connections in use.", sMongoPoolInUse},
+	{"elysiandb_memory_budget_bytes", "Memory budget of the process, 0 when there is none.", sMemoryBudgetBytes},
+	{"elysiandb_memory_live_bytes", "Live Go heap after the last garbage collection.", sMemoryLiveBytes},
+	{"elysiandb_memory_pressure", "0 under the budget, 1 when heavy requests wait, 2 when they are refused.", sMemoryPressure},
+	{"elysiandb_block_cache_bytes", "Bytes held by the storage block cache.", sBlockCacheBytes},
+	{"elysiandb_compaction_debt_bytes", "Bytes the storage engine still has to compact.", sCompactionDebtBytes},
+	{"elysiandb_l0_files", "Files in the first level of the storage engine.", sL0Files},
 }
 
 func Prometheus() []byte {
@@ -113,9 +118,6 @@ func Prometheus() []byte {
 			v, ok := latest.gauges[g.series]
 			if !ok || math.IsNaN(v) {
 				continue
-			}
-			if g.series == sMongoPingMs {
-				v /= 1000
 			}
 			writeHeader(&b, g.name, g.help, "gauge")
 			writeSample(&b, g.name, "", v)

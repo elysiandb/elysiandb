@@ -190,7 +190,6 @@
         "problems": {
             "flush_failing": "La última escritura en disco falló",
             "recovery_write_failing": "La escritura en el registro de recuperación falló en los últimos 5 minutos",
-            "mongodb_unreachable": "MongoDB no está accesible",
             "error_rate_high": "Más del 1 % de las solicitudes fallaron en los últimos 5 minutos",
             "latency_high": "La latencia p95 supera el umbral de solicitudes lentas desde hace 5 minutos",
             "hook_failing": "El hook {hook_id} falló en los últimos 5 minutos",
@@ -246,8 +245,7 @@
             "dataFolder": "Carpeta de datos"
         },
         "engines": {
-            "internal": "Interno",
-            "mongodb": "MongoDB (beta)"
+            "internal": "Interno"
         },
         "features": {
             "cache": "Caché de la API",
@@ -278,8 +276,7 @@
             "persistence": "Persistencia",
             "runtime": "Ejecución",
             "connections": "Conexiones",
-            "hooks": "Hooks",
-            "mongodb": "MongoDB"
+            "hooks": "Hooks"
         },
         "tabs": {
             "data": "Datos",
@@ -320,10 +317,7 @@
             "transactions": "Transacciones abiertas",
             "oldestTransaction": "Transacción abierta más antigua",
             "hookExecutions": "Ejecuciones de hooks por segundo",
-            "hookDuration": "Duración de los hooks (p95)",
-            "mongoPing": "Ping de MongoDB",
-            "mongoErrors": "Errores de MongoDB por minuto",
-            "mongoPool": "Conexiones del pool de MongoDB en uso"
+            "hookDuration": "Duración de los hooks (p95)"
         },
         "series": {
             "http": "HTTP",
@@ -377,8 +371,6 @@
             "openTransactions": "Transacciones",
             "oldestTransaction": "Antigüedad",
             "executions": "Ejecuciones",
-            "ping": "Ping",
-            "poolInUse": "En uso",
             "logSinceCheckpoint": "Desde el último checkpoint",
             "logBytes": "Log en disco",
             "liveBytes": "Datos vivos"

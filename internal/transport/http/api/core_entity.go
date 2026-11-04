@@ -2,7 +2,6 @@ package api
 
 import (
 	api_storage "github.com/taymour/elysiandb/internal/api"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/valyala/fasthttp"
 )
 
@@ -11,7 +10,7 @@ const coreEntityForbiddenBody = `{"error":"core entities cannot be accessed thro
 func RejectCoreEntity(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
 		entity, _ := ctx.UserValue("entity").(string)
-		if engine.IsCoreEntityType(entity) {
+		if api_storage.IsCoreEntityType(entity) {
 			sendCoreEntityForbidden(ctx)
 			return
 		}
@@ -22,7 +21,7 @@ func RejectCoreEntity(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 
 func referencesCoreEntity(entityTypes []string) bool {
 	for _, entityType := range entityTypes {
-		if engine.IsCoreEntityType(entityType) {
+		if api_storage.IsCoreEntityType(entityType) {
 			return true
 		}
 	}

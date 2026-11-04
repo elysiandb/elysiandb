@@ -190,7 +190,6 @@
         "problems": {
             "flush_failing": "La dernière écriture sur disque a échoué",
             "recovery_write_failing": "L'écriture dans le journal de reprise a échoué au cours des 5 dernières minutes",
-            "mongodb_unreachable": "MongoDB est injoignable",
             "error_rate_high": "Plus de 1 % des requêtes ont échoué au cours des 5 dernières minutes",
             "latency_high": "La latence p95 dépasse le seuil des requêtes lentes depuis 5 minutes",
             "hook_failing": "Le hook {hook_id} a échoué au cours des 5 dernières minutes",
@@ -246,8 +245,7 @@
             "dataFolder": "Dossier des données"
         },
         "engines": {
-            "internal": "Interne",
-            "mongodb": "MongoDB (bêta)"
+            "internal": "Interne"
         },
         "features": {
             "cache": "Cache de l'API",
@@ -278,8 +276,7 @@
             "persistence": "Persistance",
             "runtime": "Exécution",
             "connections": "Connexions",
-            "hooks": "Hooks",
-            "mongodb": "MongoDB"
+            "hooks": "Hooks"
         },
         "tabs": {
             "data": "Données",
@@ -320,10 +317,7 @@
             "transactions": "Transactions ouvertes",
             "oldestTransaction": "Plus ancienne transaction ouverte",
             "hookExecutions": "Exécutions de hooks par seconde",
-            "hookDuration": "Durée des hooks (p95)",
-            "mongoPing": "Ping MongoDB",
-            "mongoErrors": "Erreurs MongoDB par minute",
-            "mongoPool": "Connexions du pool MongoDB utilisées"
+            "hookDuration": "Durée des hooks (p95)"
         },
         "series": {
             "http": "HTTP",
@@ -377,8 +371,6 @@
             "openTransactions": "Transactions",
             "oldestTransaction": "Ancienneté",
             "executions": "Exécutions",
-            "ping": "Ping",
-            "poolInUse": "Utilisées",
             "logSinceCheckpoint": "Depuis le dernier checkpoint",
             "logBytes": "Log sur disque",
             "liveBytes": "Données vivantes"

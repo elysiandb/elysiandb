@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/memory"
 	"github.com/taymour/elysiandb/internal/metrics"
 
 	"github.com/taymour/elysiandb/internal/datastore"
@@ -37,10 +38,13 @@ type ListQuery struct {
 
 type ListResult struct {
 	snap  *datastore.Snapshot
+	guard *Guard
 	Docs  []datastore.Doc
 	Total int
 	Err   error
 }
+
+const decodeCheckEvery = 512
 
 func (r *ListResult) Snapshot() *datastore.Snapshot {
 	return r.snap
@@ -57,7 +61,12 @@ func (r *ListResult) IDs() []string {
 
 func (r *ListResult) Decode() []map[string]any {
 	out := make([]map[string]any, 0, len(r.Docs))
-	for _, d := range r.Docs {
+	for i, d := range r.Docs {
+		if i%decodeCheckEvery == decodeCheckEvery-1 && memoryExhausted(r.guard) {
+			r.Err = ErrBusy
+			return []map[string]any{}
+		}
+
 		doc, err := d.Decode()
 		if err == nil {
 			out = append(out, doc)
@@ -80,7 +89,6 @@ func includeReader() func(entity, id string) map[string]any {
 }
 
 func newDocReader() func(entity, id string) map[string]any {
-	snaps := map[string]*datastore.Snapshot{}
 	cache := map[string][]byte{}
 
 	return func(entity, id string) map[string]any {
@@ -97,20 +105,9 @@ func newDocReader() func(entity, id string) map[string]any {
 			return nil
 		}
 
-		snap := snaps[entity]
-		if snap == nil {
-			snap = e.Snapshot(entity)
-			snaps[entity] = snap
-		}
-
-		doc, ok := snap.Get(id)
+		b, ok := e.Read(entity, id)
 		if !ok {
 			cache[key] = nil
-			return nil
-		}
-
-		b, err := doc.Bytes()
-		if err != nil {
 			return nil
 		}
 
@@ -353,8 +350,16 @@ func exactOf(kind byte, s string) []byte {
 }
 
 func collect(view *datastore.IndexView, lo, hi []byte, set *datastore.Bitset, keep func(key string) bool) {
+	if keep == nil {
+		view.ScanSeqs(lo, hi, func(seq uint32) bool {
+			set.Set(seq)
+			return true
+		})
+		return
+	}
+
 	view.ScanRange(lo, hi, func(key string, seq uint32) bool {
-		if keep == nil || keep(key) {
+		if keep(key) {
 			set.Set(seq)
 		}
 		return true
@@ -635,7 +640,7 @@ func Plan(q ListQuery) *ListResult {
 		}
 	}
 
-	res := &ListResult{snap: snap}
+	res := &ListResult{snap: snap, guard: q.Guard}
 	reader := includeReader()
 
 	heavy := needsMatch && heavyPlan(snap, cand, evalIncludes)
@@ -680,7 +685,7 @@ func Plan(q ListQuery) *ListResult {
 				release = r
 			}
 
-			if q.Guard.Check() != nil {
+			if q.Guard.Check() != nil || memoryExhausted(q.Guard) {
 				expired = true
 				return false
 			}
@@ -731,6 +736,8 @@ func Plan(q ListQuery) *ListResult {
 }
 
 const (
+	scanShare             = 4
+	detachedPage          = 1000
 	heavyCandidates       = 2048
 	guardInterval         = 64
 	defaultQueuePerWorker = 4
@@ -815,21 +822,40 @@ func heavyPlan(snap *datastore.Snapshot, cand candidates, evalIncludes string) b
 	return maybe > heavyCandidates
 }
 
+func tryHeavySlot(slots chan struct{}, guard *Guard) bool {
+	if guard != nil && memory.UnderPressure() {
+		return false
+	}
+
+	select {
+	case slots <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func rejectHeavy(guard *Guard) error {
+	metrics.HeavyRejected()
+	if memory.UnderPressure() {
+		metrics.MemoryRefused()
+	}
+
+	return guard.fail(ErrBusy)
+}
+
 func acquireHeavyLane(guard *Guard) (func(), error) {
 	slots := heavyLane()
 	release := func() { <-slots }
 
-	select {
-	case slots <- struct{}{}:
+	if tryHeavySlot(slots, guard) {
 		metrics.HeavyQuery(0)
 		return release, nil
-	default:
 	}
 
 	patient := guard == nil || guard.Admitted
 	if limit := heavyQueueLimit(cap(slots)); !patient && limit >= 0 && heavyWaiting.Load() >= limit {
-		metrics.HeavyRejected()
-		return nil, guard.fail(ErrBusy)
+		return nil, rejectHeavy(guard)
 	}
 
 	heavyWaiting.Add(1)
@@ -844,23 +870,38 @@ func acquireHeavyLane(guard *Guard) (func(), error) {
 	defer ticker.Stop()
 
 	for {
-		select {
-		case slots <- struct{}{}:
+		if tryHeavySlot(slots, guard) {
 			metrics.HeavyQuery(time.Since(start))
 			return release, nil
-		case <-ticker.C:
 		}
+
+		<-ticker.C
 
 		if err := guard.Check(); err != nil {
 			metrics.HeavyQuery(time.Since(start))
 			return nil, err
 		}
 
-		if timeout >= 0 && time.Since(start) >= timeout {
+		if memoryExhausted(guard) {
 			metrics.HeavyRejected()
-			return nil, guard.fail(ErrBusy)
+			return nil, guard.Err()
+		}
+
+		if timeout >= 0 && time.Since(start) >= timeout {
+			return nil, rejectHeavy(guard)
 		}
 	}
+}
+
+func memoryExhausted(guard *Guard) bool {
+	if guard == nil || !memory.IsCritical() {
+		return false
+	}
+
+	metrics.MemoryRefused()
+	_ = guard.fail(ErrBusy)
+
+	return true
 }
 
 func DeadlineFromConfig() time.Time {
@@ -892,7 +933,11 @@ func (p *planner) directPage(q ListQuery) ([]datastore.Doc, int, bool) {
 	snap := p.snap
 	total := snap.Len()
 	docs := []datastore.Doc{}
+	detach := q.Limit > 0 && q.Limit <= detachedPage
 	take := func(d datastore.Doc) bool {
+		if detach {
+			d = d.Detach()
+		}
 		docs = append(docs, d)
 		return q.Limit <= 0 || len(docs) < q.Limit
 	}
@@ -948,7 +993,7 @@ func countMatches(snap *datastore.Snapshot, cand candidates, needsMatch, everyth
 }
 
 func iterateCandidates(snap *datastore.Snapshot, cand candidates, fn func(datastore.Doc) bool) {
-	if cand.all || cand.set.Count()*16 > snap.Len() {
+	if cand.all || cand.set.Count()*scanShare > snap.Len() {
 		snap.Ascend(0, fn)
 		return
 	}
@@ -970,9 +1015,13 @@ func paginate(src orderedSource, offset, limit int, countAll bool) ([]datastore.
 	}
 
 	docs := []datastore.Doc{}
+	detach := limit > 0 && limit <= detachedPage
 	n := 0
 	src(func(d datastore.Doc) bool {
 		if n >= offset && (limit <= 0 || len(docs) < limit) {
+			if detach {
+				d = d.Detach()
+			}
 			docs = append(docs, d)
 		}
 		n++
@@ -1199,112 +1248,16 @@ func (p *planner) sortPathCrossesReference(field string) bool {
 	return false
 }
 
-func groupEnd(view *datastore.IndexView, i int) int {
-	key, _, ok := view.At(i)
-	if !ok {
-		return i
-	}
-
-	return view.Rank([]byte(datastore.KeyPayload(key)+"\xff\xff\xff\xff\xff")) - 1
-}
-
-func groupStart(view *datastore.IndexView, i int) int {
-	key, _, ok := view.At(i)
-	if !ok {
-		return i
-	}
-
-	return view.Rank([]byte(datastore.KeyPayload(key)))
-}
-
-func emitRange(view *datastore.IndexView, start, end int, fn func(seq uint32) bool) bool {
-	i := start
-	stopped := false
-	view.AscendAt(start, func(_ string, seq uint32) bool {
-		if i > end {
-			return false
-		}
-		i++
-		if !fn(seq) {
-			stopped = true
-			return false
-		}
-		return true
-	})
-
-	return !stopped
-}
-
 func walkSortIndexFrom(view *datastore.IndexView, ascending bool, skip int, fn func(seq uint32) bool) {
-	missingStart := view.Rank([]byte{datastore.SortRankMissing})
-	total := view.Len()
-
-	if ascending {
-		view.AscendAt(skip, func(_ string, seq uint32) bool { return fn(seq) })
-		return
-	}
-
-	end := missingStart - 1
-	for end >= 0 {
-		start := groupStart(view, end)
-		size := end - start + 1
-		if skip >= size {
-			skip -= size
-			end = start - 1
-			continue
-		}
-
-		if !emitRange(view, start+skip, end, fn) {
-			return
-		}
-
-		skip = 0
-		end = start - 1
-	}
-
-	if missingStart+skip < total {
-		view.AscendAt(missingStart+skip, func(_ string, seq uint32) bool { return fn(seq) })
-	}
+	view.Walk(ascending, skip, fn)
 }
 
 func walkSortIndex(view *datastore.IndexView, ascending bool, fn func(seq uint32) bool) {
-	walkSortIndexFrom(view, ascending, 0, fn)
+	view.Walk(ascending, 0, fn)
 }
 
 func walkSortGroups(view *datastore.IndexView, ascending bool, fn func(seqs []uint32) bool) {
-	missingStart := view.Rank([]byte{datastore.SortRankMissing})
-	total := view.Len()
-
-	group := func(start, end int) bool {
-		seqs := make([]uint32, 0, end-start+1)
-		emitRange(view, start, end, func(seq uint32) bool {
-			seqs = append(seqs, seq)
-			return true
-		})
-		return fn(seqs)
-	}
-
-	if ascending {
-		for i := 0; i < missingStart; {
-			end := groupEnd(view, i)
-			if !group(i, end) {
-				return
-			}
-			i = end + 1
-		}
-	} else {
-		for end := missingStart - 1; end >= 0; {
-			start := groupStart(view, end)
-			if !group(start, end) {
-				return
-			}
-			end = start - 1
-		}
-	}
-
-	if missingStart < total {
-		group(missingStart, total-1)
-	}
+	view.WalkGroups(ascending, fn)
 }
 
 func decodeMap(b []byte) map[string]any {

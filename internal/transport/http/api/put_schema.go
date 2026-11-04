@@ -3,7 +3,8 @@ package api
 import (
 	"encoding/json"
 
-	"github.com/taymour/elysiandb/internal/engine"
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
@@ -11,7 +12,7 @@ import (
 func PutSchemaController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 
-	if !engine.EntityTypeExists(entity) {
+	if !api_storage.EntityTypeExists(entity) {
 		ctx.SetStatusCode(fasthttp.StatusNotFound)
 		ctx.SetBodyString(`{"error":"entity not found"}`)
 		return
@@ -33,7 +34,7 @@ func PutSchemaController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	storable := engine.UpdateEntitySchema(entity, fieldsRaw)
+	storable := api_storage.UpdateEntitySchema(entity, fieldsRaw)
 
 	observe.Audit(ctx, "schema changed", "entity", entity)
 	out, _ := json.Marshal(storable)

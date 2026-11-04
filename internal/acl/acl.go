@@ -3,7 +3,8 @@ package acl
 import (
 	"strings"
 
-	"github.com/taymour/elysiandb/internal/engine"
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/security"
 )
@@ -22,7 +23,7 @@ func CanCreateEntity(username, entity string) bool {
 }
 
 func canCreateNewEntityType(username, entity string) bool {
-	if strings.HasPrefix(entity, globals.CoreFieldsPrefix) || engine.EntityTypeExists(entity) {
+	if strings.HasPrefix(entity, globals.CoreFieldsPrefix) || api_storage.EntityTypeExists(entity) {
 		return false
 	}
 
@@ -51,7 +52,7 @@ func CanWriteListOfEntities(username, entity string, list []map[string]any) bool
 
 	for _, item := range list {
 		id, ok := item["id"].(string)
-		if !ok || id == "" || !engine.EntityExists(entity, id) {
+		if !ok || id == "" || !api_storage.EntityExists(entity, id) {
 			continue
 		}
 
@@ -135,7 +136,7 @@ func canOwningUpdate(acl *ACL, entity, id, username string, updates map[string]a
 		return false
 	}
 
-	existing := engine.ReadEntityById(entity, id)
+	existing := api_storage.ReadEntityById(entity, id)
 	owner, ok := existing[UsernameField].(string)
 	if !ok || owner == "" || owner != username {
 		return false
