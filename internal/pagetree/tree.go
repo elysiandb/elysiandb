@@ -36,6 +36,10 @@ func (t Tree) Loader() Loader {
 }
 
 func (t Tree) page(r *Ref) *Page {
+	if !r.hot.Load() {
+		r.hot.Store(true)
+	}
+
 	if p := r.mem.Load(); p != nil {
 		return p
 	}
@@ -174,6 +178,176 @@ func (t Tree) put(r *Ref, key, val []byte) (*Ref, *Ref, bool) {
 	right := c.split(t.tok)
 
 	return cr, t.fresh(right), replaced
+}
+
+func (t Tree) Upsert(key string, fn func(val []byte, found bool) []byte) Tree {
+	k := []byte(key)
+	if t.root == nil {
+		v := fn(nil, false)
+		p := emptyLeaf(t.tok)
+		p.insertKey(0, k)
+		p.insertVal(0, v)
+		p.total = 1
+		t.root = t.fresh(p)
+		return t
+	}
+
+	ref, split, _ := t.upsert(t.root, k, fn)
+	if split == nil {
+		t.root = ref
+		return t
+	}
+
+	left, right := t.page(ref), t.page(split)
+	root := &Page{owner: t.tok, koff: []uint32{0}}
+	root.insertKey(0, left.minKey())
+	root.insertKey(1, right.minKey())
+	root.kids = []*Ref{ref, split}
+	root.sizes = []uint64{left.total, right.total}
+	root.total = left.total + right.total
+	t.root = t.fresh(root)
+
+	return t
+}
+
+func (t Tree) upsert(r *Ref, key []byte, fn func([]byte, bool) []byte) (*Ref, *Ref, bool) {
+	p := t.page(r)
+	if p.leaf {
+		i, found := p.search(key)
+		c, cr := t.own(r, p)
+		if found {
+			cur := c.val(i)
+			next := fn(cur, true)
+			if len(next) != len(cur) || (len(next) > 0 && &next[0] != &cur[0]) {
+				c.setVal(i, next)
+			}
+		} else {
+			c.insertKey(i, key)
+			c.insertVal(i, fn(nil, false))
+			c.total++
+		}
+
+		if !c.full() {
+			return cr, nil, found
+		}
+
+		right := c.split(t.tok)
+
+		return cr, t.fresh(right), found
+	}
+
+	i := p.childIndex(key)
+	kid, split, found := t.upsert(p.kids[i], key, fn)
+
+	if kid == p.kids[i] && split == nil && found && p.owner == t.tok && t.tok.active() {
+		return r, nil, true
+	}
+
+	c, cr := t.own(r, p)
+	kp := t.page(kid)
+	c.kids[i] = kid
+	c.sizes[i] = kp.total
+	c.setKey(i, kp.minKey())
+	if !found {
+		c.total++
+	}
+
+	if split != nil {
+		sp := t.page(split)
+		c.insertKey(i+1, sp.minKey())
+		c.kids = insertAt(c.kids, i+1, split)
+		c.sizes = insertAt(c.sizes, i+1, sp.total)
+	}
+
+	if !c.full() {
+		return cr, nil, found
+	}
+
+	right := c.split(t.tok)
+
+	return cr, t.fresh(right), found
+}
+
+func (t Tree) Update(key string, fn func(val []byte) []byte) (Tree, bool) {
+	if t.root == nil {
+		return t, false
+	}
+
+	ref, split, found := t.update(t.root, []byte(key), fn)
+	if !found {
+		return t, false
+	}
+
+	if split == nil {
+		t.root = ref
+		return t, true
+	}
+
+	left, right := t.page(ref), t.page(split)
+	root := &Page{owner: t.tok, koff: []uint32{0}}
+	root.insertKey(0, left.minKey())
+	root.insertKey(1, right.minKey())
+	root.kids = []*Ref{ref, split}
+	root.sizes = []uint64{left.total, right.total}
+	root.total = left.total + right.total
+	t.root = t.fresh(root)
+
+	return t, true
+}
+
+func (t Tree) update(r *Ref, key []byte, fn func([]byte) []byte) (*Ref, *Ref, bool) {
+	p := t.page(r)
+	if p.leaf {
+		i, found := p.search(key)
+		if !found {
+			return r, nil, false
+		}
+
+		c, cr := t.own(r, p)
+		cur := c.val(i)
+		next := fn(cur)
+		if len(next) != len(cur) || (len(next) > 0 && &next[0] != &cur[0]) {
+			c.setVal(i, next)
+		}
+
+		if !c.full() {
+			return cr, nil, true
+		}
+
+		right := c.split(t.tok)
+
+		return cr, t.fresh(right), true
+	}
+
+	i := p.childIndex(key)
+	kid, split, found := t.update(p.kids[i], key, fn)
+	if !found {
+		return r, nil, false
+	}
+
+	if kid == p.kids[i] && split == nil && p.owner == t.tok && t.tok.active() {
+		return r, nil, true
+	}
+
+	c, cr := t.own(r, p)
+	kp := t.page(kid)
+	c.kids[i] = kid
+	c.sizes[i] = kp.total
+
+	if split != nil {
+		sp := t.page(split)
+		c.insertKey(i+1, sp.minKey())
+		c.kids = insertAt(c.kids, i+1, split)
+		c.sizes = insertAt(c.sizes, i+1, sp.total)
+	}
+
+	if !c.full() {
+		return cr, nil, true
+	}
+
+	right := c.split(t.tok)
+
+	return cr, t.fresh(right), true
 }
 
 func (t Tree) Delete(key string) (Tree, bool) {

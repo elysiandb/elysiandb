@@ -8,11 +8,12 @@ import (
 )
 
 const (
-	compactionInterval = 10 * time.Second
-	compactionRatio    = 0.5
-	compactionBatch    = 512
-	checkpointSpacing  = 10
-	checkpointMaxGap   = 5 * time.Minute
+	compactionInterval    = 10 * time.Second
+	compactionRatio       = 0.5
+	compactionBatch       = 512
+	checkpointSpacing     = 10
+	checkpointMaxGap      = 5 * time.Minute
+	forcedCheckpointBytes = 256 << 20
 )
 
 func (e *Engine) maintenanceLoop() {
@@ -45,7 +46,7 @@ func (e *Engine) maintenanceLoop() {
 			}
 		}
 
-		if (compacted || e.checkpointDue()) && e.checkpointSpaced() {
+		if (compacted || e.checkpointDue()) && (e.checkpointSpaced() || e.LogSinceCheckpoint() >= e.forcedCheckpointLog()) {
 			compacted = false
 			if err := e.checkpoint(false); err != nil {
 				engineLog.Error("checkpoint failed", "err", err)
@@ -72,6 +73,14 @@ func (e *Engine) LogSinceCheckpoint() int64 {
 	}
 
 	return int64(pos.Segment-ck.Segment-1)*size + (size - int64(ck.Offset)) + int64(pos.Offset)
+}
+
+func (e *Engine) forcedCheckpointLog() int64 {
+	if e.opts.MaxLogBytes > 0 {
+		return e.opts.MaxLogBytes
+	}
+
+	return forcedCheckpointBytes
 }
 
 func (e *Engine) checkpointSpaced() bool {
@@ -197,7 +206,7 @@ func (e *Engine) moveDocs(name string, recs []journal.Record) (int, error) {
 		r := ent.root.Load()
 		batch := []journal.Record{}
 		for _, rec := range recs[start:end] {
-			s, ok := r.ids.Get(rec.Key)
+			s, ok := r.slotByID(rec.Key, true)
 			if !ok || s.lsn != rec.LSN || rec.Gen != r.gen {
 				continue
 			}
@@ -268,6 +277,9 @@ type EngineStats struct {
 	Inline              bool
 	Documents           int64
 	ResidentStructBytes int64
+	PageCacheLimit      int64
+	PageLoads           int64
+	PageWrites          int64
 }
 
 func (e *Engine) Stats() EngineStats {
@@ -303,15 +315,15 @@ func (e *Engine) Stats() EngineStats {
 
 	e.catalogMu.RLock()
 	for _, ent := range e.entities {
-		r := ent.root.Load()
-		n := int64(r.slots.Len())
-		s.Documents += n
-		s.ResidentStructBytes += n * 160
-		for _, idx := range r.indexes {
-			s.ResidentStructBytes += int64(idx.tree.Len()) * 48
-		}
+		s.Documents += int64(ent.root.Load().slots.Len())
 	}
 	e.catalogMu.RUnlock()
+
+	pages := e.pages.stats()
+	s.ResidentStructBytes = pages.Resident
+	s.PageCacheLimit = pages.Limit
+	s.PageLoads = pages.Loads
+	s.PageWrites = pages.Writes
 
 	return s
 }

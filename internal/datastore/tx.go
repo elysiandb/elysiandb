@@ -281,7 +281,7 @@ func (e *Engine) commit(tx *Tx) (journal.Ticket, error) {
 		entity, id := splitDocKey(key)
 		current := uint64(0)
 		if ent := e.entity(entity, false); ent != nil {
-			if s, ok := ent.root.Load().ids.Get(id); ok {
+			if s, ok := ent.root.Load().slotByID(id, true); ok {
 				current = s.lsn
 			}
 		}

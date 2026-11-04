@@ -12,18 +12,24 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/journal"
 	"github.com/taymour/elysiandb/internal/log"
-	"github.com/taymour/elysiandb/internal/ptree"
+	"github.com/taymour/elysiandb/internal/pagetree"
 )
 
 const (
-	checkpointMagic   = "ELYCKPT1"
-	checkpointVersion = 1
-	manifestFormat    = 1
+	checkpointMagic     = "ELYCKPT1"
+	kvCheckpointMagic   = "ELYKVCK1"
+	checkpointVersion   = 1
+	manifestFormat      = 1
+	manifestFormatPages = 2
+	LegacyCheckpoints   = "legacy-checkpoint"
+	pageWalkEvery       = time.Minute
+	pageVictimsPerCycle = 2
 )
 
 var (
@@ -32,13 +38,55 @@ var (
 )
 
 type manifest struct {
-	Format     int    `json:"format"`
-	Checkpoint string `json:"checkpoint"`
-	LSN        uint64 `json:"lsn"`
-	Segment    uint32 `json:"segment"`
-	Offset     uint32 `json:"offset"`
-	CreatedAt  string `json:"created_at"`
-	Version    string `json:"elysiandb_version,omitempty"`
+	Format     int              `json:"format"`
+	Checkpoint string           `json:"checkpoint,omitempty"`
+	KV         string           `json:"kv,omitempty"`
+	LSN        uint64           `json:"lsn"`
+	Segment    uint32           `json:"segment"`
+	Offset     uint32           `json:"offset"`
+	CreatedAt  string           `json:"created_at"`
+	Version    string           `json:"elysiandb_version,omitempty"`
+	Types      []string         `json:"types,omitempty"`
+	Entities   []manifestEntity `json:"entities,omitempty"`
+	Live       map[string]int64 `json:"live,omitempty"`
+}
+
+type pageRoot struct {
+	ID   uint64 `json:"id"`
+	Size uint32 `json:"size"`
+}
+
+type manifestIndex struct {
+	Name    string   `json:"name"`
+	Root    pageRoot `json:"root"`
+	Dormant bool     `json:"dormant,omitempty"`
+}
+
+type manifestEntity struct {
+	Name    string          `json:"name"`
+	Gen     uint64          `json:"gen"`
+	NextSeq uint32          `json:"next_seq"`
+	Version uint64          `json:"version"`
+	Refs    []RefPath       `json:"refs,omitempty"`
+	Slots   pageRoot        `json:"slots"`
+	IDs     pageRoot        `json:"ids"`
+	Indexes []manifestIndex `json:"indexes,omitempty"`
+}
+
+func rootOf(t pagetree.Tree) pageRoot {
+	if r := t.Root(); r != nil {
+		return pageRoot{ID: r.ID(), Size: r.Size()}
+	}
+
+	return pageRoot{}
+}
+
+func (e *Engine) openTree(r pageRoot) pagetree.Tree {
+	if r.ID == 0 {
+		return pagetree.New(e.pages)
+	}
+
+	return pagetree.Open(e.pages, pagetree.StoredRef(r.ID, r.Size))
 }
 
 func readManifest(dir string) (*manifest, error) {
@@ -56,8 +104,8 @@ func readManifest(dir string) (*manifest, error) {
 		return nil, fmt.Errorf("cannot read %s: %w", ManifestFile, err)
 	}
 
-	if m.Format != manifestFormat {
-		return nil, fmt.Errorf("%s has format %d, this version reads format %d", ManifestFile, m.Format, manifestFormat)
+	if m.Format != manifestFormat && m.Format != manifestFormatPages {
+		return nil, fmt.Errorf("%s has format %d, this version reads formats %d and %d", ManifestFile, m.Format, manifestFormat, manifestFormatPages)
 	}
 
 	return &m, nil
@@ -382,25 +430,27 @@ func (e *Engine) restore(ck *checkpointData) error {
 	e.types = append([]string(nil), ck.types...)
 	e.catalogMu.Unlock()
 
-	needValues := e.inline
-	var loads []*slot
-
+	live := map[uint32]int64{}
 	for _, ce := range ck.entities {
 		ent := e.entity(ce.name, true)
 
-		seqKeys := make([]string, len(ce.slots))
-		for i, s := range ce.slots {
-			seqKeys[i] = seqKey(s.seq)
-			if needValues {
-				loads = append(loads, s)
-			}
+		bySeq := append([]*slot(nil), ce.slots...)
+		sort.Slice(bySeq, func(i, j int) bool { return bySeq[i].seq < bySeq[j].seq })
+		seqKeys := make([]string, len(bySeq))
+		seqVals := make([][]byte, len(bySeq))
+		for i, sl := range bySeq {
+			seqKeys[i] = seqKey(sl.seq)
+			seqVals[i] = encodeSlot(nil, *sl)
+			live[sl.loc.Segment] += int64(sl.loc.Length)
 		}
 
 		byID := append([]*slot(nil), ce.slots...)
 		sort.Slice(byID, func(i, j int) bool { return byID[i].id < byID[j].id })
 		idKeys := make([]string, len(byID))
-		for i, s := range byID {
-			idKeys[i] = s.id
+		idVals := make([][]byte, len(byID))
+		for i, sl := range byID {
+			idKeys[i] = sl.id
+			idVals[i] = seqBytes(sl.seq)
 		}
 
 		r := &root{
@@ -408,13 +458,13 @@ func (e *Engine) restore(ck *checkpointData) error {
 			nextSeq: ce.nextSeq,
 			version: ce.version,
 			refs:    ce.refs,
-			slots:   ptree.FromSorted(seqKeys, ce.slots),
-			ids:     ptree.FromSorted(idKeys, byID),
+			slots:   pagetree.FromSorted(e.pages, seqKeys, seqVals),
+			ids:     pagetree.FromSorted(e.pages, idKeys, idVals),
 			indexes: map[string]*index{},
 		}
 
 		for _, ci := range ce.indexes {
-			r.indexes[ci.spec.Name()] = &index{spec: ci.spec, ready: true, tree: ptree.FromSorted(ci.keys, make([]struct{}, len(ci.keys)))}
+			r.indexes[ci.spec.Name()] = &index{spec: ci.spec, ready: true, tree: pagetree.FromSorted(e.pages, ci.keys, nil)}
 		}
 
 		if x, ok := ck.extras[ce.name]; ok {
@@ -423,23 +473,18 @@ func (e *Engine) restore(ck *checkpointData) error {
 					r.indexes[spec.Name()] = &index{spec: spec, dormant: true}
 				}
 			}
-
-			if x.search {
-				e.searchOnOpen = append(e.searchOnOpen, ent)
-			}
 		}
 
 		ent.root.Store(r)
 	}
 
-	sort.Slice(loads, func(i, j int) bool {
-		if loads[i].loc.Segment != loads[j].loc.Segment {
-			return loads[i].loc.Segment < loads[j].loc.Segment
-		}
-		return loads[i].loc.Offset < loads[j].loc.Offset
-	})
+	e.live.reset(live)
 
-	kvLoads := append([]ckKV(nil), ck.kv...)
+	return e.restoreKV(ck.kv)
+}
+
+func (e *Engine) restoreKV(entries []ckKV) error {
+	kvLoads := append([]ckKV(nil), entries...)
 	sort.Slice(kvLoads, func(i, j int) bool {
 		a, b := kvLoads[i].entry.loc, kvLoads[j].entry.loc
 		if a.Segment != b.Segment {
@@ -449,14 +494,6 @@ func (e *Engine) restore(ck *checkpointData) error {
 	})
 
 	sc := &segmentCache{j: e.j}
-	for _, s := range loads {
-		v, err := sc.value(s.loc)
-		if err != nil {
-			return err
-		}
-		s.data = v
-	}
-
 	for _, kv := range kvLoads {
 		v, err := sc.value(kv.entry.loc)
 		if err != nil {
@@ -469,6 +506,126 @@ func (e *Engine) restore(ck *checkpointData) error {
 		e.kv.setLocked(sh, kv.key, kv.entry)
 		sh.mu.Unlock()
 	}
+
+	return nil
+}
+
+func (e *Engine) restorePages(m *manifest) error {
+	e.catalogMu.Lock()
+	e.types = append([]string(nil), m.Types...)
+	e.catalogMu.Unlock()
+
+	for _, me := range m.Entities {
+		ent := e.entity(me.Name, true)
+		r := &root{
+			gen:     me.Gen,
+			nextSeq: me.NextSeq,
+			version: me.Version,
+			refs:    me.Refs,
+			slots:   e.openTree(me.Slots),
+			ids:     e.openTree(me.IDs),
+			indexes: map[string]*index{},
+		}
+
+		for _, mi := range me.Indexes {
+			spec, ok := ParseIndexName(mi.Name)
+			if !ok {
+				return fmt.Errorf("%s names an unknown index %q", ManifestFile, mi.Name)
+			}
+
+			if mi.Dormant {
+				r.indexes[mi.Name] = &index{spec: spec, dormant: true}
+				continue
+			}
+
+			r.indexes[mi.Name] = &index{spec: spec, ready: true, tree: e.openTree(mi.Root)}
+		}
+
+		ent.root.Store(r)
+	}
+
+	live := map[uint32]int64{}
+	for seg, n := range m.Live {
+		id, err := strconv.ParseUint(seg, 10, 32)
+		if err != nil {
+			return fmt.Errorf("%s has an invalid segment %q", ManifestFile, seg)
+		}
+		live[uint32(id)] = n
+	}
+	e.live.reset(live)
+
+	if m.KV == "" {
+		return nil
+	}
+
+	kv, err := readKVCheckpoint(filepath.Join(e.dir, m.KV))
+	if err != nil {
+		return fmt.Errorf("cannot read the checkpoint %s: %w", m.KV, err)
+	}
+
+	return e.restoreKV(kv)
+}
+
+func readKVCheckpoint(path string) ([]ckKV, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(data) < len(kvCheckpointMagic)+4 || string(data[:len(kvCheckpointMagic)]) != kvCheckpointMagic {
+		return nil, errCheckpoint
+	}
+
+	body := data[:len(data)-4]
+	if crc32.Checksum(body, castagnoli) != binary.LittleEndian.Uint32(data[len(data)-4:]) {
+		return nil, errCheckpoint
+	}
+
+	r := &ckReader{data: body, pos: len(kvCheckpointMagic)}
+	var out []ckKV
+	for n := r.uvarint(); n > 0 && r.err == nil; n-- {
+		key := r.str()
+		out = append(out, ckKV{key: key, entry: &kvEntry{lsn: r.uvarint(), expiresAt: r.varint(), loc: r.loc()}})
+	}
+
+	if r.err == nil && r.pos != len(r.data) {
+		r.err = errCheckpoint
+	}
+
+	return out, r.err
+}
+
+func (e *Engine) finishUpgrade() error {
+	if err := e.checkpoint(true); err != nil {
+		return fmt.Errorf("cannot write the upgraded checkpoint: %w", err)
+	}
+
+	entries, err := os.ReadDir(e.dir)
+	if err != nil {
+		return err
+	}
+
+	legacy := filepath.Join(e.dir, LegacyCheckpoints)
+	moved := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasPrefix(name, "checkpoint-") || !strings.HasSuffix(name, ".ckpt") {
+			continue
+		}
+
+		if err := os.MkdirAll(legacy, 0o755); err != nil {
+			return err
+		}
+
+		if err := os.Rename(filepath.Join(e.dir, name), filepath.Join(legacy, name)); err != nil {
+			return err
+		}
+		moved++
+	}
+
+	_ = syncDir(e.dir)
+	engineLog.Info("storage format upgraded", "from", e.upgradeFrom, "to", manifestFormatPages, "kept_in", LegacyCheckpoints, "files", moved)
+	e.upgradeFrom = 0
 
 	return nil
 }
@@ -519,7 +676,7 @@ func (e *Engine) checkpoint(force bool) error {
 	snaps := make([]entitySnapshot, 0, len(ents))
 	for _, ent := range ents {
 		ent.apply.Lock()
-		snaps = append(snaps, entitySnapshot{name: ent.name, r: ent.root.Load(), search: ent.search.Load() != nil})
+		snaps = append(snaps, entitySnapshot{name: ent.name, r: ent.root.Load()})
 		ent.apply.Unlock()
 	}
 
@@ -537,66 +694,64 @@ func (e *Engine) checkpoint(force bool) error {
 	}
 	sort.Slice(kv, func(i, j int) bool { return kv[i].key < kv[j].key })
 
+	docLive := e.live.snapshot()
+
 	if err := e.j.Flush(); err != nil {
 		return fmt.Errorf("cannot flush the log before a checkpoint: %w", err)
 	}
 
+	m := manifest{Format: manifestFormatPages, LSN: lsn, Segment: pos.Segment, Offset: pos.Offset, Types: types, Live: map[string]int64{}}
+	for _, snap := range snaps {
+		trees := []pagetree.Tree{snap.r.slots, snap.r.ids}
+		me := manifestEntity{Name: snap.name, Gen: snap.r.gen, NextSeq: snap.r.nextSeq, Version: snap.r.version, Refs: snap.r.refs}
+
+		names := make([]string, 0, len(snap.r.indexes))
+		for name := range snap.r.indexes {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+
+		for _, name := range names {
+			idx := snap.r.indexes[name]
+			switch {
+			case idx.dormant:
+				me.Indexes = append(me.Indexes, manifestIndex{Name: name, Dormant: true})
+			case idx.ready:
+				trees = append(trees, idx.tree)
+			}
+		}
+
+		for _, t := range trees {
+			if err := e.pages.flushTree(t); err != nil {
+				return fmt.Errorf("cannot write the pages of %s: %w", snap.name, err)
+			}
+		}
+
+		me.Slots, me.IDs = rootOf(snap.r.slots), rootOf(snap.r.ids)
+		for _, name := range names {
+			if idx := snap.r.indexes[name]; idx.ready {
+				me.Indexes = append(me.Indexes, manifestIndex{Name: name, Root: rootOf(idx.tree)})
+			}
+		}
+		sort.Slice(me.Indexes, func(i, j int) bool { return me.Indexes[i].Name < me.Indexes[j].Name })
+
+		m.Entities = append(m.Entities, me)
+	}
+
+	if err := e.pages.sync(); err != nil {
+		return fmt.Errorf("cannot sync the pages: %w", err)
+	}
+
 	live := map[uint32]int64{}
-	name := fmt.Sprintf("checkpoint-%016d.ckpt", lsn)
-	err := writeFileAtomic(filepath.Join(e.dir, name), func(w io.Writer) error {
+	for seg, n := range docLive {
+		live[seg] += n
+	}
+
+	m.KV = fmt.Sprintf("kv-%016d.ckpt", lsn)
+	err := writeFileAtomic(filepath.Join(e.dir, m.KV), func(w io.Writer) error {
 		cw := newCkWriter(w)
-		if _, err := io.WriteString(cw.w, checkpointMagic); err != nil {
+		if _, err := io.WriteString(cw.w, kvCheckpointMagic); err != nil {
 			return err
-		}
-
-		cw.uvarint(checkpointVersion)
-		cw.uvarint(lsn)
-		cw.uvarint(uint64(pos.Segment))
-		cw.uvarint(uint64(pos.Offset))
-		cw.uvarint(uint64(len(types)))
-		for _, t := range types {
-			cw.str(t)
-		}
-
-		cw.uvarint(uint64(len(snaps)))
-		for _, s := range snaps {
-			cw.str(s.name)
-			cw.uvarint(s.r.gen)
-			cw.uvarint(uint64(s.r.nextSeq))
-			cw.uvarint(s.r.version)
-			cw.uvarint(uint64(len(s.r.refs)))
-			for _, ref := range s.r.refs {
-				cw.str(ref.Path)
-				cw.str(ref.Target)
-			}
-
-			cw.uvarint(uint64(s.r.slots.Len()))
-			s.r.slots.AscendAt(0, func(_ string, sl *slot) bool {
-				cw.uvarint(uint64(sl.seq))
-				cw.str(sl.id)
-				cw.uvarint(sl.lsn)
-				cw.loc(sl.loc)
-				live[sl.loc.Segment] += int64(sl.loc.Length)
-				return cw.err == nil
-			})
-
-			ready := []*index{}
-			for _, idx := range s.r.indexes {
-				if idx.ready {
-					ready = append(ready, idx)
-				}
-			}
-			sort.Slice(ready, func(i, j int) bool { return ready[i].spec.Name() < ready[j].spec.Name() })
-
-			cw.uvarint(uint64(len(ready)))
-			for _, idx := range ready {
-				cw.str(idx.spec.Name())
-				cw.uvarint(uint64(idx.tree.Len()))
-				idx.tree.AscendAt(0, func(k string, _ struct{}) bool {
-					cw.str(k)
-					return cw.err == nil
-				})
-			}
 		}
 
 		cw.uvarint(uint64(len(kv)))
@@ -607,8 +762,6 @@ func (e *Engine) checkpoint(force bool) error {
 			cw.loc(item.entry.loc)
 			live[item.entry.loc.Segment] += int64(item.entry.loc.Length)
 		}
-
-		writeExtras(cw, snaps)
 
 		if cw.err != nil {
 			return cw.err
@@ -624,18 +777,24 @@ func (e *Engine) checkpoint(force bool) error {
 		return fmt.Errorf("cannot write the checkpoint: %w", err)
 	}
 
-	m := manifest{Format: manifestFormat, Checkpoint: name, LSN: lsn, Segment: pos.Segment, Offset: pos.Offset, CreatedAt: time.Now().UTC().Format(time.RFC3339)}
+	for seg, n := range docLive {
+		m.Live[strconv.FormatUint(uint64(seg), 10)] = n
+	}
+
+	m.CreatedAt = time.Now().UTC().Format(time.RFC3339)
 	if err := writeManifest(e.dir, m); err != nil {
 		return fmt.Errorf("cannot write the manifest: %w", err)
 	}
 
-	e.removeOldCheckpoints(name)
+	e.removeOldCheckpoints(m.KV)
 	e.ckState.Store(&checkpointState{pos: pos, lsn: lsn, at: time.Now()})
 	e.segmentLive.Store(&live)
 	e.stats.checkpoints.Add(1)
 	e.stats.checkpointNanos.Store(int64(time.Since(start)))
 
 	e.retireDeadSegments(pos, live)
+	e.cleanPages(snaps)
+	e.pages.sweep()
 
 	engineLog.Debug("checkpoint written", "lsn", lsn, "entities", len(snaps), "kv_keys", len(kv), "duration_ms", log.Since(start))
 
@@ -650,9 +809,122 @@ func (e *Engine) removeOldCheckpoints(keep string) {
 
 	for _, entry := range entries {
 		name := entry.Name()
-		if name != keep && strings.HasPrefix(name, "checkpoint-") && (strings.HasSuffix(name, ".ckpt") || strings.HasSuffix(name, ".ckpt.tmp")) {
+		if name != keep && strings.HasPrefix(name, "kv-") && (strings.HasSuffix(name, ".ckpt") || strings.HasSuffix(name, ".ckpt.tmp")) {
 			_ = os.Remove(filepath.Join(e.dir, name))
 		}
+	}
+}
+
+func (e *Engine) CompactPages() (int, error) {
+	before := len(e.pages.segmentSizes())
+	for round := 0; round < 3; round++ {
+		e.ckptMu.Lock()
+		e.lastPageWalk = time.Time{}
+		e.ckptMu.Unlock()
+
+		if err := e.checkpoint(true); err != nil {
+			return 0, err
+		}
+	}
+
+	return before - len(e.pages.segmentSizes()), nil
+}
+
+func (e *Engine) PageStats() PageStats {
+	return e.pages.stats()
+}
+
+func (e *Engine) cleanPages(snaps []entitySnapshot) {
+	if len(e.pageRemoval) == 0 && time.Since(e.lastPageWalk) < pageWalkEvery {
+		return
+	}
+	e.lastPageWalk = time.Now()
+
+	live := map[uint32]int64{}
+	for _, snap := range snaps {
+		trees := []pagetree.Tree{snap.r.slots, snap.r.ids}
+		for _, idx := range snap.r.indexes {
+			if idx.ready {
+				trees = append(trees, idx.tree)
+			}
+		}
+
+		for _, t := range trees {
+			t.WalkStored(func(id uint64, size uint32) {
+				seg, _ := splitPageID(id)
+				live[seg] += int64(size) + pageHeaderSize
+			})
+		}
+	}
+
+	current := e.pages.currentSegment()
+	var dead, victims []uint32
+	for seg, size := range e.pages.segmentSizes() {
+		if seg >= current {
+			continue
+		}
+
+		switch {
+		case live[seg] == 0:
+			dead = append(dead, seg)
+		case live[seg]*2 < size && len(victims) < pageVictimsPerCycle:
+			victims = append(victims, seg)
+		}
+	}
+
+	e.pages.remove(dead)
+	e.pageRemoval = victims
+
+	if len(victims) == 0 {
+		return
+	}
+
+	isVictim := map[uint32]bool{}
+	for _, seg := range victims {
+		isVictim[seg] = true
+	}
+
+	e.relocatePages(func(id uint64) bool {
+		seg, _ := splitPageID(id)
+		return isVictim[seg]
+	})
+}
+
+func (e *Engine) relocatePages(victim func(id uint64) bool) {
+	e.catalogMu.RLock()
+	ents := make([]*entity, 0, len(e.entities))
+	for _, ent := range e.entities {
+		ents = append(ents, ent)
+	}
+	e.catalogMu.RUnlock()
+
+	for _, ent := range ents {
+		ent.apply.Lock()
+		cur := ent.root.Load()
+		tok := pagetree.NewToken()
+		nr := *cur
+		moved := 0
+
+		relocate := func(t pagetree.Tree) pagetree.Tree {
+			out, n := t.WithToken(tok).Relocate(victim)
+			moved += n
+			return out.WithToken(nil)
+		}
+
+		nr.slots = relocate(cur.slots)
+		nr.ids = relocate(cur.ids)
+		nr.indexes = cloneIndexes(cur.indexes)
+		for name, idx := range cur.indexes {
+			if idx.ready {
+				nr.indexes[name] = &index{spec: idx.spec, ready: true, tree: relocate(idx.tree)}
+			}
+		}
+
+		tok.Freeze()
+		if moved > 0 {
+			ent.root.Store(&nr)
+		}
+		ent.apply.Unlock()
 	}
 }
 
@@ -672,44 +944,5 @@ func (e *Engine) retireDeadSegments(pos journal.Position, live map[uint32]int64)
 				engineLog.Warn("cannot remove a log segment", "segment", seg.ID, "err", err)
 			}
 		}
-	}
-}
-
-func writeExtras(cw *ckWriter, snaps []entitySnapshot) {
-	type extra struct {
-		name    string
-		dormant []string
-		search  bool
-	}
-
-	var extras []extra
-	for _, s := range snaps {
-		x := extra{name: s.name, search: s.search}
-		for name, idx := range s.r.indexes {
-			if idx.dormant {
-				x.dormant = append(x.dormant, name)
-			}
-		}
-		sort.Strings(x.dormant)
-
-		if len(x.dormant) > 0 || x.search {
-			extras = append(extras, x)
-		}
-	}
-
-	cw.uvarint(ckExtrasSection)
-	cw.uvarint(uint64(len(extras)))
-	for _, x := range extras {
-		cw.str(x.name)
-		cw.uvarint(uint64(len(x.dormant)))
-		for _, name := range x.dormant {
-			cw.str(name)
-		}
-
-		search := uint64(0)
-		if x.search {
-			search = 1
-		}
-		cw.uvarint(search)
 	}
 }

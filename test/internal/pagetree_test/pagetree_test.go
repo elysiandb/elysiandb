@@ -186,6 +186,36 @@ func TestRandomOperationsAgainstASortedMap(t *testing.T) {
 		for op := 0; op < 1+r.Intn(200); op++ {
 			k := fmt.Sprintf("k%d", r.Intn(5000))
 			switch {
+			case r.Intn(6) == 0:
+				grow := r.Intn(2) == 0
+				w, _ = w.Update(k, func(v []byte) []byte {
+					if grow {
+						return append(append([]byte(nil), v...), 'g')
+					}
+					if len(v) > 0 {
+						v[0] = 'Z'
+					}
+					return v
+				})
+				if v, ok := m[k]; ok {
+					if grow {
+						m[k] = v + "g"
+					} else if len(v) > 0 {
+						m[k] = "Z" + v[1:]
+					}
+				}
+			case r.Intn(5) == 0:
+				w = w.Upsert(k, func(v []byte, found bool) []byte {
+					if !found {
+						return []byte("new")
+					}
+					return append(append([]byte(nil), v...), 'u')
+				})
+				if v, ok := m[k]; ok {
+					m[k] = v + "u"
+				} else {
+					m[k] = "new"
+				}
 			case r.Intn(3) == 0:
 				w, _ = w.Delete(k)
 				delete(m, k)

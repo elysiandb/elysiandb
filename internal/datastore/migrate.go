@@ -46,6 +46,7 @@ func (e *Engine) migrateIfNeeded() (*MigrationReport, error) {
 
 	start := time.Now()
 	_ = os.RemoveAll(filepath.Join(e.dir, LogFolder))
+	_ = os.RemoveAll(filepath.Join(e.dir, PagesFolder))
 	tmp := filepath.Join(e.dir, migrationFolder)
 	_ = os.RemoveAll(tmp)
 

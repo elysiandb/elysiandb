@@ -2,6 +2,8 @@ package datastore_test
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -145,8 +147,8 @@ func TestBatchedIndexBuildFollowsConcurrentWrites(t *testing.T) {
 		return true
 	})
 
-	if n := e.DropIdleIndexes(-time.Minute); n != len(specs) {
-		t.Fatalf("expected %d released indexes, got %d", len(specs), n)
+	if n := e.DropIdleIndexes(-time.Minute); n != len(specs)+1 {
+		t.Fatalf("expected %d released indexes with the search index, got %d", len(specs)+1, n)
 	}
 	for _, spec := range specs {
 		e.EnsureIndex("w", spec)
@@ -223,11 +225,8 @@ func TestSmallEntityIndexIsBuiltAtOnce(t *testing.T) {
 		t.Fatalf("the index of a small entity is ready and filled, got %d entries", len(got))
 	}
 
-	if _, ok := e.SearchCandidates("small", "*alpha*"); ok {
-		t.Fatalf("the first search starts the index and scans")
-	}
 	if set, ok := e.SearchCandidates("small", "*alpha*"); !ok || set.Count() != 200 {
-		t.Fatalf("the search index of a small entity is ready at the second search")
+		t.Fatalf("the search index of a small entity is ready at the first search")
 	}
 }
 
@@ -321,4 +320,82 @@ func TestResetReleasesTheCachedValues(t *testing.T) {
 	if e.Stats().ValueCacheBytes == 0 {
 		t.Fatalf("the values of other entities stay cached")
 	}
+}
+
+func TestFragmentedPageSegmentsAreCleaned(t *testing.T) {
+	opts := options(t.TempDir())
+	opts.SegmentSize = 0
+	opts.PageSegmentSize = 256 << 10
+	opts.PageCacheBytes = 1 << 20
+	e, err := datastore.Open(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	spec := datastore.IndexSpec{Kind: datastore.IndexSort, Field: "text"}
+	putDocs(t, e, "frag", 0, 20000, workDoc)
+	e.EnsureIndex("frag", spec)
+	if err := e.Checkpoint(); err != nil {
+		t.Fatal(err)
+	}
+
+	for round := 0; round < 3; round++ {
+		putDocs(t, e, "frag", 0, 20000, func(i int) map[string]any {
+			d := workDoc(i)
+			d["text"] = fmt.Sprintf("round%d-%05d", round, 20000-i)
+			return d
+		})
+		if err := e.Checkpoint(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	pagesOnDisk := func() int64 {
+		var total int64
+		entries, _ := os.ReadDir(filepath.Join(opts.Folder, datastore.PagesFolder))
+		for _, entry := range entries {
+			info, _ := entry.Info()
+			total += info.Size()
+		}
+		return total
+	}
+
+	before := pagesOnDisk()
+	removed, err := e.CompactPages()
+	if err != nil {
+		t.Fatal(err)
+	}
+	after := pagesOnDisk()
+	if removed == 0 || after*2 > before {
+		t.Fatalf("fragmented page segments are cleaned: %d removed, %d bytes before, %d after", removed, before, after)
+	}
+
+	check := func(e *datastore.Engine) {
+		t.Helper()
+		snap := e.Snapshot("frag")
+		if snap.Len() != 20000 {
+			t.Fatalf("expected 20000 documents, got %d", snap.Len())
+		}
+		d, ok := snap.Get("w00007")
+		doc, _ := d.Decode()
+		if !ok || doc["text"] != "round2-19993" {
+			t.Fatalf("the last version of a document survives the cleaning, got %v", doc)
+		}
+		got, _ := entries(e, "frag", spec)
+		if len(got) != 20000 {
+			t.Fatalf("the index survives the cleaning, %d entries", len(got))
+		}
+	}
+
+	check(e)
+	if err := e.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	e, err = datastore.Open(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.Close()
+	check(e)
 }

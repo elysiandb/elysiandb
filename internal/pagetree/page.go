@@ -37,7 +37,12 @@ func (t *Token) active() bool {
 type Ref struct {
 	id   atomic.Uint64
 	size atomic.Uint32
+	hot  atomic.Bool
 	mem  atomic.Pointer[Page]
+}
+
+func (r *Ref) TakeHot() bool {
+	return r.hot.Swap(false)
 }
 
 func NewRef(p *Page) *Ref {

@@ -18,6 +18,7 @@ const (
 	IndexFilter IndexKind = 'f'
 	IndexSort   IndexKind = 's'
 	IndexRefs   IndexKind = 'r'
+	IndexSearch IndexKind = 'g'
 )
 
 type IndexSpec struct {
@@ -35,7 +36,7 @@ func ParseIndexName(name string) (IndexSpec, bool) {
 	}
 
 	switch IndexKind(name[0]) {
-	case IndexFilter, IndexSort, IndexRefs:
+	case IndexFilter, IndexSort, IndexRefs, IndexSearch:
 		return IndexSpec{Kind: IndexKind(name[0]), Field: name[2:]}, true
 	}
 

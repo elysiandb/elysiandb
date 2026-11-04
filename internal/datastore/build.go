@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/taymour/elysiandb/internal/log"
-	"github.com/taymour/elysiandb/internal/ptree"
+	"github.com/taymour/elysiandb/internal/pagetree"
 )
 
 const (
@@ -110,7 +110,7 @@ func (e *Engine) buildEntity(ent *entity, background bool) {
 	}
 }
 
-func (e *Engine) claim(ent *entity) (*root, *buildPass, []claimedBuild, *trigramIndex, bool) {
+func (e *Engine) claim(ent *entity) (*root, *buildPass, []claimedBuild, bool) {
 	ent.apply.Lock()
 	defer ent.apply.Unlock()
 
@@ -138,14 +138,8 @@ func (e *Engine) claim(ent *entity) (*root, *buildPass, []claimedBuild, *trigram
 		pending = pending[:limit]
 	}
 
-	var search *trigramIndex
-	if t := ent.search.Load(); t != nil && !t.claimed {
-		t.claimed = true
-		search = t
-	}
-
-	if len(pending) == 0 && search == nil {
-		return nil, nil, nil, nil, false
+	if len(pending) == 0 {
+		return nil, nil, nil, false
 	}
 
 	pass := &buildPass{before: map[uint32]map[string]any{}}
@@ -154,59 +148,94 @@ func (e *Engine) claim(ent *entity) (*root, *buildPass, []claimedBuild, *trigram
 	}
 	ent.passes[pass] = struct{}{}
 
-	return snap, pass, pending, search, more
+	return snap, pass, pending, more
 }
 
 func (e *Engine) buildPass(ent *entity) bool {
-	snap, pass, jobs, search, more := e.claim(ent)
+	snap, pass, jobs, more := e.claim(ent)
 	if pass == nil {
 		return false
 	}
 
 	start := time.Now()
 	keys := make([][]string, len(jobs))
+	searchJob := -1
+	for i, j := range jobs {
+		if j.spec.Kind == IndexSearch {
+			searchJob = i
+		}
+	}
+
 	docs := 0
-	snap.slots.AscendAt(0, func(_ string, s *slot) bool {
-		doc := e.decodeSlot(s)
-		if search != nil && doc != nil {
-			search.add(s.seq, doc)
+	each := func(fn func(seq uint32, doc map[string]any)) {
+		snap.slots.AscendAt(0, func(k string, v []byte) bool {
+			s := decodeSlotValue(keySeq(k), v, true)
+			fn(s.seq, e.decodeSlot(s))
+			return true
+		})
+	}
+
+	var searchKeys []string
+	var searchVals [][]byte
+	var containers map[string][]byte
+	if searchJob >= 0 {
+		containers = map[string][]byte{}
+	}
+
+	each(func(seq uint32, doc map[string]any) {
+		for i, j := range jobs {
+			if i == searchJob {
+				continue
+			}
+			for _, k := range uniqueKeys(extractKeys(j.spec, doc)) {
+				keys[i] = append(keys[i], k+seqKey(seq))
+			}
 		}
 
-		for i, j := range jobs {
-			for _, k := range uniqueKeys(extractKeys(j.spec, doc)) {
-				keys[i] = append(keys[i], k+seqKey(s.seq))
+		if containers != nil && doc != nil {
+			chunk := seq >> postingChunkBits
+			off := uint16(seq & (postingChunk - 1))
+			for _, g := range searchGrams(doc) {
+				key := postingKey(g, chunk)
+				containers[key] = postingAdd(containers[key], off)
 			}
 		}
 
 		docs++
-		return true
 	})
 
-	if search != nil {
-		search.mu.Lock()
-		search.ready = true
-		search.docs = docs
-		search.updates = docs
-		search.mu.Unlock()
+	if containers != nil {
+		searchKeys = make([]string, 0, len(containers))
+		for k := range containers {
+			searchKeys = append(searchKeys, k)
+		}
+		sort.Strings(searchKeys)
+		searchVals = make([][]byte, len(searchKeys))
+		for i, k := range searchKeys {
+			searchVals[i] = containers[k]
+		}
+		containers = nil
 	}
 
-	trees := make([]ptree.Tree[struct{}], len(jobs))
+	trees := make([]pagetree.Tree, len(jobs))
 	for i := range jobs {
+		if i == searchJob {
+			trees[i] = pagetree.FromSorted(e.pages, searchKeys, searchVals)
+			continue
+		}
 		sort.Strings(keys[i])
-		trees[i] = ptree.FromSorted(keys[i], make([]struct{}, len(keys[i])))
+		trees[i] = pagetree.FromSorted(e.pages, keys[i], nil)
 		keys[i] = nil
 	}
 
 	requeue := e.commitPass(ent, snap, pass, jobs, trees)
 
-	if len(jobs) > 0 {
-		engineLog.Debug("indexes built", "entity", ent.name, "indexes", len(jobs), "search", search != nil, "documents", docs, "duration_ms", log.Since(start))
-	}
+	engineLog.Debug("indexes built", "entity", ent.name, "indexes", len(jobs), "documents", docs, "duration_ms", log.Since(start))
 
 	return more || requeue
 }
 
-func (e *Engine) commitPass(ent *entity, snap *root, pass *buildPass, jobs []claimedBuild, trees []ptree.Tree[struct{}]) bool {
+func (e *Engine) commitPass(ent *entity, snap *root, pass *buildPass, jobs []claimedBuild, trees []pagetree.Tree) bool {
 	ent.apply.Lock()
 	defer ent.apply.Unlock()
 
@@ -217,13 +246,16 @@ func (e *Engine) commitPass(ent *entity, snap *root, pass *buildPass, jobs []cla
 	current := func(seq uint32) map[string]any {
 		doc, ok := after[seq]
 		if !ok {
-			if s, found := cur.slots.Get(seqKey(seq)); found {
+			if s, found := cur.slotBySeq(seq, false); found {
 				doc = e.decodeSlot(s)
 			}
 			after[seq] = doc
 		}
 		return doc
 	}
+
+	tok := pagetree.NewToken()
+	defer tok.Freeze()
 
 	var nr *root
 	requeue := false
@@ -240,15 +272,9 @@ func (e *Engine) commitPass(ent *entity, snap *root, pass *buildPass, jobs []cla
 			continue
 		}
 
-		tree := trees[i]
+		tree := trees[i].WithToken(tok)
 		for seq, before := range pass.before {
-			for _, k := range uniqueKeys(extractKeys(j.spec, before)) {
-				tree, _ = tree.Delete(k + seqKey(seq))
-			}
-
-			for _, k := range uniqueKeys(extractKeys(j.spec, current(seq))) {
-				tree, _ = tree.Put(k+seqKey(seq), struct{}{})
-			}
+			tree, _ = applyDocChange(j.spec, tree, seq, before, current(seq))
 		}
 
 		delete(ent.building, j.name)
@@ -257,7 +283,7 @@ func (e *Engine) commitPass(ent *entity, snap *root, pass *buildPass, jobs []cla
 			c.indexes = cloneIndexes(cur.indexes)
 			nr = &c
 		}
-		nr.indexes[j.name] = &index{spec: j.spec, ready: true, tree: tree}
+		nr.indexes[j.name] = &index{spec: j.spec, ready: true, tree: tree.WithToken(nil)}
 	}
 
 	if nr != nil {
@@ -338,6 +364,9 @@ func (e *Engine) IndexStates() []IndexState {
 	for _, ent := range ents {
 		for name, idx := range ent.root.Load().indexes {
 			st := IndexState{Entity: ent.name, Index: name, LastUsed: ent.lastUse(name)}
+			if idx.spec.Kind == IndexSearch {
+				st.Index = "search"
+			}
 			switch {
 			case idx.dormant:
 				st.State = "released"
@@ -350,16 +379,6 @@ func (e *Engine) IndexStates() []IndexState {
 			out = append(out, st)
 		}
 
-		if t := ent.search.Load(); t != nil {
-			st := IndexState{Entity: ent.name, Index: "search", State: "building"}
-			t.mu.RLock()
-			if t.ready {
-				st.State = "ready"
-				st.Entries = len(t.postings)
-			}
-			t.mu.RUnlock()
-			out = append(out, st)
-		}
 	}
 
 	sort.Slice(out, func(i, j int) bool {

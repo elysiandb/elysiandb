@@ -127,11 +127,13 @@ func compare(t *testing.T, step int, e *datastore.Engine, m *model) {
 }
 
 func TestRandomOperationsAgainstAModel(t *testing.T) {
-	for _, cache := range []int64{0, 4 << 10} {
-		t.Run(fmt.Sprintf("cache=%d", cache), func(t *testing.T) {
+	for _, c := range []struct{ cache, pages, segment int64 }{{0, 0, 0}, {4 << 10, 0, 0}, {4 << 10, 16 << 10, 64 << 10}} {
+		t.Run(fmt.Sprintf("cache=%d/pages=%d", c.cache, c.pages), func(t *testing.T) {
 			dir := t.TempDir()
 			opts := options(dir)
-			opts.CacheBytes = cache
+			opts.CacheBytes = c.cache
+			opts.PageCacheBytes = c.pages
+			opts.PageSegmentSize = c.segment
 			e, err := datastore.Open(opts)
 			if err != nil {
 				t.Fatal(err)
@@ -175,7 +177,11 @@ func TestRandomOperationsAgainstAModel(t *testing.T) {
 					e.KVDelete(key)
 					delete(m.kv, key)
 				case op < 92:
-					err = e.Checkpoint()
+					if step%3 == 0 {
+						_, err = e.CompactPages()
+					} else {
+						err = e.Checkpoint()
+					}
 				case op < 95:
 					_, err = e.Compact(4)
 				case op < 98:

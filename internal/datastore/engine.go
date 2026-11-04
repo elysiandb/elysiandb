@@ -37,6 +37,8 @@ type Options struct {
 	CheckpointEvery time.Duration
 	MaxLogBytes     int64
 	CacheBytes      int64
+	PageCacheBytes  int64
+	PageSegmentSize int64
 	IndexWorkers    int
 	Background      bool
 	SegmentSize     int64
@@ -56,6 +58,8 @@ type Engine struct {
 	j        *journal.Journal
 	inline   bool
 	cache    *valueCache
+	pages    *pageStore
+	live     liveBytes
 
 	catalogMu sync.RWMutex
 	entities  map[string]*entity
@@ -71,7 +75,9 @@ type Engine struct {
 
 	builds       chan *entity
 	buildOrder   atomic.Uint64
-	searchOnOpen []*entity
+	upgradeFrom  int
+	pageRemoval  []uint32
+	lastPageWalk time.Time
 	stop         chan struct{}
 	wg           sync.WaitGroup
 	closed       atomic.Bool
@@ -114,7 +120,7 @@ func Open(opts Options) (*Engine, error) {
 		dir:      opts.Folder,
 		lock:     lock,
 		inline:   opts.CacheBytes <= 0,
-		cache:    newValueCache(max(opts.CacheBytes, 1), 64),
+		cache:    newValueCache(valueCacheLimit(opts.CacheBytes), 64),
 		entities: map[string]*entity{},
 		kv:       newKVStore(opts.Shards),
 		builds:   make(chan *entity, 1024),
@@ -129,9 +135,26 @@ func Open(opts Options) (*Engine, error) {
 	}
 	e.migrated = report
 
-	if err := e.load(); err != nil {
+	pages, err := openPageStore(filepath.Join(opts.Folder, PagesFolder), opts.PageCacheBytes, opts.PageSegmentSize)
+	if err != nil {
 		e.unlock()
 		return nil, err
+	}
+	e.pages = pages
+
+	if err := e.load(); err != nil {
+		e.pages.close()
+		e.unlock()
+		return nil, err
+	}
+
+	if e.upgradeFrom != 0 {
+		if err := e.finishUpgrade(); err != nil {
+			e.j.Abandon()
+			e.pages.close()
+			e.unlock()
+			return nil, err
+		}
 	}
 
 	if opts.Background {
@@ -204,7 +227,16 @@ func (e *Engine) load() error {
 	}
 
 	from := journal.Position{Segment: 1}
-	if m != nil {
+	switch {
+	case m != nil && m.Format == manifestFormatPages:
+		if err := e.restorePages(m); err != nil {
+			return err
+		}
+
+		from = journal.Position{Segment: m.Segment, Offset: m.Offset}
+		e.ckState.Store(&checkpointState{pos: from, lsn: m.LSN})
+		e.j.SetNextLSN(m.LSN + 1)
+	case m != nil:
 		ck, err := readCheckpoint(filepath.Join(e.dir, m.Checkpoint))
 		if err != nil {
 			return fmt.Errorf("cannot read the checkpoint %s: %w", m.Checkpoint, err)
@@ -215,6 +247,7 @@ func (e *Engine) load() error {
 		}
 
 		from = ck.pos
+		e.upgradeFrom = m.Format
 		e.ckState.Store(&checkpointState{pos: ck.pos, lsn: ck.lastLSN})
 		e.j.SetNextLSN(ck.lastLSN + 1)
 	}
@@ -247,10 +280,9 @@ func (e *Engine) startBackground() {
 	go e.maintenanceLoop()
 	go e.buildLoop()
 
-	for _, ent := range e.searchOnOpen {
-		e.startSearchIndex(ent)
+	if e.inline {
+		go e.warmValues()
 	}
-	e.searchOnOpen = nil
 }
 
 func (e *Engine) Close() error {
@@ -271,6 +303,10 @@ func (e *Engine) Close() error {
 		errs = append(errs, err)
 	}
 
+	if err := e.pages.close(); err != nil {
+		errs = append(errs, err)
+	}
+
 	e.unlock()
 
 	return errors.Join(errs...)
@@ -284,6 +320,7 @@ func (e *Engine) Abandon() {
 	close(e.stop)
 	e.wg.Wait()
 	e.j.Abandon()
+	e.pages.close()
 	e.unlock()
 }
 
@@ -299,7 +336,7 @@ func (e *Engine) entity(name string, create bool) *entity {
 	defer e.catalogMu.Unlock()
 
 	if ent = e.entities[name]; ent == nil {
-		ent = newEntity(name)
+		ent = e.newEntity(name)
 		e.entities[name] = ent
 	}
 
@@ -400,7 +437,7 @@ type Snapshot struct {
 func (e *Engine) Snapshot(name string) *Snapshot {
 	ent := e.entity(name, false)
 	if ent == nil {
-		return &Snapshot{e: e, name: name, r: &root{indexes: map[string]*index{}}}
+		return &Snapshot{e: e, name: name, r: e.emptyRoot(0, 0)}
 	}
 
 	return &Snapshot{e: e, ent: ent, r: ent.root.Load(), name: name}
@@ -457,7 +494,7 @@ func (s *Snapshot) Refs() []RefPath {
 
 type Doc struct {
 	s    *Snapshot
-	slot *slot
+	slot slot
 }
 
 func (d Doc) ID() string {
@@ -491,7 +528,7 @@ func (d Doc) Decode() (map[string]any, error) {
 }
 
 func (s *Snapshot) Get(id string) (Doc, bool) {
-	sl, ok := s.r.ids.Get(id)
+	sl, ok := s.r.slotByID(id, true)
 	if !ok {
 		return Doc{}, false
 	}
@@ -500,7 +537,7 @@ func (s *Snapshot) Get(id string) (Doc, bool) {
 }
 
 func (s *Snapshot) BySeq(seq uint32) (Doc, bool) {
-	sl, ok := s.r.slots.Get(seqKey(seq))
+	sl, ok := s.r.slotBySeq(seq, true)
 	if !ok {
 		return Doc{}, false
 	}
@@ -509,17 +546,17 @@ func (s *Snapshot) BySeq(seq uint32) (Doc, bool) {
 }
 
 func (s *Snapshot) At(i int) (Doc, bool) {
-	_, sl, ok := s.r.slots.At(i)
+	k, v, ok := s.r.slots.At(i)
 	if !ok {
 		return Doc{}, false
 	}
 
-	return Doc{s: s, slot: sl}, true
+	return Doc{s: s, slot: decodeSlotValue(keySeq(k), v, true)}, true
 }
 
 func (s *Snapshot) Ascend(offset int, fn func(Doc) bool) {
-	s.r.slots.AscendAt(offset, func(_ string, sl *slot) bool {
-		return fn(Doc{s: s, slot: sl})
+	s.r.slots.AscendAt(offset, func(k string, v []byte) bool {
+		return fn(Doc{s: s, slot: decodeSlotValue(keySeq(k), v, true)})
 	})
 }
 
@@ -566,7 +603,7 @@ func (v *IndexView) Rank(prefix []byte) int {
 
 func (v *IndexView) ScanPrefix(prefix []byte, fn func(key string, seq uint32) bool) {
 	p := string(prefix)
-	v.idx.tree.AscendFrom(p, func(k string, _ struct{}) bool {
+	v.idx.tree.AscendFrom(p, func(k string, _ []byte) bool {
 		if len(k) < len(p)+4 || k[:len(p)] != p {
 			return false
 		}
@@ -577,7 +614,7 @@ func (v *IndexView) ScanPrefix(prefix []byte, fn func(key string, seq uint32) bo
 
 func (v *IndexView) ScanRange(lo, hi []byte, fn func(key string, seq uint32) bool) {
 	h := string(hi)
-	v.idx.tree.AscendFrom(string(lo), func(k string, _ struct{}) bool {
+	v.idx.tree.AscendFrom(string(lo), func(k string, _ []byte) bool {
 		if hi != nil && k >= h {
 			return false
 		}
@@ -587,7 +624,7 @@ func (v *IndexView) ScanRange(lo, hi []byte, fn func(key string, seq uint32) boo
 }
 
 func (v *IndexView) AscendAt(i int, fn func(key string, seq uint32) bool) {
-	v.idx.tree.AscendAt(i, func(k string, _ struct{}) bool {
+	v.idx.tree.AscendAt(i, func(k string, _ []byte) bool {
 		return fn(k, keySeq(k))
 	})
 }
@@ -663,7 +700,6 @@ func (e *Engine) DropIndexes(name string) {
 	r.indexes = map[string]*index{}
 	ent.building = map[string]*buildState{}
 	ent.root.Store(&r)
-	ent.search.Store(nil)
 	ent.apply.Unlock()
 }
 
