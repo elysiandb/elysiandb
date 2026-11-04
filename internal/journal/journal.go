@@ -385,6 +385,10 @@ func (j *Journal) writeOnce() error {
 		err = j.syncDirty()
 	}
 
+	if err != nil && j.opts.OnWriteError != nil {
+		j.opts.OnWriteError(err)
+	}
+
 	j.mu.Lock()
 	j.attempts++
 	if err != nil {
@@ -394,10 +398,6 @@ func (j *Journal) writeOnce() error {
 		j.writeErr = err
 		j.done.Broadcast()
 		j.mu.Unlock()
-
-		if j.opts.OnWriteError != nil {
-			j.opts.OnWriteError(err)
-		}
 
 		return err
 	}
