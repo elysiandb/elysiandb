@@ -102,7 +102,7 @@ Every key added after 0.2.4 is optional. Their defaults keep the 0.2.4 answers, 
 | **store.folder**                     | Path where data is persisted to disk. One ElysianDB process at a time can open it (see Storage engine internals) |
 | **store.shards**                     | Number of locks of the KV keys (rounded up to a power of two)                         |
 | **store.flushIntervalSeconds**       | Period at which the write-ahead log is synced to disk, which bounds what a power cut can lose. `0` syncs it only at `/save`, `SAVE`, shutdown and when a memtable is written to disk. Ignored with `store.durability: fsync`, which syncs every write |
-| **store.crashRecovery.enabled**      | Answers a write once it is in the write-ahead log, so that it survives a `kill -9`. With `false`, a write is answered as soon as it is queued for the log |
+| **store.crashRecovery.enabled**      | Answers a write once it is in the write-ahead log, so that it survives a `kill -9`. With `false`, a write is answered as soon as it is queued for the log, and the log is written every `store.flushIntervalSeconds` |
 | **store.crashRecovery.maxLogMB**     | Largest memtable in MB, between 4 and 64: the write-ahead log written since the last memtable flush stays about this size |
 | **store.durability**                 | `default`, or `fsync` to sync the write-ahead log once per group of writes before answering, so that acknowledged writes survive a power cut |
 | **store.memory.limitMB**             | Memory budget of the whole process. `0` (default) uses 75 % of the container memory limit when there is one, and no budget otherwise. It sets `GOMEMLIMIT`, gives 30 % of it to the block cache of the store, up to 1/16 to its memtables, and keeps the rest for index builds, requests, hooks, the API cache and the garbage collector. Once it is reached, heavy requests wait or are answered `503` (see Memory below) |
@@ -569,7 +569,7 @@ The `mongodb` engine, in beta until 0.2.4, was removed. ElysianDB refuses to sta
 | Setting | Guarantee |
 | ------- | --------- |
 | `store.crashRecovery.enabled: true` | A change is written to the write-ahead log before the answer: it survives a `kill -9`. The log is synced to disk every `store.flushIntervalSeconds`, which bounds what a power cut can lose |
-| `store.crashRecovery.enabled: false` | A change is answered as soon as it is queued for the write-ahead log: a `kill -9` can lose the last milliseconds of writes |
+| `store.crashRecovery.enabled: false` | A change is answered as soon as it is queued for the write-ahead log, which is written and synced every `store.flushIntervalSeconds`: up to that window is lost in a crash |
 | `store.durability: fsync` | The write-ahead log is synced once per group of writes before the answer: acknowledged writes survive a power cut |
 | `POST /save`, TCP `SAVE` | Checks that the data folder is writable and syncs the write-ahead log, without blocking other requests |
 

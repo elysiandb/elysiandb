@@ -566,19 +566,24 @@ func (e *Engine) Abandon() {
 }
 
 func (e *Engine) Checkpoint() error {
-	if e.closed.Load() {
+	if !e.enter() {
 		return ErrClosed
 	}
+	defer e.leave()
 
 	if err := probeFolder(e.dir); err != nil {
 		return err
 	}
 
-	if err := e.fs.syncAll(); err != nil {
+	return e.syncLog()
+}
+
+func (e *Engine) syncLog() error {
+	if err := e.db.LogData(nil, pebble.Sync); err != nil {
 		return err
 	}
 
-	return e.db.LogData(nil, pebble.Sync)
+	return e.fs.syncAll()
 }
 
 func probeFolder(dir string) error {
@@ -699,13 +704,14 @@ func (e *Engine) apply(b *pebble.Batch, durable bool) (applied, error) {
 	return applied{b: b, wait: wait, e: e}, nil
 }
 
-func (a applied) finish() {
+func (a applied) finish() error {
 	if a.b == nil {
-		return
+		return nil
 	}
 
+	var err error
 	if a.wait {
-		if err := a.b.SyncWait(); err != nil {
+		if err = a.b.SyncWait(); err != nil {
 			if a.e.opts.OnWriteError != nil {
 				a.e.opts.OnWriteError(err)
 			} else {
@@ -715,6 +721,8 @@ func (a applied) finish() {
 	}
 
 	_ = a.b.Close()
+
+	return err
 }
 
 type pin struct {
@@ -726,6 +734,11 @@ type pin struct {
 }
 
 func (e *Engine) acquirePin() *pin {
+	if !e.enter() {
+		return nil
+	}
+	defer e.leave()
+
 	e.pinsMu.Lock()
 	defer e.pinsMu.Unlock()
 
@@ -784,10 +797,41 @@ func (e *Engine) closePins() {
 	e.current = nil
 }
 
+func (p *pin) hold() bool {
+	for {
+		r := p.refs.Load()
+		if r <= 0 || p.closed.Load() {
+			return false
+		}
+
+		if p.refs.CompareAndSwap(r, r+1) {
+			return true
+		}
+	}
+}
+
+func (p *pin) use() (func(), bool) {
+	if p == nil || !p.e.enter() {
+		return nil, false
+	}
+
+	if !p.hold() {
+		p.e.leave()
+		return nil, false
+	}
+
+	return func() {
+		p.release()
+		p.e.leave()
+	}, true
+}
+
 func (p *pin) get(key []byte) ([]byte, bool, error) {
-	if p.closed.Load() {
+	done, ok := p.use()
+	if !ok {
 		return nil, false, ErrClosed
 	}
+	defer done()
 
 	v, closer, err := p.ps.Get(key)
 	if errors.Is(err, pebble.ErrNotFound) {
@@ -804,15 +848,53 @@ func (p *pin) get(key []byte) ([]byte, bool, error) {
 	return out, true, nil
 }
 
-func (p *pin) iter(lower, upper []byte) (*pebble.Iterator, error) {
-	if p.closed.Load() {
+type scanner struct {
+	*pebble.Iterator
+	done func()
+}
+
+func (s *scanner) Close() error {
+	err := s.Iterator.Close()
+	s.done()
+
+	return err
+}
+
+func (p *pin) iter(lower, upper []byte) (*scanner, error) {
+	done, ok := p.use()
+	if !ok {
 		return nil, ErrClosed
 	}
 
-	return p.ps.NewIter(&pebble.IterOptions{LowerBound: lower, UpperBound: upper})
+	it, err := p.ps.NewIter(&pebble.IterOptions{LowerBound: lower, UpperBound: upper})
+	if err != nil {
+		done()
+		return nil, err
+	}
+
+	return &scanner{Iterator: it, done: done}, nil
+}
+
+func (e *Engine) iter(lower, upper []byte) (*scanner, error) {
+	if !e.enter() {
+		return nil, ErrClosed
+	}
+
+	it, err := e.db.NewIter(&pebble.IterOptions{LowerBound: lower, UpperBound: upper})
+	if err != nil {
+		e.leave()
+		return nil, err
+	}
+
+	return &scanner{Iterator: it, done: e.leave}, nil
 }
 
 func (e *Engine) get(key []byte) ([]byte, bool, error) {
+	if !e.enter() {
+		return nil, false, ErrClosed
+	}
+	defer e.leave()
+
 	v, closer, err := e.db.Get(key)
 	if errors.Is(err, pebble.ErrNotFound) {
 		return nil, false, nil

@@ -178,9 +178,7 @@ func (e *Engine) KVPut(key string, value []byte, expiresAt int64) error {
 	}
 	sh.mu.Unlock()
 
-	a.finish()
-
-	return nil
+	return a.finish()
 }
 
 func (e *Engine) KVDelete(key string) bool {
@@ -227,7 +225,7 @@ func (e *Engine) kvDelete(key string, onlyIfExpiresAt int64, durable bool) bool 
 	}
 	sh.mu.Unlock()
 
-	a.finish()
+	_ = a.finish()
 
 	return true
 }
@@ -254,9 +252,8 @@ func (e *Engine) KVReset() error {
 
 	e.kv.resetCounts()
 	e.kv.unlockAll()
-	a.finish()
 
-	return nil
+	return a.finish()
 }
 
 func (e *Engine) KVCount() (int64, int64) {
@@ -268,7 +265,7 @@ func (e *Engine) scanKV(lower []byte, fn func(key string) bool) {
 		return
 	}
 
-	it, err := e.db.NewIter(&pebble.IterOptions{LowerBound: lower, UpperBound: []byte{familyKV + 1}})
+	it, err := e.iter(lower, []byte{familyKV + 1})
 	if err != nil {
 		return
 	}
@@ -361,7 +358,7 @@ func (e *Engine) dueKeys(now int64) []dueKey {
 	var upper [9]byte
 	upper[0] = familyTTL
 	binary.BigEndian.PutUint64(upper[1:], uint64(now+1))
-	it, err := e.db.NewIter(&pebble.IterOptions{LowerBound: []byte{familyTTL}, UpperBound: upper[:]})
+	it, err := e.iter([]byte{familyTTL}, upper[:])
 	if err != nil {
 		return nil
 	}

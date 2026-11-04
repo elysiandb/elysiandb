@@ -3,28 +3,29 @@ package datastore
 import "time"
 
 type EngineStats struct {
-	Flushes          int64
-	LastFlushMs      float64
-	MemTableBytes    int64
-	WALBytes         int64
-	LiveBytes        int64
-	DiskBytes        int64
-	BlockCacheBytes  int64
-	BlockCacheLimit  int64
-	BlockCacheHits   int64
-	BlockCacheMisses int64
-	Conflicts        int64
-	Documents        int64
-	Compactions      int64
-	CompactionDebt   int64
-	CompactingBytes  int64
-	L0Files          int64
-	ReadAmp          int
-	WriteStalls      int64
-	StallMs          float64
-	OpenSnapshots    int
-	BuiltDocuments   int64
-	BackgroundErrors int64
+	Flushes           int64
+	LastFlushMs       float64
+	UnflushedLogBytes int64
+	MemTableBytes     int64
+	WALBytes          int64
+	LiveBytes         int64
+	DiskBytes         int64
+	BlockCacheBytes   int64
+	BlockCacheLimit   int64
+	BlockCacheHits    int64
+	BlockCacheMisses  int64
+	Conflicts         int64
+	Documents         int64
+	Compactions       int64
+	CompactionDebt    int64
+	CompactingBytes   int64
+	L0Files           int64
+	ReadAmp           int
+	WriteStalls       int64
+	StallMs           float64
+	OpenSnapshots     int
+	BuiltDocuments    int64
+	BackgroundErrors  int64
 }
 
 func (e *Engine) Stats() EngineStats {
@@ -49,12 +50,14 @@ func (e *Engine) Stats() EngineStats {
 		}
 	}
 
-	if e.closed.Load() {
+	if !e.enter() {
 		return s
 	}
-
 	m := e.db.Metrics()
-	s.MemTableBytes = int64(m.WAL.Size)
+	e.leave()
+
+	s.UnflushedLogBytes = int64(m.WAL.Size)
+	s.MemTableBytes = int64(m.MemTable.Size)
 	s.WALBytes = int64(m.WAL.PhysicalSize)
 	s.LiveBytes = int64(m.Table.Local.LiveSize)
 	s.DiskBytes = int64(m.DiskSpaceUsage())
@@ -72,9 +75,10 @@ func (e *Engine) Stats() EngineStats {
 }
 
 func (e *Engine) LogSinceCheckpoint() int64 {
-	if e.closed.Load() {
+	if !e.enter() {
 		return 0
 	}
+	defer e.leave()
 
 	return int64(e.db.Metrics().WAL.Size)
 }

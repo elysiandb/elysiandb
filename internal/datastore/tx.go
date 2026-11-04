@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cockroachdb/pebble/v2"
@@ -74,47 +74,29 @@ func (e *Engine) newTx() *Tx {
 }
 
 type gate struct {
-	mu     sync.Mutex
-	inside int
-	shut   bool
-	done   chan struct{}
+	inside atomic.Int64
+	shut   atomic.Bool
 }
 
 func (g *gate) enter() bool {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	if g.shut {
+	g.inside.Add(1)
+	if g.shut.Load() {
+		g.inside.Add(-1)
 		return false
 	}
-	g.inside++
 
 	return true
 }
 
 func (g *gate) leave() {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	g.inside--
-	if g.shut && g.inside == 0 && g.done != nil {
-		close(g.done)
-		g.done = nil
-	}
+	g.inside.Add(-1)
 }
 
 func (g *gate) shutAndWait() {
-	g.mu.Lock()
-	g.shut = true
-	if g.inside == 0 {
-		g.mu.Unlock()
-		return
+	g.shut.Store(true)
+	for g.inside.Load() > 0 {
+		time.Sleep(time.Millisecond)
 	}
-
-	done := make(chan struct{})
-	g.done = done
-	g.mu.Unlock()
-	<-done
 }
 
 func (e *Engine) enter() bool {
@@ -150,9 +132,7 @@ func (e *Engine) Update(fn func(tx *Tx) error) error {
 			return err
 		}
 
-		a.finish()
-
-		return nil
+		return a.finish()
 	}
 }
 
@@ -681,6 +661,7 @@ func (e *Engine) commit(tx *Tx) (applied, error) {
 	}
 
 	defer func() {
+
 		if tx.clear {
 			e.kv.unlockAll()
 		}
@@ -693,6 +674,14 @@ func (e *Engine) commit(tx *Tx) (applied, error) {
 			ents[i].mu.Unlock()
 		}
 	}()
+
+	if tx.clear {
+		for _, ent := range e.allEntities() {
+			if !names[ent.name] {
+				return applied{}, ErrConflict
+			}
+		}
+	}
 
 	c := &commitCtx{e: e, drafts: map[string]*draft{}}
 	for key, lsn := range tx.reads {

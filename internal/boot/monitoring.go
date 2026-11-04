@@ -84,7 +84,7 @@ func engineSample() metrics.EngineSample {
 	st := e.Stats()
 
 	return metrics.EngineSample{
-		LogSinceCheckpoint: st.MemTableBytes,
+		LogSinceCheckpoint: st.UnflushedLogBytes,
 		LogBytes:           st.WALBytes,
 		LiveBytes:          st.LiveBytes,
 		ValueCacheHits:     st.BlockCacheHits,

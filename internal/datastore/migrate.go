@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cockroachdb/pebble/v2"
 	"github.com/taymour/elysiandb/internal/legacy"
 	"github.com/taymour/elysiandb/internal/legacy/logengine"
 )
@@ -307,7 +306,7 @@ func (e *Engine) keepRefs(name string, refs []RefPath) error {
 
 func verifyEntity(snap *Snapshot, entity string, src migrationSource) error {
 	i := 0
-	var it *pebble.Iterator
+	var it *scanner
 	if snap != nil && snap.p != nil {
 		lower := partPrefix(snap.id, partDocs)
 		var err error

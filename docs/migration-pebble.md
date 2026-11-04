@@ -66,7 +66,7 @@ No key has to change. The keys of the previous storage are still read, and keep 
 | `store.folder` | Unchanged. The store lives in its `pebble/` sub-folder |
 | `store.shards` | Number of locks of the KV keys |
 | `store.flushIntervalSeconds` | Period at which the write-ahead log is synced to disk. `0` syncs it at `/save`, `SAVE`, shutdown and memtable flushes only |
-| `store.crashRecovery.enabled` | `true`: a write is answered once it is in the write-ahead log, so it survives a `kill -9`. `false`: a write is answered as soon as it is queued for the log |
+| `store.crashRecovery.enabled` | `true`: a write is answered once it is in the write-ahead log, so it survives a `kill -9`. `false`: a write is answered as soon as it is queued for the log, which is written every `store.flushIntervalSeconds`, so up to that window is lost in a crash, as before |
 | `store.crashRecovery.maxLogMB` | Largest memtable, between 4 and 64 MB: it bounds the log replayed after a crash |
 | `store.durability` | `fsync`: the write-ahead log is synced before each answer, per group of writes |
 | `store.memory.limitMB` | Memory budget, now of the whole process (see below) |

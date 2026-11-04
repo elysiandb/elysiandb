@@ -52,8 +52,13 @@ func (e *Engine) Snapshot(name string) *Snapshot {
 		return s
 	}
 
+	p := e.acquirePin()
+	if p == nil {
+		return s
+	}
+
 	s.id = rec.id
-	s.attach(e.acquirePin())
+	s.attach(p)
 
 	return s
 }
@@ -79,6 +84,9 @@ func (e *Engine) SnapshotAll() map[string]*Snapshot {
 	}
 
 	p := e.acquirePin()
+	if p == nil {
+		return out
+	}
 	defer p.release()
 
 	for _, ent := range e.allEntities() {
@@ -104,6 +112,8 @@ func (s *Snapshot) record() *entityRecord {
 	if s.p == nil {
 		return nil
 	}
+
+	defer runtime.KeepAlive(s)
 
 	s.once.Do(func() {
 		b, ok, err := s.p.get(entityMetaKey(s.name))
@@ -189,6 +199,7 @@ func (d Doc) record() ([]byte, error) {
 	if d.s == nil || d.s.p == nil {
 		return nil, errMissing
 	}
+	defer runtime.KeepAlive(d.s)
 
 	b, ok, err := d.s.p.get(docKey(d.s.id, d.seq))
 	if err != nil {
@@ -307,6 +318,7 @@ func (s *Snapshot) Get(id string) (Doc, bool) {
 	if s.p == nil {
 		return Doc{}, false
 	}
+	defer runtime.KeepAlive(s)
 
 	sb, ok, err := s.p.get(idKey(s.id, id))
 	if err != nil || !ok || len(sb) != 4 {
@@ -330,6 +342,7 @@ func (s *Snapshot) BySeq(seq uint32) (Doc, bool) {
 	if s.p == nil {
 		return Doc{}, false
 	}
+	defer runtime.KeepAlive(s)
 
 	rec, ok, err := s.p.get(docKey(s.id, seq))
 	if err != nil || !ok {
@@ -430,6 +443,8 @@ func (v *IndexView) CountBelow(kind byte) int {
 }
 
 func (v *IndexView) scan(lower, upper []byte, reverse bool, fn func(entry []byte) bool) {
+	defer runtime.KeepAlive(v.s)
+
 	it, err := v.s.p.iter(lower, upper)
 	if err != nil {
 		return

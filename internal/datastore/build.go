@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -78,7 +79,9 @@ func (e *Engine) writeRecord(ent *entity, rec *entityRecord, ranges [][2][]byte)
 	if err != nil {
 		return err
 	}
-	a.finish()
+	if err := a.finish(); err != nil {
+		return err
+	}
 	ent.rec.Store(rec)
 
 	return nil
@@ -249,7 +252,13 @@ func (e *Engine) claim(ent *entity) (*buildJob, *pin, *entityRecord, []*indexMet
 	}
 	ent.job = job
 
-	return job, e.acquirePin(), next, pending
+	p := e.acquirePin()
+	if p == nil {
+		ent.job = nil
+		return nil, nil, nil, nil
+	}
+
+	return job, p, next, pending
 }
 
 type builtDoc struct {
@@ -363,10 +372,38 @@ func (e *Engine) buildPass(ent *entity) bool {
 
 func (e *Engine) abandonJob(ent *entity, job *buildJob) {
 	ent.mu.Lock()
-	if ent.job == job {
-		ent.job = nil
+	defer ent.mu.Unlock()
+
+	if ent.job != job {
+		return
 	}
-	ent.mu.Unlock()
+	ent.job = nil
+
+	rec := ent.rec.Load()
+	if rec == nil || rec.gen != job.gen || e.closed.Load() {
+		return
+	}
+
+	next := rec.clone()
+	ranges := [][2][]byte{}
+	for name := range job.names {
+		m := next.index(name)
+		if m == nil || m.state != stateBuilding {
+			continue
+		}
+		m.state = stateDormant
+		m.clear()
+		lo, hi := indexRange(next.id, m.no)
+		ranges = append(ranges, [2][]byte{lo, hi})
+	}
+
+	if len(ranges) == 0 {
+		return
+	}
+
+	if err := e.writeRecord(ent, next, ranges); err != nil {
+		engineLog.Error("cannot release an interrupted index build", "entity", ent.name, "err", err)
+	}
 }
 
 func (e *Engine) hasPendingBuilds(ent *entity) bool {
@@ -472,7 +509,9 @@ func (e *Engine) flushBuild(ent *entity, job *buildJob, metas []*indexMeta, pend
 		engineLog.Error("index build write failed", "entity", ent.name, "err", err)
 		return false
 	}
-	a.finish()
+	if err := a.finish(); err != nil {
+		return false
+	}
 
 	ent.rec.Store(next)
 	if final {
@@ -651,6 +690,8 @@ func (e *Engine) IndexStates() []IndexState {
 }
 
 func (v *IndexView) postings(gram uint32) *Bitset {
+	defer runtime.KeepAlive(v.s)
+
 	out := &Bitset{}
 	lower := concat(v.prefix, []byte{byte(gram >> 16), byte(gram >> 8), byte(gram)})
 	it, err := v.s.p.iter(lower, prefixEnd(lower))
@@ -763,7 +804,7 @@ func (e *Engine) maintenanceLoop() {
 		case <-idle.C:
 			e.DropIdleIndexes(IndexIdleAfter)
 		case <-sync:
-			if err := e.fs.syncAll(); err != nil && e.opts.OnWriteError != nil {
+			if err := e.syncLog(); err != nil && e.opts.OnWriteError != nil {
 				e.opts.OnWriteError(err)
 			}
 		case r := <-e.compacts:

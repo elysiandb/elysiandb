@@ -401,7 +401,13 @@ func TestMain(m *testing.M) {
 }
 
 func crashChild(dir string) {
-	e, err := datastore.Open(options(dir))
+	opts := options(dir)
+	background := os.Getenv("ELYSIAN_CRASH_BACKGROUND") != ""
+	if background {
+		opts.Durability = datastore.DurabilityBackground
+	}
+
+	e, err := datastore.Open(opts)
 	if err != nil {
 		fmt.Println("ERR", err)
 		os.Exit(1)
@@ -427,6 +433,10 @@ func crashChild(dir string) {
 			os.Exit(1)
 		}
 
+		if background && e.Checkpoint() != nil {
+			os.Exit(1)
+		}
+
 		fmt.Fprintf(w, "ACK %s %d\n", id, i%7)
 		_ = w.Flush()
 
@@ -437,6 +447,14 @@ func crashChild(dir string) {
 }
 
 func TestKill9LosesNoAcknowledgedWrite(t *testing.T) {
+	kill9(t, "")
+}
+
+func TestKill9AfterASaveLosesNothingWithoutCrashRecovery(t *testing.T) {
+	kill9(t, "1")
+}
+
+func kill9(t *testing.T, background string) {
 	runs := 10
 	if v, err := strconv.Atoi(os.Getenv("ELYSIAN_KILL9_RUNS")); err == nil {
 		runs = v
@@ -449,7 +467,7 @@ func TestKill9LosesNoAcknowledgedWrite(t *testing.T) {
 
 	for run := 0; run < runs; run++ {
 		cmd := exec.Command(os.Args[0], "-test.run", "^$")
-		cmd.Env = append(os.Environ(), "ELYSIAN_CRASH_CHILD="+dir)
+		cmd.Env = append(os.Environ(), "ELYSIAN_CRASH_CHILD="+dir, "ELYSIAN_CRASH_BACKGROUND="+background)
 		stdout, _ := cmd.StdoutPipe()
 		if err := cmd.Start(); err != nil {
 			t.Fatal(err)
