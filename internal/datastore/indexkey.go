@@ -100,23 +100,8 @@ func AppendTime(dst []byte, t time.Time) []byte {
 	return binary.BigEndian.AppendUint32(dst, uint32(t.Nanosecond()))
 }
 
-func seqKey(seq uint32) string {
-	var b [4]byte
-	binary.BigEndian.PutUint32(b[:], seq)
-
-	return string(b[:])
-}
-
-func keySeq(key string) uint32 {
-	return binary.BigEndian.Uint32([]byte(key[len(key)-4:]))
-}
-
 func KeyPayload(key string) string {
 	return key[:len(key)-4]
-}
-
-func entryKey(payload []byte, seq uint32) string {
-	return string(binary.BigEndian.AppendUint32(payload, seq))
 }
 
 func ElementString(v any) string {

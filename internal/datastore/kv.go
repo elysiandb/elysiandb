@@ -1,6 +1,7 @@
 package datastore
 
 import (
+	"encoding/binary"
 	"sort"
 	"strings"
 	"sync"
@@ -8,195 +9,114 @@ import (
 	"time"
 
 	xxhash "github.com/cespare/xxhash/v2"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/taymour/elysiandb/internal/docpath"
-	"github.com/taymour/elysiandb/internal/journal"
-	"github.com/taymour/elysiandb/internal/ptree"
 )
 
-type kvEntry struct {
-	value     []byte
-	expiresAt int64
-	lsn       uint64
-	loc       journal.Location
-}
+const expireBatch = 4096
 
 type kvShard struct {
-	mu sync.RWMutex
-	m  map[string]*kvEntry
+	mu sync.Mutex
 }
 
-type kvStore struct {
+type kvState struct {
 	shards  []*kvShard
 	mask    uint64
-	keysMu  sync.Mutex
-	keys    atomic.Pointer[ptree.Tree[string]]
 	count   atomic.Int64
 	withTTL atomic.Int64
-	wheelMu sync.Mutex
-	wheel   map[int64]map[string]struct{}
 }
 
-func newKVStore(shards int) *kvStore {
+func newKVState(shards int) *kvState {
 	n := 1
 	for n < shards {
 		n <<= 1
 	}
 
-	s := &kvStore{shards: make([]*kvShard, n), mask: uint64(n - 1), wheel: map[int64]map[string]struct{}{}}
+	s := &kvState{shards: make([]*kvShard, n), mask: uint64(n - 1)}
 	for i := range s.shards {
-		s.shards[i] = &kvShard{m: map[string]*kvEntry{}}
+		s.shards[i] = &kvShard{}
 	}
-	s.keys.Store(&ptree.Tree[string]{})
 
 	return s
 }
 
-func (s *kvStore) shard(key string) *kvShard {
+func (s *kvState) shard(key string) *kvShard {
 	return s.shards[xxhash.Sum64String(key)&s.mask]
 }
 
-func (s *kvStore) lockAll() {
+func (s *kvState) lockAll() {
 	for _, sh := range s.shards {
 		sh.mu.Lock()
 	}
 }
 
-func (s *kvStore) unlockAll() {
+func (s *kvState) unlockAll() {
 	for i := len(s.shards) - 1; i >= 0; i-- {
 		s.shards[i].mu.Unlock()
 	}
 }
 
-func lowerKey(key string) string {
-	return strings.ToLower(key) + "\x00" + key
+func countPrefix(db *pebble.DB, family byte) (int64, error) {
+	it, err := db.NewIter(&pebble.IterOptions{LowerBound: []byte{family}, UpperBound: []byte{family + 1}})
+	if err != nil {
+		return 0, err
+	}
+
+	n := int64(0)
+	for it.First(); it.Valid(); it.Next() {
+		n++
+	}
+
+	return n, it.Close()
 }
 
-func (s *kvStore) indexKey(key string, add bool) {
-	s.keysMu.Lock()
-	t := *s.keys.Load()
-	if add {
-		t, _ = t.Put(lowerKey(key), key)
-	} else {
-		t, _ = t.Delete(lowerKey(key))
+func (s *kvState) load(db *pebble.DB) error {
+	keys, err := countPrefix(db, familyKV)
+	if err != nil {
+		return err
 	}
-	s.keys.Store(&t)
-	s.keysMu.Unlock()
+
+	withTTL, err := countPrefix(db, familyTTL)
+	if err != nil {
+		return err
+	}
+
+	s.count.Store(keys)
+	s.withTTL.Store(withTTL)
+
+	return nil
 }
 
-func (s *kvStore) schedule(key string, expiresAt int64) {
-	if expiresAt <= 0 {
-		return
+func (s *kvState) clear(b *pebble.Batch) error {
+	if err := b.DeleteRange([]byte{familyKV}, []byte{familyKV + 1}, nil); err != nil {
+		return err
 	}
 
-	s.wheelMu.Lock()
-	b := s.wheel[expiresAt]
-	if b == nil {
-		b = map[string]struct{}{}
-		s.wheel[expiresAt] = b
-	}
-	b[key] = struct{}{}
-	s.wheelMu.Unlock()
+	return b.DeleteRange([]byte{familyTTL}, []byte{familyTTL + 1}, nil)
 }
 
-func (s *kvStore) setLocked(sh *kvShard, key string, entry *kvEntry) {
-	old, existed := sh.m[key]
-	sh.m[key] = entry
-
-	if !existed {
-		s.count.Add(1)
-		s.indexKey(key, true)
-	}
-
-	hadTTL := existed && old.expiresAt > 0
-	switch {
-	case entry.expiresAt > 0 && !hadTTL:
-		s.withTTL.Add(1)
-	case entry.expiresAt <= 0 && hadTTL:
-		s.withTTL.Add(-1)
-	}
-
-	s.schedule(key, entry.expiresAt)
-}
-
-func (s *kvStore) deleteLocked(sh *kvShard, key string) bool {
-	old, existed := sh.m[key]
-	if !existed {
-		return false
-	}
-
-	delete(sh.m, key)
-	s.count.Add(-1)
-	if old.expiresAt > 0 {
-		s.withTTL.Add(-1)
-	}
-	s.indexKey(key, false)
-
-	return true
-}
-
-func (s *kvStore) applyPut(rec *journal.Record, replay bool) {
-	sh := s.shard(rec.Key)
-	sh.mu.Lock()
-	defer sh.mu.Unlock()
-
-	old, exists := sh.m[rec.Key]
-	if replay && exists && old.lsn >= rec.LSN {
-		return
-	}
-
-	if rec.Kind == journal.KindKVMove {
-		if !exists {
-			return
-		}
-
-		moved := *old
-		moved.lsn = rec.LSN
-		moved.loc = rec.Loc
-		sh.m[rec.Key] = &moved
-
-		return
-	}
-
-	if replay && rec.ExpiresAt > 0 && rec.ExpiresAt <= time.Now().Unix() {
-		s.deleteLocked(sh, rec.Key)
-		return
-	}
-
-	s.setLocked(sh, rec.Key, &kvEntry{value: append([]byte(nil), rec.Value...), expiresAt: rec.ExpiresAt, lsn: rec.LSN, loc: rec.Loc})
-}
-
-func (s *kvStore) applyDelete(key string) {
-	sh := s.shard(key)
-	sh.mu.Lock()
-	s.deleteLocked(sh, key)
-	sh.mu.Unlock()
-}
-
-func (s *kvStore) clearLocked(lsn uint64) {
-	for _, sh := range s.shards {
-		sh.m = map[string]*kvEntry{}
-	}
-
+func (s *kvState) resetCounts() {
 	s.count.Store(0)
 	s.withTTL.Store(0)
-	s.keysMu.Lock()
-	s.keys.Store(&ptree.Tree[string]{})
-	s.keysMu.Unlock()
-	s.wheelMu.Lock()
-	s.wheel = map[int64]map[string]struct{}{}
-	s.wheelMu.Unlock()
 }
 
 func (e *Engine) KVGet(key string) ([]byte, int64, bool) {
-	sh := e.kv.shard(key)
-	sh.mu.RLock()
-	entry, ok := sh.m[key]
-	sh.mu.RUnlock()
-	if !ok {
+	if e.closed.Load() {
 		return nil, 0, false
 	}
 
-	return entry.value, entry.expiresAt, true
+	pk := kvKey(key)
+	b, ok, err := e.get(pk)
+	if err != nil || !ok {
+		return nil, 0, false
+	}
+
+	_, value, exp, valid := decodeKVValue(pk, b)
+	if !valid {
+		return nil, 0, false
+	}
+
+	return value, exp, true
 }
 
 func (e *Engine) KVExpiration(key string) (int64, bool) {
@@ -209,90 +129,166 @@ func (e *Engine) KVExpiration(key string) (int64, bool) {
 }
 
 func (e *Engine) KVPut(key string, value []byte, expiresAt int64) error {
-	if e.closed.Load() {
+	if !e.enter() {
 		return ErrClosed
 	}
+	defer e.leave()
 
 	sh := e.kv.shard(key)
 	sh.mu.Lock()
-	recs := []journal.Record{{Kind: journal.KindKVPut, Key: key, Value: value, ExpiresAt: expiresAt}}
-	ticket, err := e.j.Append(recs)
+
+	pk := kvKey(key)
+	old, existed, err := e.get(pk)
 	if err != nil {
 		sh.mu.Unlock()
 		return err
 	}
 
-	e.kv.setLocked(sh, key, &kvEntry{value: append([]byte(nil), value...), expiresAt: expiresAt, lsn: recs[0].LSN, loc: recs[0].Loc})
+	oldExp := int64(0)
+	if existed {
+		if _, _, exp, ok := decodeKVValue(pk, old); ok {
+			oldExp = exp
+		}
+	}
+
+	b := e.db.NewBatch()
+	_ = b.Set(pk, encodeKVValue(nil, key, value, expiresAt), nil)
+	if oldExp > 0 && oldExp != expiresAt {
+		_ = b.Delete(ttlKey(oldExp, key), nil)
+	}
+	if expiresAt > 0 {
+		_ = b.Set(ttlKey(expiresAt, key), nil, nil)
+	}
+
+	a, err := e.apply(b, true)
+	if err != nil {
+		sh.mu.Unlock()
+		return err
+	}
+
+	if !existed {
+		e.kv.count.Add(1)
+	}
+
+	switch {
+	case expiresAt > 0 && oldExp <= 0:
+		e.kv.withTTL.Add(1)
+	case expiresAt <= 0 && oldExp > 0:
+		e.kv.withTTL.Add(-1)
+	}
 	sh.mu.Unlock()
 
-	if err := ticket.Wait(); err != nil {
-		engineLog.Error("log write failed, the change stays in memory and will be retried", "err", err)
-	}
+	a.finish()
 
 	return nil
 }
 
 func (e *Engine) KVDelete(key string) bool {
-	return e.kvDelete(key, journal.KindKVDelete, 0)
+	return e.kvDelete(key, 0, true)
 }
 
-func (e *Engine) kvDelete(key string, kind journal.Kind, onlyIfExpiresAt int64) bool {
-	if e.closed.Load() {
+func (e *Engine) kvDelete(key string, onlyIfExpiresAt int64, durable bool) bool {
+	if !e.enter() {
 		return false
 	}
+	defer e.leave()
 
 	sh := e.kv.shard(key)
 	sh.mu.Lock()
-	entry, ok := sh.m[key]
-	if !ok || (onlyIfExpiresAt != 0 && entry.expiresAt != onlyIfExpiresAt) {
+
+	pk := kvKey(key)
+	old, existed, err := e.get(pk)
+	if err != nil || !existed {
 		sh.mu.Unlock()
 		return false
 	}
 
-	ticket, err := e.j.Append([]journal.Record{{Kind: kind, Key: key}})
+	_, _, exp, _ := decodeKVValue(pk, old)
+	if onlyIfExpiresAt != 0 && exp != onlyIfExpiresAt {
+		sh.mu.Unlock()
+		return false
+	}
+
+	b := e.db.NewBatch()
+	_ = b.Delete(pk, nil)
+	if exp > 0 {
+		_ = b.Delete(ttlKey(exp, key), nil)
+	}
+
+	a, err := e.apply(b, durable)
 	if err != nil {
 		sh.mu.Unlock()
 		return false
 	}
 
-	e.kv.deleteLocked(sh, key)
+	e.kv.count.Add(-1)
+	if exp > 0 {
+		e.kv.withTTL.Add(-1)
+	}
 	sh.mu.Unlock()
 
-	if kind == journal.KindKVDelete {
-		if err := ticket.Wait(); err != nil {
-			engineLog.Error("log write failed, the change stays in memory and will be retried", "err", err)
-		}
-	}
+	a.finish()
 
 	return true
 }
 
 func (e *Engine) KVReset() error {
-	if e.closed.Load() {
+	if !e.enter() {
 		return ErrClosed
 	}
+	defer e.leave()
 
 	e.kv.lockAll()
-	ticket, err := e.j.Append([]journal.Record{{Kind: journal.KindKVReset}})
+	b := e.db.NewBatch()
+	if err := e.kv.clear(b); err != nil {
+		_ = b.Close()
+		e.kv.unlockAll()
+		return err
+	}
+
+	a, err := e.apply(b, true)
 	if err != nil {
 		e.kv.unlockAll()
 		return err
 	}
 
-	e.kv.clearLocked(0)
+	e.kv.resetCounts()
 	e.kv.unlockAll()
+	a.finish()
 
-	return ticket.Wait()
+	return nil
 }
 
 func (e *Engine) KVCount() (int64, int64) {
 	return e.kv.count.Load(), e.kv.withTTL.Load()
 }
 
+func (e *Engine) scanKV(lower []byte, fn func(key string) bool) {
+	if e.closed.Load() {
+		return
+	}
+
+	it, err := e.db.NewIter(&pebble.IterOptions{LowerBound: lower, UpperBound: []byte{familyKV + 1}})
+	if err != nil {
+		return
+	}
+	defer it.Close()
+
+	for it.First(); it.Valid(); it.Next() {
+		key, _, _, ok := decodeKVValue(it.Key(), it.Value())
+		if !ok {
+			continue
+		}
+
+		if !fn(key) {
+			return
+		}
+	}
+}
+
 func (e *Engine) KVKeys() []string {
-	t := e.kv.keys.Load()
-	keys := make([]string, 0, t.Len())
-	t.AscendAt(0, func(_ string, key string) bool {
+	keys := []string{}
+	e.scanKV([]byte{familyKV}, func(key string) bool {
 		keys = append(keys, key)
 		return true
 	})
@@ -310,11 +306,12 @@ func literalPrefix(pattern string) string {
 }
 
 func (e *Engine) KVMatch(pattern string, limit int, fn func(key string) bool) {
-	t := e.kv.keys.Load()
 	lower := strings.ToLower(literalPrefix(pattern))
+	seek := kvSeekKey(lower)
 	n := 0
-	t.AscendFrom(lower, func(k string, key string) bool {
-		if !strings.HasPrefix(k, lower) {
+	var keys []string
+	e.scanKV(seek, func(key string) bool {
+		if !strings.HasPrefix(strings.ToLower(key), lower) {
 			return false
 		}
 
@@ -322,10 +319,17 @@ func (e *Engine) KVMatch(pattern string, limit int, fn func(key string) bool) {
 			return true
 		}
 
+		keys = append(keys, key)
 		n++
 
-		return fn(key) && (limit <= 0 || n < limit)
+		return limit <= 0 || n < limit
 	})
+
+	for _, key := range keys {
+		if !fn(key) {
+			return
+		}
+	}
 }
 
 func (e *Engine) expiryLoop() {
@@ -344,29 +348,53 @@ func (e *Engine) expiryLoop() {
 	}
 }
 
-func (e *Engine) ExpireDue(now int64) int {
-	e.kv.wheelMu.Lock()
-	due := []int64{}
-	for ts := range e.kv.wheel {
-		if ts <= now {
-			due = append(due, ts)
+type dueKey struct {
+	key string
+	exp int64
+}
+
+func (e *Engine) dueKeys(now int64) []dueKey {
+	if e.closed.Load() {
+		return nil
+	}
+
+	var upper [9]byte
+	upper[0] = familyTTL
+	binary.BigEndian.PutUint64(upper[1:], uint64(now+1))
+	it, err := e.db.NewIter(&pebble.IterOptions{LowerBound: []byte{familyTTL}, UpperBound: upper[:]})
+	if err != nil {
+		return nil
+	}
+	defer it.Close()
+
+	out := []dueKey{}
+	for it.First(); it.Valid() && len(out) < expireBatch; it.Next() {
+		k := it.Key()
+		if len(k) < 9 {
+			continue
 		}
+		out = append(out, dueKey{key: string(k[9:]), exp: int64(binary.BigEndian.Uint64(k[1:9]))})
 	}
-	sort.Slice(due, func(i, j int) bool { return due[i] < due[j] })
 
-	buckets := make([]map[string]struct{}, 0, len(due))
-	for _, ts := range due {
-		buckets = append(buckets, e.kv.wheel[ts])
-		delete(e.kv.wheel, ts)
-	}
-	e.kv.wheelMu.Unlock()
+	return out
+}
 
+func (e *Engine) ExpireDue(now int64) int {
 	expired := 0
-	for i, b := range buckets {
-		for key := range b {
-			if e.kvDelete(key, journal.KindKVExpire, due[i]) {
+	for {
+		due := e.dueKeys(now)
+		removed := 0
+		for _, d := range due {
+			if e.kvDelete(d.key, d.exp, false) {
 				expired++
+				removed++
+			} else {
+				e.dropTTLEntry(d)
 			}
+		}
+
+		if len(due) < expireBatch || removed == 0 {
+			break
 		}
 	}
 
@@ -375,4 +403,21 @@ func (e *Engine) ExpireDue(now int64) int {
 	}
 
 	return expired
+}
+
+func (e *Engine) dropTTLEntry(d dueKey) {
+	if !e.enter() {
+		return
+	}
+	defer e.leave()
+
+	sh := e.kv.shard(d.key)
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+
+	if _, exp, ok := e.KVGet(d.key); ok && exp == d.exp {
+		return
+	}
+
+	_ = e.db.Delete(ttlKey(d.exp, d.key), pebble.NoSync)
 }

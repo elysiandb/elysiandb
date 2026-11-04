@@ -90,13 +90,13 @@ func engineSample() metrics.EngineSample {
 	st := e.Stats()
 
 	return metrics.EngineSample{
-		LogSinceCheckpoint: st.LogSinceCheckpoint,
-		LogBytes:           st.LogBytes,
+		LogSinceCheckpoint: st.MemTableBytes,
+		LogBytes:           st.WALBytes,
 		LiveBytes:          st.LiveBytes,
-		ValueCacheHits:     st.ValueCacheHits,
-		ValueCacheMisses:   st.ValueCacheMisses,
-		ResidentBytes:      st.ResidentStructBytes,
-		CheckpointMs:       st.LastCheckpointMs,
+		ValueCacheHits:     st.BlockCacheHits,
+		ValueCacheMisses:   st.BlockCacheMisses,
+		ResidentBytes:      st.BlockCacheBytes + st.MemTableBytes,
+		CheckpointMs:       st.LastFlushMs,
 	}
 }
 

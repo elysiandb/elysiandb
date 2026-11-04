@@ -15,8 +15,9 @@ import (
 	"time"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
-	"github.com/taymour/elysiandb/internal/configuration"
+	"github.com/taymour/elysiandb/internal/boot"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/memory"
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
@@ -65,21 +66,16 @@ func TestFillWithAMemoryBudget(t *testing.T) {
 		t.Skip("set ELYSIAN_FILL_DOCS (for example 3200000) to fill two entities under a 4 GB budget")
 	}
 
-	budget := int64(4096) << 20
-	debug.SetMemoryLimit(budget)
-	values, pages := storage.ValueCacheBytes, storage.PageCacheBytes
-	storage.ValueCacheBytes = func(*configuration.Config) int64 { return budget / 4 }
-	storage.PageCacheBytes = func(*configuration.Config) int64 { return budget / 4 }
-	t.Cleanup(func() {
-		storage.ValueCacheBytes, storage.PageCacheBytes = values, pages
-		debug.SetMemoryLimit(-1)
-	})
-
 	cfg := config(t.TempDir())
 	cfg.Store.FlushIntervalSeconds = 5
 	cfg.Store.Memory.LimitMB = 4096
 	cfg.Store.Shards = 512
 	globals.SetConfig(cfg)
+	boot.ApplyMemoryLimit()
+	t.Cleanup(func() {
+		debug.SetMemoryLimit(-1)
+		memory.SetBudget(0)
+	})
 	if err := storage.Open(storage.ModeServer); err != nil {
 		t.Fatal(err)
 	}
@@ -143,8 +139,8 @@ func TestFillWithAMemoryBudget(t *testing.T) {
 			now := time.Now()
 			gc, cpu := cpuSeconds("/cpu/classes/gc/total:cpu-seconds"), cpuSeconds("/cpu/classes/total:cpu-seconds")
 			st := storage.Engine().Stats()
-			t.Logf("%9d docs %7.0f docs/s  go memory %5d MB  gc %3.0f%% of cpu  last checkpoint %6.0f ms  pages %5d MB",
-				n, float64(step)/now.Sub(lastT).Seconds(), (ms.Sys-ms.HeapReleased)>>20, 100*(gc-lastGC)/max(cpu-lastCPU, 1e-9), st.LastCheckpointMs, st.ResidentStructBytes>>20)
+			t.Logf("%9d docs %7.0f docs/s  go memory %5d MB  gc %3.0f%% of cpu  last flush %6.0f ms  block cache %5d MB  compaction debt %5d MB",
+				n, float64(step)/now.Sub(lastT).Seconds(), (ms.Sys-ms.HeapReleased)>>20, 100*(gc-lastGC)/max(cpu-lastCPU, 1e-9), st.LastFlushMs, st.BlockCacheBytes>>20, st.CompactionDebt>>20)
 			lastT, lastGC, lastCPU = now, gc, cpu
 			next += step
 		}
@@ -153,7 +149,7 @@ func TestFillWithAMemoryBudget(t *testing.T) {
 		}
 	}
 	wg.Wait()
-	t.Logf("fill: %d documents in %s, peak Go memory %d MB for a budget of %d MB", total, time.Since(start).Round(time.Second), peak>>20, budget>>20)
+	t.Logf("fill: %d documents in %s, peak Go memory %d MB for a budget of %d MB", total, time.Since(start).Round(time.Second), peak>>20, memory.Budget()>>20)
 
 	t0 := time.Now()
 	if err := storage.Checkpoint(); err != nil {

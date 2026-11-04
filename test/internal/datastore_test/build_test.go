@@ -2,8 +2,6 @@ package datastore_test
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -19,7 +17,6 @@ func openBackground(t *testing.T) *datastore.Engine {
 	opts := options(t.TempDir())
 	opts.Background = true
 	opts.IndexWorkers = 2
-	opts.SegmentSize = 0
 	e, err := datastore.Open(opts)
 	if err != nil {
 		t.Fatal(err)
@@ -111,6 +108,9 @@ func TestBatchedIndexBuildFollowsConcurrentWrites(t *testing.T) {
 				id := fmt.Sprintf("w%05d", i*37%20000)
 				switch i % 3 {
 				case 0:
+					if err := tx.Put("w", id, map[string]any{"id": id, "a": float64(-i), "b": "between", "c": i%2 == 0, "text": "between"}); err != nil {
+						return err
+					}
 					return tx.Put("w", id, map[string]any{"id": id, "a": float64(1000 + i), "b": "moved", "c": i%2 == 1, "text": "omega"})
 				case 1:
 					tx.Delete("w", id)
@@ -201,7 +201,7 @@ func TestIdleIndexIsReleasedAndRebuiltOnUse(t *testing.T) {
 
 	first := ""
 	view, _ := e.Snapshot("idle").Index(spec)
-	view.AscendAt(0, func(_ string, seq uint32) bool {
+	view.Walk(true, 0, func(seq uint32) bool {
 		d, _ := e.Snapshot("idle").BySeq(seq)
 		first = d.ID()
 		return false
@@ -234,7 +234,6 @@ func TestRestartRebuildsSearchIndexesAndKeepsReleasedIndexes(t *testing.T) {
 	dir := t.TempDir()
 	opts := options(dir)
 	opts.Background = true
-	opts.SegmentSize = 0
 
 	e, err := datastore.Open(opts)
 	if err != nil {
@@ -284,59 +283,20 @@ func TestRestartRebuildsSearchIndexesAndKeepsReleasedIndexes(t *testing.T) {
 	}
 }
 
-func TestResetReleasesTheCachedValues(t *testing.T) {
+func TestIndexesFollowWritesAcrossRestarts(t *testing.T) {
 	opts := options(t.TempDir())
-	opts.Background = true
-	opts.SegmentSize = 0
-	opts.CacheBytes = 256 << 20
-	e, err := datastore.Open(opts)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer e.Close()
-
-	putDocs(t, e, "cached", 0, 20000, workDoc)
-	putDocs(t, e, "kept", 0, 1000, workDoc)
-	before := e.Stats().ValueCacheBytes
-	if before < 1<<20 {
-		t.Fatalf("the values should be cached, got %d bytes", before)
-	}
-
-	if err := e.Update(func(tx *datastore.Tx) error {
-		tx.ResetEntity("cached")
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	deadline := time.Now().Add(5 * time.Second)
-	for e.Stats().ValueCacheBytes > before/10 {
-		if time.Now().After(deadline) {
-			t.Fatalf("the values of a reset entity leave the cache, %d of %d bytes left", e.Stats().ValueCacheBytes, before)
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-
-	if e.Stats().ValueCacheBytes == 0 {
-		t.Fatalf("the values of other entities stay cached")
-	}
-}
-
-func TestFragmentedPageSegmentsAreCleaned(t *testing.T) {
-	opts := options(t.TempDir())
-	opts.SegmentSize = 0
-	opts.PageSegmentSize = 256 << 10
-	opts.PageCacheBytes = 1 << 20
 	e, err := datastore.Open(opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	spec := datastore.IndexSpec{Kind: datastore.IndexSort, Field: "text"}
+	filter := datastore.IndexSpec{Kind: datastore.IndexFilter, Field: "b"}
 	putDocs(t, e, "frag", 0, 20000, workDoc)
 	e.EnsureIndex("frag", spec)
-	if err := e.Checkpoint(); err != nil {
-		t.Fatal(err)
+	e.EnsureIndex("frag", filter)
+	if _, ok := e.SearchCandidates("frag", "*alpha*"); !ok {
+		t.Fatalf("the search index is built in the foreground without background workers")
 	}
 
 	for round := 0; round < 3; round++ {
@@ -350,26 +310,6 @@ func TestFragmentedPageSegmentsAreCleaned(t *testing.T) {
 		}
 	}
 
-	pagesOnDisk := func() int64 {
-		var total int64
-		entries, _ := os.ReadDir(filepath.Join(opts.Folder, datastore.PagesFolder))
-		for _, entry := range entries {
-			info, _ := entry.Info()
-			total += info.Size()
-		}
-		return total
-	}
-
-	before := pagesOnDisk()
-	removed, err := e.CompactPages()
-	if err != nil {
-		t.Fatal(err)
-	}
-	after := pagesOnDisk()
-	if removed == 0 || after*2 > before {
-		t.Fatalf("fragmented page segments are cleaned: %d removed, %d bytes before, %d after", removed, before, after)
-	}
-
 	check := func(e *datastore.Engine) {
 		t.Helper()
 		snap := e.Snapshot("frag")
@@ -379,11 +319,34 @@ func TestFragmentedPageSegmentsAreCleaned(t *testing.T) {
 		d, ok := snap.Get("w00007")
 		doc, _ := d.Decode()
 		if !ok || doc["text"] != "round2-19993" {
-			t.Fatalf("the last version of a document survives the cleaning, got %v", doc)
+			t.Fatalf("the last version of a document is read, got %v", doc)
 		}
 		got, _ := entries(e, "frag", spec)
 		if len(got) != 20000 {
-			t.Fatalf("the index survives the cleaning, %d entries", len(got))
+			t.Fatalf("the sort index has one entry per document, %d entries", len(got))
+		}
+		view, _ := snap.Index(spec)
+		if view.Len() != 20000 || view.CountKind(datastore.SortRankString) != 20000 {
+			t.Fatalf("the index counts follow the writes, %d entries, %d strings", view.Len(), view.CountKind(datastore.SortRankString))
+		}
+		prev := ""
+		view.Walk(true, 0, func(seq uint32) bool {
+			d, _ := snap.BySeq(seq)
+			doc, _ := d.Decode()
+			text := doc["text"].(string)
+			if text < prev {
+				t.Fatalf("the sort index is ordered, %s after %s", text, prev)
+			}
+			prev = text
+			return true
+		})
+		set, ok := e.SearchCandidates("frag", "*alpha*")
+		if !ok || set.Count() != 0 {
+			t.Fatalf("the search index follows the updates, %d candidates left", set.Count())
+		}
+		set, ok = e.SearchCandidates("frag", "*round2*")
+		if !ok || set.Count() != 20000 {
+			t.Fatalf("the search index follows the updates, %d candidates", set.Count())
 		}
 	}
 

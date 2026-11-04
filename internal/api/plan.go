@@ -353,8 +353,16 @@ func exactOf(kind byte, s string) []byte {
 }
 
 func collect(view *datastore.IndexView, lo, hi []byte, set *datastore.Bitset, keep func(key string) bool) {
+	if keep == nil {
+		view.ScanSeqs(lo, hi, func(seq uint32) bool {
+			set.Set(seq)
+			return true
+		})
+		return
+	}
+
 	view.ScanRange(lo, hi, func(key string, seq uint32) bool {
-		if keep == nil || keep(key) {
+		if keep(key) {
 			set.Set(seq)
 		}
 		return true
@@ -1199,112 +1207,16 @@ func (p *planner) sortPathCrossesReference(field string) bool {
 	return false
 }
 
-func groupEnd(view *datastore.IndexView, i int) int {
-	key, _, ok := view.At(i)
-	if !ok {
-		return i
-	}
-
-	return view.Rank([]byte(datastore.KeyPayload(key)+"\xff\xff\xff\xff\xff")) - 1
-}
-
-func groupStart(view *datastore.IndexView, i int) int {
-	key, _, ok := view.At(i)
-	if !ok {
-		return i
-	}
-
-	return view.Rank([]byte(datastore.KeyPayload(key)))
-}
-
-func emitRange(view *datastore.IndexView, start, end int, fn func(seq uint32) bool) bool {
-	i := start
-	stopped := false
-	view.AscendAt(start, func(_ string, seq uint32) bool {
-		if i > end {
-			return false
-		}
-		i++
-		if !fn(seq) {
-			stopped = true
-			return false
-		}
-		return true
-	})
-
-	return !stopped
-}
-
 func walkSortIndexFrom(view *datastore.IndexView, ascending bool, skip int, fn func(seq uint32) bool) {
-	missingStart := view.Rank([]byte{datastore.SortRankMissing})
-	total := view.Len()
-
-	if ascending {
-		view.AscendAt(skip, func(_ string, seq uint32) bool { return fn(seq) })
-		return
-	}
-
-	end := missingStart - 1
-	for end >= 0 {
-		start := groupStart(view, end)
-		size := end - start + 1
-		if skip >= size {
-			skip -= size
-			end = start - 1
-			continue
-		}
-
-		if !emitRange(view, start+skip, end, fn) {
-			return
-		}
-
-		skip = 0
-		end = start - 1
-	}
-
-	if missingStart+skip < total {
-		view.AscendAt(missingStart+skip, func(_ string, seq uint32) bool { return fn(seq) })
-	}
+	view.Walk(ascending, skip, fn)
 }
 
 func walkSortIndex(view *datastore.IndexView, ascending bool, fn func(seq uint32) bool) {
-	walkSortIndexFrom(view, ascending, 0, fn)
+	view.Walk(ascending, 0, fn)
 }
 
 func walkSortGroups(view *datastore.IndexView, ascending bool, fn func(seqs []uint32) bool) {
-	missingStart := view.Rank([]byte{datastore.SortRankMissing})
-	total := view.Len()
-
-	group := func(start, end int) bool {
-		seqs := make([]uint32, 0, end-start+1)
-		emitRange(view, start, end, func(seq uint32) bool {
-			seqs = append(seqs, seq)
-			return true
-		})
-		return fn(seqs)
-	}
-
-	if ascending {
-		for i := 0; i < missingStart; {
-			end := groupEnd(view, i)
-			if !group(i, end) {
-				return
-			}
-			i = end + 1
-		}
-	} else {
-		for end := missingStart - 1; end >= 0; {
-			start := groupStart(view, end)
-			if !group(start, end) {
-				return
-			}
-			end = start - 1
-		}
-	}
-
-	if missingStart < total {
-		group(missingStart, total-1)
-	}
+	view.WalkGroups(ascending, fn)
 }
 
 func decodeMap(b []byte) map[string]any {

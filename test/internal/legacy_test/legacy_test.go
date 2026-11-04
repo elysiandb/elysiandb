@@ -198,8 +198,12 @@ func TestMigrationMovesTheLegacyFilesAndKeepsTheData(t *testing.T) {
 	}
 
 	snap := storage.Engine().Snapshot("books")
-	first, _ := snap.At(0)
-	if snap.Len() != 2 || first.ID() != "b2" {
+	first := ""
+	snap.Ascend(0, func(d datastore.Doc) bool {
+		first = d.ID()
+		return false
+	})
+	if snap.Len() != 2 || first != "b2" {
 		t.Fatalf("documents keep their 0.2.4 order")
 	}
 

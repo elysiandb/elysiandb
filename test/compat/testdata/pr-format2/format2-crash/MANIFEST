@@ -1,0 +1,626 @@
+{
+  "format": 2,
+  "kv": "kv-0000000000000192.ckpt",
+  "lsn": 192,
+  "segment": 1,
+  "offset": 40330,
+  "created_at": "2026-11-04T15:50:05Z",
+  "types": [
+    "_elysiandb_core_acl",
+    "_elysiandb_core_schema",
+    "_elysiandb_core_user",
+    "_elysiandb_core_hook",
+    "author",
+    "book",
+    "review",
+    "purchase",
+    "budget_month",
+    "program",
+    "step",
+    "note"
+  ],
+  "entities": [
+    {
+      "name": "_elysiandb_core_acl",
+      "gen": 0,
+      "next_seq": 16,
+      "version": 28,
+      "slots": {
+        "id": 4294967296,
+        "size": 416
+      },
+      "ids": {
+        "id": 4294967720,
+        "size": 320
+      }
+    },
+    {
+      "name": "_elysiandb_core_hook",
+      "gen": 0,
+      "next_seq": 3,
+      "version": 44,
+      "slots": {
+        "id": 4294968048,
+        "size": 146
+      },
+      "ids": {
+        "id": 4294968202,
+        "size": 128
+      }
+    },
+    {
+      "name": "_elysiandb_core_schema",
+      "gen": 0,
+      "next_seq": 11,
+      "version": 39,
+      "slots": {
+        "id": 4294968338,
+        "size": 243
+      },
+      "ids": {
+        "id": 4294968589,
+        "size": 178
+      }
+    },
+    {
+      "name": "_elysiandb_core_user",
+      "gen": 0,
+      "next_seq": 2,
+      "version": 41,
+      "slots": {
+        "id": 4294968775,
+        "size": 35
+      },
+      "ids": {
+        "id": 4294968818,
+        "size": 25
+      },
+      "indexes": [
+        {
+          "name": "s:username",
+          "root": {
+            "id": 8589934592,
+            "size": 31
+          }
+        }
+      ]
+    },
+    {
+      "name": "author",
+      "gen": 0,
+      "next_seq": 8,
+      "version": 52,
+      "slots": {
+        "id": 4294968851,
+        "size": 114
+      },
+      "ids": {
+        "id": 4294968973,
+        "size": 66
+      },
+      "indexes": [
+        {
+          "name": "f:active",
+          "root": {
+            "id": 8589934631,
+            "size": 122
+          }
+        },
+        {
+          "name": "f:born",
+          "root": {
+            "id": 8589934761,
+            "size": 514
+          }
+        },
+        {
+          "name": "f:country",
+          "root": {
+            "id": 8589935283,
+            "size": 234
+          }
+        },
+        {
+          "name": "f:meta.level",
+          "root": {
+            "id": 8589935525,
+            "size": 234
+          }
+        },
+        {
+          "name": "f:meta.score",
+          "root": {
+            "id": 8589935767,
+            "size": 178
+          }
+        },
+        {
+          "name": "f:name",
+          "root": {
+            "id": 8589935953,
+            "size": 396
+          }
+        },
+        {
+          "name": "f:nickname",
+          "root": {
+            "id": 8589936357,
+            "size": 88
+          }
+        },
+        {
+          "name": "f:tags",
+          "root": {
+            "id": 8589936453,
+            "size": 297
+          }
+        },
+        {
+          "name": "s:born",
+          "root": {
+            "id": 8589936758,
+            "size": 154
+          }
+        },
+        {
+          "name": "s:country",
+          "root": {
+            "id": 8589936920,
+            "size": 90
+          }
+        },
+        {
+          "name": "s:meta.score",
+          "root": {
+            "id": 8589937018,
+            "size": 122
+          }
+        },
+        {
+          "name": "s:name",
+          "root": {
+            "id": 8589937148,
+            "size": 171
+          }
+        }
+      ]
+    },
+    {
+      "name": "book",
+      "gen": 0,
+      "next_seq": 30,
+      "version": 82,
+      "refs": [
+        {
+          "Path": "author",
+          "Target": "author"
+        },
+        {
+          "Path": "coauthors",
+          "Target": "author"
+        }
+      ],
+      "slots": {
+        "id": 4294969047,
+        "size": 474
+      },
+      "ids": {
+        "id": 4294969529,
+        "size": 272
+      },
+      "indexes": [
+        {
+          "name": "f:author.country",
+          "root": {
+            "id": 0,
+            "size": 0
+          }
+        },
+        {
+          "name": "f:author.id",
+          "root": {
+            "id": 8589938217,
+            "size": 40
+          }
+        },
+        {
+          "name": "f:author.meta.score",
+          "root": {
+            "id": 0,
+            "size": 0
+          }
+        },
+        {
+          "name": "f:author.name",
+          "root": {
+            "id": 0,
+            "size": 0
+          }
+        },
+        {
+          "name": "f:awards",
+          "root": {
+            "id": 8589938265,
+            "size": 212
+          }
+        },
+        {
+          "name": "f:coauthors.id",
+          "root": {
+            "id": 8589939015,
+            "size": 43
+          }
+        },
+        {
+          "name": "f:coauthors.name",
+          "root": {
+            "id": 0,
+            "size": 0
+          }
+        },
+        {
+          "name": "f:edition",
+          "root": {
+            "id": 8589939066,
+            "size": 326
+          }
+        },
+        {
+          "name": "f:genres",
+          "root": {
+            "id": 8589940520,
+            "size": 52
+          }
+        },
+        {
+          "name": "f:inStock",
+          "root": {
+            "id": 8589941050,
+            "size": 36
+          }
+        },
+        {
+          "name": "f:isbn",
+          "root": {
+            "id": 8589942464,
+            "size": 48
+          }
+        },
+        {
+          "name": "f:missing",
+          "root": {
+            "id": 0,
+            "size": 0
+          }
+        },
+        {
+          "name": "f:notes",
+          "root": {
+            "id": 8589942520,
+            "size": 9
+          }
+        },
+        {
+          "name": "f:price",
+          "root": {
+            "id": 8589943217,
+            "size": 43
+          }
+        },
+        {
+          "name": "f:published",
+          "root": {
+            "id": 8589946018,
+            "size": 109
+          }
+        },
+        {
+          "name": "f:status",
+          "root": {
+            "id": 8589947421,
+            "size": 46
+          }
+        },
+        {
+          "name": "f:stock.shop",
+          "root": {
+            "id": 8589948155,
+            "size": 43
+          }
+        },
+        {
+          "name": "f:stock.warehouse",
+          "root": {
+            "id": 8589948886,
+            "size": 43
+          }
+        },
+        {
+          "name": "f:summary",
+          "root": {
+            "id": 8589953031,
+            "size": 89
+          }
+        },
+        {
+          "name": "f:title",
+          "root": {
+            "id": 8589954916,
+            "size": 58
+          }
+        },
+        {
+          "name": "f:year",
+          "root": {
+            "id": 8589955662,
+            "size": 43
+          }
+        },
+        {
+          "name": "g:",
+          "root": {
+            "id": 8589968855,
+            "size": 268
+          }
+        },
+        {
+          "name": "r:",
+          "root": {
+            "id": 8589970511,
+            "size": 76
+          }
+        },
+        {
+          "name": "s:inStock",
+          "root": {
+            "id": 8589970595,
+            "size": 242
+          }
+        },
+        {
+          "name": "s:isbn",
+          "root": {
+            "id": 8589970845,
+            "size": 572
+          }
+        },
+        {
+          "name": "s:price",
+          "root": {
+            "id": 8589971425,
+            "size": 452
+          }
+        },
+        {
+          "name": "s:published",
+          "root": {
+            "id": 8589971885,
+            "size": 572
+          }
+        },
+        {
+          "name": "s:status",
+          "root": {
+            "id": 8589972465,
+            "size": 530
+          }
+        },
+        {
+          "name": "s:stock.shop",
+          "root": {
+            "id": 8589973003,
+            "size": 452
+          }
+        },
+        {
+          "name": "s:title",
+          "root": {
+            "id": 8589973463,
+            "size": 781
+          }
+        },
+        {
+          "name": "s:year",
+          "root": {
+            "id": 8589974252,
+            "size": 452
+          }
+        }
+      ]
+    },
+    {
+      "name": "budget_month",
+      "gen": 0,
+      "next_seq": 12,
+      "version": 170,
+      "slots": {
+        "id": 4294969809,
+        "size": 194
+      },
+      "ids": {
+        "id": 4294970011,
+        "size": 110
+      },
+      "indexes": [
+        {
+          "name": "s:month",
+          "root": {
+            "id": 8589974712,
+            "size": 194
+          }
+        }
+      ]
+    },
+    {
+      "name": "note",
+      "gen": 0,
+      "next_seq": 1,
+      "version": 189,
+      "slots": {
+        "id": 4294970129,
+        "size": 17
+      },
+      "ids": {
+        "id": 4294970154,
+        "size": 10
+      }
+    },
+    {
+      "name": "program",
+      "gen": 0,
+      "next_seq": 3,
+      "version": 173,
+      "slots": {
+        "id": 4294970172,
+        "size": 50
+      },
+      "ids": {
+        "id": 4294970230,
+        "size": 29
+      },
+      "indexes": [
+        {
+          "name": "f:label",
+          "root": {
+            "id": 0,
+            "size": 0
+          }
+        },
+        {
+          "name": "f:status",
+          "root": {
+            "id": 8589974914,
+            "size": 105
+          }
+        }
+      ]
+    },
+    {
+      "name": "purchase",
+      "gen": 0,
+      "next_seq": 36,
+      "version": 158,
+      "slots": {
+        "id": 4294970267,
+        "size": 573
+      },
+      "ids": {
+        "id": 4294970848,
+        "size": 326
+      },
+      "indexes": [
+        {
+          "name": "f:month",
+          "root": {
+            "id": 8589976461,
+            "size": 71
+          }
+        }
+      ]
+    },
+    {
+      "name": "review",
+      "gen": 0,
+      "next_seq": 40,
+      "version": 122,
+      "refs": [
+        {
+          "Path": "book",
+          "Target": "book"
+        }
+      ],
+      "slots": {
+        "id": 4294971182,
+        "size": 642
+      },
+      "ids": {
+        "id": 4294971832,
+        "size": 362
+      },
+      "indexes": [
+        {
+          "name": "f:book.id",
+          "root": {
+            "id": 8589977810,
+            "size": 63
+          }
+        },
+        {
+          "name": "f:book.title",
+          "root": {
+            "id": 0,
+            "size": 0
+          }
+        },
+        {
+          "name": "f:created",
+          "root": {
+            "id": 8589980481,
+            "size": 106
+          }
+        },
+        {
+          "name": "f:stars",
+          "root": {
+            "id": 8589981495,
+            "size": 44
+          }
+        },
+        {
+          "name": "f:text",
+          "root": {
+            "id": 8589984497,
+            "size": 106
+          }
+        },
+        {
+          "name": "g:",
+          "root": {
+            "id": 8589988865,
+            "size": 78
+          }
+        },
+        {
+          "name": "r:",
+          "root": {
+            "id": 8589988951,
+            "size": 922
+          }
+        }
+      ]
+    },
+    {
+      "name": "step",
+      "gen": 0,
+      "next_seq": 15,
+      "version": 188,
+      "slots": {
+        "id": 4294972202,
+        "size": 257
+      },
+      "ids": {
+        "id": 4294972467,
+        "size": 152
+      },
+      "indexes": [
+        {
+          "name": "f:done",
+          "root": {
+            "id": 8589989881,
+            "size": 227
+          }
+        },
+        {
+          "name": "f:program_id",
+          "root": {
+            "id": 8589990116,
+            "size": 467
+          }
+        }
+      ]
+    }
+  ],
+  "live": {
+    "1": 34617
+  }
+}

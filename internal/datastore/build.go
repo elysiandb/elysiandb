@@ -1,21 +1,25 @@
 package datastore
 
 import (
+	"context"
+	"encoding/binary"
+	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/log"
-	"github.com/taymour/elysiandb/internal/pagetree"
 )
 
 const (
 	smallEntityDocs   = 512
-	maxBatchEntries   = 2_000_000
-	maxBatchIndexes   = 32
+	maxJobIndexes     = 32
+	buildFlushDocs    = 4096
 	IndexIdleAfter    = time.Hour
 	idleSweepInterval = time.Minute
+	pressurePause     = 20 * time.Millisecond
 )
 
 type usageClock struct {
@@ -43,6 +47,111 @@ func (ent *entity) lastUse(name string) time.Time {
 	}
 
 	return time.Time{}
+}
+
+type buildJob struct {
+	names     map[string]bool
+	gen       uint64
+	builtUpTo int64
+	dirty     *Bitset
+	canceled  bool
+}
+
+func (j *buildJob) covers(name string) bool {
+	return j.names[name]
+}
+
+func (e *Engine) writeRecord(ent *entity, rec *entityRecord, ranges [][2][]byte) error {
+	b := e.db.NewBatch()
+	for _, r := range ranges {
+		if err := b.DeleteRange(r[0], r[1], nil); err != nil {
+			_ = b.Close()
+			return err
+		}
+	}
+
+	if err := b.Set(entityMetaKey(ent.name), encodeRecord(rec), nil); err != nil {
+		_ = b.Close()
+		return err
+	}
+
+	a, err := e.apply(b, false)
+	if err != nil {
+		return err
+	}
+	a.finish()
+	ent.rec.Store(rec)
+
+	for _, r := range ranges {
+		e.scheduleCompaction(r)
+	}
+
+	return nil
+}
+
+func (e *Engine) EnsureIndex(name string, spec IndexSpec) bool {
+	key := spec.Name()
+	ent := e.entity(name, true)
+	if m := ent.rec.Load().index(key); m != nil && m.state != stateDormant {
+		if m.state == stateReady {
+			ent.touch(key)
+		}
+		return m.state == stateReady
+	}
+
+	if !e.enter() {
+		return false
+	}
+	defer e.leave()
+
+	ent.mu.Lock()
+	rec := ent.rec.Load()
+	if m := rec.index(key); m != nil && m.state != stateDormant {
+		ent.mu.Unlock()
+		return m.state == stateReady
+	}
+
+	ent.touch(key)
+	var next *entityRecord
+	if rec == nil {
+		next = &entityRecord{id: e.nextID.Add(1) - 1}
+	} else {
+		next = rec.clone()
+	}
+
+	m := next.index(key)
+	if m == nil {
+		m = next.addIndex(spec, stateBuilding)
+	}
+	m.state = stateBuilding
+	m.clear()
+	if next.count == 0 {
+		m.state = stateReady
+	}
+
+	err := e.writeRecord(ent, next, nil)
+	ready := m.state == stateReady
+	small := next.count <= smallEntityDocs
+	ent.mu.Unlock()
+
+	if err != nil {
+		engineLog.Error("cannot register an index", "entity", name, "index", key, "err", err)
+		return false
+	}
+
+	if ready {
+		return true
+	}
+
+	if !small && e.schedule(ent) {
+		return false
+	}
+
+	e.buildEntity(ent, false)
+
+	m = ent.rec.Load().index(key)
+
+	return m != nil && m.state == stateReady
 }
 
 func (e *Engine) schedule(ent *entity) bool {
@@ -87,20 +196,13 @@ func (e *Engine) buildLoop() {
 	}
 }
 
-type claimedBuild struct {
-	name string
-	spec IndexSpec
-	st   *buildState
-}
-
 func (e *Engine) buildEntity(ent *entity, background bool) {
 	if background {
 		ent.queued.Store(false)
 	}
 
 	for {
-		more := e.buildPass(ent)
-		if !more {
+		if !e.buildPass(ent) {
 			return
 		}
 
@@ -110,211 +212,364 @@ func (e *Engine) buildEntity(ent *entity, background bool) {
 	}
 }
 
-func (e *Engine) claim(ent *entity) (*root, *buildPass, []claimedBuild, bool) {
-	ent.apply.Lock()
-	defer ent.apply.Unlock()
+func (e *Engine) claim(ent *entity) (*buildJob, *pin, *entityRecord, []*indexMeta) {
+	ent.mu.Lock()
+	defer ent.mu.Unlock()
 
-	snap := ent.root.Load()
-	var pending []claimedBuild
-	for name, st := range ent.building {
-		if st.pass != nil {
-			continue
-		}
-
-		idx, ok := snap.indexes[name]
-		if !ok || idx.ready || idx.dormant {
-			delete(ent.building, name)
-			continue
-		}
-
-		pending = append(pending, claimedBuild{name: name, spec: idx.spec, st: st})
+	rec := ent.rec.Load()
+	if rec == nil || ent.job != nil || e.closed.Load() {
+		return nil, nil, nil, nil
 	}
 
-	sort.Slice(pending, func(i, j int) bool { return pending[i].st.order < pending[j].st.order })
-
-	limit := min(maxBatchIndexes, max(1, maxBatchEntries/max(1, snap.slots.Len())))
-	more := len(pending) > limit
-	if more {
-		pending = pending[:limit]
+	var pending []*indexMeta
+	for _, m := range rec.indexes {
+		if m.state == stateBuilding {
+			pending = append(pending, m)
+		}
 	}
 
 	if len(pending) == 0 {
-		return nil, nil, nil, false
+		return nil, nil, nil, nil
 	}
 
-	pass := &buildPass{before: map[uint32]map[string]any{}}
-	for _, c := range pending {
-		c.st.pass = pass
+	sort.Slice(pending, func(i, j int) bool { return pending[i].no < pending[j].no })
+	if len(pending) > maxJobIndexes {
+		pending = pending[:maxJobIndexes]
 	}
-	ent.passes[pass] = struct{}{}
 
-	return snap, pass, pending, more
+	job := &buildJob{names: map[string]bool{}, gen: rec.gen, builtUpTo: -1, dirty: NewBitset(rec.nextSeq)}
+	for _, m := range pending {
+		job.names[m.name] = true
+	}
+	ent.job = job
+
+	return job, e.acquirePin(), rec, pending
+}
+
+type builtDoc struct {
+	seq   uint32
+	keys  [][]string
+	grams []uint32
+}
+
+func (e *Engine) underPressure() bool {
+	return e.opts.MemoryPressure != nil && e.opts.MemoryPressure()
+}
+
+func (e *Engine) stopping() bool {
+	select {
+	case <-e.stop:
+		return true
+	default:
+		return false
+	}
 }
 
 func (e *Engine) buildPass(ent *entity) bool {
-	snap, pass, jobs, more := e.claim(ent)
-	if pass == nil {
+	job, p, rec, metas := e.claim(ent)
+	if job == nil {
+		return false
+	}
+	defer p.release()
+
+	start := time.Now()
+	pending := []builtDoc{}
+	size := 0
+	docs := 0
+	aborted := false
+
+	flush := func(final bool) bool {
+		if !e.flushBuild(ent, job, metas, pending, final) {
+			aborted = true
+			return false
+		}
+		pending = pending[:0]
+		size = 0
+		return true
+	}
+
+	lower := partPrefix(rec.id, partDocs)
+	it, err := p.iter(lower, prefixEnd(lower))
+	if err != nil {
+		e.abandonJob(ent, job)
 		return false
 	}
 
-	start := time.Now()
-	keys := make([][]string, len(jobs))
-	searchJob := -1
-	for i, j := range jobs {
-		if j.spec.Kind == IndexSearch {
-			searchJob = i
+	for it.First(); it.Valid(); it.Next() {
+		key := it.Key()
+		if len(key) != 10 {
+			continue
 		}
-	}
 
-	docs := 0
-	each := func(fn func(seq uint32, doc map[string]any)) {
-		snap.slots.AscendAt(0, func(k string, v []byte) bool {
-			s := decodeSlotValue(keySeq(k), v, true)
-			fn(s.seq, e.decodeSlot(s))
-			return true
-		})
-	}
+		for e.underPressure() && !e.stopping() {
+			time.Sleep(pressurePause)
+		}
 
-	var searchKeys []string
-	var searchVals [][]byte
-	var containers map[string][]byte
-	if searchJob >= 0 {
-		containers = map[string][]byte{}
-	}
+		if e.stopping() {
+			aborted = true
+			break
+		}
 
-	each(func(seq uint32, doc map[string]any) {
-		for i, j := range jobs {
-			if i == searchJob {
+		_, _, value, ok := decodeDocValue(it.Value())
+		if !ok {
+			continue
+		}
+
+		doc := decodeDoc(value)
+		bd := builtDoc{seq: binary.BigEndian.Uint32(key[6:]), keys: make([][]string, len(metas))}
+		for i, m := range metas {
+			if m.spec.Kind == IndexSearch {
+				bd.grams = searchGrams(doc)
+				size += 2 * len(bd.grams)
 				continue
 			}
-			for _, k := range uniqueKeys(extractKeys(j.spec, doc)) {
-				keys[i] = append(keys[i], k+seqKey(seq))
+
+			bd.keys[i] = uniqueKeys(extractKeys(m.spec, doc))
+			for _, k := range bd.keys[i] {
+				size += len(k) + 24
 			}
 		}
 
-		if containers != nil && doc != nil {
-			chunk := seq >> postingChunkBits
-			off := uint16(seq & (postingChunk - 1))
-			for _, g := range searchGrams(doc) {
-				key := postingKey(g, chunk)
-				containers[key] = postingAdd(containers[key], off)
-			}
-		}
-
+		pending = append(pending, bd)
 		docs++
-	})
-
-	if containers != nil {
-		searchKeys = make([]string, 0, len(containers))
-		for k := range containers {
-			searchKeys = append(searchKeys, k)
+		if (len(pending) >= buildFlushDocs || int64(size) >= e.opts.BuildBytes) && !flush(false) {
+			break
 		}
-		sort.Strings(searchKeys)
-		searchVals = make([][]byte, len(searchKeys))
-		for i, k := range searchKeys {
-			searchVals[i] = containers[k]
-		}
-		containers = nil
 	}
 
-	trees := make([]pagetree.Tree, len(jobs))
-	for i := range jobs {
-		if i == searchJob {
-			trees[i] = pagetree.FromSorted(e.pages, searchKeys, searchVals)
-			continue
-		}
-		sort.Strings(keys[i])
-		trees[i] = pagetree.FromSorted(e.pages, keys[i], nil)
-		keys[i] = nil
+	_ = it.Close()
+
+	if aborted {
+		e.abandonJob(ent, job)
+		return false
 	}
 
-	requeue := e.commitPass(ent, snap, pass, jobs, trees)
+	if !flush(true) {
+		e.abandonJob(ent, job)
+		return false
+	}
 
-	engineLog.Debug("indexes built", "entity", ent.name, "indexes", len(jobs), "documents", docs, "duration_ms", log.Since(start))
+	e.stats.builtDocs.Add(int64(docs))
+	engineLog.Debug("indexes built", "entity", ent.name, "indexes", len(metas), "documents", docs, "duration_ms", log.Since(start))
 
-	return more || requeue
+	return e.hasPendingBuilds(ent)
 }
 
-func (e *Engine) commitPass(ent *entity, snap *root, pass *buildPass, jobs []claimedBuild, trees []pagetree.Tree) bool {
-	ent.apply.Lock()
-	defer ent.apply.Unlock()
+func (e *Engine) abandonJob(ent *entity, job *buildJob) {
+	ent.mu.Lock()
+	if ent.job == job {
+		ent.job = nil
+	}
+	ent.mu.Unlock()
+}
 
-	delete(ent.passes, pass)
+func (e *Engine) hasPendingBuilds(ent *entity) bool {
+	ent.mu.Lock()
+	defer ent.mu.Unlock()
 
-	cur := ent.root.Load()
-	after := map[uint32]map[string]any{}
-	current := func(seq uint32) map[string]any {
-		doc, ok := after[seq]
-		if !ok {
-			if s, found := cur.slotBySeq(seq, false); found {
-				doc = e.decodeSlot(s)
+	if ent.job != nil {
+		return false
+	}
+
+	for _, m := range ent.rec.Load().indexes {
+		if m.state == stateBuilding {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (e *Engine) flushBuild(ent *entity, job *buildJob, metas []*indexMeta, pending []builtDoc, final bool) bool {
+	ent.mu.Lock()
+	defer ent.mu.Unlock()
+
+	cur := ent.rec.Load()
+	if job.canceled || ent.job != job || cur == nil || cur.gen != job.gen || e.closed.Load() {
+		return false
+	}
+
+	next := cur.clone()
+	b := e.db.NewBatch()
+	postings := map[string][]uint16{}
+	var sk [4]byte
+	for _, bd := range pending {
+		if job.dirty.Has(bd.seq) {
+			continue
+		}
+
+		binary.BigEndian.PutUint32(sk[:], bd.seq)
+		for i, meta := range metas {
+			m := next.index(meta.name)
+			if m == nil || m.state != stateBuilding {
+				continue
 			}
-			after[seq] = doc
+
+			if m.spec.Kind == IndexSearch {
+				if len(bd.grams) == 0 {
+					continue
+				}
+				m.entries++
+				chunk := bd.seq >> postingChunkBits
+				off := uint16(bd.seq & (postingChunk - 1))
+				for _, g := range bd.grams {
+					k := string(indexKey(next.id, m.no, postingEntry(g, chunk)))
+					postings[k] = append(postings[k], off)
+				}
+				continue
+			}
+
+			counted := m.counted()
+			for _, k := range bd.keys[i] {
+				if err := b.Set(indexKey(next.id, m.no, append([]byte(k), sk[:]...)), nil, nil); err != nil {
+					_ = b.Close()
+					return false
+				}
+				m.entries++
+				if counted {
+					m.addKind(k[0], 1)
+				}
+			}
 		}
-		return doc
 	}
 
-	tok := pagetree.NewToken()
-	defer tok.Freeze()
-
-	var nr *root
-	requeue := false
-	for i, j := range jobs {
-		st := ent.building[j.name]
-		idx, still := cur.indexes[j.name]
-		if st != j.st || !still || idx.ready || idx.dormant {
-			continue
+	for k, offs := range postings {
+		var adds, removes chunkBits
+		for _, off := range offs {
+			adds.set(off)
 		}
-
-		if cur.gen != snap.gen {
-			st.pass = nil
-			requeue = true
-			continue
+		if err := b.Merge([]byte(k), encodeDelta(&adds, &removes), nil); err != nil {
+			_ = b.Close()
+			return false
 		}
-
-		tree := trees[i].WithToken(tok)
-		for seq, before := range pass.before {
-			tree, _ = applyDocChange(j.spec, tree, seq, before, current(seq))
-		}
-
-		delete(ent.building, j.name)
-		if nr == nil {
-			c := *cur
-			c.indexes = cloneIndexes(cur.indexes)
-			nr = &c
-		}
-		nr.indexes[j.name] = &index{spec: j.spec, ready: true, tree: tree.WithToken(nil)}
 	}
 
-	if nr != nil {
-		ent.root.Store(nr)
+	if len(pending) > 0 {
+		job.builtUpTo = int64(pending[len(pending)-1].seq)
 	}
 
-	return requeue
+	if final {
+		for _, meta := range metas {
+			if m := next.index(meta.name); m != nil && m.state == stateBuilding {
+				m.state = stateReady
+			}
+		}
+	}
+
+	if err := b.Set(entityMetaKey(ent.name), encodeRecord(next), nil); err != nil {
+		_ = b.Close()
+		return false
+	}
+
+	a, err := e.apply(b, false)
+	if err != nil {
+		engineLog.Error("index build write failed", "entity", ent.name, "err", err)
+		return false
+	}
+	a.finish()
+
+	ent.rec.Store(next)
+	if final {
+		ent.job = nil
+	}
+
+	return true
+}
+
+func (e *Engine) DropIndexes(name string) {
+	ent := e.entity(name, false)
+	if ent == nil || !e.enter() {
+		return
+	}
+	defer e.leave()
+
+	ent.mu.Lock()
+	defer ent.mu.Unlock()
+
+	rec := ent.rec.Load()
+	if rec == nil || len(rec.indexes) == 0 {
+		return
+	}
+
+	next := rec.clone()
+	ranges := [][2][]byte{}
+	for _, m := range next.indexes {
+		lo, hi := indexRange(next.id, m.no)
+		ranges = append(ranges, [2][]byte{lo, hi})
+	}
+	next.indexes = nil
+
+	if ent.job != nil {
+		ent.job.canceled = true
+		ent.job = nil
+	}
+
+	if err := e.writeRecord(ent, next, ranges); err != nil {
+		engineLog.Error("cannot drop indexes", "entity", name, "err", err)
+	}
+}
+
+func (e *Engine) IndexNames(name string) []string {
+	ent := e.entity(name, false)
+	if ent == nil {
+		return nil
+	}
+
+	rec := ent.rec.Load()
+	if rec == nil {
+		return []string{}
+	}
+
+	names := make([]string, 0, len(rec.indexes))
+	for _, m := range rec.indexes {
+		names = append(names, m.name)
+	}
+
+	return names
+}
+
+func (e *Engine) IndexBacklog() int {
+	n := 0
+	for _, ent := range e.allEntities() {
+		for _, m := range ent.rec.Load().indexesOrNil() {
+			if m.state == stateBuilding {
+				n++
+			}
+		}
+	}
+
+	return n
+}
+
+func (r *entityRecord) indexesOrNil() []*indexMeta {
+	if r == nil {
+		return nil
+	}
+
+	return r.indexes
 }
 
 func (e *Engine) DropIdleIndexes(idle time.Duration) int {
-	e.catalogMu.RLock()
-	ents := make([]*entity, 0, len(e.entities))
-	for _, ent := range e.entities {
-		ents = append(ents, ent)
+	if !e.enter() {
+		return 0
 	}
-	e.catalogMu.RUnlock()
+	defer e.leave()
 
 	cutoff := time.Now().Add(-idle)
 	dropped := 0
-	for _, ent := range ents {
-		ent.apply.Lock()
-		r := ent.root.Load()
-		var nr *root
-		for name, idx := range r.indexes {
-			if !idx.ready || idx.dormant {
+	for _, ent := range e.allEntities() {
+		ent.mu.Lock()
+		rec := ent.rec.Load()
+		var next *entityRecord
+		ranges := [][2][]byte{}
+		for _, m := range rec.indexesOrNil() {
+			if m.state != stateReady {
 				continue
 			}
 
-			last := ent.lastUse(name)
+			last := ent.lastUse(m.name)
 			if last.IsZero() {
-				ent.touch(name)
+				ent.touch(m.name)
 				continue
 			}
 
@@ -322,19 +577,24 @@ func (e *Engine) DropIdleIndexes(idle time.Duration) int {
 				continue
 			}
 
-			if nr == nil {
-				c := *r
-				c.indexes = cloneIndexes(r.indexes)
-				nr = &c
+			if next == nil {
+				next = rec.clone()
 			}
-			nr.indexes[name] = &index{spec: idx.spec, dormant: true}
+
+			nm := next.index(m.name)
+			nm.state = stateDormant
+			nm.clear()
+			lo, hi := indexRange(next.id, nm.no)
+			ranges = append(ranges, [2][]byte{lo, hi})
 			dropped++
 		}
 
-		if nr != nil {
-			ent.root.Store(nr)
+		if next != nil {
+			if err := e.writeRecord(ent, next, ranges); err != nil {
+				engineLog.Error("cannot release idle indexes", "entity", ent.name, "err", err)
+			}
 		}
-		ent.apply.Unlock()
+		ent.mu.Unlock()
 	}
 
 	if dropped > 0 {
@@ -353,32 +613,25 @@ type IndexState struct {
 }
 
 func (e *Engine) IndexStates() []IndexState {
-	e.catalogMu.RLock()
-	ents := make([]*entity, 0, len(e.entities))
-	for _, ent := range e.entities {
-		ents = append(ents, ent)
-	}
-	e.catalogMu.RUnlock()
-
 	out := []IndexState{}
-	for _, ent := range ents {
-		for name, idx := range ent.root.Load().indexes {
-			st := IndexState{Entity: ent.name, Index: name, LastUsed: ent.lastUse(name)}
-			if idx.spec.Kind == IndexSearch {
+	for _, ent := range e.allEntities() {
+		for _, m := range ent.rec.Load().indexesOrNil() {
+			st := IndexState{Entity: ent.name, Index: m.name, LastUsed: ent.lastUse(m.name)}
+			if m.spec.Kind == IndexSearch {
 				st.Index = "search"
 			}
-			switch {
-			case idx.dormant:
+
+			switch m.state {
+			case stateDormant:
 				st.State = "released"
-			case idx.ready:
+			case stateReady:
 				st.State = "ready"
-				st.Entries = idx.tree.Len()
+				st.Entries = int(m.entries)
 			default:
 				st.State = "building"
 			}
 			out = append(out, st)
 		}
-
 	}
 
 	sort.Slice(out, func(i, j int) bool {
@@ -389,4 +642,126 @@ func (e *Engine) IndexStates() []IndexState {
 	})
 
 	return out
+}
+
+func (v *IndexView) postings(gram uint32) *Bitset {
+	out := &Bitset{}
+	lower := concat(v.prefix, []byte{byte(gram >> 16), byte(gram >> 8), byte(gram)})
+	it, err := v.s.p.iter(lower, prefixEnd(lower))
+	if err != nil {
+		return out
+	}
+	defer it.Close()
+
+	n := len(v.prefix)
+	for it.First(); it.Valid(); it.Next() {
+		k := it.Key()
+		if len(k) != n+7 {
+			continue
+		}
+		out.addContainer(binary.BigEndian.Uint32(k[n+3:]), it.Value())
+	}
+
+	return out
+}
+
+func (e *Engine) SearchCandidates(name string, pattern string) (*Bitset, bool) {
+	patternGrams := PatternTrigrams(pattern)
+	if len(patternGrams) == 0 {
+		return nil, false
+	}
+
+	grams := make([]uint32, len(patternGrams))
+	for i, g := range patternGrams {
+		grams[i] = gramOf(g, 0)
+	}
+	sort.Slice(grams, func(i, j int) bool { return grams[i] < grams[j] })
+
+	if e.entity(name, false) == nil {
+		return &Bitset{}, true
+	}
+
+	snap := e.Snapshot(name)
+	view, ok := snap.Index(searchSpec())
+	if !ok {
+		if snap.Len() > 0 && (!snap.HasIndex(searchSpec()) || snap.IndexDormant(searchSpec())) {
+			e.EnsureIndex(name, searchSpec())
+			snap = e.Snapshot(name)
+			view, ok = snap.Index(searchSpec())
+		}
+		if !ok {
+			return nil, false
+		}
+	}
+
+	var out *Bitset
+	for _, g := range grams {
+		set := view.postings(g)
+		if out == nil {
+			out = set
+		} else {
+			out.And(set)
+		}
+		if out.Count() == 0 {
+			return out, true
+		}
+	}
+
+	return out, true
+}
+
+func (e *Engine) scheduleCompaction(r [2][]byte) {
+	if !e.opts.Background {
+		return
+	}
+
+	select {
+	case e.compacts <- r:
+	default:
+	}
+}
+
+func (e *Engine) compactRange(r [2][]byte) {
+	if _, err := os.Stat(filepath.Join(e.dir, PebbleFolder)); err != nil {
+		return
+	}
+
+	start := time.Now()
+	if err := e.db.Compact(context.Background(), r[0], r[1], false); err != nil {
+		if !e.closed.Load() {
+			engineLog.Debug("range compaction failed", "err", err)
+		}
+		return
+	}
+
+	engineLog.Debug("deleted range compacted", "duration_ms", log.Since(start))
+}
+
+func (e *Engine) maintenanceLoop() {
+	defer e.wg.Done()
+
+	idle := time.NewTicker(idleSweepInterval)
+	defer idle.Stop()
+
+	var sync <-chan time.Time
+	if e.opts.FlushInterval > 0 {
+		t := time.NewTicker(e.opts.FlushInterval)
+		defer t.Stop()
+		sync = t.C
+	}
+
+	for {
+		select {
+		case <-e.stop:
+			return
+		case <-idle.C:
+			e.DropIdleIndexes(IndexIdleAfter)
+		case <-sync:
+			if err := e.fs.syncAll(); err != nil && e.opts.OnWriteError != nil {
+				e.opts.OnWriteError(err)
+			}
+		case r := <-e.compacts:
+			e.compactRange(r)
+		}
+	}
 }
