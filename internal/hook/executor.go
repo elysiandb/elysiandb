@@ -165,13 +165,14 @@ func queryVersion(targetEntity string, bypassAcl bool) string {
 func (r *Request) query(h Hook, targetEntity string, filters map[string]map[string]string, bypassAcl bool, guard *api_storage.Guard) (*result, string, error) {
 	prepared.observe(h.Script, targetEntity, filters)
 
+	start := time.Now()
 	key := targetEntity + "\x00" + r.owner(bypassAcl) + "\x00" + filtersKey(filters)
 
 	r.mu.Lock()
 	res, ok := r.memo[key]
 	r.mu.Unlock()
 	if ok {
-		metrics.ObserveHookQuery(h.ID, h.Entity, h.Event, len(res.rows), true)
+		metrics.ObserveHookQuery(h.ID, h.Entity, h.Event, len(res.rows), true, time.Since(start))
 		return res, key, nil
 	}
 
@@ -186,7 +187,7 @@ func (r *Request) query(h Hook, targetEntity string, filters map[string]map[stri
 		return nil, key, err
 	}
 
-	metrics.ObserveHookQuery(h.ID, h.Entity, h.Event, len(res.rows), hit)
+	metrics.ObserveHookQuery(h.ID, h.Entity, h.Event, len(res.rows), hit, time.Since(start))
 
 	r.mu.Lock()
 	if cur, ok := r.memo[key]; ok {

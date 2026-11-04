@@ -256,12 +256,13 @@ func ObserveHook(id, entity, phase string, d time.Duration, err error) {
 	}
 }
 
-func ObserveHookQuery(id, entity, phase string, rows int, cacheHit bool) {
+func ObserveHookQuery(id, entity, phase string, rows int, cacheHit bool, d time.Duration) {
 	v, _ := hookStats.LoadOrStore(id, &hookStat{id: id, entity: entity, phase: phase})
 
 	hs := v.(*hookStat)
 	hs.queries.Add(1)
 	hs.rowsRead.Add(uint64(rows))
+	hs.queryNanos.Add(uint64(d))
 	if cacheHit {
 		hs.cacheHits.Add(1)
 	}
@@ -489,6 +490,7 @@ type hookStat struct {
 	cacheHits   atomic.Uint64
 	errors      atomic.Uint64
 	totalNanos  atomic.Uint64
+	queryNanos  atomic.Uint64
 	latency     Histogram
 	mu          sync.Mutex
 	lastError   string
@@ -505,6 +507,7 @@ type HookSummary struct {
 	CacheHits   uint64     `json:"query_cache_hits"`
 	Errors      uint64     `json:"errors"`
 	AvgMs       *Number    `json:"avg_ms"`
+	AvgQueryMs  *Number    `json:"avg_query_ms,omitempty"`
 	P95Ms       *Number    `json:"p95_ms"`
 	LastError   string     `json:"last_error"`
 	LastErrorAt *time.Time `json:"last_error_at"`
@@ -529,6 +532,9 @@ func hookSummaries() []HookSummary {
 
 		if executions > 0 {
 			summary.AvgMs = num(float64(h.totalNanos.Load()) / float64(executions) / float64(time.Millisecond))
+			if summary.Queries > 0 {
+				summary.AvgQueryMs = num(float64(h.queryNanos.Load()) / float64(executions) / float64(time.Millisecond))
+			}
 		}
 
 		h.mu.Lock()
