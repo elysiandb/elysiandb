@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
     branches: ["**"]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -30,9 +34,6 @@ jobs:
 
       - name: Verify go.mod
         run: go mod tidy && git diff --exit-code
-
-      - name: Run tests (race)
-        run: make test
 
       - name: Coverage (all packages)
         run: |
