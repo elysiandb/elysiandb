@@ -105,7 +105,7 @@ Every key added after 0.2.4 is optional. Their defaults keep the 0.2.4 answers, 
 | **store.crashRecovery.enabled**      | Writes each change to the log before answering, so that it survives a `kill -9` |
 | **store.crashRecovery.maxLogMB**     | Log written since the last checkpoint that triggers a new checkpoint                  |
 | **store.durability**                 | `default`, or `fsync` to sync the log once per group of writes, so that acknowledged writes survive a power cut |
-| **store.memory.limitMB**             | Memory budget. `0` (default) uses 75 % of the container memory limit when there is one, and no limit otherwise. It sets `GOMEMLIMIT`; when set explicitly, 25 % of it holds the documents read most often, 25 % the pages of the engine structures used most often, and the rest is left for requests and the garbage collector, so that the whole process stays within it whatever the volume; the rest is read from disk on demand |
+| **store.memory.limitMB**             | Memory budget. `0` (default) uses 75 % of the container memory limit when there is one, and no limit otherwise. It sets `GOMEMLIMIT`; when set explicitly, the whole process is kept within it whatever the volume (see Memory budget below) |
 | **server.http**                      | Enables and configures the HTTP REST/KV interface                                     |
 | **server.http.cors.allowedOrigins**  | Origins allowed to call the HTTP API from a browser (see CORS below). Empty by default |
 | **server.http.trustedProxies**       | Addresses or CIDR ranges of the reverse proxies in front of ElysianDB (see Reverse proxy below). Empty by default |
@@ -152,6 +152,10 @@ A request that must check many documents one by one (a filter that no index answ
 ElysianDB stops the work of a request as soon as its client has closed the connection (`api.query.cancelOnDisconnect`): the documents it was checking, its queued place in the heavy lane and its remaining hooks. Such a request is counted in `abandoned_rps` and logged with status `499`. A client that closes only its sending side while it waits for the answer is seen as gone, as with most HTTP servers; set `cancelOnDisconnect: false` for such clients. Behind a reverse proxy, keep the proxy's default of closing the upstream connection when its client leaves (`proxy_ignore_client_abort off` in nginx).
 
 `api.hooks.timeoutMs` bounds each hook run, including the `ctx.query` calls it makes: a `ctx.query` that would wait longer is stopped with the script, which leaves the document as it was and logs `hook script stopped after …`. `api.hooks.requestBudgetMs` bounds the hook time of a request, and `api.query.timeoutMs` the whole request.
+
+Hooks whose runs take more than a few milliseconds on average (a `ctx.query` over a large entity, for example) run in a lane of their own, a quarter of the threads wide, with the same queue limits: they never take the slots of heavy queries, and a page whose hooks cannot get a slot in time is answered `503` `server busy`.
+
+With an explicit memory budget, a request also reserves the memory it works with (see Memory budget below). A request that would need more than half of the share of requests, or that cannot get its memory within `api.query.queueTimeoutMs`, is answered `503` `server busy` as well, before the process grows.
 
 Recommended values for clients that give up after 10 seconds:
 
@@ -212,7 +216,7 @@ The same data is served by admin endpoints, which take the same credentials as `
 | -------- | ------- |
 | `GET /monitoring/overview` | Instance, status and problems, traffic, data, persistence, runtime, connections and log counters |
 | `GET /monitoring/series?range=15m\|1h\|24h&since=<unix ms>` | Time series with one point per second (`15m`), 10 seconds (`1h`) or minute (`24h`). With `since`, only newer points |
-| `GET /monitoring/details` | Top routes, hook statistics, documents per entity type, and the indexes of each entity type with their state (`ready`, `building` or `released`), entries and last use |
+| `GET /monitoring/details` | Top routes, hook statistics, documents per entity type, and the indexes of each entity type: form (`ordered`, `bitmap`, `composite`, `sort`, `search`, `references`), origin (`query`, `hook`, `advisor`), whether a hook keeps it (`pinned`), state (`ready`, `building` or `released`), entries, size on disk, uses and last use |
 | `GET /monitoring/logs?level=&component=&q=&user=&request_id=&since=&until=&before=&after=&limit=` | Log lines, newest first. `404` when `log.bufferLines` is `0` |
 | `GET /monitoring/logs/download?...` | The same lines as an NDJSON file |
 | `GET /monitoring/logs/level`, `PUT /monitoring/logs/level` | The current log level; `{"level": "debug", "minutes": 15}` changes it for 1 to 1440 minutes, then it goes back to `log.level` by itself |
@@ -224,7 +228,7 @@ The status is `healthy`, `warning` or `critical`, with these problems:
 | Code | Severity | Condition |
 | ---- | -------- | --------- |
 | `flush_failing` | critical | The last checkpoint failed |
-| `recovery_write_failing` | critical | A log write failed in the last 5 minutes. The change stays in memory and the write is retried |
+| `recovery_write_failing` | critical | A log write failed in the last 5 minutes, for example on a full disk. The writers wait, unanswered, until the write succeeds: no change is acknowledged before it is in the log |
 | `mongodb_unreachable` | critical | The MongoDB ping fails |
 | `error_rate_high` | warning | More than 1 % of at least 20 HTTP requests answered `5xx` over 5 minutes |
 | `latency_high` | warning | p95 above `log.slowRequestMs` over 5 minutes |
@@ -239,6 +243,8 @@ The status is `healthy`, `warning` or `critical`, with these problems:
 With `monitoring.prometheus.enabled: true`, `GET /metrics` serves the counters, gauges and latency histograms in the Prometheus text format, for example `elysiandb_http_requests_total{status_class="5xx"}`, `elysiandb_http_request_duration_seconds`, `elysiandb_tcp_commands_total{command="GET"}`, `elysiandb_kv_keys` and `elysiandb_entities{entity_type="books"}`. Set `monitoring.prometheus.token` to let Prometheus authenticate with `Authorization: Bearer <token>`, since a scraper cannot log in with a session cookie in `user` mode.
 
 The CPU series are given two ways: `cpu_percent` is a share of all the threads the process may use (`gomaxprocs`), so 100 % means every thread is busy, and `cpu_cores` is the number of busy threads. The engine adds `log_since_checkpoint_bytes`, `log_bytes` (log on disk), `live_bytes` (data the log still holds), `checkpoint_ms`, `value_cache_hit_ratio` and `resident_bytes`, the heavy lane adds `heavy_queries_rps`, `heavy_queued_rps` (requests that waited for a slot), `heavy_waiting` (requests waiting now), `heavy_wait_p95_ms`, `heavy_rejected_rps` (answered `503` `server busy`) and `abandoned_rps` (requests stopped because their client left), and `tcp_auth_p95_ms` is the duration of TCP `AUTH`. Prometheus exports them as `elysiandb_heavy_queries_total`, `elysiandb_heavy_queued_total`, `elysiandb_heavy_rejected_total`, `elysiandb_requests_abandoned_total` and `elysiandb_heavy_waiting`. Hook statistics give the number of `ctx.query` calls, the rows they read and their cache hits.
+
+The memory budget adds `memory_budget_bytes`, `heap_live_bytes` (memory the garbage collector found in use at its last cycle), `memory_pressure` (`0` normal, `1` high, `2` critical), `memory_refused_rps` (requests refused for memory), and one series per share: `value_cache_bytes`, `page_cache_bytes`, `dirty_page_bytes` (pages waiting for a checkpoint), `hook_results_bytes`, `index_build_bytes` and `request_reserved_bytes`. Hooks add `hook_query_hit_ratio` and `hook_output_hit_ratio` (reused `ctx.query` results and reused hook results), and indexes `index_count` and `index_bytes`. The Admin UI shows them in the Memory budget section of the System tab, the Hooks tab and the Indexes section of the Data tab, which lists every index.
 
 With `monitoring.pprof.enabled: true`, admins can profile a running instance, for example `go tool pprof http://localhost:8089/debug/pprof/profile?seconds=30`.
 
@@ -465,6 +471,8 @@ At the first start on a 0.2.4 data folder (`elysiandb.json`, `elysiandbjson.json
 
 `users.key` and `sessions.json` keep their place and format. Backup archives keep format v1: archives of 0.2.4 restore on this version, and archives of this version restore on 0.2.4.
 
+Data folders written by earlier builds of this version are read as they are: `MANIFEST` format 1 is upgraded at the first start (see Storage engine internals), and format 2 folders gain the bitmap and composite indexes, `MANIFEST.prev` and the `previous_lsn`, `derived_indexes` and `index_origins` fields of `MANIFEST`. A build of this version from before these additions still reads such a folder: it ignores these fields and `MANIFEST.prev`, rebuilds the indexes it needs and cleans up the pages it does not use.
+
 To go back to 0.2.4:
 
 * without the writes made since the upgrade: stop ElysianDB, move the files of `legacy-0.2.4/` back to the data folder, remove `MANIFEST`, `log/`, `pages/`, the `kv-*` file and `legacy-checkpoint/`, and start 0.2.4;
@@ -485,7 +493,8 @@ All of them fix defects of 0.2.4:
 * Sessions are kept in memory and `sessions.json` is written when they change. Expired sessions are removed at the next session change instead of during a request, and a change made to `sessions.json` by hand needs a restart.
 * The `elysiandb` commands open the data folder without background work and close it cleanly, so the next start no longer reports an unclean shutdown. They cannot run on the folder of a running server.
 * The REST API filters through references (for example `filter[author.name]`) and the sort indexes use the referenced documents' current values.
-* Under overload, heavy requests beyond `api.query.maxQueued`, or waiting longer than `api.query.queueTimeoutMs`, are answered `503` `{"error":"server busy"}` with `Retry-After: 1` instead of waiting; set both to `-1` to wait as 0.2.4 did. The work of a request whose client left is stopped (`api.query.cancelOnDisconnect`).
+* Under overload, heavy requests beyond `api.query.maxQueued`, or waiting longer than `api.query.queueTimeoutMs`, are answered `503` `{"error":"server busy"}` with `Retry-After: 1` instead of waiting; set both to `-1` to wait as 0.2.4 did. The work of a request whose client left is stopped (`api.query.cancelOnDisconnect`). With an explicit `store.memory.limitMB`, a request that the memory budget cannot hold gets the same answer.
+* A write is answered only once the log has accepted it: on a full disk, writers wait instead of being acknowledged with a change that a crash would lose.
 
 ### Upgrading from 0.2.1
 
@@ -552,10 +561,10 @@ The `internal` engine is the built-in storage engine provided by ElysianDB, and 
 
 It offers:
 
-* An append-only log that holds the data, with group commit and checkpoints
+* An append-only log that holds the data, with group commit and checkpoints, behind a tested durability layer
 * Copy-on-write entity state, so that reads never wait for writes
-* Indexes for sorts, filters, search and references, built when first needed
-* A memory budget
+* Automatic indexes for sorts, filters, search and references, in the form that suits each field
+* A memory budget that holds the whole process
 * Full compatibility with all ElysianDB features (REST API, Query API, ACLs, hooks, transactions, Admin UI)
 
 See Storage engine internals below.
@@ -627,9 +636,22 @@ This section describes the `internal` engine.
 
 **Entity state.** For each entity, the engine keeps the position of each document in the log, its insertion order, the id directory and the indexes as persistent trees of pages (`pages/000001.pgs`, …). Pages hold their keys and values as plain bytes, so the garbage collector does not walk them, and the pages used least are dropped from memory and read back from disk when the memory budget is reached. A write builds new versions of the few pages it touches, changes the pages it already copied in place within the same batch, and publishes them at once: a reader works on a consistent snapshot without any lock, and a write locks only its entity for a few microseconds. Deleting a document costs the same at 1,000 or 1,000,000 documents, and `DELETE /api/<entity>` is immediate. Writes that read a document first (updates, sub-entity merges) are checked at commit and replayed if another write changed that document meanwhile, so no update is lost.
 
-**Indexes.** A field gets a sort index the first time it is sorted on, and a filter index the first time it is filtered on. Indexes are built in the background while queries keep working without them, then kept up to date by every write. The indexes an entity is waiting for are built together, in one pass over its documents, oldest request first; an entity of up to 512 documents gets its indexes at once. An index unused for an hour is released (its memory and its upkeep on writes) and rebuilt at its next use. Indexes never change results: a filter is answered from the index entries with the same filter functions as before (a day range on a date field, for example, is counted on the index without reading the documents), and the documents an index cannot decide on are checked one by one. Search uses an index of three-character sequences stored like the other indexes, and filters through references (`filter[author.name]`) use the index of the referenced entity and the reverse references.
+**Indexes.** Indexes only narrow the documents a request looks at: results, their order and counts are exactly the ones a scan of every document would give. A field gets a sort index the first time it is sorted on and a filter index the first time it is filtered on; they are built in the background, while requests keep working without them, then kept up to date by every write. The indexes an entity is waiting for are built together in one pass over its documents, oldest request first, within the share of the memory budget for index builds; an entity of up to 512 documents gets its indexes at once. ElysianDB uses several forms:
 
-**Checkpoints and restarts.** Every `store.flushIntervalSeconds`, or when `store.crashRecovery.maxLogMB` of log has been written, the engine writes the pages changed since the previous checkpoint (never the documents again, never the unchanged pages) and switches `MANIFEST` to the new roots, without holding any lock that requests or the monitoring wait for. Its duration depends on the writes since the previous checkpoint, not on the size of the database. A checkpoint never starts sooner after the previous one than ten times its duration (at most five minutes), so that checkpoints take at most a tenth of the time under load. A restart opens the roots named in `MANIFEST`, reads pages on demand and replays the log written after the checkpoint, so its time depends on the recent writes, not on the size of the database. A torn last batch, left by a crash, is dropped. A folder written by an earlier build of this version (`MANIFEST` format 1) is upgraded at its first start; the previous checkpoint file is kept in `legacy-checkpoint/`.
+| Form | Used for |
+| ---- | -------- |
+| ordered (`f:<field>`) | Equality, ranges, prefixes, `contains`, arrays (each element is an entry) and dates; exact counts by rank |
+| bitmap (`b:<field>`) | The same filters on fields with few distinct values (a status, a kind, a boolean): one bitmap per value and per range of 4,096 documents, combined and counted without reading documents |
+| composite (`c:<field>,<sort>`) | An equality filter on one field with a sort on another: pages at any `offset` and counts are read by rank, without walking the documents before the page |
+| sort (`s:<field>`) | Sorts and pagination by rank, ties in insertion order, missing values last |
+| full text (`search`) | `search`, with an index of three-character sequences |
+| references (`r:`) | Filters through references (`filter[author.name]`), with the index of the referenced entity |
+
+**Planner.** For each filter, the planner counts how many documents the index of each condition would keep (by rank on ordered indexes, from the bitmaps otherwise), starts from the most selective one and checks the others on its candidates only, instead of collecting every condition. A filter with an equality and a sort uses a composite index when one exists and the field holds only strings; a page of `pre_read` hooks reads documents one by one until it is full.
+
+**Index advisor.** Every minute, ElysianDB looks at the indexes of entities of more than 4,096 documents: a filter index on a field with at most 64 distinct values is turned into a bitmap, and back into an ordered index if the field later holds more than 1,024 values. A pair of equality filter and sort seen eight times on such an entity gets a composite index. An index unused for an hour is released (its memory and its upkeep on writes) and rebuilt at its next use; under memory pressure that lasts, the least used indexes idle for ten minutes are released first. The indexes the `ctx.query` calls of a hook need are found when the hook is created, changed or loaded (and otherwise at its first run), built in advance and kept while the hook exists (`pinned`). Indexes have no configuration and are not managed by hand; their list, form, origin, state, size and uses are in the monitoring (see Monitoring).
+
+**Checkpoints and restarts.** Every `store.flushIntervalSeconds`, when `store.crashRecovery.maxLogMB` of log has been written, or as soon as the pages changed since the previous checkpoint reach their share of the memory budget (256 MB without a budget), the engine writes those pages (never the documents again, never the unchanged pages) and switches `MANIFEST` to the new roots, without holding any lock that requests or the monitoring wait for. Its duration depends on the writes since the previous checkpoint, not on the size of the database. When the changed pages reach twice their share, writers wait for the checkpoint, so that memory stays bounded during a mass insert. The previous checkpoint is kept as `MANIFEST.prev`, with its pages and the log written since: if the last checkpoint cannot be read at startup, ElysianDB starts from the previous one and replays the log from there. A restart opens the roots named in `MANIFEST`, reads pages on demand and replays the log written after the checkpoint, so its time depends on the recent writes, not on the size of the database. A torn last batch, left by a crash, is dropped. A folder written by an earlier build of this version (`MANIFEST` format 1) is upgraded at its first start; the previous checkpoint file is kept in `legacy-checkpoint/`.
 
 **Compaction.** In the background, a log segment with less than half of live data is rewritten into the current one, and segments that no longer hold live data are deleted after a checkpoint. Page segments are cleaned the same way: the live pages of a page segment that is less than half used are copied by the next checkpoint, and the segment is deleted once no checkpoint uses it.
 
@@ -642,7 +664,22 @@ This section describes the `internal` engine.
 | `store.durability: fsync` | The log is synced once per group of writes before the answer: it survives a power cut |
 | `POST /save`, TCP `SAVE` | Writes a checkpoint and syncs it, without blocking other requests |
 
-**Memory.** Documents and pages are kept as bytes, with no pointers for the garbage collector to scan. With `store.memory.limitMB` set, only the most read documents and pages stay in memory and the others are read from disk on demand, so the process stays within the budget at any volume. Without it, everything read stays in memory. After `DELETE /api/<entity>`, the memory of its documents is released and returned to the system. Large lists are streamed: their memory does not grow with their size.
+A change is acknowledged only once the log has accepted it. When a log write fails, on a full disk for example, the writers wait unanswered and the write is retried until the disk accepts it; reads keep working and checkpoints resume once the disk has room. Every file the engine writes goes through one durability layer (log segments, page segments, `MANIFEST` and the key-value checkpoint), which syncs a file before the directory entry that names it and names a new file only once it is complete. Its tests cut the power at every single write, sync and rename of a workload with checkpoints and compaction, and check that every acknowledged write is there after the restart; they also damage, truncate or remove each kind of file, fill the disk, and restart the engine many times in a row.
+
+**Memory.** Documents and pages are kept as bytes, with no pointers for the garbage collector to scan. With `store.memory.limitMB` set, only the most read documents and pages stay in memory and the others are read from disk on demand, so the process stays within the budget at any volume (see Memory budget below). Without it, everything read stays in memory. After `DELETE /api/<entity>`, the memory of its documents is released and returned to the system. Large lists are streamed: their memory does not grow with their size.
+
+**Memory budget.** With an explicit `store.memory.limitMB`, the budget is shared out, and every share is counted at its real size:
+
+| Share | Of the budget | When it is reached |
+| ----- | ------------- | ------------------ |
+| Documents read most often | 10 % | The least used ones leave memory and are read back from disk |
+| Pages of the engine structures | 15 % | The least used pages leave memory and are read back from disk |
+| Pages changed since the last checkpoint | 4 % | A checkpoint starts; at twice the share, writers wait for it |
+| Results of hook queries | 12 % | The least used results are dropped; a result that cannot fit is refused with `503` |
+| Index builds | 6 % | The next build waits for the current one |
+| Working memory of requests | 12 % | A request waits for memory, then is answered `503` `server busy` |
+
+The rest, about 40 %, is left for the runtime and the garbage collector, so that the live memory stays far below the budget and the garbage collector never runs continuously. ElysianDB also follows the memory the process holds: above 65 % of the budget in use after a garbage collection, or 95 % held in total, the shares of documents, pages, index builds and requests are halved, and above 80 % or 105 % they are quartered, until the memory comes back down. A request reserves memory for the documents it decodes, the response it builds and, when it runs heavy work, an envelope of 8 MB; it gives it back when it ends.
 
 **One process per folder.** The engine locks `elysiandb.lock` in the data folder. A second process on the same folder, `elysiandb backup` on the folder of a running server for example, stops with an error.
 
@@ -2132,6 +2169,22 @@ The `ctx` object exposes:
 | ------------------------ | ----------------------------------------- |
 | `entity`                 | The current entity object being processed |
 | `query(entity, filters)` | Query another entity programmatically. Core entities (`_elysiandb_core_*`) always return an empty list |
+| `count(entity, filters)` | The number of documents `query` would return |
+| `sum(entity, filters, field)` | The sum of the numeric values of `field` (a dotted path is allowed) over the documents `query` would return; other values are ignored |
+| `group(entity, filters, field[, sumField])` | An object with one key per value of `field` (strings, numbers and booleans) over the documents `query` would return, each holding `count` and, with `sumField`, `sum` |
+
+`count`, `sum` and `group` are optional: they are computed by ElysianDB on the same documents as `query`, with the same ACL rules, without converting them for the script. For example, the spending of a month over all purchases:
+
+```javascript
+function postRead(ctx) {
+  var months = ctx.group("purchase", { status: { neq: "cancelled" } }, "budget_month", "price")
+  var month = months[ctx.entity.id] || { count: 0, sum: 0 }
+  ctx.entity.spent = month.sum
+  ctx.entity.purchase_count = month.count
+}
+```
+
+The groups of a result are computed once and reused by every document and every request until the queried entity changes, so a page of 120 months costs one pass over the purchases instead of 120.
 
 ---
 
@@ -2166,6 +2219,19 @@ function postRead(ctx) {
 ```
 
 If `bypass_acl` is disabled, results returned by `query` are filtered using ACL rules.
+
+---
+
+### Hooks at Scale
+
+Hooks behave exactly as described above; ElysianDB only avoids repeating work:
+
+* **Shared query results.** The result of a `ctx.query` is kept, without converting the documents, as long as the queried entity (and the ACL, without `bypass_acl`) is unchanged: every document of a page and every following request reads the same result, and a script receives it as a regular array whose objects read their fields on demand. A write to the queried entity updates the kept result from the documents it changed, instead of reading the entity again. A result that cannot fit in its share of the memory budget is refused with `503` `server busy`.
+* **Reused hook results.** A hook run that reads neither the current time (`Date.now()`, `new Date()` without arguments) nor `Math.random()`, and that does not fail, depends only on the document it receives and on the results of its `ctx.query` calls. Its changes to the document are kept and applied again, without running the script, to the same document as long as the entities it queried are unchanged.
+* **Indexes prepared in advance.** The fields that the `ctx.query` calls of a script filter on are indexed in the background when the hook is created or changed, and these indexes are kept while the hook exists (see Storage engine internals).
+* **Lane.** A hook whose runs take more than a few milliseconds on average waits for a slot of the hook lane (see Overload and timeouts).
+
+Each script is compiled once. Every run gets a fresh JavaScript runtime, as before: creating one costs about a microsecond, and nothing a script leaves in its globals can reach another run. The monitoring gives, per hook, its executions, duration, `ctx.query` calls, rows read and reused results.
 
 ---
 

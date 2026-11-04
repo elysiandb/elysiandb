@@ -43,10 +43,11 @@ engine:
 
 The `internal` engine is the storage engine shipped with ElysianDB, designed together with its API. It provides:
 
-* An append-only log that holds the data, with group commit, checkpoints and background compaction
+* An append-only log that holds the data, with group commit, checkpoints and background compaction, behind a durability layer tested against a power cut at every disk operation
 * Copy-on-write entity state: reads never wait for writes
-* Indexes for sorts, filters, search and references, built when first needed
-* Streamed responses and a memory budget
+* Automatic indexes for sorts, filters, search and references (ordered, bitmap and composite forms), built in the background, chosen by selectivity and released when unused
+* A memory budget that holds the whole process, from caches to the working memory of requests and hooks, at millions of documents
+* Hooks that stay fast at scale: shared `ctx.query` results, reused hook results and optional `count`, `sum` and `group` helpers
 * Very high throughput and low latency
 * Full compatibility with all ElysianDB features
 
