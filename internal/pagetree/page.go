@@ -120,7 +120,27 @@ func (p *Page) Kids() []*Ref {
 }
 
 func (p *Page) Bytes() int {
-	return len(p.keys) + len(p.vals) + 4*(len(p.koff)+len(p.voff)) + 24*len(p.kids) + 128
+	return cap(p.keys) + cap(p.vals) + 4*(cap(p.koff)+cap(p.voff)) + 16*cap(p.kids) + 8*cap(p.sizes) + 72*len(p.kids) + 160
+}
+
+func (p *Page) Compact() *Page {
+	c := &Page{leaf: p.leaf, owner: p.owner, total: p.total}
+	c.keys = append(make([]byte, 0, len(p.keys)), p.keys...)
+	c.koff = append(make([]uint32, 0, len(p.koff)), p.koff...)
+	if p.leaf {
+		c.vals = append(make([]byte, 0, len(p.vals)), p.vals...)
+		c.voff = append(make([]uint32, 0, len(p.voff)), p.voff...)
+		return c
+	}
+
+	c.kids = append(make([]*Ref, 0, len(p.kids)), p.kids...)
+	c.sizes = append(make([]uint64, 0, len(p.sizes)), p.sizes...)
+
+	return c
+}
+
+func (r *Ref) Replace(old, next *Page) bool {
+	return r.mem.CompareAndSwap(old, next)
 }
 
 func (p *Page) key(i int) []byte {
@@ -387,6 +407,49 @@ func Encode(dst []byte, p *Page) ([]byte, error) {
 	return dst, nil
 }
 
+func payloadSizes(b []byte, pos int, n uint64, leaf bool) (int, int, bool) {
+	keys, vals := 0, 0
+	skip := func() (int, bool) {
+		v, w := binary.Uvarint(b[pos:])
+		if w <= 0 || uint64(len(b)-pos-w) < v {
+			return 0, false
+		}
+		pos += w + int(v)
+		return int(v), true
+	}
+
+	for i := uint64(0); i < n; i++ {
+		kl, ok := skip()
+		if !ok {
+			return 0, 0, false
+		}
+		keys += kl
+
+		if leaf {
+			vl, ok := skip()
+			if !ok {
+				return 0, 0, false
+			}
+			vals += vl
+			continue
+		}
+
+		if len(b)-pos < 8 {
+			return 0, 0, false
+		}
+		pos += 8
+		for j := 0; j < 2; j++ {
+			_, w := binary.Uvarint(b[pos:])
+			if w <= 0 {
+				return 0, 0, false
+			}
+			pos += w
+		}
+	}
+
+	return keys, vals, true
+}
+
 func Decode(b []byte) (*Page, error) {
 	if len(b) < 2 || (b[0] != 1 && b[0] != 2) {
 		return nil, ErrCorruptPage
@@ -408,11 +471,16 @@ func Decode(b []byte) (*Page, error) {
 		return nil, ErrCorruptPage
 	}
 
+	keyBytes, valBytes, ok := payloadSizes(b, pos, n, p.leaf)
+	if !ok {
+		return nil, ErrCorruptPage
+	}
+
 	p.koff = make([]uint32, 1, n+1)
-	p.keys = make([]byte, 0, len(b))
+	p.keys = make([]byte, 0, keyBytes)
 	if p.leaf {
 		p.voff = make([]uint32, 1, n+1)
-		p.vals = make([]byte, 0, len(b))
+		p.vals = make([]byte, 0, valBytes)
 	} else {
 		p.kids = make([]*Ref, 0, n)
 		p.sizes = make([]uint64, 0, n)

@@ -59,6 +59,12 @@ func (c *valueCache) setLimit(limit int64) {
 	}
 }
 
+const cacheEntryOverhead = 112
+
+func entrySize(data []byte) int64 {
+	return int64(cap(data)) + cacheEntryOverhead
+}
+
 func (c *valueCache) shard(lsn uint64) *cacheShard {
 	return c.shards[(lsn*0x9E3779B97F4A7C15>>32)%uint64(len(c.shards))]
 }
@@ -95,7 +101,7 @@ func (c *valueCache) put(lsn uint64, data []byte) {
 		return
 	}
 
-	size := int64(len(data))
+	size := entrySize(data)
 	if size > s.limit {
 		return
 	}
@@ -137,7 +143,7 @@ func (s *cacheShard) evictOne() {
 		}
 
 		delete(s.index, e.lsn)
-		s.bytes -= int64(len(e.data))
+		s.bytes -= entrySize(e.data)
 		*e = cacheEntry{}
 		s.free = append(s.free, s.hand)
 		s.hand++
@@ -156,7 +162,7 @@ func (c *valueCache) drop(lsn uint64) int64 {
 		return 0
 	}
 
-	size := int64(len(s.entries[i].data))
+	size := entrySize(s.entries[i].data)
 	s.bytes -= size
 	s.entries[i] = cacheEntry{}
 	s.free = append(s.free, i)

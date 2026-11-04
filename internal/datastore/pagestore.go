@@ -281,6 +281,10 @@ func (s *pageStore) write(ref *pagetree.Ref, p *pagetree.Page) error {
 
 	ref.Persisted(id, uint32(len(payload)))
 	s.writes.Add(1)
+
+	if c := p.Compact(); ref.Replace(p, c) {
+		p = c
+	}
 	s.remember(ref, p)
 
 	return nil
