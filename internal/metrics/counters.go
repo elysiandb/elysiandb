@@ -28,6 +28,8 @@ const (
 	cHookErrors
 	cHeavyQueries
 	cHeavyQueued
+	cHeavyRejected
+	cRequestsAbandoned
 	cKVGets
 	cKVSets
 	cKVDeletes
@@ -70,6 +72,7 @@ var (
 	httpLatency   Histogram
 	tcpLatency    Histogram
 	tcpAuth       Histogram
+	heavyWait     Histogram
 	hookLatency   Histogram
 	tcpOpen       atomic.Int64
 	startedAt     = time.Now()
@@ -159,7 +162,16 @@ func HeavyQuery(wait time.Duration) {
 	add(cHeavyQueries, 1)
 	if wait > time.Millisecond {
 		add(cHeavyQueued, 1)
+		heavyWait.Observe(wait)
 	}
+}
+
+func HeavyRejected() {
+	add(cHeavyRejected, 1)
+}
+
+func RequestAbandoned() {
+	add(cRequestsAbandoned, 1)
 }
 
 func SlowRequest() {

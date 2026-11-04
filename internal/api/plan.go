@@ -1,12 +1,12 @@
 package api_storage
 
 import (
-	"errors"
 	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/globals"
@@ -32,7 +32,7 @@ type ListQuery struct {
 	Includes  string
 	CountOnly bool
 	Snapshot  *datastore.Snapshot
-	Deadline  time.Time
+	Guard     *Guard
 }
 
 type ListResult struct {
@@ -634,7 +634,7 @@ func Plan(q ListQuery) *ListResult {
 	reader := includeReader()
 
 	if needsMatch && heavyPlan(snap, cand, evalIncludes) {
-		release, err := acquireHeavyLane(q.Deadline)
+		release, err := acquireHeavyLane(q.Guard)
 		if err != nil {
 			res.Err = err
 			return res
@@ -658,7 +658,7 @@ func Plan(q ListQuery) *ListResult {
 		}
 
 		verified++
-		if verified%128 == 0 && !q.Deadline.IsZero() && time.Now().After(q.Deadline) {
+		if verified%guardInterval == 0 && q.Guard.Check() != nil {
 			expired = true
 			return false
 		}
@@ -684,29 +684,72 @@ func Plan(q ListQuery) *ListResult {
 		res.Docs, res.Total = paginate(order, q.Offset, q.Limit, q.CountOnly)
 	}
 
-	if expired {
-		res.Err = ErrDeadline
+	if expired || q.Guard.Err() != nil {
+		res.Err = q.Guard.Err()
+		if res.Err == nil {
+			res.Err = ErrDeadline
+		}
 		res.Docs, res.Total = nil, 0
 	}
 
 	return res
 }
 
-var ErrDeadline = errors.New("request deadline exceeded")
-
-const heavyCandidates = 2048
-
-var (
-	heavyMu    sync.Mutex
-	heavySlots chan struct{}
-	heavySize  int
+const (
+	heavyCandidates       = 2048
+	guardInterval         = 64
+	defaultQueuePerWorker = 4
+	defaultQueueTimeout   = 5 * time.Second
+	heavyLanePollInterval = 20 * time.Millisecond
 )
 
-func heavyLane() chan struct{} {
-	size := runtime.GOMAXPROCS(0)
+var (
+	heavyMu      sync.Mutex
+	heavySlots   chan struct{}
+	heavySize    int
+	heavyWaiting atomic.Int64
+)
+
+func HeavyLaneSize() int {
 	if cfg := globals.GetConfig(); cfg != nil && cfg.Api.Query.Workers > 0 {
-		size = cfg.Api.Query.Workers
+		return cfg.Api.Query.Workers
 	}
+
+	return max(1, runtime.GOMAXPROCS(0)/2)
+}
+
+func heavyQueueLimit(size int) int64 {
+	if cfg := globals.GetConfig(); cfg != nil {
+		switch {
+		case cfg.Api.Query.MaxQueued > 0:
+			return int64(cfg.Api.Query.MaxQueued)
+		case cfg.Api.Query.MaxQueued < 0:
+			return -1
+		}
+	}
+
+	return int64(size * defaultQueuePerWorker)
+}
+
+func heavyQueueTimeout() time.Duration {
+	if cfg := globals.GetConfig(); cfg != nil {
+		switch {
+		case cfg.Api.Query.QueueTimeoutMs > 0:
+			return time.Duration(cfg.Api.Query.QueueTimeoutMs) * time.Millisecond
+		case cfg.Api.Query.QueueTimeoutMs < 0:
+			return -1
+		}
+	}
+
+	return defaultQueueTimeout
+}
+
+func HeavyWaiting() int {
+	return int(heavyWaiting.Load())
+}
+
+func heavyLane() chan struct{} {
+	size := HeavyLaneSize()
 
 	heavyMu.Lock()
 	defer heavyMu.Unlock()
@@ -736,31 +779,52 @@ func heavyPlan(snap *datastore.Snapshot, cand candidates, evalIncludes string) b
 	return maybe > heavyCandidates
 }
 
-func acquireHeavyLane(deadline time.Time) (func(), error) {
+func acquireHeavyLane(guard *Guard) (func(), error) {
 	slots := heavyLane()
-	start := time.Now()
+	release := func() { <-slots }
 
 	select {
 	case slots <- struct{}{}:
+		metrics.HeavyQuery(0)
+		return release, nil
 	default:
-		if deadline.IsZero() {
-			slots <- struct{}{}
-			break
-		}
-
-		timer := time.NewTimer(time.Until(deadline))
-		defer timer.Stop()
-
-		select {
-		case slots <- struct{}{}:
-		case <-timer.C:
-			return nil, ErrDeadline
-		}
 	}
 
-	metrics.HeavyQuery(time.Since(start))
+	patient := guard == nil || guard.Admitted
+	if limit := heavyQueueLimit(cap(slots)); !patient && limit >= 0 && heavyWaiting.Load() >= limit {
+		metrics.HeavyRejected()
+		return nil, guard.fail(ErrBusy)
+	}
 
-	return func() { <-slots }, nil
+	heavyWaiting.Add(1)
+	defer heavyWaiting.Add(-1)
+
+	start := time.Now()
+	timeout := heavyQueueTimeout()
+	if patient {
+		timeout = -1
+	}
+	ticker := time.NewTicker(heavyLanePollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case slots <- struct{}{}:
+			metrics.HeavyQuery(time.Since(start))
+			return release, nil
+		case <-ticker.C:
+		}
+
+		if err := guard.Check(); err != nil {
+			metrics.HeavyQuery(time.Since(start))
+			return nil, err
+		}
+
+		if timeout >= 0 && time.Since(start) >= timeout {
+			metrics.HeavyRejected()
+			return nil, guard.fail(ErrBusy)
+		}
+	}
 }
 
 func DeadlineFromConfig() time.Time {

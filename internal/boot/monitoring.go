@@ -19,6 +19,7 @@ func MonitoringSources() metrics.Sources {
 		IndexBacklog:    api_storage.IndexBacklog,
 		RecoverySizes:   storageLogSizes,
 		Engine:          engineSample,
+		HeavyWaiting:    api_storage.HeavyWaiting,
 		Transactions:    transaction.OpenTransactions,
 		HTTPConnections: HTTPConnections,
 		CacheEntries: func() int {

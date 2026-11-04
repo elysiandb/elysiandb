@@ -104,8 +104,15 @@ type ApiConfig struct {
 }
 
 type ApiQueryConfig struct {
-	Workers   int `yaml:"workers"`
-	TimeoutMs int `yaml:"timeoutMs"`
+	Workers            int   `yaml:"workers"`
+	TimeoutMs          int   `yaml:"timeoutMs"`
+	MaxQueued          int   `yaml:"maxQueued"`
+	QueueTimeoutMs     int   `yaml:"queueTimeoutMs"`
+	CancelOnDisconnect *bool `yaml:"cancelOnDisconnect"`
+}
+
+func (c ApiQueryConfig) CancelsAbandonedRequests() bool {
+	return c.CancelOnDisconnect == nil || *c.CancelOnDisconnect
 }
 
 type ApiResponseConfig struct {
@@ -280,6 +287,15 @@ func LoadConfig(path string) (*Config, error) {
 
 	if cfg.Store.Memory.LimitMB < 0 {
 		return nil, fmt.Errorf("store.memory.limitMB must be 0 or more")
+	}
+
+	for name, v := range map[string]int{
+		"api.query.maxQueued":      cfg.Api.Query.MaxQueued,
+		"api.query.queueTimeoutMs": cfg.Api.Query.QueueTimeoutMs,
+	} {
+		if v < -1 {
+			return nil, fmt.Errorf("%s must be -1 (no limit), 0 (default) or more", name)
+		}
 	}
 
 	if cfg.Security.Authentication.Enabled {

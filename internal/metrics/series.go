@@ -77,6 +77,10 @@ const (
 	sTCPAuthP95
 	sHeavyQueriesRps
 	sHeavyQueuedRps
+	sHeavyRejectedRps
+	sHeavyWaiting
+	sHeavyWaitP95
+	sAbandonedRps
 	numSeries
 )
 
@@ -153,6 +157,10 @@ var seriesNames = [numSeries]string{
 	sTCPAuthP95:              "tcp_auth_p95_ms",
 	sHeavyQueriesRps:         "heavy_queries_rps",
 	sHeavyQueuedRps:          "heavy_queued_rps",
+	sHeavyRejectedRps:        "heavy_rejected_rps",
+	sHeavyWaiting:            "heavy_waiting",
+	sHeavyWaitP95:            "heavy_wait_p95_ms",
+	sAbandonedRps:            "abandoned_rps",
 }
 
 func SeriesNames() []string {
@@ -182,6 +190,8 @@ var rateSeries = map[int]int{
 	sHookErrorsRps:     cHookErrors,
 	sHeavyQueriesRps:   cHeavyQueries,
 	sHeavyQueuedRps:    cHeavyQueued,
+	sHeavyRejectedRps:  cHeavyRejected,
+	sAbandonedRps:      cRequestsAbandoned,
 	sKVGetsRps:         cKVGets,
 	sKVSetsRps:         cKVSets,
 	sKVDeletesRps:      cKVDeletes,
@@ -236,6 +246,7 @@ func derive(prev, cur *snapshot) Point {
 
 	p.V[sHookP95] = cur.hook.sub(prev.hook).quantile(0.95)
 	p.V[sTCPAuthP95] = cur.auth.sub(prev.auth).quantile(0.95)
+	p.V[sHeavyWaitP95] = cur.wait.sub(prev.wait).quantile(0.95)
 
 	if hits, misses := delta(cKVHits), delta(cKVMisses); hits+misses > 0 {
 		p.V[sKVHitRatio] = hits / (hits + misses)

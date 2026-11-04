@@ -236,7 +236,7 @@ func (r *Request) apply(entity string, data map[string]any, event, phase, fnName
 			continue
 		}
 
-		if r.overBudget() {
+		if r.overBudget() || r.guard.Stopped() {
 			break
 		}
 

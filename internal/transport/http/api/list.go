@@ -60,7 +60,8 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	preReadHooks := hooksEnabled && hook.EntityHasPreReadHooks(entity)
 	postReadHooks := hooksEnabled && hook.EntityHasPostReadHooks(entity)
 	paginateAfterHooks := preReadHooks && len(filters) > 0
-	hooks := hook.NewRequest(currentUser)
+	guard := requestGuard(ctx)
+	hooks := hook.NewRequest(currentUser).WithGuard(guard)
 
 	if engine.IsEngineInternal() && !paginateAfterHooks {
 		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
@@ -78,10 +79,10 @@ func ListController(ctx *fasthttp.RequestCtx) {
 				Search:    search,
 				Includes:  includes,
 				CountOnly: mode != acl.ReadOwned,
-				Deadline:  api_storage.DeadlineFromConfig(),
+				Guard:     guard,
 			})
 			if res.Err != nil {
-				sendDeadlineExceeded(ctx)
+				sendGuardError(ctx, res.Err)
 				return
 			}
 			writeCount(ctx, countPlanned(res, limit > 0 || offset > 0 || sortField != "", mode, currentUser), entity, hash, cacheDeps(entity, includes))
@@ -97,10 +98,10 @@ func ListController(ctx *fasthttp.RequestCtx) {
 				SortAsc:   sortAscending,
 				Filters:   filters,
 				Search:    search,
-				Deadline:  api_storage.DeadlineFromConfig(),
+				Guard:     guard,
 			})
 			if res.Err != nil {
-				sendDeadlineExceeded(ctx)
+				sendGuardError(ctx, res.Err)
 				return
 			}
 
@@ -118,17 +119,17 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	var data []map[string]any
 	if paginateAfterHooks && engine.IsEngineInternal() {
 		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
-		res := api_storage.Plan(api_storage.ListQuery{Entity: entity, SortField: sortField, SortAsc: sortAscending, Search: search, Includes: includes})
+		res := api_storage.Plan(api_storage.ListQuery{Entity: entity, SortField: sortField, SortAsc: sortAscending, Search: search, Includes: includes, Guard: guard})
 		stored := func(item map[string]any) bool { return api_storage.StoredFiltersMatchEntity(item, filters) }
 		matches := func(item map[string]any) bool { return api_storage.FiltersMatchEntity(item, filters) }
 		candidates := api_storage.StoredCandidates(res.Snapshot(), filters, nil, includes)
 		data = lazyPreReadPage(hooks, entity, res, includes, stored, candidates, acl.ReadModeFor(currentUser, entity), currentUser, matches, offset, limit)
 	} else if paginateAfterHooks {
 		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
-		data = engine.ListEntities(entity, 0, 0, sortField, sortAscending, nil, search, includes)
+		data = listEntities(guard, entity, 0, 0, sortField, sortAscending, nil, search, includes)
 		data = api_storage.ApplyStoredFiltersToList(data, filters, 0, 0)
 	} else {
-		data = engine.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
+		data = listEntities(guard, entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
 	}
 
 	if !paginateAfterHooks || !engine.IsEngineInternal() {
@@ -146,6 +147,10 @@ func ListController(ctx *fasthttp.RequestCtx) {
 		data = engine.ApplyFiltersToList(data, filters)
 	}
 
+	if guardStopped(ctx, guard) {
+		return
+	}
+
 	includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
 	if countOnlyParam {
 		writeCount(ctx, len(data), entity, hash, cacheDeps(entity, includes))
@@ -154,6 +159,9 @@ func ListController(ctx *fasthttp.RequestCtx) {
 
 	if postReadHooks {
 		applyPostReadHooks(hooks, entity, data)
+		if guardStopped(ctx, guard) {
+			return
+		}
 	}
 
 	fields := api_storage.ParseFieldsParam(fieldsParam)

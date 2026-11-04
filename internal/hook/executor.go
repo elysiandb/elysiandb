@@ -1,6 +1,7 @@
 package hook
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/taymour/elysiandb/internal/acl"
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	engine "github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/metrics"
@@ -76,6 +78,7 @@ type Request struct {
 	budget   time.Duration
 	spent    atomic.Int64
 	skipped  atomic.Bool
+	guard    *api_storage.Guard
 }
 
 func NewRequest(username string) *Request {
@@ -85,6 +88,16 @@ func NewRequest(username string) *Request {
 	}
 
 	return r
+}
+
+func (r *Request) WithGuard(guard *api_storage.Guard) *Request {
+	r.guard = guard
+
+	return r
+}
+
+func (r *Request) Stopped() bool {
+	return r.guard.Stopped()
 }
 
 func (r *Request) overBudget() bool {
@@ -145,7 +158,15 @@ func copyRows(rows []map[string]any) []map[string]any {
 	return out
 }
 
-func (r *Request) query(h Hook, targetEntity string, filters map[string]map[string]string, bypassAcl bool) []map[string]any {
+func listForHook(targetEntity string, filters map[string]map[string]string, guard *api_storage.Guard) ([]map[string]any, error) {
+	if !engine.IsEngineInternal() {
+		return engine.ListEntities(targetEntity, 0, 0, "", true, filters, "", ""), nil
+	}
+
+	return api_storage.ListEntitiesGuarded(targetEntity, 0, 0, "", true, filters, "", "", guard)
+}
+
+func (r *Request) query(h Hook, targetEntity string, filters map[string]map[string]string, bypassAcl bool, guard *api_storage.Guard) ([]map[string]any, error) {
 	owner := r.username
 	if bypassAcl {
 		owner = "\x00bypass"
@@ -158,7 +179,7 @@ func (r *Request) query(h Hook, targetEntity string, filters map[string]map[stri
 	r.mu.Unlock()
 	if ok {
 		metrics.ObserveHookQuery(h.ID, h.Entity, h.Event, len(rows), true)
-		return copyRows(rows)
+		return copyRows(rows), nil
 	}
 
 	version := entityVersion(targetEntity)
@@ -175,11 +196,15 @@ func (r *Request) query(h Hook, targetEntity string, filters map[string]map[stri
 			r.memo[key] = cached.rows
 			r.mu.Unlock()
 			metrics.ObserveHookQuery(h.ID, h.Entity, h.Event, len(cached.rows), true)
-			return copyRows(cached.rows)
+			return copyRows(cached.rows), nil
 		}
 	}
 
-	results := engine.ListEntities(targetEntity, 0, 0, "", true, filters, "", "")
+	results, err := listForHook(targetEntity, filters, guard)
+	if err != nil {
+		return nil, err
+	}
+
 	if !bypassAcl {
 		results = acl.FilterListOfEntities(r.username, targetEntity, results)
 	}
@@ -199,7 +224,26 @@ func (r *Request) query(h Hook, targetEntity string, filters map[string]map[stri
 		queryCacheMu.Unlock()
 	}
 
-	return copyRows(results)
+	return copyRows(results), nil
+}
+
+func (r *Request) runDeadline(timeout time.Duration) (time.Time, string) {
+	stopAt := time.Now().Add(timeout)
+	reason := fmt.Sprintf("hook script stopped after %s", timeout)
+	if r.guard != nil && !r.guard.Deadline.IsZero() && r.guard.Deadline.Before(stopAt) {
+		stopAt = r.guard.Deadline
+		reason = api_storage.ErrDeadline.Error()
+	}
+
+	return stopAt, reason
+}
+
+func (r *Request) stopReason(err error, timeoutReason string) error {
+	if errors.Is(err, api_storage.ErrDeadline) && r.guard.Err() == nil {
+		return errors.New(timeoutReason)
+	}
+
+	return err
 }
 
 func (r *Request) applyScript(h Hook, fnName string, entity map[string]any) error {
@@ -208,10 +252,11 @@ func (r *Request) applyScript(h Hook, fnName string, entity map[string]any) erro
 		return err
 	}
 
-	timeout := scriptTimeout()
+	stopAt, reason := r.runDeadline(scriptTimeout())
+	run := r.guard.Until(stopAt)
 	vm := goja.New()
-	timer := time.AfterFunc(timeout, func() {
-		vm.Interrupt(fmt.Sprintf("hook script stopped after %s", timeout))
+	timer := time.AfterFunc(time.Until(stopAt), func() {
+		vm.Interrupt(reason)
 	})
 	defer timer.Stop()
 
@@ -244,7 +289,12 @@ func (r *Request) applyScript(h Hook, fnName string, entity map[string]any) erro
 				filters[field] = condMap
 			}
 
-			return vm.ToValue(r.query(h, targetEntity, filters, h.ByPassACL))
+			rows, err := r.query(h, targetEntity, filters, h.ByPassACL, run)
+			if err != nil {
+				panic(vm.NewGoError(r.stopReason(err, reason)))
+			}
+
+			return vm.ToValue(rows)
 		},
 	}
 

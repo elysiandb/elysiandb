@@ -28,6 +28,7 @@ type Sources struct {
 	MongoPoolInUse       func() int
 	DefaultAdminPassword func() bool
 	Engine               func() EngineSample
+	HeavyWaiting         func() int
 }
 
 type EngineSample struct {
@@ -55,6 +56,7 @@ type snapshot struct {
 	http        hist
 	tcp         hist
 	auth        hist
+	wait        hist
 	hook        hist
 	logWarnings uint64
 	logErrors   uint64
@@ -188,6 +190,7 @@ func Reset() {
 	httpLatency = Histogram{}
 	tcpLatency = Histogram{}
 	tcpAuth = Histogram{}
+	heavyWait = Histogram{}
 	hookLatency = Histogram{}
 	tcpOpen.Store(0)
 	routeStats = sync.Map{}
@@ -327,6 +330,7 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 		http:   httpLatency.snapshot(),
 		tcp:    tcpLatency.snapshot(),
 		auth:   tcpAuth.snapshot(),
+		wait:   heavyWait.snapshot(),
 		hook:   hookLatency.snapshot(),
 		procs:  runtime.GOMAXPROCS(0),
 		gauges: map[int]float64{},
@@ -391,6 +395,10 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 	}
 	if src.MongoPoolInUse != nil {
 		s.gauges[sMongoPoolInUse] = float64(src.MongoPoolInUse())
+	}
+
+	if src.HeavyWaiting != nil {
+		s.gauges[sHeavyWaiting] = float64(src.HeavyWaiting())
 	}
 
 	if src.Engine != nil {

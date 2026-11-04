@@ -196,7 +196,8 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 	hooksEnabled := globals.GetConfig().Api.Hooks.Enabled
 	preReadHooks := hooksEnabled && hook.EntityHasPreReadHooks(payload.Entity)
 	postReadHooks := hooksEnabled && hook.EntityHasPostReadHooks(payload.Entity)
-	hooks := hook.NewRequest(currentUser)
+	guard := requestGuard(ctx)
+	hooks := hook.NewRequest(currentUser).WithGuard(guard)
 
 	q := query.Query{
 		Entity:    payload.Entity,
@@ -213,9 +214,9 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 	if engine.IsEngineInternal() && !filterAfterHooks {
 		mode := acl.ReadModeFor(currentUser, payload.Entity)
 		if payload.CountOnly {
-			res := api_storage.PlanQueryUntil(q, mode != acl.ReadOwned, api_storage.DeadlineFromConfig())
+			res := api_storage.PlanQueryGuarded(q, mode != acl.ReadOwned, guard)
 			if res.Err != nil {
-				sendDeadlineExceeded(ctx)
+				sendGuardError(ctx, res.Err)
 				return
 			}
 			writeCount(ctx, countPlanned(res, q.Offset > 0 || q.Limit > 0 || len(q.OrderedSorts()) > 0, mode, currentUser), payload.Entity, hash, cacheDeps(payload.Entity, ""))
@@ -223,9 +224,9 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		}
 
 		if len(fields) == 0 && !preReadHooks && !postReadHooks && mode == acl.ReadAll {
-			res := api_storage.PlanQueryUntil(q, false, api_storage.DeadlineFromConfig())
+			res := api_storage.PlanQueryGuarded(q, false, guard)
 			if res.Err != nil {
-				sendDeadlineExceeded(ctx)
+				sendGuardError(ctx, res.Err)
 				return
 			}
 
@@ -242,7 +243,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		all := q
 		all.Offset, all.Limit = 0, 0
 		all.Filter = query.FilterNode{Leaf: map[string]map[string]string{}}
-		res := api_storage.PlanQuery(all, false)
+		res := api_storage.PlanQueryGuarded(all, false, guard)
 		stored := func(item map[string]any) bool {
 			return len(api_storage.ApplyStoredQueryFilter([]map[string]any{item}, filter)) == 1
 		}
@@ -259,8 +260,11 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		q.Filter = query.FilterNode{Leaf: map[string]map[string]string{}}
 	}
 
-	data, err := engine.ExecuteQuery(q)
+	data, err := executeQuery(guard, q)
 	if err != nil {
+		if guardStopped(ctx, guard) {
+			return
+		}
 		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 		return
@@ -285,6 +289,11 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 }
 
 func finishQuery(ctx *fasthttp.RequestCtx, payload QueryPayload, data []map[string]any, hooks *hook.Request, postReadHooks bool, fields []string, hash []byte) {
+	guard := requestGuard(ctx)
+	if guardStopped(ctx, guard) {
+		return
+	}
+
 	if payload.CountOnly {
 		writeCount(ctx, len(data), payload.Entity, hash, cacheDeps(payload.Entity, ""))
 		return
@@ -292,6 +301,9 @@ func finishQuery(ctx *fasthttp.RequestCtx, payload QueryPayload, data []map[stri
 
 	if postReadHooks {
 		applyPostReadHooks(hooks, payload.Entity, data)
+		if guardStopped(ctx, guard) {
+			return
+		}
 	}
 
 	if len(fields) > 0 {

@@ -312,6 +312,22 @@ func ListEntities(
 	search string,
 	includesParam string,
 ) []map[string]any {
+	out, _ := ListEntitiesGuarded(entity, limit, offset, sortField, sortAscending, filters, search, includesParam, nil)
+
+	return out
+}
+
+func ListEntitiesGuarded(
+	entity string,
+	limit int,
+	offset int,
+	sortField string,
+	sortAscending bool,
+	filters map[string]map[string]string,
+	search string,
+	includesParam string,
+	guard *Guard,
+) ([]map[string]any, error) {
 	includes := MergeIncludes(includesParam, ExtractAutoIncludes(filters))
 	res := Plan(ListQuery{
 		Entity:    entity,
@@ -322,14 +338,19 @@ func ListEntities(
 		Filters:   filters,
 		Search:    search,
 		Includes:  includes,
+		Guard:     guard,
 	})
+
+	if res.Err != nil {
+		return []map[string]any{}, res.Err
+	}
 
 	out := res.Decode()
 	if includes != "" && len(out) > 0 {
 		out = applyIncludesWith(out, includes, res.reader())
 	}
 
-	return out
+	return out, guard.Err()
 }
 
 func ApplyFiltersToList(
