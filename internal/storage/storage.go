@@ -344,20 +344,6 @@ func ResetStore() {
 	}
 }
 
-func ClearAll() {
-	e := current.Load()
-	if e == nil {
-		return
-	}
-
-	if err := e.Update(func(tx *datastore.Tx) error {
-		tx.ClearAll()
-		return nil
-	}); err != nil {
-		storageLog.Error("clear failed", "err", err)
-	}
-}
-
 func CountKeys() (uint64, uint64) {
 	e := current.Load()
 	if e == nil {

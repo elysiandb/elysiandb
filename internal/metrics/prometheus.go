@@ -79,8 +79,6 @@ var promGauges = []struct {
 	{"elysiandb_admin_sessions", "Active Admin UI sessions.", sAdminSessions},
 	{"elysiandb_open_transactions", "Open transactions.", sOpenTransactions},
 	{"elysiandb_oldest_transaction_seconds", "Age of the oldest open transaction.", sOldestTransaction},
-	{"elysiandb_mongodb_ping_seconds", "MongoDB ping latency.", sMongoPingMs},
-	{"elysiandb_mongodb_pool_in_use", "MongoDB pool connections in use.", sMongoPoolInUse},
 }
 
 func Prometheus() []byte {
@@ -113,9 +111,6 @@ func Prometheus() []byte {
 			v, ok := latest.gauges[g.series]
 			if !ok || math.IsNaN(v) {
 				continue
-			}
-			if g.series == sMongoPingMs {
-				v /= 1000
 			}
 			writeHeader(&b, g.name, g.help, "gauge")
 			writeSample(&b, g.name, "", v)

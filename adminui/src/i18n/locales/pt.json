@@ -190,7 +190,6 @@
         "problems": {
             "flush_failing": "A última gravação em disco falhou",
             "recovery_write_failing": "A gravação no log de recuperação falhou nos últimos 5 minutos",
-            "mongodb_unreachable": "O MongoDB está inacessível",
             "error_rate_high": "Mais de 1 % das requisições falharam nos últimos 5 minutos",
             "latency_high": "A latência p95 está acima do limite de requisições lentas há 5 minutos",
             "hook_failing": "O hook {hook_id} falhou nos últimos 5 minutos",
@@ -246,8 +245,7 @@
             "dataFolder": "Pasta de dados"
         },
         "engines": {
-            "internal": "Interno",
-            "mongodb": "MongoDB (beta)"
+            "internal": "Interno"
         },
         "features": {
             "cache": "Cache da API",
@@ -278,8 +276,7 @@
             "persistence": "Persistência",
             "runtime": "Execução",
             "connections": "Conexões",
-            "hooks": "Hooks",
-            "mongodb": "MongoDB"
+            "hooks": "Hooks"
         },
         "tabs": {
             "data": "Dados",
@@ -320,10 +317,7 @@
             "transactions": "Transações abertas",
             "oldestTransaction": "Transação aberta mais antiga",
             "hookExecutions": "Execuções de hooks por segundo",
-            "hookDuration": "Duração dos hooks (p95)",
-            "mongoPing": "Ping do MongoDB",
-            "mongoErrors": "Erros do MongoDB por minuto",
-            "mongoPool": "Conexões do pool do MongoDB em uso"
+            "hookDuration": "Duração dos hooks (p95)"
         },
         "series": {
             "http": "HTTP",
@@ -377,8 +371,6 @@
             "openTransactions": "Transações",
             "oldestTransaction": "Idade",
             "executions": "Execuções",
-            "ping": "Ping",
-            "poolInUse": "Em uso",
             "logSinceCheckpoint": "Desde o último checkpoint",
             "logBytes": "Log em disco",
             "liveBytes": "Dados vivos"

@@ -6,7 +6,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/taymour/elysiandb/internal/engine"
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/metrics"
@@ -184,7 +185,7 @@ func InitHooks() {
 		return
 	}
 
-	if engine.EntityTypeExists(HookEntity) {
+	if api_storage.EntityTypeExists(HookEntity) {
 		return
 	}
 
@@ -195,12 +196,12 @@ func InitHooks() {
 }
 
 func CreateHookEntity() error {
-	err := engine.CreateEntityType(HookEntity)
+	err := api_storage.CreateEntityType(HookEntity)
 	if err != nil {
 		return err
 	}
 
-	engine.UpdateEntitySchema(HookEntity, HookEntitySchema)
+	api_storage.UpdateEntitySchema(HookEntity, HookEntitySchema)
 
 	return nil
 }

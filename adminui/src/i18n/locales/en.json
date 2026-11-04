@@ -190,7 +190,6 @@
         "problems": {
             "flush_failing": "The last flush to disk failed",
             "recovery_write_failing": "Writing to the recovery log failed in the last 5 minutes",
-            "mongodb_unreachable": "MongoDB is unreachable",
             "error_rate_high": "More than 1 % of requests failed over the last 5 minutes",
             "latency_high": "The p95 latency has been above the slow request threshold for 5 minutes",
             "hook_failing": "Hook {hook_id} failed in the last 5 minutes",
@@ -246,8 +245,7 @@
             "dataFolder": "Data folder"
         },
         "engines": {
-            "internal": "Internal",
-            "mongodb": "MongoDB (beta)"
+            "internal": "Internal"
         },
         "features": {
             "cache": "API cache",
@@ -278,8 +276,7 @@
             "persistence": "Persistence",
             "runtime": "Runtime",
             "connections": "Connections",
-            "hooks": "Hooks",
-            "mongodb": "MongoDB"
+            "hooks": "Hooks"
         },
         "tabs": {
             "data": "Data",
@@ -320,10 +317,7 @@
             "transactions": "Open transactions",
             "oldestTransaction": "Oldest open transaction",
             "hookExecutions": "Hook executions per second",
-            "hookDuration": "Hook duration (p95)",
-            "mongoPing": "MongoDB ping",
-            "mongoErrors": "MongoDB errors per minute",
-            "mongoPool": "MongoDB pool connections in use"
+            "hookDuration": "Hook duration (p95)"
         },
         "series": {
             "http": "HTTP",
@@ -377,8 +371,6 @@
             "openTransactions": "Transactions",
             "oldestTransaction": "Age",
             "executions": "Executions",
-            "ping": "Ping",
-            "poolInUse": "In use",
             "logSinceCheckpoint": "Since the last checkpoint",
             "logBytes": "Log on disk",
             "liveBytes": "Live data"

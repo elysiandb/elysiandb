@@ -541,17 +541,14 @@ func TestAuthenticationOffOnPublicAddress(t *testing.T) {
 	}
 }
 
-func TestSlowSourcesMongoDiskAndDefaultPassword(t *testing.T) {
+func TestSlowSourcesDiskAndDefaultPassword(t *testing.T) {
 	folder := t.TempDir()
 	if err := os.WriteFile(filepath.Join(folder, "data.json"), make([]byte, 1234), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	pingErr := errors.New("server selection error")
 	setup(t, metrics.Sources{
 		DataFolder:           func() string { return folder },
-		MongoPing:            func() (time.Duration, error) { return 0, pingErr },
-		MongoPoolInUse:       func() int { return 3 },
 		DefaultAdminPassword: func() bool { return false },
 	})
 	now := time.Now()
@@ -563,17 +560,11 @@ func TestSlowSourcesMongoDiskAndDefaultPassword(t *testing.T) {
 	if got := last(t, s, "disk_bytes"); got == nil || *got != 1234 {
 		t.Fatalf("disk_bytes = %v, want 1234", got)
 	}
-	if got := last(t, s, "mongo_pool_in_use"); got == nil || *got != 3 {
-		t.Fatalf("mongo_pool_in_use = %v, want 3", got)
-	}
 	if got := last(t, s, "mongo_ping_ms"); got != nil {
-		t.Fatalf("a failed ping has no latency, got %v", *got)
+		t.Fatalf("the removed MongoDB engine has no latency, got %v", *got)
 	}
 
 	status := metrics.CurrentStatus()
-	if p, ok := hasProblem(status, "mongodb_unreachable"); !ok || p.Severity != metrics.SeverityCritical {
-		t.Fatalf("expected mongodb_unreachable, got %v", problemCodes(status))
-	}
 	if _, ok := hasProblem(status, "default_admin_password"); ok {
 		t.Fatalf("the default password is not in use")
 	}

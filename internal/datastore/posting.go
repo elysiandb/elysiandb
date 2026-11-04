@@ -33,20 +33,6 @@ func (c *chunkBits) set(off uint16) {
 	c[off/64] |= 1 << (off % 64)
 }
 
-func (c *chunkBits) clear(off uint16) {
-	c[off/64] &^= 1 << (off % 64)
-}
-
-func (c *chunkBits) empty() bool {
-	for _, w := range c {
-		if w != 0 {
-			return false
-		}
-	}
-
-	return true
-}
-
 func (c *chunkBits) count() int {
 	n := 0
 	for _, w := range c {

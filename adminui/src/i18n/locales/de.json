@@ -190,7 +190,6 @@
         "problems": {
             "flush_failing": "Das letzte Schreiben auf die Festplatte ist fehlgeschlagen",
             "recovery_write_failing": "Das Schreiben in das Wiederherstellungsprotokoll ist in den letzten 5 Minuten fehlgeschlagen",
-            "mongodb_unreachable": "MongoDB ist nicht erreichbar",
             "error_rate_high": "Mehr als 1 % der Anfragen sind in den letzten 5 Minuten fehlgeschlagen",
             "latency_high": "Die p95-Latenz liegt seit 5 Minuten über dem Schwellenwert für langsame Anfragen",
             "hook_failing": "Hook {hook_id} ist in den letzten 5 Minuten fehlgeschlagen",
@@ -246,8 +245,7 @@
             "dataFolder": "Datenordner"
         },
         "engines": {
-            "internal": "Intern",
-            "mongodb": "MongoDB (Beta)"
+            "internal": "Intern"
         },
         "features": {
             "cache": "API-Cache",
@@ -278,8 +276,7 @@
             "persistence": "Persistenz",
             "runtime": "Laufzeitumgebung",
             "connections": "Verbindungen",
-            "hooks": "Hooks",
-            "mongodb": "MongoDB"
+            "hooks": "Hooks"
         },
         "tabs": {
             "data": "Daten",
@@ -320,10 +317,7 @@
             "transactions": "Offene Transaktionen",
             "oldestTransaction": "Älteste offene Transaktion",
             "hookExecutions": "Hook-Ausführungen pro Sekunde",
-            "hookDuration": "Hook-Dauer (p95)",
-            "mongoPing": "MongoDB-Ping",
-            "mongoErrors": "MongoDB-Fehler pro Minute",
-            "mongoPool": "Belegte Verbindungen im MongoDB-Pool"
+            "hookDuration": "Hook-Dauer (p95)"
         },
         "series": {
             "http": "HTTP",
@@ -377,8 +371,6 @@
             "openTransactions": "Transaktionen",
             "oldestTransaction": "Alter",
             "executions": "Ausführungen",
-            "ping": "Ping",
-            "poolInUse": "Belegt",
             "logSinceCheckpoint": "Seit dem letzten Checkpoint",
             "logBytes": "Log auf der Platte",
             "liveBytes": "Aktive Daten"

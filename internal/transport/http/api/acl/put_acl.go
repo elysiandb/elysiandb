@@ -3,8 +3,9 @@ package http_acl
 import (
 	"encoding/json"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/taymour/elysiandb/internal/acl"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
@@ -22,7 +23,7 @@ func UpdateACLForUsernameAndEntityController(ctx *fasthttp.RequestCtx) {
 	entity := ctx.UserValue("entity").(string)
 	username := ctx.UserValue("user_name").(string)
 
-	if engine.IsCoreEntityType(entity) {
+	if api_storage.IsCoreEntityType(entity) {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString(`{"error":"core entities have no ACL: users, ACLs and hooks are managed by admin users only"}`)
 		return

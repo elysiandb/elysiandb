@@ -3,8 +3,9 @@ package http_acl
 import (
 	"encoding/json"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/taymour/elysiandb/internal/acl"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
@@ -24,7 +25,7 @@ func GetAllACLForUsername(ctx *fasthttp.RequestCtx) {
 
 	var acls []map[string]any
 
-	entities := engine.ListPublicEntityTypes()
+	entities := api_storage.ListPublicEntityTypes()
 
 	for _, entity := range entities {
 		acl := acl.GetACLEntityForUsername(entity, username)

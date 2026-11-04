@@ -6,7 +6,6 @@ import (
 
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/configuration"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/metrics"
@@ -50,8 +49,22 @@ func listener(server configuration.ServerConfig) string {
 	return fmt.Sprintf("%s:%d", server.Host, server.Port)
 }
 
+const migrationGuide = "docs/migration-pebble.md"
+
+func RequireInternalEngine(cfg *configuration.Config) {
+	switch cfg.Engine.Name {
+	case "", "internal":
+	case "mongodb":
+		log.Fatal("the mongodb engine was removed", "component", "boot", "engine", cfg.Engine.Name,
+			"hint", "set engine.name to internal and restore a backup taken with the previous version, see "+migrationGuide)
+	default:
+		log.Fatal("unsupported storage engine", "component", "boot", "engine", cfg.Engine.Name, "hint", "use internal, see "+migrationGuide)
+	}
+}
+
 func InitDB() {
 	cfg := globals.GetConfig()
+	RequireInternalEngine(cfg)
 
 	if cfg.Api.Cache.Enabled {
 		cache.InitCache(time.Duration(cfg.Api.Cache.CleanupIntervalSeconds) * time.Second)
@@ -64,14 +77,6 @@ func InitDB() {
 
 	logStorageLoaded(cfg, start)
 
-	switch {
-	case engine.IsEngineMongoDB():
-		InitMongoDBConnection()
-	case engine.IsEngineInternal():
-	default:
-		log.Fatal("unsupported storage engine", "component", "boot", "engine", cfg.Engine.Name, "hint", "use internal or mongodb")
-	}
-
 	BootACL()
 	BootHooks()
 	BootApiCacheCleaner()
@@ -79,6 +84,7 @@ func InitDB() {
 
 func InitTool() {
 	cfg := globals.GetConfig()
+	RequireInternalEngine(cfg)
 
 	start := time.Now()
 	if err := storage.Open(storage.ModeTool); err != nil {
@@ -87,10 +93,6 @@ func InitTool() {
 	}
 
 	logStorageLoaded(cfg, start)
-
-	if engine.IsEngineMongoDB() {
-		InitMongoDBConnection()
-	}
 }
 
 func logStorageLoaded(cfg *configuration.Config, start time.Time) {

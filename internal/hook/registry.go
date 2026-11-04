@@ -5,9 +5,10 @@ import (
 	"sort"
 	"sync"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/taymour/elysiandb/internal/datastore"
 	"github.com/taymour/elysiandb/internal/docpath"
-	engine "github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
@@ -29,10 +30,6 @@ type registry struct {
 var hooks = &registry{}
 
 func (r *registry) forEntity(entity string) ([]Hook, bool) {
-	if !engine.IsEngineInternal() {
-		return nil, false
-	}
-
 	e := storage.Engine()
 	if e == nil {
 		return nil, false
@@ -99,7 +96,7 @@ func hooksForEntity(entity string) []Hook {
 }
 
 func listHooksFromEngine(entity string) []Hook {
-	data := engine.ListEntities(
+	data := api_storage.ListEntities(
 		HookEntity,
 		0,
 		0,

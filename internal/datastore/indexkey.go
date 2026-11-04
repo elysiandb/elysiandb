@@ -100,10 +100,6 @@ func AppendTime(dst []byte, t time.Time) []byte {
 	return binary.BigEndian.AppendUint32(dst, uint32(t.Nanosecond()))
 }
 
-func KeyPayload(key string) string {
-	return key[:len(key)-4]
-}
-
 func ElementString(v any) string {
 	switch s := v.(type) {
 	case string:

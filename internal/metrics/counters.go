@@ -222,10 +222,6 @@ func ForcedFlush() {
 	add(cForcedFlushes, 1)
 }
 
-func MongoError() {
-	add(cMongoErrors, 1)
-}
-
 func RecoveryWriteFailed(err error) {
 	add(cRecoveryFailures, 1)
 	recoveryState.set(err.Error(), "")

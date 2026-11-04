@@ -376,22 +376,6 @@ func ApplyFiltersToList(
 	return filtered
 }
 
-func ApplyStoredFiltersToList(
-	entities []map[string]any,
-	filters map[string]map[string]string,
-	offset int,
-	limit int,
-) []map[string]any {
-	filtered := make([]map[string]any, 0, len(entities))
-	for _, e := range entities {
-		if StoredFiltersMatchEntity(e, filters) {
-			filtered = append(filtered, e)
-		}
-	}
-
-	return applyOffsetLimit(filtered, offset, limit)
-}
-
 func Paginate(entities []map[string]any, offset, limit int) []map[string]any {
 	return applyOffsetLimit(entities, offset, limit)
 }
@@ -682,6 +666,13 @@ func CommitBatch(ops []BatchOperation) error {
 			}
 		}
 
+		return nil
+	})
+}
+
+func WipeAll() error {
+	return update(func(tx *datastore.Tx) error {
+		tx.ClearAll()
 		return nil
 	})
 }

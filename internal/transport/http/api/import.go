@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/taymour/elysiandb/internal/acl"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/transport/http/observe"
@@ -34,7 +35,7 @@ func ImportController(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
-	if rejected := engine.ValidateImport(dump); len(rejected) > 0 {
+	if rejected := api_storage.ValidateImport(dump, api_storage.GetEntitySchema); len(rejected) > 0 {
 		sendImportResponse(ctx, fasthttp.StatusBadRequest, map[string]any{
 			"error":    "invalid documents, nothing was imported",
 			"rejected": rejected,
@@ -43,7 +44,7 @@ func ImportController(ctx *fasthttp.RequestCtx) {
 	}
 
 	start := time.Now()
-	rejected := engine.ImportAll(dump)
+	rejected := api_storage.ImportAll(dump)
 	for entity := range dump {
 		purgeCache(entity, nil)
 	}
@@ -87,7 +88,7 @@ func removeAccountEntities(dump map[string][]map[string]any) []string {
 
 func removeInternalEntities(dump map[string][]map[string]any) {
 	for entity := range dump {
-		if engine.IsCoreEntityType(entity) && entity != hook.HookEntity {
+		if api_storage.IsCoreEntityType(entity) && entity != hook.HookEntity {
 			delete(dump, entity)
 		}
 	}

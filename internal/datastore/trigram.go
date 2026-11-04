@@ -3,8 +3,6 @@ package datastore
 import (
 	"math/bits"
 	"strings"
-
-	"github.com/taymour/elysiandb/internal/docpath"
 )
 
 type Bitset struct {
@@ -84,34 +82,6 @@ func (b *Bitset) ForEach(fn func(i uint32) bool) {
 			w &= w - 1
 		}
 	}
-}
-
-func DocumentTrigrams(doc map[string]any) map[string]struct{} {
-	out := map[string]struct{}{}
-	var walk func(v any)
-	walk = func(v any) {
-		switch t := v.(type) {
-		case map[string]any:
-			for k, child := range t {
-				if docpath.IsSearchableKey(k) {
-					walk(child)
-				}
-			}
-		case []any:
-			for _, item := range t {
-				walk(item)
-			}
-		case string:
-			lower := strings.ToLower(t)
-			for i := 0; i+3 <= len(lower); i++ {
-				out[lower[i:i+3]] = struct{}{}
-			}
-		}
-	}
-
-	walk(doc)
-
-	return out
 }
 
 func PatternTrigrams(pattern string) []string {

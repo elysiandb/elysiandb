@@ -3,7 +3,6 @@ package boot
 import (
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/metrics"
 	"github.com/taymour/elysiandb/internal/security"
@@ -15,7 +14,7 @@ func MonitoringSources() metrics.Sources {
 	sources := metrics.Sources{
 		DataFolder:      func() string { return globals.GetConfig().Store.Folder },
 		KVKeys:          storage.CountKeys,
-		EntityCounts:    engine.CountEntitiesPerType,
+		EntityCounts:    api_storage.CountEntitiesPerType,
 		IndexBacklog:    api_storage.IndexBacklog,
 		RecoverySizes:   storageLogSizes,
 		Engine:          engineSample,
@@ -37,11 +36,6 @@ func MonitoringSources() metrics.Sources {
 
 	if security.BasicAuthenticationIsEnabled() || security.UserAuthenticationIsEnabled() {
 		sources.DefaultAdminPassword = security.DefaultAdminPasswordIsInUse
-	}
-
-	if engine.IsEngineMongoDB() {
-		sources.MongoPing = MongoPing
-		sources.MongoPoolInUse = func() int { return int(mongoPoolInUse.Load()) }
 	}
 
 	return sources
@@ -102,7 +96,7 @@ func engineSample() metrics.EngineSample {
 
 func indexStates() []metrics.IndexState {
 	e := storage.Engine()
-	if e == nil || !engine.IsEngineInternal() {
+	if e == nil {
 		return nil
 	}
 

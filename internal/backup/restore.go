@@ -12,9 +12,10 @@ import (
 	"strings"
 	"time"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/taymour/elysiandb/internal/acl"
 	"github.com/taymour/elysiandb/internal/cache"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/taymour/elysiandb/internal/schema"
@@ -178,7 +179,7 @@ func apply(src io.Reader, manifest *Manifest) (*Report, error) {
 }
 
 func replaceData(archive *archiveReader, manifest *Manifest) (*Report, error) {
-	if err := engine.WipeAll(); err != nil {
+	if err := api_storage.WipeAll(); err != nil {
 		return nil, err
 	}
 
@@ -198,7 +199,7 @@ func replaceData(archive *archiveReader, manifest *Manifest) (*Report, error) {
 			return nil, err
 		}
 
-		count, err := engine.RestoreEntities(entity.Name, newDocumentReader(r, path).next)
+		count, err := api_storage.RestoreEntities(entity.Name, newDocumentReader(r, path).next)
 		if err != nil {
 			return nil, err
 		}
@@ -234,7 +235,7 @@ func restoreSchemas(archive *archiveReader, manifest *Manifest) (int, error) {
 		schemas = append(schemas, data)
 	}
 
-	return engine.RestoreEntities(schema.SchemaEntity, func() (map[string]any, error) {
+	return api_storage.RestoreEntities(schema.SchemaEntity, func() (map[string]any, error) {
 		if len(schemas) == 0 {
 			return nil, io.EOF
 		}

@@ -12,7 +12,8 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/taymour/elysiandb/internal/engine"
+	api_storage "github.com/taymour/elysiandb/internal/api"
+
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/crypto/bcrypt"
@@ -119,7 +120,7 @@ func (u *BasicHashedUser) FromDataMap(data map[string]any) error {
 }
 
 func (u *BasicHashedUser) Save() error {
-	err := engine.WriteEntity(UserEntity, u.ToDataMap())
+	err := api_storage.WriteEntity(UserEntity, u.ToDataMap())
 	if len(err) == 0 {
 		return nil
 	}
@@ -133,7 +134,7 @@ func (u *BasicHashedUser) Save() error {
 }
 
 func InitAdminUserIfNotExists() error {
-	adminUser := engine.ReadEntityById(UserEntity, DefaultAdminUsername)
+	adminUser := api_storage.ReadEntityById(UserEntity, DefaultAdminUsername)
 	if adminUser != nil {
 		return nil
 	}
@@ -174,17 +175,17 @@ func UserEntitySchema() map[string]any {
 }
 
 func InitBasicUsersStorage() error {
-	exists := engine.EntityTypeExists(UserEntity)
+	exists := api_storage.EntityTypeExists(UserEntity)
 	if exists {
 		return nil
 	}
 
-	err := engine.CreateEntityType(UserEntity)
+	err := api_storage.CreateEntityType(UserEntity)
 	if err != nil {
 		return err
 	}
 
-	engine.UpdateEntitySchema(UserEntity, UserEntitySchema())
+	api_storage.UpdateEntitySchema(UserEntity, UserEntitySchema())
 
 	return nil
 }
@@ -195,7 +196,7 @@ func GetBasicUserByUsername(username string) (map[string]any, error) {
 		return nil, err
 	}
 
-	u := engine.ReadEntityById(UserEntity, username)
+	u := api_storage.ReadEntityById(UserEntity, username)
 	if u == nil {
 		return nil, fmt.Errorf("user '%s' not found", username)
 	}
@@ -211,7 +212,7 @@ func ListBasicUsers() ([]map[string]any, error) {
 		return nil, err
 	}
 
-	users := engine.ListEntities(
+	users := api_storage.ListEntities(
 		UserEntity,
 		0,
 		0,
@@ -254,7 +255,7 @@ func ValidatePassword(password string) error {
 }
 
 func BasicUserExists(username string) bool {
-	return engine.ReadEntityById(UserEntity, username) != nil
+	return api_storage.ReadEntityById(UserEntity, username) != nil
 }
 
 func CreateBasicUser(user *BasicUser) error {
@@ -285,7 +286,7 @@ func ChangeUserPasswordKeepingSession(username, newPassword, sessionID string) e
 }
 
 func changeUserPassword(username, newPassword, keptSessionID string) error {
-	u := engine.ReadEntityById(UserEntity, username)
+	u := api_storage.ReadEntityById(UserEntity, username)
 	if u == nil {
 		return fmt.Errorf("user '%s' not found", username)
 	}
@@ -318,7 +319,7 @@ func changeUserPassword(username, newPassword, keptSessionID string) error {
 }
 
 func ChangeUserRole(username, newRole string) error {
-	u := engine.ReadEntityById(UserEntity, username)
+	u := api_storage.ReadEntityById(UserEntity, username)
 	if u == nil {
 		return fmt.Errorf("user '%s' %w", username, ErrUserNotFound)
 	}
@@ -361,13 +362,13 @@ func DeleteBasicUser(username string) error {
 		return ErrLastAdmin
 	}
 
-	engine.DeleteEntityById(UserEntity, username)
+	api_storage.DeleteEntityById(UserEntity, username)
 
 	return DeleteUserSessions(username)
 }
 
 func isLastAdmin(username string) bool {
-	u := engine.ReadEntityById(UserEntity, username)
+	u := api_storage.ReadEntityById(UserEntity, username)
 	if u == nil || u["role"] != string(RoleAdmin) {
 		return false
 	}
@@ -468,7 +469,7 @@ func spendPasswordCheck(password string) {
 }
 
 func AuthenticateUser(username, password string) (*BasicHashedUser, bool) {
-	u := engine.ReadEntityById(UserEntity, username)
+	u := api_storage.ReadEntityById(UserEntity, username)
 	if u == nil {
 		spendPasswordCheck(password)
 		return nil, false

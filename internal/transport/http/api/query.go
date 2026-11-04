@@ -11,7 +11,6 @@ import (
 	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/taymour/elysiandb/internal/query"
@@ -151,7 +150,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if engine.IsCoreEntityType(payload.Entity) {
+	if api_storage.IsCoreEntityType(payload.Entity) {
 		sendCoreEntityForbidden(ctx)
 		return
 	}
@@ -211,7 +210,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 	filterAfterHooks := preReadHooks && !api_storage.QueryFilterIsEmpty(filter)
 	fields := api_storage.ParseFieldsParam(payload.Fields)
 
-	if engine.IsEngineInternal() && !filterAfterHooks {
+	if !filterAfterHooks {
 		mode := acl.ReadModeFor(currentUser, payload.Entity)
 		if payload.CountOnly {
 			res := api_storage.PlanQueryGuarded(q, mode != acl.ReadOwned, guard)
@@ -239,7 +238,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
-	if filterAfterHooks && engine.IsEngineInternal() {
+	if filterAfterHooks {
 		all := q
 		all.Offset, all.Limit = 0, 0
 		all.Filter = query.FilterNode{Leaf: map[string]map[string]string{}}
@@ -254,12 +253,6 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if filterAfterHooks {
-		q.Offset = 0
-		q.Limit = 0
-		q.Filter = query.FilterNode{Leaf: map[string]map[string]string{}}
-	}
-
 	data, err := executeQuery(guard, q)
 	if err != nil {
 		if guardStopped(ctx, guard) {
@@ -270,16 +263,9 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if filterAfterHooks {
-		data = api_storage.ApplyStoredQueryFilter(data, filter)
-	}
-
 	data = acl.FilterListOfEntities(currentUser, payload.Entity, data)
 
-	if filterAfterHooks {
-		matches := func(item map[string]any) bool { return api_storage.QueryFilterMatchesEntity(filter, item) }
-		data = applyPreReadHooksAndFilter(hooks, payload.Entity, data, matches, payload.Offset, payload.Limit)
-	} else if preReadHooks && !payload.CountOnly {
+	if preReadHooks && !payload.CountOnly {
 		for i, item := range data {
 			data[i] = hooks.PreRead(payload.Entity, item)
 		}

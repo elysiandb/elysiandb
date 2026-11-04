@@ -7,9 +7,7 @@ import (
 	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
-	"github.com/taymour/elysiandb/internal/mongodb"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
@@ -26,13 +24,6 @@ func CreateController(ctx *fasthttp.RequestCtx) {
 	}
 
 	var schemaData map[string]any
-
-	if engine.IsEngineMongoDB() {
-		schemaData = mongodb.GetEntitySchema(entity)
-	} else {
-		schemaData = nil
-	}
-
 	if globals.GetConfig().Api.Schema.Strict && schema.IsManualSchema(entity, schemaData) {
 		var tmp any
 		if json.Unmarshal(body, &tmp) == nil {
@@ -99,7 +90,7 @@ func handleSingleEntity(ctx *fasthttp.RequestCtx, entity string, body []byte) bo
 		data[acl.UsernameField] = username
 	}
 
-	errors := engine.WriteEntity(entity, data)
+	errors := api_storage.WriteEntity(entity, data)
 	if len(errors) > 0 {
 		response, _ := json.Marshal(errors)
 		ctx.Response.Header.Set("Content-Type", "application/json")
@@ -147,7 +138,7 @@ func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool
 
 	validationErrors, valid := simulateListWrite(entity, list)
 	if valid {
-		validationErrors = engine.WriteListOfEntities(entity, list)
+		validationErrors = api_storage.WriteListOfEntities(entity, list)
 	}
 
 	if hasValidationErrors(validationErrors) {
@@ -165,7 +156,7 @@ func handleEntityList(ctx *fasthttp.RequestCtx, entity string, body []byte) bool
 }
 
 func simulateListWrite(entity string, list []map[string]any) ([][]schema.ValidationError, bool) {
-	simulation := api_storage.NewWriteSimulation(engine.GetEntitySchema, engine.ReadEntityById)
+	simulation := api_storage.NewWriteSimulation(api_storage.GetEntitySchema, api_storage.ReadEntityById)
 
 	validationErrors := make([][]schema.ValidationError, 0, len(list))
 	for _, item := range list {
