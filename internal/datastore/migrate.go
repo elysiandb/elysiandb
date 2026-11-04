@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/taymour/elysiandb/internal/durable"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,12 +31,12 @@ type MigrationReport struct {
 }
 
 func (e *Engine) migrateIfNeeded() (*MigrationReport, error) {
-	m, err := readManifest(e.dir)
+	stored, err := e.manifests.Stored()
 	if err != nil {
 		return nil, err
 	}
 
-	if m != nil {
+	if len(stored) > 0 {
 		e.moveLegacyFiles()
 		return nil, nil
 	}
@@ -46,7 +47,7 @@ func (e *Engine) migrateIfNeeded() (*MigrationReport, error) {
 
 	start := time.Now()
 	_ = os.RemoveAll(filepath.Join(e.dir, LogFolder))
-	_ = os.RemoveAll(filepath.Join(e.dir, PagesFolder))
+	_ = os.RemoveAll(filepath.Join(e.dir, durable.PagesFolder))
 	tmp := filepath.Join(e.dir, migrationFolder)
 	_ = os.RemoveAll(tmp)
 
@@ -90,7 +91,7 @@ func (e *Engine) migrateIfNeeded() (*MigrationReport, error) {
 		return nil, err
 	}
 
-	_ = syncDir(e.dir)
+	_ = durable.OS.SyncDir(e.dir)
 	_ = os.RemoveAll(tmp)
 	e.moveLegacyFiles()
 

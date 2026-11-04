@@ -475,6 +475,12 @@ func (j *Journal) fileFor(segment uint32, create bool) (File, error) {
 	j.files[segment] = f
 	j.filesMu.Unlock()
 
+	if create {
+		if err := j.fs.SyncDir(j.dir); err != nil {
+			return nil, err
+		}
+	}
+
 	return f, nil
 }
 

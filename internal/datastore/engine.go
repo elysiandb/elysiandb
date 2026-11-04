@@ -3,6 +3,7 @@ package datastore
 import (
 	"errors"
 	"fmt"
+	"github.com/taymour/elysiandb/internal/durable"
 	"os"
 	"path/filepath"
 	"slices"
@@ -52,15 +53,18 @@ type Options struct {
 var engineInstances atomic.Uint64
 
 type Engine struct {
-	instance uint64
-	opts     Options
-	dir      string
-	lock     *os.File
-	j        *journal.Journal
-	inline   bool
-	cache    *valueCache
-	pages    *pageStore
-	live     liveBytes
+	instance  uint64
+	opts      Options
+	dir       string
+	lock      *os.File
+	j         *journal.Journal
+	inline    bool
+	cache     *valueCache
+	pages     *durable.PageStore
+	manifests *durable.Manifests
+	current   *manifest
+	previous  *manifest
+	live      liveBytes
 
 	catalogMu sync.RWMutex
 	entities  map[string]*entity
@@ -121,18 +125,19 @@ func Open(opts Options) (*Engine, error) {
 	}
 
 	e := &Engine{
-		instance: engineInstances.Add(1),
-		opts:     opts,
-		dir:      opts.Folder,
-		lock:     lock,
-		inline:   opts.CacheBytes <= 0,
-		cache:    newValueCache(valueCacheLimit(opts.CacheBytes), 64),
-		entities: map[string]*entity{},
-		kv:       newKVStore(opts.Shards),
-		builds:   make(chan *entity, 1024),
-		flushNow: make(chan struct{}, 1),
-		flushed:  make(chan struct{}),
-		stop:     make(chan struct{}),
+		instance:  engineInstances.Add(1),
+		opts:      opts,
+		dir:       opts.Folder,
+		lock:      lock,
+		inline:    opts.CacheBytes <= 0,
+		cache:     newValueCache(valueCacheLimit(opts.CacheBytes), 64),
+		entities:  map[string]*entity{},
+		kv:        newKVStore(opts.Shards),
+		manifests: durable.OpenManifests(opts.FS, opts.Folder),
+		builds:    make(chan *entity, 1024),
+		flushNow:  make(chan struct{}, 1),
+		flushed:   make(chan struct{}),
+		stop:      make(chan struct{}),
 	}
 
 	start := time.Now()
@@ -143,7 +148,7 @@ func Open(opts Options) (*Engine, error) {
 	}
 	e.migrated = report
 
-	pages, err := openPageStore(filepath.Join(opts.Folder, PagesFolder), opts.PageCacheBytes, opts.PageSegmentSize)
+	pages, err := durable.OpenPageStore(opts.FS, filepath.Join(opts.Folder, durable.PagesFolder), opts.PageCacheBytes, opts.PageSegmentSize)
 	if err != nil {
 		e.unlock()
 		return nil, err
@@ -151,7 +156,7 @@ func Open(opts Options) (*Engine, error) {
 	e.pages = pages
 
 	if err := e.load(); err != nil {
-		e.pages.close()
+		e.pages.Close()
 		e.unlock()
 		return nil, err
 	}
@@ -159,7 +164,7 @@ func Open(opts Options) (*Engine, error) {
 	if e.upgradeFrom != 0 {
 		if err := e.finishUpgrade(); err != nil {
 			e.j.Abandon()
-			e.pages.close()
+			e.pages.Close()
 			e.unlock()
 			return nil, err
 		}
@@ -229,10 +234,11 @@ func (e *Engine) load() error {
 	}
 	e.j = j
 
-	m, err := readManifest(e.dir)
+	m, previous, err := e.chooseManifest()
 	if err != nil {
 		return err
 	}
+	e.current, e.previous = m, previous
 
 	from := journal.Position{Segment: 1}
 	switch {
@@ -312,7 +318,7 @@ func (e *Engine) Close() error {
 		errs = append(errs, err)
 	}
 
-	if err := e.pages.close(); err != nil {
+	if err := e.pages.Close(); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -329,7 +335,7 @@ func (e *Engine) Abandon() {
 	close(e.stop)
 	e.wg.Wait()
 	e.j.Abandon()
-	e.pages.close()
+	e.pages.Close()
 	e.unlock()
 }
 

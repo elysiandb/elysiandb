@@ -1,6 +1,7 @@
 package datastore
 
 import (
+	"github.com/taymour/elysiandb/internal/durable"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -172,7 +173,7 @@ func (e *Engine) measureIndexes() {
 
 			var size int64
 			idx.tree.WalkStored(func(_ uint64, n uint32) {
-				size += int64(n) + pageHeaderSize
+				size += int64(n) + durable.PageHeaderSize
 			})
 			_ = idx.tree.ForEachDirty(func(_ *pagetree.Ref, p *pagetree.Page) error {
 				size += int64(p.Bytes())

@@ -2,6 +2,7 @@ package datastore_test
 
 import (
 	"fmt"
+	"github.com/taymour/elysiandb/internal/durable"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -352,7 +353,7 @@ func TestFragmentedPageSegmentsAreCleaned(t *testing.T) {
 
 	pagesOnDisk := func() int64 {
 		var total int64
-		entries, _ := os.ReadDir(filepath.Join(opts.Folder, datastore.PagesFolder))
+		entries, _ := os.ReadDir(filepath.Join(opts.Folder, durable.PagesFolder))
 		for _, entry := range entries {
 			info, _ := entry.Info()
 			total += info.Size()

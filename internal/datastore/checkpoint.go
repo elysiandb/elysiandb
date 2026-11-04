@@ -1,14 +1,12 @@
 package datastore
 
 import (
-	"bufio"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash"
+	"github.com/taymour/elysiandb/internal/durable"
 	"hash/crc32"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -23,7 +21,6 @@ import (
 
 const (
 	checkpointMagic     = "ELYCKPT1"
-	kvCheckpointMagic   = "ELYKVCK1"
 	checkpointVersion   = 1
 	manifestFormat      = 1
 	manifestFormatPages = 2
@@ -84,6 +81,98 @@ func (me *manifestEntity) addIndex(spec IndexSpec, mi manifestIndex) {
 	me.Indexes = append(me.Indexes, mi)
 }
 
+func parseManifest(data []byte) (*manifest, error) {
+	var m manifest
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, fmt.Errorf("cannot read %s: %w", ManifestFile, err)
+	}
+
+	if m.Format != manifestFormat && m.Format != manifestFormatPages {
+		return nil, fmt.Errorf("%s has format %d, this version reads formats %d and %d", ManifestFile, m.Format, manifestFormat, manifestFormatPages)
+	}
+
+	return &m, nil
+}
+
+func (e *Engine) files() durable.FS {
+	return durable.Or(e.opts.FS)
+}
+
+func (m *manifest) roots() []pageRoot {
+	var out []pageRoot
+	for _, me := range m.Entities {
+		out = append(out, me.Slots, me.IDs)
+		for _, mi := range append(append([]manifestIndex(nil), me.Indexes...), me.Derived...) {
+			if !mi.Dormant {
+				out = append(out, mi.Root)
+			}
+		}
+	}
+
+	return out
+}
+
+func (e *Engine) checkManifest(m *manifest) error {
+	if m.Format != manifestFormatPages {
+		return nil
+	}
+
+	if m.KV != "" {
+		if _, err := durable.ReadKVFile(e.files(), filepath.Join(e.dir, m.KV)); err != nil {
+			return fmt.Errorf("cannot read %s: %w", m.KV, err)
+		}
+	}
+
+	for _, r := range m.roots() {
+		if r.ID == 0 {
+			continue
+		}
+		if _, err := e.pages.Load(pagetree.StoredRef(r.ID, r.Size)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (e *Engine) chooseManifest() (*manifest, *manifest, error) {
+	stored, err := e.manifests.Stored()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var chosen, previous *manifest
+	var reasons []string
+	for i, sm := range stored {
+		m, err := parseManifest(sm.Data)
+		if err == nil && chosen == nil {
+			err = e.checkManifest(m)
+		}
+
+		if err != nil {
+			reasons = append(reasons, fmt.Sprintf("%s: %v", sm.Name, err))
+			continue
+		}
+
+		if chosen == nil {
+			chosen = m
+			e.manifests.Adopt(sm.Data)
+			if i > 0 {
+				engineLog.Warn("the last checkpoint is unreadable, the previous one is used", "reason", reasons[0])
+			}
+			continue
+		}
+
+		previous = m
+	}
+
+	if chosen == nil && len(stored) > 0 {
+		return nil, nil, fmt.Errorf("no readable checkpoint: %s", strings.Join(reasons, "; "))
+	}
+
+	return chosen, previous, nil
+}
+
 func rootOf(t pagetree.Tree) pageRoot {
 	if r := t.Root(); r != nil {
 		return pageRoot{ID: r.ID(), Size: r.Size()}
@@ -98,130 +187,6 @@ func (e *Engine) openTree(r pageRoot) pagetree.Tree {
 	}
 
 	return pagetree.Open(e.pages, pagetree.StoredRef(r.ID, r.Size))
-}
-
-func readManifest(dir string) (*manifest, error) {
-	data, err := os.ReadFile(filepath.Join(dir, ManifestFile))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-
-		return nil, err
-	}
-
-	var m manifest
-	if err := json.Unmarshal(data, &m); err != nil {
-		return nil, fmt.Errorf("cannot read %s: %w", ManifestFile, err)
-	}
-
-	if m.Format != manifestFormat && m.Format != manifestFormatPages {
-		return nil, fmt.Errorf("%s has format %d, this version reads formats %d and %d", ManifestFile, m.Format, manifestFormat, manifestFormatPages)
-	}
-
-	return &m, nil
-}
-
-func writeFileAtomic(path string, write func(w io.Writer) error) error {
-	tmp := path + ".tmp"
-	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-
-	bw := bufio.NewWriterSize(f, 1<<20)
-	err = write(bw)
-	if err == nil {
-		err = bw.Flush()
-	}
-
-	if err == nil {
-		err = f.Sync()
-	}
-
-	if closeErr := f.Close(); err == nil {
-		err = closeErr
-	}
-
-	if err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-
-	return syncDir(filepath.Dir(path))
-}
-
-func syncDir(dir string) error {
-	d, err := os.Open(dir)
-	if err != nil {
-		return err
-	}
-
-	defer d.Close()
-
-	_ = d.Sync()
-
-	return nil
-}
-
-func writeManifest(dir string, m manifest) error {
-	data, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return writeFileAtomic(filepath.Join(dir, ManifestFile), func(w io.Writer) error {
-		_, err := w.Write(append(data, '\n'))
-		return err
-	})
-}
-
-type ckWriter struct {
-	w   io.Writer
-	crc hash.Hash32
-	buf []byte
-	err error
-}
-
-func newCkWriter(w io.Writer) *ckWriter {
-	crc := crc32.New(castagnoli)
-	return &ckWriter{w: io.MultiWriter(w, crc), crc: crc, buf: make([]byte, 0, 64)}
-}
-
-func (c *ckWriter) uvarint(v uint64) {
-	if c.err != nil {
-		return
-	}
-
-	c.buf = binary.AppendUvarint(c.buf[:0], v)
-	_, c.err = c.w.Write(c.buf)
-}
-
-func (c *ckWriter) varint(v int64) {
-	if c.err != nil {
-		return
-	}
-
-	c.buf = binary.AppendVarint(c.buf[:0], v)
-	_, c.err = c.w.Write(c.buf)
-}
-
-func (c *ckWriter) str(s string) {
-	c.uvarint(uint64(len(s)))
-	if c.err == nil {
-		_, c.err = io.WriteString(c.w, s)
-	}
-}
-
-func (c *ckWriter) loc(l journal.Location) {
-	c.uvarint(uint64(l.Segment))
-	c.uvarint(uint64(l.Offset))
-	c.uvarint(uint64(l.Length))
 }
 
 type ckReader struct {
@@ -406,6 +371,7 @@ func readCheckpoint(path string) (*checkpointData, error) {
 
 type segmentCache struct {
 	j    *journal.Journal
+	fs   durable.FS
 	id   uint32
 	data []byte
 }
@@ -416,7 +382,7 @@ func (c *segmentCache) value(loc journal.Location) ([]byte, error) {
 	}
 
 	if c.data == nil || c.id != loc.Segment {
-		data, err := readSegmentFile(c.j.Dir(), loc.Segment)
+		data, err := durable.ReadFile(c.fs, filepath.Join(c.j.Dir(), journal.SegmentName(loc.Segment)))
 		if err != nil {
 			return nil, err
 		}
@@ -430,10 +396,6 @@ func (c *segmentCache) value(loc journal.Location) ([]byte, error) {
 	}
 
 	return append([]byte(nil), c.data[loc.Offset:end]...), nil
-}
-
-func readSegmentFile(dir string, id uint32) ([]byte, error) {
-	return os.ReadFile(filepath.Join(dir, journal.SegmentName(id)))
 }
 
 func (e *Engine) restore(ck *checkpointData) error {
@@ -504,7 +466,7 @@ func (e *Engine) restoreKV(entries []ckKV) error {
 		return a.Offset < b.Offset
 	})
 
-	sc := &segmentCache{j: e.j}
+	sc := &segmentCache{j: e.j, fs: e.files()}
 	for _, kv := range kvLoads {
 		v, err := sc.value(kv.entry.loc)
 		if err != nil {
@@ -573,41 +535,17 @@ func (e *Engine) restorePages(m *manifest) error {
 		return nil
 	}
 
-	kv, err := readKVCheckpoint(filepath.Join(e.dir, m.KV))
+	records, err := durable.ReadKVFile(e.files(), filepath.Join(e.dir, m.KV))
 	if err != nil {
 		return fmt.Errorf("cannot read the checkpoint %s: %w", m.KV, err)
 	}
 
+	kv := make([]ckKV, 0, len(records))
+	for _, r := range records {
+		kv = append(kv, ckKV{key: r.Key, entry: &kvEntry{lsn: r.LSN, expiresAt: r.ExpiresAt, loc: journal.Location{Segment: r.Segment, Offset: r.Offset, Length: r.Length}}})
+	}
+
 	return e.restoreKV(kv)
-}
-
-func readKVCheckpoint(path string) ([]ckKV, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(data) < len(kvCheckpointMagic)+4 || string(data[:len(kvCheckpointMagic)]) != kvCheckpointMagic {
-		return nil, errCheckpoint
-	}
-
-	body := data[:len(data)-4]
-	if crc32.Checksum(body, castagnoli) != binary.LittleEndian.Uint32(data[len(data)-4:]) {
-		return nil, errCheckpoint
-	}
-
-	r := &ckReader{data: body, pos: len(kvCheckpointMagic)}
-	var out []ckKV
-	for n := r.uvarint(); n > 0 && r.err == nil; n-- {
-		key := r.str()
-		out = append(out, ckKV{key: key, entry: &kvEntry{lsn: r.uvarint(), expiresAt: r.varint(), loc: r.loc()}})
-	}
-
-	if r.err == nil && r.pos != len(r.data) {
-		r.err = errCheckpoint
-	}
-
-	return out, r.err
 }
 
 func (e *Engine) finishUpgrade() error {
@@ -615,7 +553,8 @@ func (e *Engine) finishUpgrade() error {
 		return fmt.Errorf("cannot write the upgraded checkpoint: %w", err)
 	}
 
-	entries, err := os.ReadDir(e.dir)
+	files := e.files()
+	entries, err := files.ReadDir(e.dir)
 	if err != nil {
 		return err
 	}
@@ -628,17 +567,17 @@ func (e *Engine) finishUpgrade() error {
 			continue
 		}
 
-		if err := os.MkdirAll(legacy, 0o755); err != nil {
+		if err := files.MkdirAll(legacy, 0o755); err != nil {
 			return err
 		}
 
-		if err := os.Rename(filepath.Join(e.dir, name), filepath.Join(legacy, name)); err != nil {
+		if err := files.Rename(filepath.Join(e.dir, name), filepath.Join(legacy, name)); err != nil {
 			return err
 		}
 		moved++
 	}
 
-	_ = syncDir(e.dir)
+	_ = files.SyncDir(e.dir)
 	engineLog.Info("storage format upgraded", "from", e.upgradeFrom, "to", manifestFormatPages, "kept_in", LegacyCheckpoints, "files", moved)
 	e.upgradeFrom = 0
 
@@ -744,7 +683,7 @@ func (e *Engine) checkpoint(force bool) error {
 		}
 
 		for _, t := range trees {
-			if err := e.pages.flushTree(t); err != nil {
+			if err := e.pages.FlushTree(t); err != nil {
 				return fmt.Errorf("cannot write the pages of %s: %w", snap.name, err)
 			}
 		}
@@ -761,7 +700,7 @@ func (e *Engine) checkpoint(force bool) error {
 		m.Entities = append(m.Entities, me)
 	}
 
-	if err := e.pages.sync(); err != nil {
+	if err := e.pages.Sync(); err != nil {
 		return fmt.Errorf("cannot sync the pages: %w", err)
 	}
 
@@ -771,32 +710,14 @@ func (e *Engine) checkpoint(force bool) error {
 	}
 
 	m.KV = fmt.Sprintf("kv-%016d.ckpt", lsn)
-	err := writeFileAtomic(filepath.Join(e.dir, m.KV), func(w io.Writer) error {
-		cw := newCkWriter(w)
-		if _, err := io.WriteString(cw.w, kvCheckpointMagic); err != nil {
-			return err
-		}
+	records := make([]durable.KVRecord, 0, len(kv))
+	for _, item := range kv {
+		loc := item.entry.loc
+		records = append(records, durable.KVRecord{Key: item.key, LSN: item.entry.lsn, ExpiresAt: item.entry.expiresAt, Segment: loc.Segment, Offset: loc.Offset, Length: loc.Length})
+		live[loc.Segment] += int64(loc.Length)
+	}
 
-		cw.uvarint(uint64(len(kv)))
-		for _, item := range kv {
-			cw.str(item.key)
-			cw.uvarint(item.entry.lsn)
-			cw.varint(item.entry.expiresAt)
-			cw.loc(item.entry.loc)
-			live[item.entry.loc.Segment] += int64(item.entry.loc.Length)
-		}
-
-		if cw.err != nil {
-			return cw.err
-		}
-
-		var sum [4]byte
-		binary.LittleEndian.PutUint32(sum[:], cw.crc.Sum32())
-		_, err := w.Write(sum[:])
-
-		return err
-	})
-	if err != nil {
+	if err := durable.WriteKVFile(e.files(), filepath.Join(e.dir, m.KV), records); err != nil {
 		return fmt.Errorf("cannot write the checkpoint: %w", err)
 	}
 
@@ -805,41 +726,59 @@ func (e *Engine) checkpoint(force bool) error {
 	}
 
 	m.CreatedAt = time.Now().UTC().Format(time.RFC3339)
-	if err := writeManifest(e.dir, m); err != nil {
+	data, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	if err := e.manifests.Commit(append(data, '\n')); err != nil {
 		return fmt.Errorf("cannot write the manifest: %w", err)
 	}
 
-	e.removeOldCheckpoints(m.KV)
+	e.previous = e.current
+	e.current = &m
+	e.removeOldCheckpoints()
 	e.ckState.Store(&checkpointState{pos: pos, lsn: lsn, at: time.Now()})
 	e.segmentLive.Store(&live)
 	e.stats.checkpoints.Add(1)
 	e.stats.checkpointNanos.Store(int64(time.Since(start)))
 
-	e.retireDeadSegments(pos, live)
+	retain := pos
+	if e.previous != nil && e.previous.Format == manifestFormatPages {
+		retain = journal.Position{Segment: e.previous.Segment, Offset: e.previous.Offset}
+	}
+	e.retireDeadSegments(retain, live)
 	e.cleanPages(snaps)
-	e.pages.sweep()
+	e.pages.Sweep()
 
 	engineLog.Debug("checkpoint written", "lsn", lsn, "entities", len(snaps), "kv_keys", len(kv), "duration_ms", log.Since(start))
 
 	return nil
 }
 
-func (e *Engine) removeOldCheckpoints(keep string) {
-	entries, err := os.ReadDir(e.dir)
+func (e *Engine) removeOldCheckpoints() {
+	keep := map[string]bool{}
+	for _, m := range []*manifest{e.current, e.previous} {
+		if m != nil && m.KV != "" {
+			keep[m.KV] = true
+		}
+	}
+
+	entries, err := e.files().ReadDir(e.dir)
 	if err != nil {
 		return
 	}
 
 	for _, entry := range entries {
 		name := entry.Name()
-		if name != keep && strings.HasPrefix(name, "kv-") && (strings.HasSuffix(name, ".ckpt") || strings.HasSuffix(name, ".ckpt.tmp")) {
-			_ = os.Remove(filepath.Join(e.dir, name))
+		if !keep[name] && strings.HasPrefix(name, "kv-") && (strings.HasSuffix(name, ".ckpt") || strings.HasSuffix(name, ".ckpt.tmp")) {
+			_ = e.files().Remove(filepath.Join(e.dir, name))
 		}
 	}
 }
 
 func (e *Engine) CompactPages() (int, error) {
-	before := len(e.pages.segmentSizes())
+	before := len(e.pages.SegmentSizes())
 	for round := 0; round < 3; round++ {
 		e.ckptMu.Lock()
 		e.lastPageWalk = time.Time{}
@@ -850,11 +789,11 @@ func (e *Engine) CompactPages() (int, error) {
 		}
 	}
 
-	return before - len(e.pages.segmentSizes()), nil
+	return before - len(e.pages.SegmentSizes()), nil
 }
 
-func (e *Engine) PageStats() PageStats {
-	return e.pages.stats()
+func (e *Engine) PageStats() durable.PageStats {
+	return e.pages.Stats()
 }
 
 func (e *Engine) cleanPages(snaps []entitySnapshot) {
@@ -864,6 +803,15 @@ func (e *Engine) cleanPages(snaps []entitySnapshot) {
 	e.lastPageWalk = time.Now()
 
 	live := map[uint32]int64{}
+	if e.previous != nil && e.previous.Format == manifestFormatPages {
+		for _, r := range e.previous.roots() {
+			e.openTree(r).WalkStored(func(id uint64, size uint32) {
+				seg, _ := durable.SplitPageID(id)
+				live[seg] += int64(size) + durable.PageHeaderSize
+			})
+		}
+	}
+
 	for _, snap := range snaps {
 		trees := []pagetree.Tree{snap.r.slots, snap.r.ids}
 		for _, idx := range snap.r.indexes {
@@ -874,15 +822,15 @@ func (e *Engine) cleanPages(snaps []entitySnapshot) {
 
 		for _, t := range trees {
 			t.WalkStored(func(id uint64, size uint32) {
-				seg, _ := splitPageID(id)
-				live[seg] += int64(size) + pageHeaderSize
+				seg, _ := durable.SplitPageID(id)
+				live[seg] += int64(size) + durable.PageHeaderSize
 			})
 		}
 	}
 
-	current := e.pages.currentSegment()
+	current := e.pages.CurrentSegment()
 	var dead, victims []uint32
-	for seg, size := range e.pages.segmentSizes() {
+	for seg, size := range e.pages.SegmentSizes() {
 		if seg >= current {
 			continue
 		}
@@ -895,7 +843,7 @@ func (e *Engine) cleanPages(snaps []entitySnapshot) {
 		}
 	}
 
-	e.pages.remove(dead)
+	e.pages.Remove(dead)
 	e.pageRemoval = victims
 
 	if len(victims) == 0 {
@@ -908,7 +856,7 @@ func (e *Engine) cleanPages(snaps []entitySnapshot) {
 	}
 
 	e.relocatePages(func(id uint64) bool {
-		seg, _ := splitPageID(id)
+		seg, _ := durable.SplitPageID(id)
 		return isVictim[seg]
 	})
 }

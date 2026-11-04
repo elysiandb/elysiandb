@@ -142,6 +142,6 @@ func (e *Engine) followPressure() {
 	}
 
 	if e.opts.PageCacheBytes > 0 {
-		e.pages.setLimit(scaled(e.opts.PageCacheBytes, level))
+		e.pages.SetLimit(scaled(e.opts.PageCacheBytes, level))
 	}
 }

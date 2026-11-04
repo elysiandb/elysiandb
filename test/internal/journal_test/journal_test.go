@@ -215,6 +215,8 @@ func (fs *faultyFS) OpenFile(name string, flag int, perm os.FileMode) (journal.F
 }
 
 func (fs *faultyFS) Remove(name string) error                   { return journal.OSFS.Remove(name) }
+func (fs *faultyFS) Rename(from, to string) error               { return journal.OSFS.Rename(from, to) }
+func (fs *faultyFS) SyncDir(name string) error                  { return journal.OSFS.SyncDir(name) }
 func (fs *faultyFS) ReadDir(name string) ([]os.DirEntry, error) { return journal.OSFS.ReadDir(name) }
 func (fs *faultyFS) MkdirAll(name string, perm os.FileMode) error {
 	return journal.OSFS.MkdirAll(name, perm)

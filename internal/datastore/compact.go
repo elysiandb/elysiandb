@@ -337,7 +337,7 @@ func (e *Engine) Stats() EngineStats {
 	}
 	e.catalogMu.RUnlock()
 
-	pages := e.pages.stats()
+	pages := e.pages.Stats()
 	s.ResidentStructBytes = pages.Resident
 	s.PageCacheLimit = pages.Limit
 	s.PageLoads = pages.Loads

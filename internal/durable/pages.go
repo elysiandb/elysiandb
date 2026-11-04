@@ -1,4 +1,4 @@
-package datastore
+package durable
 
 import (
 	"encoding/binary"
@@ -22,33 +22,37 @@ const (
 	PagesFolder       = "pages"
 	pageSegmentSuffix = ".pgs"
 	pageSegmentSize   = 64 << 20
-	pageHeaderSize    = 8
+	PageHeaderSize    = 8
 	pageCloseDelay    = 15 * time.Minute
 )
 
-var errPageChecksum = errors.New("datastore: page checksum mismatch")
+var (
+	ErrPageChecksum = errors.New("durable: page checksum mismatch")
+	castagnoli      = crc32.MakeTable(crc32.Castagnoli)
+)
 
 type cachedPage struct {
 	ref   weak.Pointer[pagetree.Ref]
 	bytes int64
 }
 
-type pageStore struct {
+type PageStore struct {
+	fs      FS
 	dir     string
 	segSize int64
 
 	wmu      sync.Mutex
-	cur      *os.File
+	cur      File
 	curID    uint32
 	curOff   int64
 	buf      []byte
 	bufStart int64
-	unsynced map[uint32]*os.File
+	unsynced map[uint32]File
 
 	rmu     sync.RWMutex
-	files   map[uint32]*os.File
+	files   map[uint32]File
 	sizes   map[uint32]int64
-	retired map[uint32]*os.File
+	retired map[uint32]File
 
 	cmu      sync.Mutex
 	ring     []cachedPage
@@ -68,12 +72,13 @@ func pageID(seg uint32, off int64) uint64 {
 	return uint64(seg)<<32 | uint64(off)
 }
 
-func splitPageID(id uint64) (uint32, int64) {
+func SplitPageID(id uint64) (uint32, int64) {
 	return uint32(id >> 32), int64(uint32(id))
 }
 
-func openPageStore(dir string, limit, segSize int64) (*pageStore, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+func OpenPageStore(fs FS, dir string, limit, segSize int64) (*PageStore, error) {
+	fs = Or(fs)
+	if err := fs.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
 
@@ -81,10 +86,10 @@ func openPageStore(dir string, limit, segSize int64) (*pageStore, error) {
 		segSize = pageSegmentSize
 	}
 
-	s := &pageStore{dir: dir, segSize: segSize, files: map[uint32]*os.File{}, sizes: map[uint32]int64{}, retired: map[uint32]*os.File{}, unsynced: map[uint32]*os.File{}}
+	s := &PageStore{fs: fs, dir: dir, segSize: segSize, files: map[uint32]File{}, sizes: map[uint32]int64{}, retired: map[uint32]File{}, unsynced: map[uint32]File{}}
 	s.limit.Store(limit)
 
-	entries, err := os.ReadDir(dir)
+	entries, err := fs.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -100,16 +105,16 @@ func openPageStore(dir string, limit, segSize int64) (*pageStore, error) {
 			continue
 		}
 
-		f, err := os.Open(filepath.Join(dir, name))
+		f, err := fs.OpenFile(filepath.Join(dir, name), os.O_RDWR, 0o600)
 		if err != nil {
-			s.close()
+			s.Close()
 			return nil, err
 		}
 
 		info, err := f.Stat()
 		if err != nil {
 			f.Close()
-			s.close()
+			s.Close()
 			return nil, err
 		}
 
@@ -121,12 +126,12 @@ func openPageStore(dir string, limit, segSize int64) (*pageStore, error) {
 	return s, nil
 }
 
-func (s *pageStore) setLimit(limit int64) {
+func (s *PageStore) SetLimit(limit int64) {
 	s.limit.Store(limit)
 	s.evict()
 }
 
-func (s *pageStore) Load(ref *pagetree.Ref) (*pagetree.Page, error) {
+func (s *PageStore) Load(ref *pagetree.Ref) (*pagetree.Page, error) {
 	if p := ref.Resident(); p != nil {
 		return p, nil
 	}
@@ -150,14 +155,14 @@ func (s *pageStore) Load(ref *pagetree.Ref) (*pagetree.Page, error) {
 	return got, nil
 }
 
-func (s *pageStore) read(id uint64, size uint32) ([]byte, error) {
-	seg, off := splitPageID(id)
+func (s *PageStore) read(id uint64, size uint32) ([]byte, error) {
+	seg, off := SplitPageID(id)
 
 	s.wmu.Lock()
 	if seg == s.curID && s.cur != nil && off >= s.bufStart {
 		start := off - s.bufStart
-		if start+pageHeaderSize+int64(size) <= int64(len(s.buf)) {
-			b := append([]byte(nil), s.buf[start+pageHeaderSize:start+pageHeaderSize+int64(size)]...)
+		if start+PageHeaderSize+int64(size) <= int64(len(s.buf)) {
+			b := append([]byte(nil), s.buf[start+PageHeaderSize:start+PageHeaderSize+int64(size)]...)
 			s.wmu.Unlock()
 			return b, nil
 		}
@@ -174,19 +179,19 @@ func (s *pageStore) read(id uint64, size uint32) ([]byte, error) {
 		return nil, fmt.Errorf("page segment %d is missing", seg)
 	}
 
-	b := make([]byte, pageHeaderSize+int(size))
+	b := make([]byte, PageHeaderSize+int(size))
 	if _, err := f.ReadAt(b, off); err != nil {
 		return nil, fmt.Errorf("page %x: %w", id, err)
 	}
 
-	if binary.LittleEndian.Uint32(b) != size || crc32.Checksum(b[pageHeaderSize:], castagnoli) != binary.LittleEndian.Uint32(b[4:]) {
-		return nil, fmt.Errorf("page %x: %w", id, errPageChecksum)
+	if binary.LittleEndian.Uint32(b) != size || crc32.Checksum(b[PageHeaderSize:], castagnoli) != binary.LittleEndian.Uint32(b[4:]) {
+		return nil, fmt.Errorf("page %x: %w", id, ErrPageChecksum)
 	}
 
-	return b[pageHeaderSize:], nil
+	return b[PageHeaderSize:], nil
 }
 
-func (s *pageStore) remember(ref *pagetree.Ref, p *pagetree.Page) {
+func (s *PageStore) remember(ref *pagetree.Ref, p *pagetree.Page) {
 	size := int64(p.Bytes())
 
 	s.cmu.Lock()
@@ -198,7 +203,7 @@ func (s *pageStore) remember(ref *pagetree.Ref, p *pagetree.Page) {
 	}
 }
 
-func (s *pageStore) evict() {
+func (s *PageStore) evict() {
 	limit := s.limit.Load()
 	if limit <= 0 {
 		return
@@ -231,7 +236,7 @@ func (s *pageStore) evict() {
 	}
 }
 
-func (s *pageStore) sweep() {
+func (s *PageStore) Sweep() {
 	s.cmu.Lock()
 	defer s.cmu.Unlock()
 
@@ -249,14 +254,14 @@ func (s *pageStore) sweep() {
 	s.hand = 0
 }
 
-func (s *pageStore) write(ref *pagetree.Ref, p *pagetree.Page) error {
+func (s *PageStore) Write(ref *pagetree.Ref, p *pagetree.Page) error {
 	payload, err := pagetree.Encode(nil, p)
 	if err != nil {
 		return err
 	}
 
 	s.wmu.Lock()
-	if s.cur == nil || s.curOff+int64(len(payload))+pageHeaderSize > s.segSize {
+	if s.cur == nil || s.curOff+int64(len(payload))+PageHeaderSize > s.segSize {
 		if err := s.rotateLocked(); err != nil {
 			s.wmu.Unlock()
 			return err
@@ -264,11 +269,11 @@ func (s *pageStore) write(ref *pagetree.Ref, p *pagetree.Page) error {
 	}
 
 	off := s.curOff
-	var header [pageHeaderSize]byte
+	var header [PageHeaderSize]byte
 	binary.LittleEndian.PutUint32(header[:], uint32(len(payload)))
 	binary.LittleEndian.PutUint32(header[4:], crc32.Checksum(payload, castagnoli))
 	s.buf = append(append(s.buf, header[:]...), payload...)
-	s.curOff += int64(len(payload)) + pageHeaderSize
+	s.curOff += int64(len(payload)) + PageHeaderSize
 	id := pageID(s.curID, off)
 
 	if len(s.buf) >= 4<<20 {
@@ -290,19 +295,19 @@ func (s *pageStore) write(ref *pagetree.Ref, p *pagetree.Page) error {
 	return nil
 }
 
-func (s *pageStore) rotateLocked() error {
+func (s *PageStore) rotateLocked() error {
 	if err := s.flushBufLocked(); err != nil {
 		return err
 	}
 
 	id := s.curID + 1
 	path := filepath.Join(s.dir, pageSegmentName(id))
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
+	f, err := s.fs.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
 	if err != nil {
 		return err
 	}
 
-	if err := syncDir(s.dir); err != nil {
+	if err := s.fs.SyncDir(s.dir); err != nil {
 		f.Close()
 		return err
 	}
@@ -318,7 +323,7 @@ func (s *pageStore) rotateLocked() error {
 	return nil
 }
 
-func (s *pageStore) flushBufLocked() error {
+func (s *PageStore) flushBufLocked() error {
 	if s.cur == nil || len(s.buf) == 0 {
 		return nil
 	}
@@ -338,13 +343,13 @@ func (s *pageStore) flushBufLocked() error {
 	return nil
 }
 
-func (s *pageStore) flushTree(t pagetree.Tree) error {
+func (s *PageStore) FlushTree(t pagetree.Tree) error {
 	return t.ForEachDirty(func(ref *pagetree.Ref, p *pagetree.Page) error {
-		return s.write(ref, p)
+		return s.Write(ref, p)
 	})
 }
 
-func (s *pageStore) sync() error {
+func (s *PageStore) Sync() error {
 	s.wmu.Lock()
 	defer s.wmu.Unlock()
 
@@ -362,14 +367,14 @@ func (s *pageStore) sync() error {
 	return nil
 }
 
-func (s *pageStore) currentSegment() uint32 {
+func (s *PageStore) CurrentSegment() uint32 {
 	s.wmu.Lock()
 	defer s.wmu.Unlock()
 
 	return s.curID
 }
 
-func (s *pageStore) segmentSizes() map[uint32]int64 {
+func (s *PageStore) SegmentSizes() map[uint32]int64 {
 	s.rmu.RLock()
 	defer s.rmu.RUnlock()
 
@@ -381,7 +386,7 @@ func (s *pageStore) segmentSizes() map[uint32]int64 {
 	return out
 }
 
-func (s *pageStore) remove(ids []uint32) {
+func (s *PageStore) Remove(ids []uint32) {
 	if len(ids) == 0 {
 		return
 	}
@@ -397,11 +402,11 @@ func (s *pageStore) remove(ids []uint32) {
 		}
 		delete(s.files, id)
 		delete(s.sizes, id)
-		_ = os.Remove(filepath.Join(s.dir, pageSegmentName(id)))
+		_ = s.fs.Remove(filepath.Join(s.dir, pageSegmentName(id)))
 	}
 	s.rmu.Unlock()
 
-	_ = syncDir(s.dir)
+	_ = s.fs.SyncDir(s.dir)
 
 	time.AfterFunc(pageCloseDelay, func() {
 		s.rmu.Lock()
@@ -415,7 +420,7 @@ func (s *pageStore) remove(ids []uint32) {
 	})
 }
 
-func (s *pageStore) close() error {
+func (s *PageStore) Close() error {
 	s.wmu.Lock()
 	err := s.flushBufLocked()
 	for id, f := range s.unsynced {
@@ -448,6 +453,6 @@ type PageStats struct {
 	Writes   int64
 }
 
-func (s *pageStore) stats() PageStats {
+func (s *PageStore) Stats() PageStats {
 	return PageStats{Resident: s.resident.Load(), Limit: s.limit.Load(), Loads: s.loads.Load(), Writes: s.writes.Load()}
 }
