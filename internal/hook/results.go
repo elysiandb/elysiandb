@@ -91,7 +91,6 @@ func (c *resultCache) lookup(key, version string) (*result, *result) {
 func (c *resultCache) store(key string, res *result) bool {
 	limit := memory.HookResults.Effective()
 	if limit > 0 && res.bytes > limit {
-		memory.HookResults.Refuse()
 		return false
 	}
 
@@ -116,9 +115,6 @@ func (c *resultCache) store(key string, res *result) bool {
 
 func (c *resultCache) evictLocked(limit int64) {
 	for limit > 0 && memory.HookResults.Used() > limit && c.lru.Len() > 1 {
-		if c.lru.Back() == c.lru.Front() {
-			return
-		}
 		el := c.lru.Back()
 		it := el.Value.(*cacheItem)
 		c.lru.Remove(el)
@@ -209,7 +205,8 @@ func (c *resultCache) fill(key, version string, f *flight, build func(prev *resu
 	f.res, f.err = build(prev)
 	if f.err == nil {
 		f.res.version = version
-		if !c.store(key, f.res) {
+		if !c.store(key, f.res) && memory.Budget() > 0 {
+			memory.HookResults.Refuse()
 			f.res, f.err = nil, api_storage.ErrBusy
 		}
 	}
@@ -455,7 +452,7 @@ func buildRows(docs []datastore.Doc, prev *result, keep func(map[string]any) boo
 				if (i-lo)%buildCheckEvery == buildCheckEvery-1 {
 					grown := total.Add(b.bytes-sizes[w]) + int64(len(docs))*rowSliceBytes
 					sizes[w] = b.bytes
-					if limit := memory.HookResults.Effective(); limit > 0 && grown > limit {
+					if limit := memory.HookResults.Effective(); memory.Budget() > 0 && limit > 0 && grown > limit {
 						refused.Store(true)
 					}
 				}
