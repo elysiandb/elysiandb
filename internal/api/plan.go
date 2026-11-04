@@ -822,8 +822,8 @@ func heavyPlan(snap *datastore.Snapshot, cand candidates, evalIncludes string) b
 	return maybe > heavyCandidates
 }
 
-func tryHeavySlot(slots chan struct{}) bool {
-	if memory.UnderPressure() {
+func tryHeavySlot(slots chan struct{}, guard *Guard) bool {
+	if guard != nil && memory.UnderPressure() {
 		return false
 	}
 
@@ -848,7 +848,7 @@ func acquireHeavyLane(guard *Guard) (func(), error) {
 	slots := heavyLane()
 	release := func() { <-slots }
 
-	if tryHeavySlot(slots) {
+	if tryHeavySlot(slots, guard) {
 		metrics.HeavyQuery(0)
 		return release, nil
 	}
@@ -870,7 +870,7 @@ func acquireHeavyLane(guard *Guard) (func(), error) {
 	defer ticker.Stop()
 
 	for {
-		if tryHeavySlot(slots) {
+		if tryHeavySlot(slots, guard) {
 			metrics.HeavyQuery(time.Since(start))
 			return release, nil
 		}
@@ -880,6 +880,11 @@ func acquireHeavyLane(guard *Guard) (func(), error) {
 		if err := guard.Check(); err != nil {
 			metrics.HeavyQuery(time.Since(start))
 			return nil, err
+		}
+
+		if memoryExhausted(guard) {
+			metrics.HeavyRejected()
+			return nil, guard.Err()
 		}
 
 		if timeout >= 0 && time.Since(start) >= timeout {

@@ -200,7 +200,7 @@ func (e *Engine) buildEntity(ent *entity, background bool) {
 	}
 
 	for {
-		if !e.buildPass(ent) {
+		if !e.buildPass(ent, background) {
 			return
 		}
 
@@ -280,7 +280,7 @@ func (e *Engine) stopping() bool {
 	}
 }
 
-func (e *Engine) buildPass(ent *entity) bool {
+func (e *Engine) buildPass(ent *entity, background bool) bool {
 	job, p, rec, metas := e.claim(ent)
 	if job == nil {
 		return false
@@ -316,7 +316,7 @@ func (e *Engine) buildPass(ent *entity) bool {
 			continue
 		}
 
-		for e.underPressure() && !e.stopping() {
+		for background && e.underPressure() && !e.stopping() {
 			time.Sleep(pressurePause)
 		}
 
