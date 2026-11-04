@@ -116,7 +116,7 @@ func TestCommitIsOneBatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer j.CloseWithoutWriter()
+	defer j.Abandon()
 
 	var batches [][]journal.Record
 	if _, err := j.Replay(journal.Position{Segment: 1}, func(recs []journal.Record) error {

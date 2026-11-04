@@ -69,6 +69,7 @@ type Journal struct {
 	writeErr   error
 	attempts   uint64
 	closed     bool
+	started    atomic.Bool
 	flushed    atomic.Uint64
 
 	kick    chan struct{}
@@ -128,7 +129,9 @@ func (j *Journal) Dir() string {
 }
 
 func (j *Journal) Start() {
-	go j.writer()
+	if j.started.CompareAndSwap(false, true) {
+		go j.writer()
+	}
 }
 
 func (j *Journal) SetNextLSN(lsn uint64) {
@@ -793,8 +796,7 @@ func (j *Journal) Close() error {
 	}
 	j.mu.Unlock()
 
-	close(j.stop)
-	<-j.stopped
+	j.stopWriter()
 
 	j.mu.Lock()
 	j.closed = true
@@ -820,7 +822,28 @@ func (j *Journal) Close() error {
 	return err
 }
 
-func (j *Journal) CloseWithoutWriter() {
+func (j *Journal) stopWriter() {
+	if j.started.Load() {
+		close(j.stop)
+		<-j.stopped
+	}
+}
+
+func (j *Journal) Abandon() {
+	j.mu.Lock()
+	if j.closed {
+		j.mu.Unlock()
+		return
+	}
+
+	j.closed = true
+	j.pending = nil
+	j.pendingLen = 0
+	j.done.Broadcast()
+	j.mu.Unlock()
+
+	j.stopWriter()
+
 	j.filesMu.Lock()
 	for id, f := range j.files {
 		_ = f.Close()

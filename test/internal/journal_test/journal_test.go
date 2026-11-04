@@ -113,7 +113,7 @@ func TestAppendReplayAcrossSegments(t *testing.T) {
 	if len(recs) != 501 || recs[500].LSN != 501 {
 		t.Fatalf("appending after a replay continues the log, got %d records", len(recs))
 	}
-	j.CloseWithoutWriter()
+	j.Abandon()
 }
 
 func TestTornLastBatchIsDropped(t *testing.T) {
@@ -137,7 +137,7 @@ func TestTornLastBatchIsDropped(t *testing.T) {
 
 		j = openJournal(t, dir, journal.Options{})
 		recs, stats := replayAll(t, j)
-		j.CloseWithoutWriter()
+		j.Abandon()
 		if len(recs) != 2 || stats.Truncated == 0 {
 			t.Fatalf("cut %d: expected 2 records and a truncation, got %d %+v", cut, len(recs), stats)
 		}
@@ -147,7 +147,7 @@ func TestTornLastBatchIsDropped(t *testing.T) {
 	_ = os.WriteFile(path, garbage, 0o600)
 	j = openJournal(t, dir, journal.Options{})
 	recs, stats := replayAll(t, j)
-	j.CloseWithoutWriter()
+	j.Abandon()
 	if len(recs) != 3 || stats.Truncated != int64(len("not a batch at all")) {
 		t.Fatalf("garbage after the last batch is dropped, got %d %+v", len(recs), stats)
 	}
@@ -170,7 +170,7 @@ func TestCorruptionInASealedSegmentStopsTheReplay(t *testing.T) {
 
 	j = openJournal(t, dir, journal.Options{})
 	_, err := j.Replay(journal.Position{Segment: 1}, func([]journal.Record) error { return nil })
-	j.CloseWithoutWriter()
+	j.Abandon()
 	if !errors.Is(err, journal.ErrCorrupt) {
 		t.Fatalf("expected a corruption error, got %v", err)
 	}
@@ -258,7 +258,7 @@ func TestWriteFaultsAreReportedAndRetried(t *testing.T) {
 
 			j = openJournal(t, dir, journal.Options{})
 			recs, _ := replayAll(t, j)
-			j.CloseWithoutWriter()
+			j.Abandon()
 			if len(recs) != 2 || recs[1].Key != record(1).Key {
 				t.Fatalf("both records reach the disk, got %d", len(recs))
 			}
@@ -299,7 +299,7 @@ func TestGroupCommitUnderConcurrentWriters(t *testing.T) {
 
 	j = openJournal(t, dir, journal.Options{})
 	recs, stats := replayAll(t, j)
-	j.CloseWithoutWriter()
+	j.Abandon()
 	if len(recs) != 3200 || stats.Batches != 3200 {
 		t.Fatalf("replayed %d records", len(recs))
 	}
@@ -359,6 +359,65 @@ func FuzzReplayNeverPanics(f *testing.F) {
 			return
 		}
 		_, _ = j.Replay(journal.Position{Segment: 1}, func([]journal.Record) error { return nil })
-		j.CloseWithoutWriter()
+		j.Abandon()
 	})
+}
+
+func TestAbandonedJournalNeverWritesItsPendingBatches(t *testing.T) {
+	dir := t.TempDir()
+	j := openJournal(t, dir, journal.Options{Mode: journal.ModeWrite})
+	j.Start()
+
+	ticket, _ := j.Append([]journal.Record{record(0)})
+	if err := ticket.Wait(); err != nil {
+		t.Fatal(err)
+	}
+
+	background := openJournal(t, t.TempDir(), journal.Options{Mode: journal.ModeBackground})
+	background.Start()
+	if _, err := background.Append([]journal.Record{record(1)}); err != nil {
+		t.Fatal(err)
+	}
+	background.Abandon()
+
+	if err := background.Flush(); err == nil {
+		t.Fatalf("an abandoned journal must refuse to flush")
+	}
+
+	if _, err := background.Append([]journal.Record{record(2)}); !errors.Is(err, journal.ErrClosed) {
+		t.Fatalf("an abandoned journal must refuse new batches, got %v", err)
+	}
+
+	if segments, _ := background.Segments(); len(segments) != 0 {
+		t.Fatalf("an abandoned journal must not write its pending batch, got %v", segments)
+	}
+
+	j.Abandon()
+
+	reopened := openJournal(t, dir, journal.Options{Mode: journal.ModeWrite})
+	recs, _ := replayAll(t, reopened)
+	if len(recs) != 1 {
+		t.Fatalf("expected the written record only, got %d", len(recs))
+	}
+
+	reopened.Start()
+	for i := 1; i < 50; i++ {
+		ticket, err := reopened.Append([]journal.Record{record(i)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := ticket.Wait(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := reopened.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	final := openJournal(t, dir, journal.Options{})
+	recs, stats := replayAll(t, final)
+	final.Abandon()
+	if len(recs) != 50 || stats.Truncated != 0 {
+		t.Fatalf("the log written after a reopening is intact, got %d records and %d truncated bytes", len(recs), stats.Truncated)
+	}
 }

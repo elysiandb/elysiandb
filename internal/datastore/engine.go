@@ -272,7 +272,7 @@ func (e *Engine) Abandon() {
 
 	close(e.stop)
 	e.wg.Wait()
-	e.j.CloseWithoutWriter()
+	e.j.Abandon()
 	e.unlock()
 }
 
