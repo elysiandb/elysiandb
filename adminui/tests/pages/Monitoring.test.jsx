@@ -15,6 +15,11 @@ const DETAILS = {
     },
     hooks: [{ hook_id: "7f3c", entity: "books", phase: "post_read", executions: 52, errors: 2, avg_ms: 0.4, p95_ms: 1.1, last_error: "TypeError", last_error_at: null }],
     entity_types: [{ name: "books", count: 21004 }],
+    indexes: [
+        { entity: "books", index: "b:status", kind: "bitmap", origin: "advisor", state: "ready", entries: 21004, bytes: 40960, uses: 912, last_used_at: null },
+        { entity: "books", index: "f:author_id", kind: "ordered", origin: "hook", pinned: true, state: "ready", entries: 63012, bytes: 2097152, uses: 15, last_used_at: null },
+        { entity: "books", index: "c:genre,title", kind: "composite", origin: "advisor", state: "building", entries: 0, last_used_at: null },
+    ],
 };
 
 function LocationProbe() {
@@ -78,15 +83,29 @@ describe("Monitoring", () => {
         expect(screen.getByRole("heading", { name: "KV store" })).toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "Documents" })).toBeInTheDocument();
         expect(screen.getByRole("img", { name: "API cache hit ratio" })).toBeInTheDocument();
-        expect(screen.getByRole("cell", { name: "21,004" })).toBeInTheDocument();
+        expect(screen.getAllByRole("cell", { name: "21,004" }).length).toBeGreaterThan(0);
         expect(screen.queryByRole("img", { name: "Requests per second" })).not.toBeInTheDocument();
+    });
+
+    it("lists the indexes with their form, origin, state and size", async () => {
+        mockApi(routes());
+        renderMonitoring("/admin/monitoring?tab=data");
+
+        expect(await screen.findByRole("heading", { name: "Indexes" })).toBeInTheDocument();
+        expect(screen.getByRole("img", { name: "Index size" })).toBeInTheDocument();
+        expect(screen.getByRole("cell", { name: "b:status" })).toBeInTheDocument();
+        expect(screen.getByRole("cell", { name: "Bitmap" })).toBeInTheDocument();
+        expect(screen.getByRole("cell", { name: "Hook · pinned" })).toBeInTheDocument();
+        expect(screen.getByRole("cell", { name: "Building" })).toBeInTheDocument();
+        expect(screen.getByRole("cell", { name: "Composite" })).toBeInTheDocument();
+        expectNoRawTranslationKeys();
     });
 
     it.each([
         ["errors", ["Server errors (5xx) per second", "Authentication failures per minute", "Hook errors per minute", "Warnings and errors logged per minute"], []],
         ["persistence", ["Flush duration", "Failed and forced flushes per minute", "Log size", "Data folder size"], ["Last successful flush"]],
-        ["system", ["Memory", "Goroutines", "GC pause (p99)", "GC cycles per minute", "Process CPU (% of all threads)", "Open file descriptors", "Open connections", "Admin sessions", "Open transactions", "Oldest open transaction"], ["Runtime", "Connections"]],
-        ["hooks", ["Hook executions per second", "Hook duration (p95)"], ["Post-read"]],
+        ["system", ["Memory", "Goroutines", "GC pause (p99)", "GC cycles per minute", "Process CPU (% of all threads)", "Open file descriptors", "Memory against the budget", "Memory by use", "Memory pressure (0 normal, 1 high, 2 critical)", "Requests refused for memory per minute", "Open connections", "Admin sessions", "Open transactions", "Oldest open transaction"], ["Runtime", "Memory budget", "Connections"]],
+        ["hooks", ["Hook executions per second", "Hook duration (p95)", "Reused hook queries and results"], ["Post-read"]],
     ])("opens the %s tab from the URL", async (tab, charts, texts) => {
         mockApi(routes());
         renderMonitoring(`/admin/monitoring?tab=${tab}`);

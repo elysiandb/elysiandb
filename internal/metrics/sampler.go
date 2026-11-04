@@ -43,6 +43,8 @@ type EngineSample struct {
 	ResidentBytes      int64
 	ValueCacheBytes    int64
 	DirtyPageBytes     int64
+	IndexCount         int
+	IndexBytes         int64
 	CheckpointMs       float64
 }
 
@@ -426,6 +428,8 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 		s.gauges[sValueCacheBytes] = float64(eng.ValueCacheBytes)
 		s.gauges[sPageCacheBytes] = float64(eng.ResidentBytes)
 		s.gauges[sDirtyPageBytes] = float64(eng.DirtyPageBytes)
+		s.gauges[sIndexCount] = float64(eng.IndexCount)
+		s.gauges[sIndexBytes] = float64(eng.IndexBytes)
 		s.valueCacheHits = eng.ValueCacheHits
 		s.valueCacheMisses = eng.ValueCacheMisses
 	}

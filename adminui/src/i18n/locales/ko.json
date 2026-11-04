@@ -279,7 +279,9 @@
             "runtime": "런타임",
             "connections": "연결",
             "hooks": "훅",
-            "mongodb": "MongoDB"
+            "mongodb": "MongoDB",
+            "indexes": "인덱스",
+            "memory": "메모리 예산"
         },
         "tabs": {
             "data": "데이터",
@@ -323,7 +325,14 @@
             "hookDuration": "훅 실행 시간 (p95)",
             "mongoPing": "MongoDB ping",
             "mongoErrors": "분당 MongoDB 오류 수",
-            "mongoPool": "사용 중인 MongoDB 풀 연결"
+            "mongoPool": "사용 중인 MongoDB 풀 연결",
+            "indexCount": "인덱스",
+            "indexBytes": "인덱스 크기",
+            "memoryBudget": "예산 대비 메모리",
+            "memoryShares": "용도별 메모리",
+            "memoryPressure": "메모리 압박 (0 정상, 1 높음, 2 위험)",
+            "memoryRefused": "메모리 부족으로 거부된 요청 (분당)",
+            "hookReuse": "재사용된 훅 쿼리와 결과"
         },
         "series": {
             "http": "HTTP",
@@ -381,7 +390,21 @@
             "poolInUse": "사용 중",
             "logSinceCheckpoint": "마지막 체크포인트 이후",
             "logBytes": "디스크의 로그",
-            "liveBytes": "유효한 데이터"
+            "liveBytes": "유효한 데이터",
+            "indexCount": "인덱스",
+            "indexBytes": "크기",
+            "budget": "예산",
+            "heapLive": "활성 힙",
+            "valueCache": "캐시된 값",
+            "pageCache": "캐시된 페이지",
+            "dirtyPages": "체크포인트 대기 페이지",
+            "hookResults": "훅 결과",
+            "indexBuilds": "인덱스 생성",
+            "requestMemory": "요청",
+            "pressure": "압박",
+            "refused": "거부",
+            "queryReuse": "쿼리",
+            "outputReuse": "결과"
         },
         "routes": {
             "last15m": "가장 많이 호출된 경로, 최근 15분",
@@ -414,6 +437,37 @@
             "lastSuccess": "마지막 성공한 쓰기",
             "failures": "시작 이후 실패한 쓰기",
             "lastError": "마지막 쓰기 오류"
+        },
+        "indexes": {
+            "title": "인덱스",
+            "entity": "엔티티",
+            "index": "인덱스",
+            "kind": "형식",
+            "origin": "출처",
+            "state": "상태",
+            "entries": "항목",
+            "size": "크기",
+            "uses": "사용 횟수",
+            "lastUsed": "마지막 사용",
+            "pinned": "고정됨",
+            "kinds": {
+                "ordered": "정렬된",
+                "sort": "정렬",
+                "bitmap": "비트맵",
+                "composite": "복합",
+                "search": "전문",
+                "references": "참조"
+            },
+            "origins": {
+                "query": "쿼리",
+                "hook": "훅",
+                "advisor": "최적화기"
+            },
+            "states": {
+                "ready": "준비됨",
+                "building": "생성 중",
+                "released": "해제됨"
+            }
         }
     },
     "logs": {

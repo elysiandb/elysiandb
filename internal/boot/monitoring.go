@@ -100,6 +100,8 @@ func engineSample() metrics.EngineSample {
 		ResidentBytes:      st.ResidentStructBytes,
 		ValueCacheBytes:    st.ValueCacheBytes,
 		DirtyPageBytes:     st.DirtyPageBytes,
+		IndexCount:         st.IndexCount,
+		IndexBytes:         st.IndexBytes,
 		CheckpointMs:       st.LastCheckpointMs,
 	}
 }

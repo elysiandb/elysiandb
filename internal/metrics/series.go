@@ -93,6 +93,8 @@ const (
 	sRequestReservedBytes
 	sHookQueryHitRatio
 	sHookOutputHitRatio
+	sIndexCount
+	sIndexBytes
 	numSeries
 )
 
@@ -185,6 +187,8 @@ var seriesNames = [numSeries]string{
 	sRequestReservedBytes:    "request_reserved_bytes",
 	sHookQueryHitRatio:       "hook_query_hit_ratio",
 	sHookOutputHitRatio:      "hook_output_hit_ratio",
+	sIndexCount:              "index_count",
+	sIndexBytes:              "index_bytes",
 }
 
 func SeriesNames() []string {

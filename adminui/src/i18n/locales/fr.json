@@ -279,7 +279,9 @@
             "runtime": "Exécution",
             "connections": "Connexions",
             "hooks": "Hooks",
-            "mongodb": "MongoDB"
+            "mongodb": "MongoDB",
+            "indexes": "Index",
+            "memory": "Budget mémoire"
         },
         "tabs": {
             "data": "Données",
@@ -323,7 +325,14 @@
             "hookDuration": "Durée des hooks (p95)",
             "mongoPing": "Ping MongoDB",
             "mongoErrors": "Erreurs MongoDB par minute",
-            "mongoPool": "Connexions du pool MongoDB utilisées"
+            "mongoPool": "Connexions du pool MongoDB utilisées",
+            "indexCount": "Index",
+            "indexBytes": "Taille des index",
+            "memoryBudget": "Mémoire face au budget",
+            "memoryShares": "Mémoire par usage",
+            "memoryPressure": "Pression mémoire (0 normale, 1 haute, 2 critique)",
+            "memoryRefused": "Requêtes refusées faute de mémoire par minute",
+            "hookReuse": "Requêtes et résultats de hooks réutilisés"
         },
         "series": {
             "http": "HTTP",
@@ -381,7 +390,21 @@
             "poolInUse": "Utilisées",
             "logSinceCheckpoint": "Depuis le dernier checkpoint",
             "logBytes": "Log sur disque",
-            "liveBytes": "Données vivantes"
+            "liveBytes": "Données vivantes",
+            "indexCount": "Index",
+            "indexBytes": "Taille",
+            "budget": "Budget",
+            "heapLive": "Tas vivant",
+            "valueCache": "Valeurs en cache",
+            "pageCache": "Pages en cache",
+            "dirtyPages": "Pages en attente de checkpoint",
+            "hookResults": "Résultats des hooks",
+            "indexBuilds": "Constructions d'index",
+            "requestMemory": "Requêtes",
+            "pressure": "Pression",
+            "refused": "Refusées",
+            "queryReuse": "Requêtes",
+            "outputReuse": "Résultats"
         },
         "routes": {
             "last15m": "Routes les plus appelées, 15 dernières minutes",
@@ -414,6 +437,37 @@
             "lastSuccess": "Dernière écriture réussie",
             "failures": "Écritures en échec depuis le démarrage",
             "lastError": "Dernière erreur d'écriture"
+        },
+        "indexes": {
+            "title": "Index",
+            "entity": "Entité",
+            "index": "Index",
+            "kind": "Forme",
+            "origin": "Origine",
+            "state": "État",
+            "entries": "Entrées",
+            "size": "Taille",
+            "uses": "Usages",
+            "lastUsed": "Dernier usage",
+            "pinned": "épinglé",
+            "kinds": {
+                "ordered": "Ordonné",
+                "sort": "Tri",
+                "bitmap": "Bitmap",
+                "composite": "Composé",
+                "search": "Texte intégral",
+                "references": "Références"
+            },
+            "origins": {
+                "query": "Requête",
+                "hook": "Hook",
+                "advisor": "Optimiseur"
+            },
+            "states": {
+                "ready": "Prêt",
+                "building": "En construction",
+                "released": "Libéré"
+            }
         }
     },
     "logs": {

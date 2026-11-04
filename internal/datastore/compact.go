@@ -282,6 +282,8 @@ type EngineStats struct {
 	LiveBytes           int64
 	PendingBytes        int
 	DirtyPageBytes      int64
+	IndexCount          int
+	IndexBytes          int64
 	Inline              bool
 	Documents           int64
 	ResidentStructBytes int64
@@ -324,7 +326,14 @@ func (e *Engine) Stats() EngineStats {
 
 	e.catalogMu.RLock()
 	for _, ent := range e.entities {
-		s.Documents += int64(ent.root.Load().slots.Len())
+		r := ent.root.Load()
+		s.Documents += int64(r.slots.Len())
+		for name, idx := range r.indexes {
+			if idx.ready && !idx.dormant {
+				s.IndexCount++
+				s.IndexBytes += ent.meta(name).bytes.Load()
+			}
+		}
 	}
 	e.catalogMu.RUnlock()
 

@@ -279,7 +279,9 @@
             "runtime": "运行时",
             "connections": "连接",
             "hooks": "钩子",
-            "mongodb": "MongoDB"
+            "mongodb": "MongoDB",
+            "indexes": "索引",
+            "memory": "内存预算"
         },
         "tabs": {
             "data": "数据",
@@ -323,7 +325,14 @@
             "hookDuration": "钩子耗时 (p95)",
             "mongoPing": "MongoDB ping",
             "mongoErrors": "每分钟 MongoDB 错误数",
-            "mongoPool": "MongoDB 连接池使用中的连接"
+            "mongoPool": "MongoDB 连接池使用中的连接",
+            "indexCount": "索引",
+            "indexBytes": "索引大小",
+            "memoryBudget": "内存与预算对比",
+            "memoryShares": "按用途划分的内存",
+            "memoryPressure": "内存压力（0 正常，1 高，2 危急）",
+            "memoryRefused": "因内存而拒绝的请求（每分钟）",
+            "hookReuse": "复用的钩子查询与结果"
         },
         "series": {
             "http": "HTTP",
@@ -381,7 +390,21 @@
             "poolInUse": "使用中",
             "logSinceCheckpoint": "自上次检查点以来",
             "logBytes": "磁盘上的日志",
-            "liveBytes": "有效数据"
+            "liveBytes": "有效数据",
+            "indexCount": "索引",
+            "indexBytes": "大小",
+            "budget": "预算",
+            "heapLive": "存活堆",
+            "valueCache": "缓存的值",
+            "pageCache": "缓存的页",
+            "dirtyPages": "等待检查点的页",
+            "hookResults": "钩子结果",
+            "indexBuilds": "索引构建",
+            "requestMemory": "请求",
+            "pressure": "压力",
+            "refused": "拒绝",
+            "queryReuse": "查询",
+            "outputReuse": "结果"
         },
         "routes": {
             "last15m": "调用最多的路由，最近 15 分钟",
@@ -414,6 +437,37 @@
             "lastSuccess": "上次成功写入",
             "failures": "启动以来写入失败次数",
             "lastError": "上次写入错误"
+        },
+        "indexes": {
+            "title": "索引",
+            "entity": "实体",
+            "index": "索引",
+            "kind": "形式",
+            "origin": "来源",
+            "state": "状态",
+            "entries": "条目",
+            "size": "大小",
+            "uses": "使用次数",
+            "lastUsed": "最近使用",
+            "pinned": "已固定",
+            "kinds": {
+                "ordered": "有序",
+                "sort": "排序",
+                "bitmap": "位图",
+                "composite": "组合",
+                "search": "全文",
+                "references": "引用"
+            },
+            "origins": {
+                "query": "查询",
+                "hook": "钩子",
+                "advisor": "优化器"
+            },
+            "states": {
+                "ready": "就绪",
+                "building": "构建中",
+                "released": "已释放"
+            }
         }
     },
     "logs": {

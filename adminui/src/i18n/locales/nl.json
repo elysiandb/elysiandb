@@ -279,7 +279,9 @@
             "runtime": "Runtime",
             "connections": "Verbindingen",
             "hooks": "Hooks",
-            "mongodb": "MongoDB"
+            "mongodb": "MongoDB",
+            "indexes": "Indexen",
+            "memory": "Geheugenbudget"
         },
         "tabs": {
             "data": "Gegevens",
@@ -323,7 +325,14 @@
             "hookDuration": "Hookduur (p95)",
             "mongoPing": "MongoDB-ping",
             "mongoErrors": "MongoDB-fouten per minuut",
-            "mongoPool": "Gebruikte verbindingen in de MongoDB-pool"
+            "mongoPool": "Gebruikte verbindingen in de MongoDB-pool",
+            "indexCount": "Indexen",
+            "indexBytes": "Indexgrootte",
+            "memoryBudget": "Geheugen ten opzichte van het budget",
+            "memoryShares": "Geheugen per gebruik",
+            "memoryPressure": "Geheugendruk (0 normaal, 1 hoog, 2 kritiek)",
+            "memoryRefused": "Wegens geheugen geweigerde verzoeken per minuut",
+            "hookReuse": "Hergebruikte hookquery's en -resultaten"
         },
         "series": {
             "http": "HTTP",
@@ -381,7 +390,21 @@
             "poolInUse": "In gebruik",
             "logSinceCheckpoint": "Sinds het laatste checkpoint",
             "logBytes": "Log op schijf",
-            "liveBytes": "Actieve gegevens"
+            "liveBytes": "Actieve gegevens",
+            "indexCount": "Indexen",
+            "indexBytes": "Grootte",
+            "budget": "Budget",
+            "heapLive": "Levende heap",
+            "valueCache": "Gecachete waarden",
+            "pageCache": "Gecachete pagina's",
+            "dirtyPages": "Pagina's die op een checkpoint wachten",
+            "hookResults": "Hookresultaten",
+            "indexBuilds": "Indexopbouw",
+            "requestMemory": "Verzoeken",
+            "pressure": "Druk",
+            "refused": "Geweigerd",
+            "queryReuse": "Query's",
+            "outputReuse": "Resultaten"
         },
         "routes": {
             "last15m": "Meest gebruikte routes, laatste 15 minuten",
@@ -414,6 +437,37 @@
             "lastSuccess": "Laatste geslaagde schrijfactie",
             "failures": "Mislukte schrijfacties sinds de start",
             "lastError": "Laatste schrijffout"
+        },
+        "indexes": {
+            "title": "Indexen",
+            "entity": "Entiteit",
+            "index": "Index",
+            "kind": "Vorm",
+            "origin": "Oorsprong",
+            "state": "Status",
+            "entries": "Items",
+            "size": "Grootte",
+            "uses": "Gebruik",
+            "lastUsed": "Laatst gebruikt",
+            "pinned": "vastgezet",
+            "kinds": {
+                "ordered": "Geordend",
+                "sort": "Sortering",
+                "bitmap": "Bitmap",
+                "composite": "Samengesteld",
+                "search": "Volledige tekst",
+                "references": "Verwijzingen"
+            },
+            "origins": {
+                "query": "Query",
+                "hook": "Hook",
+                "advisor": "Optimalisator"
+            },
+            "states": {
+                "ready": "Gereed",
+                "building": "In opbouw",
+                "released": "Vrijgegeven"
+            }
         }
     },
     "logs": {

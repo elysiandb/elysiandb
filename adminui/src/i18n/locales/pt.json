@@ -279,7 +279,9 @@
             "runtime": "Execução",
             "connections": "Conexões",
             "hooks": "Hooks",
-            "mongodb": "MongoDB"
+            "mongodb": "MongoDB",
+            "indexes": "Índices",
+            "memory": "Orçamento de memória"
         },
         "tabs": {
             "data": "Dados",
@@ -323,7 +325,14 @@
             "hookDuration": "Duração dos hooks (p95)",
             "mongoPing": "Ping do MongoDB",
             "mongoErrors": "Erros do MongoDB por minuto",
-            "mongoPool": "Conexões do pool do MongoDB em uso"
+            "mongoPool": "Conexões do pool do MongoDB em uso",
+            "indexCount": "Índices",
+            "indexBytes": "Tamanho dos índices",
+            "memoryBudget": "Memória face ao orçamento",
+            "memoryShares": "Memória por uso",
+            "memoryPressure": "Pressão de memória (0 normal, 1 alta, 2 crítica)",
+            "memoryRefused": "Pedidos recusados por memória por minuto",
+            "hookReuse": "Consultas e resultados de hooks reutilizados"
         },
         "series": {
             "http": "HTTP",
@@ -381,7 +390,21 @@
             "poolInUse": "Em uso",
             "logSinceCheckpoint": "Desde o último checkpoint",
             "logBytes": "Log em disco",
-            "liveBytes": "Dados vivos"
+            "liveBytes": "Dados vivos",
+            "indexCount": "Índices",
+            "indexBytes": "Tamanho",
+            "budget": "Orçamento",
+            "heapLive": "Heap vivo",
+            "valueCache": "Valores em cache",
+            "pageCache": "Páginas em cache",
+            "dirtyPages": "Páginas à espera de checkpoint",
+            "hookResults": "Resultados de hooks",
+            "indexBuilds": "Construção de índices",
+            "requestMemory": "Pedidos",
+            "pressure": "Pressão",
+            "refused": "Recusados",
+            "queryReuse": "Consultas",
+            "outputReuse": "Resultados"
         },
         "routes": {
             "last15m": "Rotas mais chamadas, últimos 15 minutos",
@@ -414,6 +437,37 @@
             "lastSuccess": "Última gravação bem-sucedida",
             "failures": "Gravações com falha desde o início",
             "lastError": "Último erro de gravação"
+        },
+        "indexes": {
+            "title": "Índices",
+            "entity": "Entidade",
+            "index": "Índice",
+            "kind": "Forma",
+            "origin": "Origem",
+            "state": "Estado",
+            "entries": "Entradas",
+            "size": "Tamanho",
+            "uses": "Usos",
+            "lastUsed": "Último uso",
+            "pinned": "fixado",
+            "kinds": {
+                "ordered": "Ordenado",
+                "sort": "Ordenação",
+                "bitmap": "Bitmap",
+                "composite": "Composto",
+                "search": "Texto integral",
+                "references": "Referências"
+            },
+            "origins": {
+                "query": "Consulta",
+                "hook": "Hook",
+                "advisor": "Otimizador"
+            },
+            "states": {
+                "ready": "Pronto",
+                "building": "Em construção",
+                "released": "Libertado"
+            }
         }
     },
     "logs": {

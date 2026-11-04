@@ -279,7 +279,9 @@
             "runtime": "Runtime",
             "connections": "Connections",
             "hooks": "Hooks",
-            "mongodb": "MongoDB"
+            "mongodb": "MongoDB",
+            "indexes": "Indexes",
+            "memory": "Memory budget"
         },
         "tabs": {
             "data": "Data",
@@ -323,7 +325,14 @@
             "hookDuration": "Hook duration (p95)",
             "mongoPing": "MongoDB ping",
             "mongoErrors": "MongoDB errors per minute",
-            "mongoPool": "MongoDB pool connections in use"
+            "mongoPool": "MongoDB pool connections in use",
+            "indexCount": "Indexes",
+            "indexBytes": "Index size",
+            "memoryBudget": "Memory against the budget",
+            "memoryShares": "Memory by use",
+            "memoryPressure": "Memory pressure (0 normal, 1 high, 2 critical)",
+            "memoryRefused": "Requests refused for memory per minute",
+            "hookReuse": "Reused hook queries and results"
         },
         "series": {
             "http": "HTTP",
@@ -381,7 +390,21 @@
             "poolInUse": "In use",
             "logSinceCheckpoint": "Since the last checkpoint",
             "logBytes": "Log on disk",
-            "liveBytes": "Live data"
+            "liveBytes": "Live data",
+            "indexCount": "Indexes",
+            "indexBytes": "Size",
+            "budget": "Budget",
+            "heapLive": "Live heap",
+            "valueCache": "Cached values",
+            "pageCache": "Cached pages",
+            "dirtyPages": "Pages awaiting a checkpoint",
+            "hookResults": "Hook results",
+            "indexBuilds": "Index builds",
+            "requestMemory": "Requests",
+            "pressure": "Pressure",
+            "refused": "Refused",
+            "queryReuse": "Queries",
+            "outputReuse": "Results"
         },
         "routes": {
             "last15m": "Top routes, last 15 minutes",
@@ -414,6 +437,37 @@
             "lastSuccess": "Last successful flush",
             "failures": "Failed flushes since startup",
             "lastError": "Last flush error"
+        },
+        "indexes": {
+            "title": "Indexes",
+            "entity": "Entity",
+            "index": "Index",
+            "kind": "Form",
+            "origin": "Origin",
+            "state": "State",
+            "entries": "Entries",
+            "size": "Size",
+            "uses": "Uses",
+            "lastUsed": "Last used",
+            "pinned": "pinned",
+            "kinds": {
+                "ordered": "Ordered",
+                "sort": "Sort",
+                "bitmap": "Bitmap",
+                "composite": "Composite",
+                "search": "Full text",
+                "references": "References"
+            },
+            "origins": {
+                "query": "Query",
+                "hook": "Hook",
+                "advisor": "Advisor"
+            },
+            "states": {
+                "ready": "Ready",
+                "building": "Building",
+                "released": "Released"
+            }
         }
     },
     "logs": {

@@ -279,7 +279,9 @@
             "runtime": "Ejecución",
             "connections": "Conexiones",
             "hooks": "Hooks",
-            "mongodb": "MongoDB"
+            "mongodb": "MongoDB",
+            "indexes": "Índices",
+            "memory": "Presupuesto de memoria"
         },
         "tabs": {
             "data": "Datos",
@@ -323,7 +325,14 @@
             "hookDuration": "Duración de los hooks (p95)",
             "mongoPing": "Ping de MongoDB",
             "mongoErrors": "Errores de MongoDB por minuto",
-            "mongoPool": "Conexiones del pool de MongoDB en uso"
+            "mongoPool": "Conexiones del pool de MongoDB en uso",
+            "indexCount": "Índices",
+            "indexBytes": "Tamaño de los índices",
+            "memoryBudget": "Memoria frente al presupuesto",
+            "memoryShares": "Memoria por uso",
+            "memoryPressure": "Presión de memoria (0 normal, 1 alta, 2 crítica)",
+            "memoryRefused": "Solicitudes rechazadas por memoria por minuto",
+            "hookReuse": "Consultas y resultados de hooks reutilizados"
         },
         "series": {
             "http": "HTTP",
@@ -381,7 +390,21 @@
             "poolInUse": "En uso",
             "logSinceCheckpoint": "Desde el último checkpoint",
             "logBytes": "Log en disco",
-            "liveBytes": "Datos vivos"
+            "liveBytes": "Datos vivos",
+            "indexCount": "Índices",
+            "indexBytes": "Tamaño",
+            "budget": "Presupuesto",
+            "heapLive": "Heap vivo",
+            "valueCache": "Valores en caché",
+            "pageCache": "Páginas en caché",
+            "dirtyPages": "Páginas pendientes de checkpoint",
+            "hookResults": "Resultados de hooks",
+            "indexBuilds": "Construcción de índices",
+            "requestMemory": "Solicitudes",
+            "pressure": "Presión",
+            "refused": "Rechazadas",
+            "queryReuse": "Consultas",
+            "outputReuse": "Resultados"
         },
         "routes": {
             "last15m": "Rutas más usadas, últimos 15 minutos",
@@ -414,6 +437,37 @@
             "lastSuccess": "Última escritura correcta",
             "failures": "Escrituras fallidas desde el inicio",
             "lastError": "Último error de escritura"
+        },
+        "indexes": {
+            "title": "Índices",
+            "entity": "Entidad",
+            "index": "Índice",
+            "kind": "Forma",
+            "origin": "Origen",
+            "state": "Estado",
+            "entries": "Entradas",
+            "size": "Tamaño",
+            "uses": "Usos",
+            "lastUsed": "Último uso",
+            "pinned": "fijado",
+            "kinds": {
+                "ordered": "Ordenado",
+                "sort": "Orden",
+                "bitmap": "Bitmap",
+                "composite": "Compuesto",
+                "search": "Texto completo",
+                "references": "Referencias"
+            },
+            "origins": {
+                "query": "Consulta",
+                "hook": "Hook",
+                "advisor": "Optimizador"
+            },
+            "states": {
+                "ready": "Listo",
+                "building": "En construcción",
+                "released": "Liberado"
+            }
         }
     },
     "logs": {
