@@ -26,6 +26,12 @@ type Tx struct {
 	overlay map[string]int
 	resets  map[string]bool
 	clear   bool
+	decoded map[string]decodedDoc
+}
+
+type decodedDoc struct {
+	value []byte
+	doc   map[string]any
 }
 
 func docKey(entity, id string) string {
@@ -113,6 +119,26 @@ func (tx *Tx) ReadBytes(entity, id string) ([]byte, bool) {
 	}
 
 	return b, true
+}
+
+func (tx *Tx) ReadShared(entity, id string) map[string]any {
+	b, ok := tx.ReadBytes(entity, id)
+	if !ok {
+		return nil
+	}
+
+	key := docKey(entity, id)
+	if c, ok := tx.decoded[key]; ok && len(c.value) == len(b) && len(b) > 0 && &c.value[0] == &b[0] {
+		return c.doc
+	}
+
+	doc := decodeDoc(b)
+	if tx.decoded == nil {
+		tx.decoded = map[string]decodedDoc{}
+	}
+	tx.decoded[key] = decodedDoc{value: b, doc: doc}
+
+	return doc
 }
 
 func (tx *Tx) Read(entity, id string) map[string]any {

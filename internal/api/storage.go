@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -85,7 +86,7 @@ func schemaFor(tx *datastore.Tx, entity string) map[string]any {
 		return GetEntitySchema(entity)
 	}
 
-	return tx.Read(schema.SchemaEntity, entity)
+	return tx.ReadShared(schema.SchemaEntity, entity)
 }
 
 func writeEntity(tx *datastore.Tx, entity string, data map[string]any, checkInferredSchema bool) []schema.ValidationError {
@@ -171,12 +172,16 @@ func updateSchemaIfNeeded(tx *datastore.Tx, entity string, data map[string]any) 
 		return
 	}
 
-	current := tx.Read(schema.SchemaEntity, entity)
+	current := tx.ReadShared(schema.SchemaEntity, entity)
 	if globals.GetConfig().Api.Schema.Strict && current != nil && schema.IsManualSchema(entity, current) {
 		return
 	}
 
 	merged := schema.MergeAnalyzedSchema(entity, current, data)
+	if current != nil && reflect.DeepEqual(merged, current) {
+		return
+	}
+
 	if current != nil {
 		encoded, err := json.Marshal(merged)
 		if stored, ok := tx.ReadBytes(schema.SchemaEntity, entity); err == nil && ok && bytes.Equal(encoded, stored) {
