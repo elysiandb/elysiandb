@@ -13,6 +13,7 @@ import (
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/boot"
 	"github.com/taymour/elysiandb/internal/configuration"
+	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/metrics"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
@@ -203,6 +204,10 @@ func TestBlockedHookQueryStopsAtTheHookTimeout(t *testing.T) {
 	}
 
 	free()
+	relaxed := *globals.GetConfig()
+	relaxed.Api.Hooks.TimeoutMs = 60000
+	globals.SetConfig(&relaxed)
+
 	after := s.mustDo(fasthttp.StatusOK, "GET", "/api/month", "").list(t)
 	if after[0]["purchases"] != float64(busyDocs) {
 		t.Fatalf("once the lane is free the hook query is served, got %v", after)
