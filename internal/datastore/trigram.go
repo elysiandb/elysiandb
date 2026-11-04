@@ -93,6 +93,7 @@ type trigramIndex struct {
 	ready    bool
 	updates  int
 	docs     int
+	claimed  bool
 }
 
 func newTrigramIndex() *trigramIndex {
@@ -220,43 +221,25 @@ func (e *Engine) SearchCandidates(name string, pattern string) (*Bitset, bool) {
 }
 
 func (e *Engine) startSearchIndex(ent *entity) {
-	t := newTrigramIndex()
-
 	ent.apply.Lock()
-	current := ent.search.Load()
-	if current != nil && !current.ready {
+	if current := ent.search.Load(); current != nil && !current.isReady() {
 		ent.apply.Unlock()
 		return
 	}
-	ent.search.Store(t)
-	snap := ent.root.Load()
+	ent.search.Store(newTrigramIndex())
+	small := ent.root.Load().slots.Len() <= smallEntityDocs
 	ent.apply.Unlock()
 
-	run := func() {
-		docs := 0
-		snap.slots.AscendAt(0, func(_ string, s *slot) bool {
-			if doc := e.decodeSlot(s); doc != nil {
-				t.add(s.seq, doc)
-			}
-			docs++
-			return true
-		})
-
-		t.mu.Lock()
-		t.ready = true
-		t.docs = docs
-		t.updates = docs
-		t.mu.Unlock()
-	}
-
-	if e.opts.Background && !e.closed.Load() {
-		e.wg.Add(1)
-		go func() {
-			defer e.wg.Done()
-			run()
-		}()
+	if !small && e.schedule(ent) {
 		return
 	}
 
-	run()
+	e.buildEntity(ent, false)
+}
+
+func (t *trigramIndex) isReady() bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	return t.ready
 }

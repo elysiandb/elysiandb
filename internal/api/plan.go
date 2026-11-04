@@ -223,7 +223,8 @@ func (p *planner) index(spec datastore.IndexSpec) (*datastore.IndexView, bool) {
 		return view, true
 	}
 
-	if !p.snap.HasIndex(spec) && len(p.e.IndexNames(p.snap.Name())) < maxIndexesPerEntity && p.snap.Len() > 0 {
+	registered := p.snap.HasIndex(spec)
+	if ((!registered && len(p.e.IndexNames(p.snap.Name())) < maxIndexesPerEntity) || p.snap.IndexDormant(spec)) && p.snap.Len() > 0 {
 		if p.e.EnsureIndex(p.snap.Name(), spec) {
 			p.snap = p.e.Snapshot(p.snap.Name())
 			return p.snap.Index(spec)

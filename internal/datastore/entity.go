@@ -20,9 +20,10 @@ type slot struct {
 }
 
 type index struct {
-	spec  IndexSpec
-	ready bool
-	tree  ptree.Tree[struct{}]
+	spec    IndexSpec
+	ready   bool
+	dormant bool
+	tree    ptree.Tree[struct{}]
 }
 
 type root struct {
@@ -36,7 +37,12 @@ type root struct {
 }
 
 type buildState struct {
-	dirty map[uint32]struct{}
+	order uint64
+	pass  *buildPass
+}
+
+type buildPass struct {
+	before map[uint32]map[string]any
 }
 
 type entity struct {
@@ -44,11 +50,14 @@ type entity struct {
 	apply    sync.Mutex
 	root     atomic.Pointer[root]
 	building map[string]*buildState
+	passes   map[*buildPass]struct{}
 	search   atomic.Pointer[trigramIndex]
+	queued   atomic.Bool
+	usage    sync.Map
 }
 
 func newEntity(name string) *entity {
-	e := &entity{name: name, building: map[string]*buildState{}}
+	e := &entity{name: name, building: map[string]*buildState{}, passes: map[*buildPass]struct{}{}}
 	e.root.Store(&root{indexes: map[string]*index{}})
 
 	return e
@@ -113,7 +122,7 @@ func (d *draft) hasRef(ref RefPath) bool {
 }
 
 func (d *draft) needsDecode() bool {
-	return len(d.indexes) > 0 || len(d.ent.building) > 0 || d.ent.search.Load() != nil
+	return len(d.indexes) > 0 || len(d.ent.building) > 0 || len(d.ent.passes) > 0 || d.ent.search.Load() != nil
 }
 
 func (d *draft) put(rec *journal.Record, doc map[string]any, replay bool) {
@@ -215,7 +224,7 @@ func (d *draft) reset(rec *journal.Record) {
 
 	indexes := map[string]*index{}
 	for name, idx := range d.indexes {
-		indexes[name] = &index{spec: idx.spec, ready: idx.ready}
+		indexes[name] = &index{spec: idx.spec, ready: idx.ready, dormant: idx.dormant}
 	}
 
 	d.r = root{gen: rec.Gen, version: rec.LSN}
@@ -223,18 +232,16 @@ func (d *draft) reset(rec *journal.Record) {
 	d.cloned = true
 	d.refsSeen = nil
 
-	for name := range d.ent.building {
-		d.ent.building[name] = &buildState{dirty: map[uint32]struct{}{}}
-	}
-
 	if t := d.ent.search.Load(); t != nil {
 		d.ent.search.Store(nil)
 	}
 }
 
 func (d *draft) updateIndexes(seq uint32, oldDoc, newDoc map[string]any) {
-	for _, st := range d.ent.building {
-		st.dirty[seq] = struct{}{}
+	for pass := range d.ent.passes {
+		if _, seen := pass.before[seq]; !seen {
+			pass.before[seq] = oldDoc
+		}
 	}
 
 	if t := d.ent.search.Load(); t != nil && newDoc != nil {

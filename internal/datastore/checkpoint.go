@@ -234,6 +234,13 @@ type ckEntity struct {
 	indexes []ckIndex
 }
 
+type ckExtras struct {
+	dormant []IndexSpec
+	search  bool
+}
+
+const ckExtrasSection = 1
+
 type ckIndex struct {
 	spec IndexSpec
 	keys []string
@@ -250,6 +257,7 @@ type checkpointData struct {
 	types    []string
 	entities []ckEntity
 	kv       []ckKV
+	extras   map[string]ckExtras
 }
 
 func readCheckpoint(path string) (*checkpointData, error) {
@@ -313,6 +321,21 @@ func readCheckpoint(path string) (*checkpointData, error) {
 	for n := r.uvarint(); n > 0 && r.err == nil; n-- {
 		key := r.str()
 		ck.kv = append(ck.kv, ckKV{key: key, entry: &kvEntry{lsn: r.uvarint(), expiresAt: r.varint(), loc: r.loc()}})
+	}
+
+	if r.err == nil && r.pos < len(r.data) && r.uvarint() == ckExtrasSection {
+		ck.extras = map[string]ckExtras{}
+		for n := r.uvarint(); n > 0 && r.err == nil; n-- {
+			name := r.str()
+			var x ckExtras
+			for m := r.uvarint(); m > 0 && r.err == nil; m-- {
+				if spec, ok := ParseIndexName(r.str()); ok {
+					x.dormant = append(x.dormant, spec)
+				}
+			}
+			x.search = r.uvarint() == 1
+			ck.extras[name] = x
+		}
 	}
 
 	if r.err != nil {
@@ -394,6 +417,18 @@ func (e *Engine) restore(ck *checkpointData) error {
 			r.indexes[ci.spec.Name()] = &index{spec: ci.spec, ready: true, tree: ptree.FromSorted(ci.keys, make([]struct{}, len(ci.keys)))}
 		}
 
+		if x, ok := ck.extras[ce.name]; ok {
+			for _, spec := range x.dormant {
+				if _, exists := r.indexes[spec.Name()]; !exists {
+					r.indexes[spec.Name()] = &index{spec: spec, dormant: true}
+				}
+			}
+
+			if x.search {
+				e.searchOnOpen = append(e.searchOnOpen, ent)
+			}
+		}
+
 		ent.root.Store(r)
 	}
 
@@ -439,8 +474,9 @@ func (e *Engine) restore(ck *checkpointData) error {
 }
 
 type entitySnapshot struct {
-	name string
-	r    *root
+	name   string
+	r      *root
+	search bool
 }
 
 func (e *Engine) Checkpoint() error {
@@ -469,7 +505,7 @@ func (e *Engine) checkpoint(force bool) error {
 	snaps := make([]entitySnapshot, 0, len(ents))
 	for _, ent := range ents {
 		ent.apply.Lock()
-		snaps = append(snaps, entitySnapshot{name: ent.name, r: ent.root.Load()})
+		snaps = append(snaps, entitySnapshot{name: ent.name, r: ent.root.Load(), search: ent.search.Load() != nil})
 		ent.apply.Unlock()
 	}
 
@@ -558,6 +594,8 @@ func (e *Engine) checkpoint(force bool) error {
 			live[item.entry.loc.Segment] += int64(item.entry.loc.Length)
 		}
 
+		writeExtras(cw, snaps)
+
 		if cw.err != nil {
 			return cw.err
 		}
@@ -622,5 +660,44 @@ func (e *Engine) retireDeadSegments(pos journal.Position, live map[uint32]int64)
 				engineLog.Warn("cannot remove a log segment", "segment", seg.ID, "err", err)
 			}
 		}
+	}
+}
+
+func writeExtras(cw *ckWriter, snaps []entitySnapshot) {
+	type extra struct {
+		name    string
+		dormant []string
+		search  bool
+	}
+
+	var extras []extra
+	for _, s := range snaps {
+		x := extra{name: s.name, search: s.search}
+		for name, idx := range s.r.indexes {
+			if idx.dormant {
+				x.dormant = append(x.dormant, name)
+			}
+		}
+		sort.Strings(x.dormant)
+
+		if len(x.dormant) > 0 || x.search {
+			extras = append(extras, x)
+		}
+	}
+
+	cw.uvarint(ckExtrasSection)
+	cw.uvarint(uint64(len(extras)))
+	for _, x := range extras {
+		cw.str(x.name)
+		cw.uvarint(uint64(len(x.dormant)))
+		for _, name := range x.dormant {
+			cw.str(name)
+		}
+
+		search := uint64(0)
+		if x.search {
+			search = 1
+		}
+		cw.uvarint(search)
 	}
 }

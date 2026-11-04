@@ -14,7 +14,6 @@ import (
 
 	"github.com/taymour/elysiandb/internal/journal"
 	"github.com/taymour/elysiandb/internal/log"
-	"github.com/taymour/elysiandb/internal/ptree"
 )
 
 const (
@@ -72,12 +71,14 @@ type Engine struct {
 	checkpointBytes atomic.Int64
 	segmentLive     atomic.Pointer[map[uint32]int64]
 
-	builds   chan buildJob
-	stop     chan struct{}
-	wg       sync.WaitGroup
-	closed   atomic.Bool
-	writers  sync.WaitGroup
-	migrated *MigrationReport
+	builds       chan *entity
+	buildOrder   atomic.Uint64
+	searchOnOpen []*entity
+	stop         chan struct{}
+	wg           sync.WaitGroup
+	closed       atomic.Bool
+	writers      sync.WaitGroup
+	migrated     *MigrationReport
 
 	stats engineStats
 }
@@ -118,7 +119,7 @@ func Open(opts Options) (*Engine, error) {
 		cache:    newValueCache(max(opts.CacheBytes, 1), 64),
 		entities: map[string]*entity{},
 		kv:       newKVStore(opts.Shards),
-		builds:   make(chan buildJob, 1024),
+		builds:   make(chan *entity, 1024),
 		stop:     make(chan struct{}),
 	}
 
@@ -248,6 +249,11 @@ func (e *Engine) startBackground() {
 	go e.expiryLoop()
 	go e.maintenanceLoop()
 	go e.buildLoop()
+
+	for _, ent := range e.searchOnOpen {
+		e.startSearchIndex(ent)
+	}
+	e.searchOnOpen = nil
 }
 
 func (e *Engine) Close() error {
@@ -527,9 +533,14 @@ type IndexView struct {
 }
 
 func (s *Snapshot) Index(spec IndexSpec) (*IndexView, bool) {
-	idx, ok := s.r.indexes[spec.Name()]
+	name := spec.Name()
+	idx, ok := s.r.indexes[name]
 	if !ok || !idx.ready {
 		return nil, false
+	}
+
+	if s.ent != nil {
+		s.ent.touch(name)
 	}
 
 	return &IndexView{s: s, idx: idx}, true
@@ -538,6 +549,11 @@ func (s *Snapshot) Index(spec IndexSpec) (*IndexView, bool) {
 func (s *Snapshot) HasIndex(spec IndexSpec) bool {
 	_, ok := s.r.indexes[spec.Name()]
 	return ok
+}
+
+func (s *Snapshot) IndexDormant(spec IndexSpec) bool {
+	idx, ok := s.r.indexes[spec.Name()]
+	return ok && idx.dormant
 }
 
 func (v *IndexView) Len() int {
@@ -586,47 +602,45 @@ func (v *IndexView) At(i int) (string, uint32, bool) {
 }
 
 func (e *Engine) EnsureIndex(name string, spec IndexSpec) bool {
+	key := spec.Name()
 	ent := e.entity(name, true)
 	r := ent.root.Load()
-	if idx, ok := r.indexes[spec.Name()]; ok {
+	if idx, ok := r.indexes[key]; ok && !idx.dormant {
 		return idx.ready
 	}
 
 	ent.apply.Lock()
 	r = ent.root.Load()
-	if idx, ok := r.indexes[spec.Name()]; ok {
+	if idx, ok := r.indexes[key]; ok && !idx.dormant {
 		ent.apply.Unlock()
 		return idx.ready
 	}
 
+	ent.touch(key)
+	nr := *r
+	nr.indexes = cloneIndexes(r.indexes)
 	if r.slots.Len() == 0 {
-		nr := *r
-		nr.indexes = cloneIndexes(r.indexes)
-		nr.indexes[spec.Name()] = &index{spec: spec, ready: true}
+		nr.indexes[key] = &index{spec: spec, ready: true}
 		ent.root.Store(&nr)
 		ent.apply.Unlock()
 		return true
 	}
 
-	nr := *r
-	nr.indexes = cloneIndexes(r.indexes)
-	nr.indexes[spec.Name()] = &index{spec: spec}
-	ent.building[spec.Name()] = &buildState{dirty: map[uint32]struct{}{}}
+	nr.indexes[key] = &index{spec: spec}
+	ent.building[key] = &buildState{order: e.buildOrder.Add(1)}
 	ent.root.Store(&nr)
+	small := r.slots.Len() <= smallEntityDocs
 	ent.apply.Unlock()
 
-	job := buildJob{entity: ent, spec: spec}
-	if e.opts.Background && !e.closed.Load() {
-		select {
-		case e.builds <- job:
-			return false
-		default:
-		}
+	if !small && e.schedule(ent) {
+		return false
 	}
 
-	e.build(job)
+	e.buildEntity(ent, false)
 
-	return true
+	idx, ok := ent.root.Load().indexes[key]
+
+	return ok && idx.ready
 }
 
 func cloneIndexes(m map[string]*index) map[string]*index {
@@ -679,102 +693,11 @@ func (e *Engine) IndexBacklog() int {
 	n := 0
 	for _, ent := range ents {
 		for _, idx := range ent.root.Load().indexes {
-			if !idx.ready {
+			if !idx.ready && !idx.dormant {
 				n++
 			}
 		}
 	}
 
 	return n
-}
-
-type buildJob struct {
-	entity *entity
-	spec   IndexSpec
-}
-
-func (e *Engine) buildLoop() {
-	defer e.wg.Done()
-
-	sem := make(chan struct{}, e.opts.IndexWorkers)
-	var running sync.WaitGroup
-	for {
-		select {
-		case <-e.stop:
-			running.Wait()
-			return
-		case job := <-e.builds:
-			sem <- struct{}{}
-			running.Add(1)
-			go func() {
-				defer func() {
-					<-sem
-					running.Done()
-				}()
-				e.build(job)
-			}()
-		}
-	}
-}
-
-func (e *Engine) build(job buildJob) {
-	ent := job.entity
-	name := job.spec.Name()
-	start := time.Now()
-	snap := ent.root.Load()
-
-	keys := make([]string, 0, snap.slots.Len())
-	snapKeys := map[uint32][]string{}
-	snap.slots.AscendAt(0, func(_ string, s *slot) bool {
-		doc := e.decodeSlot(s)
-		ks := uniqueKeys(extractKeys(job.spec, doc))
-		snapKeys[s.seq] = ks
-		for _, k := range ks {
-			keys = append(keys, k+seqKey(s.seq))
-		}
-		return true
-	})
-
-	sort.Strings(keys)
-	vals := make([]struct{}, len(keys))
-	tree := ptree.FromSorted(keys, vals)
-
-	ent.apply.Lock()
-	defer ent.apply.Unlock()
-
-	cur := ent.root.Load()
-	st := ent.building[name]
-	idx, still := cur.indexes[name]
-	if st == nil || !still || idx.ready {
-		return
-	}
-
-	if cur.gen != snap.gen {
-		delete(ent.building, name)
-		nr := *cur
-		nr.indexes = cloneIndexes(cur.indexes)
-		delete(nr.indexes, name)
-		ent.root.Store(&nr)
-		return
-	}
-
-	for seq := range st.dirty {
-		for _, k := range snapKeys[seq] {
-			tree, _ = tree.Delete(k + seqKey(seq))
-		}
-
-		if s, ok := cur.slots.Get(seqKey(seq)); ok {
-			for _, k := range uniqueKeys(extractKeys(job.spec, e.decodeSlot(s))) {
-				tree, _ = tree.Put(k+seqKey(seq), struct{}{})
-			}
-		}
-	}
-
-	delete(ent.building, name)
-	nr := *cur
-	nr.indexes = cloneIndexes(cur.indexes)
-	nr.indexes[name] = &index{spec: job.spec, ready: true, tree: tree}
-	ent.root.Store(&nr)
-
-	engineLog.Debug("index built", "entity", ent.name, "index", name, "entries", tree.Len(), "duration_ms", log.Since(start))
 }

@@ -29,6 +29,7 @@ type Sources struct {
 	DefaultAdminPassword func() bool
 	Engine               func() EngineSample
 	HeavyWaiting         func() int
+	Indexes              func() []IndexState
 }
 
 type EngineSample struct {

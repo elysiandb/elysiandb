@@ -20,11 +20,17 @@ func (e *Engine) maintenanceLoop() {
 	defer ticker.Stop()
 
 	lastCompaction := time.Now()
+	lastSweep := time.Now()
 	for {
 		select {
 		case <-e.stop:
 			return
 		case <-ticker.C:
+		}
+
+		if time.Since(lastSweep) >= idleSweepInterval {
+			lastSweep = time.Now()
+			e.DropIdleIndexes(IndexIdleAfter)
 		}
 
 		if e.checkpointDue() {

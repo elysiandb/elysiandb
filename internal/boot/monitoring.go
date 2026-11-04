@@ -20,6 +20,7 @@ func MonitoringSources() metrics.Sources {
 		RecoverySizes:   storageLogSizes,
 		Engine:          engineSample,
 		HeavyWaiting:    api_storage.HeavyWaiting,
+		Indexes:         indexStates,
 		Transactions:    transaction.OpenTransactions,
 		HTTPConnections: HTTPConnections,
 		CacheEntries: func() int {
@@ -97,4 +98,24 @@ func engineSample() metrics.EngineSample {
 		ResidentBytes:      st.ResidentStructBytes,
 		CheckpointMs:       st.LastCheckpointMs,
 	}
+}
+
+func indexStates() []metrics.IndexState {
+	e := storage.Engine()
+	if e == nil || !engine.IsEngineInternal() {
+		return nil
+	}
+
+	states := e.IndexStates()
+	out := make([]metrics.IndexState, 0, len(states))
+	for _, st := range states {
+		item := metrics.IndexState{Entity: st.Entity, Index: st.Index, State: st.State, Entries: st.Entries}
+		if !st.LastUsed.IsZero() {
+			used := st.LastUsed
+			item.LastUsedAt = &used
+		}
+		out = append(out, item)
+	}
+
+	return out
 }
