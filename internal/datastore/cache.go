@@ -12,7 +12,7 @@ type valueCache struct {
 }
 
 type cacheShard struct {
-	mu      sync.Mutex
+	mu      sync.RWMutex
 	index   map[uint64]int
 	entries []cacheEntry
 	free    []int
@@ -24,7 +24,7 @@ type cacheShard struct {
 type cacheEntry struct {
 	lsn  uint64
 	data []byte
-	ref  bool
+	ref  atomic.Bool
 	used bool
 }
 
@@ -47,14 +47,17 @@ func (c *valueCache) shard(lsn uint64) *cacheShard {
 
 func (c *valueCache) get(lsn uint64) ([]byte, bool) {
 	s := c.shard(lsn)
-	s.mu.Lock()
+	s.mu.RLock()
 	i, ok := s.index[lsn]
 	var data []byte
 	if ok {
-		s.entries[i].ref = true
-		data = s.entries[i].data
+		e := &s.entries[i]
+		data = e.data
+		if !e.ref.Load() {
+			e.ref.Store(true)
+		}
 	}
-	s.mu.Unlock()
+	s.mu.RUnlock()
 
 	if ok {
 		c.hits.Add(1)
@@ -92,7 +95,7 @@ func (c *valueCache) put(lsn uint64, data []byte) {
 		i = len(s.entries) - 1
 	}
 
-	s.entries[i] = cacheEntry{lsn: lsn, data: data, ref: false, used: true}
+	s.entries[i] = cacheEntry{lsn: lsn, data: data, used: true}
 	s.index[lsn] = i
 	s.bytes += size
 }
@@ -109,8 +112,8 @@ func (s *cacheShard) evictOne() {
 			continue
 		}
 
-		if e.ref {
-			e.ref = false
+		if e.ref.Load() {
+			e.ref.Store(false)
 			s.hand++
 			continue
 		}
