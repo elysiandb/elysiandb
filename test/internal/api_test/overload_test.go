@@ -3,6 +3,7 @@ package api_test
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -249,4 +250,53 @@ func TestACheapPlanNeverWaitsForTheHeavyLane(t *testing.T) {
 
 	holder.free()
 	<-holder.done
+}
+
+func TestARequestCountsOnceInTheHookLaneQueue(t *testing.T) {
+	previous := runtime.GOMAXPROCS(4)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previous) })
+	globals.SetConfig(&configuration.Config{Api: configuration.ApiConfig{Query: configuration.ApiQueryConfig{MaxQueued: 2, QueueTimeoutMs: -1}}})
+
+	free, err := api_storage.AcquireHookLane(&api_storage.Guard{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	run := func(guard *api_storage.Guard, errs chan<- error) {
+		release, err := api_storage.AcquireHookLane(guard)
+		if err == nil {
+			release()
+		}
+		errs <- err
+	}
+
+	const helpers = 8
+	errs := make(chan error, helpers+1)
+
+	page := &api_storage.Guard{}
+	for i := 0; i < helpers; i++ {
+		go run(page, errs)
+	}
+	waitForQueue(t, 1)
+
+	go run(&api_storage.Guard{}, errs)
+	waitForQueue(t, 2)
+
+	beyond := &api_storage.Guard{}
+	if _, err := api_storage.AcquireHookLane(beyond); !errors.Is(err, api_storage.ErrBusy) {
+		t.Fatalf("a third request is beyond the queue limit of 2, got %v", err)
+	}
+
+	free()
+	for i := 0; i < helpers+1; i++ {
+		select {
+		case err := <-errs:
+			if err != nil {
+				t.Fatalf("a request within the queue limit is served, got %v", err)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("the waiting runs never got a slot")
+		}
+	}
+	waitForQueue(t, 0)
 }

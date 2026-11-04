@@ -845,11 +845,12 @@ type lane struct {
 	size    int
 	waiting atomic.Int64
 	sizeFn  func() int
+	bit     uint32
 }
 
 var (
-	queries = &lane{sizeFn: HeavyLaneSize}
-	hooks   = &lane{sizeFn: hookLaneSize}
+	queries = &lane{sizeFn: HeavyLaneSize, bit: 1}
+	hooks   = &lane{sizeFn: hookLaneSize, bit: 2}
 )
 
 func hookLaneSize() int {
@@ -949,6 +950,8 @@ func (l *lane) acquire(guard *Guard) (func(), error) {
 		return nil, err
 	}
 
+	first := guard.enterLane(l.bit)
+
 	select {
 	case slots <- struct{}{}:
 		metrics.HeavyQuery(0)
@@ -957,13 +960,15 @@ func (l *lane) acquire(guard *Guard) (func(), error) {
 	}
 
 	patient := guard == nil || guard.Admitted
-	if limit := heavyQueueLimit(cap(slots)); !patient && limit >= 0 && l.waiting.Load() >= limit {
+	if limit := heavyQueueLimit(cap(slots)); first && !patient && limit >= 0 && l.waiting.Load() >= limit {
 		metrics.HeavyRejected()
 		return nil, guard.fail(ErrBusy)
 	}
 
-	l.waiting.Add(1)
-	defer l.waiting.Add(-1)
+	if first {
+		l.waiting.Add(1)
+		defer l.waiting.Add(-1)
+	}
 
 	start := time.Now()
 	timeout := heavyQueueTimeout()

@@ -23,6 +23,7 @@ type Guard struct {
 	err       atomic.Pointer[error]
 	reserved  atomic.Int64
 	charged   atomic.Int64
+	lanes     atomic.Uint32
 }
 
 const memoryChunk = 1 << 20
@@ -33,6 +34,15 @@ func (g *Guard) root() *Guard {
 	}
 
 	return g
+}
+
+func (g *Guard) enterLane(bit uint32) bool {
+	r := g.root()
+	if r == nil {
+		return true
+	}
+
+	return r.lanes.Or(bit)&bit == 0
 }
 
 func (g *Guard) Charge(n int64) error {
