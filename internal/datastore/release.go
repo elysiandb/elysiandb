@@ -4,7 +4,7 @@ import (
 	"math"
 	"runtime/debug"
 	"sort"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/pagetree"
@@ -16,7 +16,11 @@ const (
 	warmBatch         = 4096
 )
 
-var lastMemoryReturn atomic.Int64
+var memoryReturn struct {
+	mu      sync.Mutex
+	last    time.Time
+	pending bool
+}
 
 func valueCacheLimit(bytes int64) int64 {
 	if bytes <= 0 {
@@ -54,12 +58,28 @@ func returnMemory(freed int64) {
 		return
 	}
 
-	now := time.Now().UnixNano()
-	last := lastMemoryReturn.Load()
-	if now-last < int64(returnMemoryEvery) || !lastMemoryReturn.CompareAndSwap(last, now) {
+	memoryReturn.mu.Lock()
+	if memoryReturn.pending {
+		memoryReturn.mu.Unlock()
 		return
 	}
 
+	wait := time.Until(memoryReturn.last.Add(returnMemoryEvery))
+	if wait > 0 {
+		memoryReturn.pending = true
+		memoryReturn.mu.Unlock()
+		time.AfterFunc(wait, func() {
+			memoryReturn.mu.Lock()
+			memoryReturn.pending = false
+			memoryReturn.last = time.Now()
+			memoryReturn.mu.Unlock()
+			debug.FreeOSMemory()
+		})
+		return
+	}
+
+	memoryReturn.last = time.Now()
+	memoryReturn.mu.Unlock()
 	debug.FreeOSMemory()
 }
 
