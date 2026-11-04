@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/memory"
 	"github.com/taymour/elysiandb/internal/pagetree"
 )
 
@@ -14,6 +15,9 @@ const (
 	smallEntityDocs   = 512
 	maxBatchEntries   = 2_000_000
 	maxBatchIndexes   = 32
+	buildEntryBytes   = 72
+	searchDocBytes    = 640
+	smallBuildBytes   = 1 << 20
 	IndexIdleAfter    = time.Hour
 	idleSweepInterval = time.Minute
 )
@@ -133,6 +137,9 @@ func (e *Engine) claim(ent *entity) (*root, *buildPass, []claimedBuild, bool) {
 	sort.Slice(pending, func(i, j int) bool { return pending[i].st.order < pending[j].st.order })
 
 	limit := min(maxBatchIndexes, max(1, maxBatchEntries/max(1, snap.slots.Len())))
+	if budget := memory.Builds.Limit(); budget > 0 {
+		limit = min(limit, max(1, int(budget/int64(max(1, snap.slots.Len())*buildEntryBytes))))
+	}
 	more := len(pending) > limit
 	if more {
 		pending = pending[:limit]
@@ -164,6 +171,24 @@ func (e *Engine) buildPass(ent *entity) bool {
 		if j.spec.Kind == IndexSearch {
 			searchJob = i
 		}
+	}
+
+	need := int64(snap.slots.Len()) * int64(len(jobs)) * buildEntryBytes
+	if searchJob >= 0 {
+		need += int64(snap.slots.Len()) * searchDocBytes
+	}
+
+	if need >= smallBuildBytes {
+		if err := memory.Builds.Acquire(need, -1, func() error {
+			if e.closed.Load() {
+				return ErrClosed
+			}
+			return nil
+		}); err != nil {
+			e.abandonPass(ent, pass, jobs)
+			return false
+		}
+		defer memory.Builds.Release(need)
 	}
 
 	docs := 0
@@ -233,6 +258,18 @@ func (e *Engine) buildPass(ent *entity) bool {
 	engineLog.Debug("indexes built", "entity", ent.name, "indexes", len(jobs), "documents", docs, "duration_ms", log.Since(start))
 
 	return more || requeue
+}
+
+func (e *Engine) abandonPass(ent *entity, pass *buildPass, jobs []claimedBuild) {
+	ent.apply.Lock()
+	defer ent.apply.Unlock()
+
+	delete(ent.passes, pass)
+	for _, j := range jobs {
+		if st := ent.building[j.name]; st == j.st {
+			st.pass = nil
+		}
+	}
 }
 
 func (e *Engine) commitPass(ent *entity, snap *root, pass *buildPass, jobs []claimedBuild, trees []pagetree.Tree) bool {
