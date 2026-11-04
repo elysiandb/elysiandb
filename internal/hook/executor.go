@@ -177,7 +177,7 @@ func (r *Request) query(h Hook, targetEntity string, filters map[string]map[stri
 
 	version := queryVersion(targetEntity, bypassAcl)
 	res, hit, err := results.get(key, version, guard, func(prev *result) (*result, error) {
-		return buildResult(targetEntity, filters, r.username, bypassAcl, guard, prev)
+		return buildResult(targetEntity, filters, r.username, bypassAcl, nil, prev)
 	})
 	if errors.Is(err, api_storage.ErrBusy) {
 		return nil, key, r.guard.Reject()

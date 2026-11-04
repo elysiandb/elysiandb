@@ -162,19 +162,23 @@ func (c *resultCache) get(key, version string, guard *api_storage.Guard, build f
 	c.flights[fkey] = f
 	c.mu.Unlock()
 
-	_, prev := c.lookup(key, version)
-	f.res, f.err = build(prev)
-	if f.err == nil {
-		f.res.version = version
-		c.store(key, f.res)
-	}
+	go func() {
+		_, prev := c.lookup(key, version)
+		f.res, f.err = build(prev)
+		if f.err == nil {
+			f.res.version = version
+			c.store(key, f.res)
+		}
 
-	c.mu.Lock()
-	delete(c.flights, fkey)
-	c.mu.Unlock()
-	close(f.done)
+		c.mu.Lock()
+		delete(c.flights, fkey)
+		c.mu.Unlock()
+		close(f.done)
+	}()
 
-	return f.res, false, f.err
+	res, _, err := waitFlight(f, guard)
+
+	return res, false, err
 }
 
 func waitFlight(f *flight, guard *api_storage.Guard) (*result, bool, error) {
