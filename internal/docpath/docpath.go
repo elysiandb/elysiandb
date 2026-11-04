@@ -129,9 +129,10 @@ func IsSearchableKey(key string) bool {
 }
 
 func MatchGlob(pattern, s string) bool {
-	pattern = strings.ToLower(pattern)
-	s = strings.ToLower(s)
-	p := pattern
+	return MatchGlobLower(strings.ToLower(pattern), strings.ToLower(s))
+}
+
+func MatchGlobLower[S ~string | ~[]byte](p string, s S) bool {
 	i, j := 0, 0
 	star := -1
 	match := 0

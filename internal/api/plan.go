@@ -609,17 +609,17 @@ func Plan(q ListQuery) *ListResult {
 
 	snap = p.snap
 
-	var match matchFunc
+	var match, matchFields matchFunc
 	if needsMatch {
 		filters, node, search := q.Filters, q.Node, q.Search
-		match = func(doc map[string]any) bool {
+		matchFields = func(doc map[string]any) bool {
 			if node != nil && !matchFilterNode(*node, doc) {
 				return false
 			}
-			if len(filters) > 0 && !FiltersMatchEntity(doc, filters) {
-				return false
-			}
-			return search == "" || SearchMatchesEntity(doc, search)
+			return len(filters) == 0 || FiltersMatchEntity(doc, filters)
+		}
+		match = func(doc map[string]any) bool {
+			return matchFields(doc) && (search == "" || SearchMatchesEntity(doc, search))
 		}
 	}
 
@@ -639,6 +639,9 @@ func Plan(q ListQuery) *ListResult {
 	reader := includeReader()
 
 	heavy := needsMatch && heavyPlan(snap, cand, evalIncludes)
+	searchOnBytes := q.Search != "" && evalIncludes == ""
+	onlySearch := searchOnBytes && !hasFilter && !hasNode
+	loweredSearch := LoweredSearchPattern(q.Search)
 	var release func()
 	defer func() {
 		if release != nil {
@@ -683,6 +686,18 @@ func Plan(q ListQuery) *ListResult {
 			}
 		}
 
+		check := match
+		if searchOnBytes {
+			if raw, err := d.Bytes(); err == nil {
+				if found, ok := searchBytesLowered(raw, loweredSearch); ok {
+					if !found || onlySearch {
+						return found
+					}
+					check = matchFields
+				}
+			}
+		}
+
 		doc, err := d.Decode()
 		if err != nil {
 			return false
@@ -692,7 +707,7 @@ func Plan(q ListQuery) *ListResult {
 			doc = applyIncludesWith([]map[string]any{doc}, evalIncludes, reader)[0]
 		}
 
-		return match(doc)
+		return check(doc)
 	}
 
 	if q.CountOnly && len(q.Sorts) == 0 && q.SortField == "" && q.Limit == 0 && q.Offset == 0 {
