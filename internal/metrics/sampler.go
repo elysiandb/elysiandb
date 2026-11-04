@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/taymour/elysiandb/internal/log"
+	"github.com/taymour/elysiandb/internal/memory"
 )
 
 type Sources struct {
@@ -38,6 +39,10 @@ type EngineSample struct {
 	ValueCacheMisses   int64
 	ResidentBytes      int64
 	CheckpointMs       float64
+	BlockCacheBytes    int64
+	CompactionDebt     int64
+	L0Files            int64
+	OpenSnapshots      int
 }
 
 type resolution struct {
@@ -393,6 +398,10 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 		s.gauges[sLiveBytes] = float64(eng.LiveBytes)
 		s.gauges[sResidentBytes] = float64(eng.ResidentBytes)
 		s.gauges[sCheckpointMs] = eng.CheckpointMs
+		s.gauges[sBlockCacheBytes] = float64(eng.BlockCacheBytes)
+		s.gauges[sCompactionDebtBytes] = float64(eng.CompactionDebt)
+		s.gauges[sL0Files] = float64(eng.L0Files)
+		s.gauges[sOpenSnapshots] = float64(eng.OpenSnapshots)
 		s.valueCacheHits = eng.ValueCacheHits
 		s.valueCacheMisses = eng.ValueCacheMisses
 	}
@@ -404,6 +413,11 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 	s.gauges[sAdminSessions] = slow.adminSessions
 	s.gauges[sDiskBytes] = slow.diskBytes
 	s.gauges[sMongoPingMs] = math.NaN()
+
+	mem := memory.Snapshot()
+	s.gauges[sMemoryBudgetBytes] = float64(mem.Budget)
+	s.gauges[sMemoryLiveBytes] = float64(mem.Live)
+	s.gauges[sMemoryPressure] = float64(mem.Level)
 
 	return s
 }

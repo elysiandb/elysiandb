@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/memory"
 	"github.com/taymour/elysiandb/internal/metrics"
 
 	"github.com/taymour/elysiandb/internal/datastore"
@@ -37,10 +38,13 @@ type ListQuery struct {
 
 type ListResult struct {
 	snap  *datastore.Snapshot
+	guard *Guard
 	Docs  []datastore.Doc
 	Total int
 	Err   error
 }
+
+const decodeCheckEvery = 512
 
 func (r *ListResult) Snapshot() *datastore.Snapshot {
 	return r.snap
@@ -57,7 +61,12 @@ func (r *ListResult) IDs() []string {
 
 func (r *ListResult) Decode() []map[string]any {
 	out := make([]map[string]any, 0, len(r.Docs))
-	for _, d := range r.Docs {
+	for i, d := range r.Docs {
+		if i%decodeCheckEvery == decodeCheckEvery-1 && memoryExhausted(r.guard) {
+			r.Err = ErrBusy
+			return []map[string]any{}
+		}
+
 		doc, err := d.Decode()
 		if err == nil {
 			out = append(out, doc)
@@ -643,7 +652,7 @@ func Plan(q ListQuery) *ListResult {
 		}
 	}
 
-	res := &ListResult{snap: snap}
+	res := &ListResult{snap: snap, guard: q.Guard}
 	reader := includeReader()
 
 	heavy := needsMatch && heavyPlan(snap, cand, evalIncludes)
@@ -688,7 +697,7 @@ func Plan(q ListQuery) *ListResult {
 				release = r
 			}
 
-			if q.Guard.Check() != nil {
+			if q.Guard.Check() != nil || memoryExhausted(q.Guard) {
 				expired = true
 				return false
 			}
@@ -739,6 +748,7 @@ func Plan(q ListQuery) *ListResult {
 }
 
 const (
+	detachedPage          = 1000
 	heavyCandidates       = 2048
 	guardInterval         = 64
 	defaultQueuePerWorker = 4
@@ -823,21 +833,40 @@ func heavyPlan(snap *datastore.Snapshot, cand candidates, evalIncludes string) b
 	return maybe > heavyCandidates
 }
 
+func tryHeavySlot(slots chan struct{}) bool {
+	if memory.UnderPressure() {
+		return false
+	}
+
+	select {
+	case slots <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func rejectHeavy(guard *Guard) error {
+	metrics.HeavyRejected()
+	if memory.UnderPressure() {
+		metrics.MemoryRefused()
+	}
+
+	return guard.fail(ErrBusy)
+}
+
 func acquireHeavyLane(guard *Guard) (func(), error) {
 	slots := heavyLane()
 	release := func() { <-slots }
 
-	select {
-	case slots <- struct{}{}:
+	if tryHeavySlot(slots) {
 		metrics.HeavyQuery(0)
 		return release, nil
-	default:
 	}
 
 	patient := guard == nil || guard.Admitted
 	if limit := heavyQueueLimit(cap(slots)); !patient && limit >= 0 && heavyWaiting.Load() >= limit {
-		metrics.HeavyRejected()
-		return nil, guard.fail(ErrBusy)
+		return nil, rejectHeavy(guard)
 	}
 
 	heavyWaiting.Add(1)
@@ -852,12 +881,12 @@ func acquireHeavyLane(guard *Guard) (func(), error) {
 	defer ticker.Stop()
 
 	for {
-		select {
-		case slots <- struct{}{}:
+		if tryHeavySlot(slots) {
 			metrics.HeavyQuery(time.Since(start))
 			return release, nil
-		case <-ticker.C:
 		}
+
+		<-ticker.C
 
 		if err := guard.Check(); err != nil {
 			metrics.HeavyQuery(time.Since(start))
@@ -865,10 +894,20 @@ func acquireHeavyLane(guard *Guard) (func(), error) {
 		}
 
 		if timeout >= 0 && time.Since(start) >= timeout {
-			metrics.HeavyRejected()
-			return nil, guard.fail(ErrBusy)
+			return nil, rejectHeavy(guard)
 		}
 	}
+}
+
+func memoryExhausted(guard *Guard) bool {
+	if guard == nil || !memory.IsCritical() {
+		return false
+	}
+
+	metrics.MemoryRefused()
+	_ = guard.fail(ErrBusy)
+
+	return true
 }
 
 func DeadlineFromConfig() time.Time {
@@ -900,7 +939,11 @@ func (p *planner) directPage(q ListQuery) ([]datastore.Doc, int, bool) {
 	snap := p.snap
 	total := snap.Len()
 	docs := []datastore.Doc{}
+	detach := q.Limit > 0 && q.Limit <= detachedPage
 	take := func(d datastore.Doc) bool {
+		if detach {
+			d = d.Detach()
+		}
 		docs = append(docs, d)
 		return q.Limit <= 0 || len(docs) < q.Limit
 	}
@@ -978,9 +1021,13 @@ func paginate(src orderedSource, offset, limit int, countAll bool) ([]datastore.
 	}
 
 	docs := []datastore.Doc{}
+	detach := limit > 0 && limit <= detachedPage
 	n := 0
 	src(func(d datastore.Doc) bool {
 		if n >= offset && (limit <= 0 || len(docs) < limit) {
+			if detach {
+				d = d.Detach()
+			}
 			docs = append(docs, d)
 		}
 		n++

@@ -81,6 +81,14 @@ const (
 	sHeavyWaiting
 	sHeavyWaitP95
 	sAbandonedRps
+	sMemoryBudgetBytes
+	sMemoryLiveBytes
+	sMemoryPressure
+	sMemoryRefusedRps
+	sBlockCacheBytes
+	sCompactionDebtBytes
+	sL0Files
+	sOpenSnapshots
 	numSeries
 )
 
@@ -161,6 +169,14 @@ var seriesNames = [numSeries]string{
 	sHeavyWaiting:            "heavy_waiting",
 	sHeavyWaitP95:            "heavy_wait_p95_ms",
 	sAbandonedRps:            "abandoned_rps",
+	sMemoryBudgetBytes:       "memory_budget_bytes",
+	sMemoryLiveBytes:         "memory_live_bytes",
+	sMemoryPressure:          "memory_pressure",
+	sMemoryRefusedRps:        "memory_refused_rps",
+	sBlockCacheBytes:         "block_cache_bytes",
+	sCompactionDebtBytes:     "compaction_debt_bytes",
+	sL0Files:                 "l0_files",
+	sOpenSnapshots:           "open_snapshots",
 }
 
 func SeriesNames() []string {
@@ -192,6 +208,7 @@ var rateSeries = map[int]int{
 	sHeavyQueuedRps:    cHeavyQueued,
 	sHeavyRejectedRps:  cHeavyRejected,
 	sAbandonedRps:      cRequestsAbandoned,
+	sMemoryRefusedRps:  cMemoryRefused,
 	sKVGetsRps:         cKVGets,
 	sKVSetsRps:         cKVSets,
 	sKVDeletesRps:      cKVDeletes,

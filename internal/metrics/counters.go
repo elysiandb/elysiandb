@@ -30,6 +30,7 @@ const (
 	cHeavyQueued
 	cHeavyRejected
 	cRequestsAbandoned
+	cMemoryRefused
 	cKVGets
 	cKVSets
 	cKVDeletes
@@ -168,6 +169,10 @@ func HeavyQuery(wait time.Duration) {
 
 func HeavyRejected() {
 	add(cHeavyRejected, 1)
+}
+
+func MemoryRefused() {
+	add(cMemoryRefused, 1)
 }
 
 func RequestAbandoned() {

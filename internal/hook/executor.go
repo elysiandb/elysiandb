@@ -143,9 +143,9 @@ func entityVersion(entity string) string {
 		return ""
 	}
 
-	snap := e.Snapshot(entity)
+	gen, ver := e.EntityVersion(entity)
 
-	return fmt.Sprintf("%d.%d.%d", e.Instance(), snap.Generation(), snap.Version())
+	return fmt.Sprintf("%d.%d.%d", e.Instance(), gen, ver)
 }
 
 func copyRows(rows []map[string]any) []map[string]any {

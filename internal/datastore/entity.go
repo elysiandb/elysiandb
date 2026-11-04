@@ -202,6 +202,19 @@ func (d Doc) record() ([]byte, error) {
 	return b, nil
 }
 
+func (d Doc) Detach() Doc {
+	if d.rec != nil {
+		return d
+	}
+
+	b, err := d.record()
+	if err != nil {
+		return d
+	}
+
+	return Doc{s: d.s, seq: d.seq, rec: append([]byte(nil), b...)}
+}
+
 func (d Doc) ID() string {
 	b, err := d.record()
 	if err != nil {

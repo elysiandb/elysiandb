@@ -159,8 +159,8 @@ func aclSignature() string {
 	}
 
 	version := func(entity string) string {
-		snap := e.Snapshot(entity)
-		return fmt.Sprintf("%d.%d", snap.Generation(), snap.Version())
+		gen, ver := e.EntityVersion(entity)
+		return fmt.Sprintf("%d.%d", gen, ver)
 	}
 
 	return e.Folder() + "|" + version(security.UserEntity) + "|" + version(ACLEntity) + "|" + version(schema.SchemaEntity) + "|" + strings.Join(e.Types(), "\x00")

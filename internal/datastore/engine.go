@@ -490,6 +490,10 @@ func (e *Engine) Folder() string {
 	return e.dir
 }
 
+func (e *Engine) Settings() Options {
+	return e.opts
+}
+
 func (e *Engine) UncleanShutdown() bool {
 	return e.unclean
 }

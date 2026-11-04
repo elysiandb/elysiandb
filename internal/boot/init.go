@@ -2,10 +2,12 @@ package boot
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/configuration"
+	"github.com/taymour/elysiandb/internal/datastore"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/metrics"
@@ -76,6 +78,7 @@ func InitDB() {
 	}
 
 	logStorageLoaded(cfg, start)
+	logStorageSettings(cfg)
 
 	BootACL()
 	BootHooks()
@@ -93,6 +96,40 @@ func InitTool() {
 	}
 
 	logStorageLoaded(cfg, start)
+}
+
+func durabilityName(d datastore.Durability) string {
+	switch d {
+	case datastore.DurabilitySync:
+		return "fsync"
+	case datastore.DurabilityWrite:
+		return "write"
+	}
+
+	return "background"
+}
+
+func logStorageSettings(cfg *configuration.Config) {
+	e := storage.Engine()
+	if e == nil {
+		return
+	}
+
+	opts := e.Settings()
+	storageLog.Info("storage settings",
+		"engine", "pebble",
+		"folder", filepath.Join(cfg.Store.Folder, datastore.PebbleFolder),
+		"durability", durabilityName(opts.Durability),
+		"wal_sync_interval_s", cfg.Store.FlushIntervalSeconds,
+		"memtable_mb", opts.MemTableBytes>>20,
+		"block_cache_mb", opts.CacheBytes>>20,
+		"kv_lock_shards", cfg.Store.Shards,
+		"index_workers", opts.IndexWorkers,
+	)
+
+	if cfg.Engine.URI != "" {
+		storageLog.Info("configuration key has no effect", "key", "engine.uri", "hint", "the internal engine does not use a connection URI")
+	}
 }
 
 func logStorageLoaded(cfg *configuration.Config, start time.Time) {

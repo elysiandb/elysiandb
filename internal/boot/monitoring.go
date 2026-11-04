@@ -91,6 +91,10 @@ func engineSample() metrics.EngineSample {
 		ValueCacheMisses:   st.BlockCacheMisses,
 		ResidentBytes:      st.BlockCacheBytes + st.MemTableBytes,
 		CheckpointMs:       st.LastFlushMs,
+		BlockCacheBytes:    st.BlockCacheBytes,
+		CompactionDebt:     st.CompactionDebt,
+		L0Files:            st.L0Files,
+		OpenSnapshots:      st.OpenSnapshots,
 	}
 }
 

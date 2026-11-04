@@ -23,11 +23,10 @@ const (
 )
 
 var (
-	budget  atomic.Int64
-	level   atomic.Int32
-	live    atomic.Int64
-	used    atomic.Int64
-	refused atomic.Int64
+	budget atomic.Int64
+	level  atomic.Int32
+	live   atomic.Int64
+	used   atomic.Int64
 
 	samplerMu sync.Mutex
 	stopCh    chan struct{}
@@ -59,31 +58,15 @@ func IsCritical() bool {
 	return Current() == Critical
 }
 
-func Refused() {
-	refused.Add(1)
-}
-
 type Stats struct {
-	Budget  int64
-	Live    int64
-	Used    int64
-	Level   string
-	Refused int64
-}
-
-func (l Level) String() string {
-	switch l {
-	case High:
-		return "high"
-	case Critical:
-		return "critical"
-	default:
-		return "normal"
-	}
+	Budget int64
+	Live   int64
+	Used   int64
+	Level  Level
 }
 
 func Snapshot() Stats {
-	return Stats{Budget: budget.Load(), Live: live.Load(), Used: used.Load(), Level: Current().String(), Refused: refused.Load()}
+	return Stats{Budget: budget.Load(), Live: live.Load(), Used: used.Load(), Level: Current()}
 }
 
 func Sample() {
@@ -135,14 +118,4 @@ func Start() {
 			}
 		}
 	}()
-}
-
-func Stop() {
-	samplerMu.Lock()
-	defer samplerMu.Unlock()
-
-	if stopCh != nil {
-		close(stopCh)
-		stopCh = nil
-	}
 }

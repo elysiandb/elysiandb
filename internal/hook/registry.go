@@ -35,13 +35,15 @@ func (r *registry) forEntity(entity string) ([]Hook, bool) {
 		return nil, false
 	}
 
-	snap := e.Snapshot(HookEntity)
+	gen, ver := e.EntityVersion(HookEntity)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if !r.loaded || r.engine != e || r.gen != snap.Generation() || r.version != snap.Version() {
+	if !r.loaded || r.engine != e || r.gen != gen || r.version != ver {
+		snap := e.Snapshot(HookEntity)
 		r.load(e, snap)
+		snap.Release()
 	}
 
 	if list, ok := r.byEntity[entity]; ok {
