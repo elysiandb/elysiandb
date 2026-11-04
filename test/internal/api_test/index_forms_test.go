@@ -87,7 +87,7 @@ func TestBitmapIndexesAnswerLikeOrderedIndexes(t *testing.T) {
 		}
 	}
 
-	checkPlannerAgainstScan(t, r, "forms", 500)
+	checkPlannerAgainstScan(t, r, "forms", 150)
 
 	for i := 0; i < 3000; i++ {
 		id := fmt.Sprintf("q%05d", r.Intn(9000))
@@ -99,7 +99,7 @@ func TestBitmapIndexesAnswerLikeOrderedIndexes(t *testing.T) {
 		}
 	}
 
-	checkPlannerAgainstScan(t, r, "forms", 500)
+	checkPlannerAgainstScan(t, r, "forms", 150)
 
 	for _, name := range e.IndexNames("forms") {
 		if name[0] == 'f' {

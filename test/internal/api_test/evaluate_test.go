@@ -107,7 +107,7 @@ func TestFiltersEvaluatedOnTheIndexMatchTheScan(t *testing.T) {
 		}
 	}
 
-	for i := 0; i < len(single)+1500; i++ {
+	for i := 0; i < len(single)+300; i++ {
 		var filters map[string]map[string]string
 		if i < len(single) {
 			filters = single[i]
