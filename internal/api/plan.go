@@ -1,6 +1,7 @@
 package api_storage
 
 import (
+	"math"
 	"runtime"
 	"sort"
 	"strconv"
@@ -535,22 +536,85 @@ func opCandidates(view *datastore.IndexView, op, cmp string, ops map[string]stri
 	return candidates{set: set, exact: exact}
 }
 
-func (p *planner) restFilters(filters map[string]map[string]string) candidates {
-	result := universe()
-	result.exact = nil
-	first := true
-	for field, ops := range filters {
-		c := p.leaf(field, ops)
-		if first {
-			result = c
-			first = false
-			continue
-		}
-		result = intersect(result, c)
+const (
+	selectiveRatio   = 16
+	selectiveMinimum = 4096
+	verifyDirectly   = 256
+)
+
+func (p *planner) estimate(field string, ops map[string]string) int {
+	if len(ops) != 1 || p.affectedByIncludes(field) {
+		return math.MaxInt
 	}
 
-	if first {
+	cmp, ok := ops["eq"]
+	if !ok || strings.ContainsAny(cmp, "*\\") {
+		return math.MaxInt
+	}
+
+	view, ok := p.filterIndex(field)
+	if !ok {
+		return math.MaxInt
+	}
+
+	n := 0
+	count := func(term []byte) {
+		n += view.Rank(afterTerm(term)) - view.Rank(term)
+	}
+
+	count(exactOf(datastore.KeyLower, strings.ToLower(cmp)))
+	count(exactOf(datastore.KeyElement, strings.Split(cmp, ",")[0]))
+	if f, err := strconv.ParseFloat(cmp, 64); err == nil {
+		count(datastore.AppendNumber([]byte{datastore.KeyNumber}, f))
+	}
+	b := byte(0)
+	if cmp == "true" || cmp == "1" {
+		b = 1
+	}
+	count([]byte{datastore.KeyBool, b})
+	if _, ok, _ := docpath.ParseDate(cmp); ok {
+		return math.MaxInt
+	}
+
+	return n
+}
+
+func (p *planner) restFilters(filters map[string]map[string]string) candidates {
+	if len(filters) == 0 {
 		return candidates{all: true}
+	}
+
+	type leafPlan struct {
+		field string
+		ops   map[string]string
+		size  int
+	}
+
+	order := make([]leafPlan, 0, len(filters))
+	for field, ops := range filters {
+		size := math.MaxInt
+		if len(filters) > 1 {
+			size = p.estimate(field, ops)
+		}
+		order = append(order, leafPlan{field: field, ops: ops, size: size})
+	}
+	sort.SliceStable(order, func(i, j int) bool {
+		if order[i].size != order[j].size {
+			return order[i].size < order[j].size
+		}
+		return order[i].field < order[j].field
+	})
+
+	result := p.leaf(order[0].field, order[0].ops)
+	for _, l := range order[1:] {
+		if !result.all {
+			pending := result.set.Count()
+			if pending <= verifyDirectly || (l.size != math.MaxInt && l.size > selectiveMinimum && l.size/selectiveRatio > pending) {
+				result.exact = nil
+				continue
+			}
+		}
+		result = intersect(result, p.leaf(l.field, l.ops))
 	}
 
 	return result
