@@ -30,6 +30,28 @@ func (b *Bitset) Set(i uint32) {
 	b.words[w] |= 1 << (i % 64)
 }
 
+func (b *Bitset) addContainer(chunk uint32, c []byte) {
+	if len(c) == 0 {
+		return
+	}
+
+	if c[0] != 1 {
+		postingEach(c, chunk<<postingChunkBits, b.Set)
+		return
+	}
+
+	first := int(chunk) * (postingChunk / 64)
+	if need := first + postingChunk/64; need > len(b.words) {
+		grown := make([]uint64, need+len(b.words)/2)
+		copy(grown, b.words)
+		b.words = grown
+	}
+
+	for w := 0; w < postingChunk/64; w++ {
+		b.words[first+w] |= binary.LittleEndian.Uint64(c[1+8*w:])
+	}
+}
+
 func (b *Bitset) Has(i uint32) bool {
 	w := int(i / 64)
 	return w < len(b.words) && b.words[w]&(1<<(i%64)) != 0
@@ -140,6 +162,7 @@ func PatternTrigrams(pattern string) []string {
 }
 
 const (
+	staleSearchSlack = 1024
 	postingChunkBits = 12
 	postingChunk     = 1 << postingChunkBits
 	postingArrayMax  = 256
@@ -367,7 +390,7 @@ func gramPostings(tree pagetree.Tree, gram uint32) *Bitset {
 		if key[:3] != prefix {
 			return false
 		}
-		postingEach(val, binary.BigEndian.Uint32([]byte(key[3:]))<<postingChunkBits, out.Set)
+		out.addContainer(binary.BigEndian.Uint32([]byte(key[3:])), val)
 		return true
 	})
 

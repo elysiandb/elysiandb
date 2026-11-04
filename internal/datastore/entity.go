@@ -121,6 +121,7 @@ type entity struct {
 	passes   map[*buildPass]struct{}
 	queued   atomic.Bool
 	usage    sync.Map
+	stale    atomic.Int64
 }
 
 func (e *Engine) newEntity(name string) *entity {
@@ -343,6 +344,15 @@ func (d *draft) updateIndexes(seq uint32, oldDoc, newDoc map[string]any) {
 			continue
 		}
 
+		if idx.spec.Kind == IndexSearch && oldDoc != nil && d.ent.stale.Add(1) > 2*int64(d.r.slots.Len())+staleSearchSlack {
+			d.ent.stale.Store(0)
+			if changed == nil {
+				changed = map[string]*index{}
+			}
+			changed[name] = &index{spec: idx.spec, dormant: true}
+			continue
+		}
+
 		tree, ok := applyDocChange(idx.spec, idx.tree.WithToken(d.tok), seq, oldDoc, newDoc)
 		if !ok {
 			continue
@@ -366,12 +376,12 @@ func (d *draft) updateIndexes(seq uint32, oldDoc, newDoc map[string]any) {
 
 func applyDocChange(spec IndexSpec, tree pagetree.Tree, seq uint32, oldDoc, newDoc map[string]any) (pagetree.Tree, bool) {
 	if spec.Kind == IndexSearch {
-		removed, added := diffGrams(searchGrams(oldDoc), searchGrams(newDoc))
-		if len(removed) == 0 && len(added) == 0 {
+		_, added := diffGrams(searchGrams(oldDoc), searchGrams(newDoc))
+		if len(added) == 0 {
 			return tree, false
 		}
 
-		return updatePostings(tree, seq, removed, added), true
+		return updatePostings(tree, seq, nil, added), true
 	}
 
 	oldKeys := uniqueKeys(extractKeys(spec, oldDoc))
