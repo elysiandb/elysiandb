@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/taymour/elysiandb/internal/datastore"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -94,7 +95,7 @@ spawn:
 func lazyPreReadPage(
 	hooks *hook.Request,
 	entity string,
-	res *api_storage.ListResult,
+	each func(func(datastore.Doc) bool),
 	includes string,
 	stored func(map[string]any) bool,
 	candidates api_storage.SeqFilter,
@@ -105,18 +106,18 @@ func lazyPreReadPage(
 	limit int,
 ) []map[string]any {
 	selected := make([]map[string]any, 0)
-	for _, d := range res.Docs {
+	each(func(d datastore.Doc) bool {
 		if candidates != nil && !candidates(d.Seq()) {
-			continue
+			return true
 		}
 
 		if hooks.Stopped() {
-			break
+			return false
 		}
 
 		item, err := d.Decode()
 		if err != nil {
-			continue
+			return true
 		}
 
 		if includes != "" {
@@ -124,23 +125,22 @@ func lazyPreReadPage(
 		}
 
 		if !stored(item) {
-			continue
+			return true
 		}
 
 		if mode == acl.ReadNone || (mode == acl.ReadOwned && !acl.OwnedBy(item, username)) {
-			continue
+			return true
 		}
 
 		item = hooks.PreRead(entity, item)
 		if !matches(item) {
-			continue
+			return true
 		}
 
 		selected = append(selected, item)
-		if limit > 0 && len(selected) >= offset+limit {
-			break
-		}
-	}
+
+		return limit <= 0 || len(selected) < offset+limit
+	})
 
 	return api_storage.Paginate(selected, offset, limit)
 }

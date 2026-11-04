@@ -34,6 +34,7 @@ type ListQuery struct {
 	CountOnly bool
 	Snapshot  *datastore.Snapshot
 	Guard     *Guard
+	Each      func(datastore.Doc) bool
 }
 
 type ListResult struct {
@@ -42,6 +43,14 @@ type ListResult struct {
 	Docs  []datastore.Doc
 	Total int
 	Err   error
+}
+
+func Snapshot(entity string) *datastore.Snapshot {
+	if e := db(); e != nil {
+		return e.Snapshot(entity)
+	}
+
+	return nil
 }
 
 func (r *ListResult) Snapshot() *datastore.Snapshot {
@@ -666,8 +675,10 @@ func Plan(q ListQuery) *ListResult {
 	}
 
 	p := &planner{e: e, snap: snap, refs: snap.Refs(), inc: q.Includes != ""}
-	if docs, total, ok := p.compositePage(q); ok {
-		return &ListResult{snap: p.snap, guard: q.Guard, Docs: docs, Total: total}
+	if q.Each == nil {
+		if docs, total, ok := p.compositePage(q); ok {
+			return &ListResult{snap: p.snap, guard: q.Guard, Docs: docs, Total: total}
+		}
 	}
 
 	hasFilter := len(q.Filters) > 0
@@ -796,7 +807,9 @@ func Plan(q ListQuery) *ListResult {
 		return check(doc)
 	}
 
-	if q.CountOnly && len(q.Sorts) == 0 && q.SortField == "" && q.Limit == 0 && q.Offset == 0 {
+	if q.Each != nil {
+		p.orderFor(q, cand, needsMatch, verify)(q.Each)
+	} else if q.CountOnly && len(q.Sorts) == 0 && q.SortField == "" && q.Limit == 0 && q.Offset == 0 {
 		res.Total = countMatches(snap, cand, needsMatch, everythingExact, verify)
 	} else if docs, total, ok := p.directPageIf(!needsMatch, q); ok {
 		res.Docs, res.Total = docs, total

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/taymour/elysiandb/internal/datastore"
 	"sort"
 	"strconv"
 
@@ -243,13 +244,16 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		all := q
 		all.Offset, all.Limit = 0, 0
 		all.Filter = query.FilterNode{Leaf: map[string]map[string]string{}}
-		res := api_storage.PlanQueryGuarded(all, false, guard)
+		snap := api_storage.Snapshot(payload.Entity)
 		stored := func(item map[string]any) bool {
 			return len(api_storage.ApplyStoredQueryFilter([]map[string]any{item}, filter)) == 1
 		}
 		matches := func(item map[string]any) bool { return api_storage.QueryFilterMatchesEntity(filter, item) }
-		candidates := api_storage.StoredCandidates(res.Snapshot(), nil, &filter, "")
-		data := lazyPreReadPage(hooks, payload.Entity, res, "", stored, candidates, acl.ReadModeFor(currentUser, payload.Entity), currentUser, matches, payload.Offset, payload.Limit)
+		candidates := api_storage.StoredCandidates(snap, nil, &filter, "")
+		each := func(fn func(datastore.Doc) bool) {
+			_ = api_storage.StreamQueryGuarded(all, guard, snap, fn)
+		}
+		data := lazyPreReadPage(hooks, payload.Entity, each, "", stored, candidates, acl.ReadModeFor(currentUser, payload.Entity), currentUser, matches, payload.Offset, payload.Limit)
 		finishQuery(ctx, payload, data, hooks, postReadHooks, fields, hash)
 		return
 	}

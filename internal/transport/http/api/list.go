@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/taymour/elysiandb/internal/datastore"
 	"strings"
 
 	"github.com/taymour/elysiandb/internal/acl"
@@ -119,11 +120,14 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	var data []map[string]any
 	if paginateAfterHooks && engine.IsEngineInternal() {
 		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
-		res := api_storage.Plan(api_storage.ListQuery{Entity: entity, SortField: sortField, SortAsc: sortAscending, Search: search, Includes: includes, Guard: guard})
+		snap := api_storage.Snapshot(entity)
 		stored := func(item map[string]any) bool { return api_storage.StoredFiltersMatchEntity(item, filters) }
 		matches := func(item map[string]any) bool { return api_storage.FiltersMatchEntity(item, filters) }
-		candidates := api_storage.StoredCandidates(res.Snapshot(), filters, nil, includes)
-		data = lazyPreReadPage(hooks, entity, res, includes, stored, candidates, acl.ReadModeFor(currentUser, entity), currentUser, matches, offset, limit)
+		candidates := api_storage.StoredCandidates(snap, filters, nil, includes)
+		each := func(fn func(datastore.Doc) bool) {
+			api_storage.Plan(api_storage.ListQuery{Entity: entity, SortField: sortField, SortAsc: sortAscending, Search: search, Includes: includes, Guard: guard, Snapshot: snap, Each: fn})
+		}
+		data = lazyPreReadPage(hooks, entity, each, includes, stored, candidates, acl.ReadModeFor(currentUser, entity), currentUser, matches, offset, limit)
 	} else if paginateAfterHooks {
 		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
 		data = listEntities(guard, entity, 0, 0, sortField, sortAscending, nil, search, includes)

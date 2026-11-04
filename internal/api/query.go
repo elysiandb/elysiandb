@@ -1,6 +1,7 @@
 package api_storage
 
 import (
+	"github.com/taymour/elysiandb/internal/datastore"
 	"github.com/taymour/elysiandb/internal/docpath"
 	"github.com/taymour/elysiandb/internal/query"
 )
@@ -20,6 +21,19 @@ func ExecuteQueryGuarded(q query.Query, guard *Guard) ([]map[string]any, error) 
 
 func PlanQuery(q query.Query, countOnly bool) *ListResult {
 	return PlanQueryGuarded(q, countOnly, nil)
+}
+
+func StreamQueryGuarded(q query.Query, guard *Guard, snap *datastore.Snapshot, fn func(datastore.Doc) bool) error {
+	filter := q.Filter
+
+	return Plan(ListQuery{
+		Entity:   q.Entity,
+		Sorts:    q.OrderedSorts(),
+		Node:     &filter,
+		Guard:    guard,
+		Snapshot: snap,
+		Each:     fn,
+	}).Err
 }
 
 func PlanQueryGuarded(q query.Query, countOnly bool, guard *Guard) *ListResult {
