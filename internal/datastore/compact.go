@@ -11,6 +11,8 @@ const (
 	compactionInterval = 10 * time.Second
 	compactionRatio    = 0.5
 	compactionBatch    = 512
+	checkpointSpacing  = 10
+	checkpointMaxGap   = 5 * time.Minute
 )
 
 func (e *Engine) maintenanceLoop() {
@@ -21,6 +23,7 @@ func (e *Engine) maintenanceLoop() {
 
 	lastCompaction := time.Now()
 	lastSweep := time.Now()
+	compacted := false
 	for {
 		select {
 		case <-e.stop:
@@ -33,20 +36,19 @@ func (e *Engine) maintenanceLoop() {
 			e.DropIdleIndexes(IndexIdleAfter)
 		}
 
-		if e.checkpointDue() {
-			if err := e.checkpoint(false); err != nil {
-				engineLog.Error("checkpoint failed", "err", err)
-			}
-		}
-
 		if time.Since(lastCompaction) >= compactionInterval {
 			lastCompaction = time.Now()
 			if n, err := e.Compact(1); err != nil {
 				engineLog.Error("compaction failed", "err", err)
 			} else if n > 0 {
-				if err := e.checkpoint(false); err != nil {
-					engineLog.Error("checkpoint failed", "err", err)
-				}
+				compacted = true
+			}
+		}
+
+		if (compacted || e.checkpointDue()) && e.checkpointSpaced() {
+			compacted = false
+			if err := e.checkpoint(false); err != nil {
+				engineLog.Error("checkpoint failed", "err", err)
 			}
 		}
 	}
@@ -72,6 +74,20 @@ func (e *Engine) LogSinceCheckpoint() int64 {
 	}
 
 	return int64(pos.Segment-ck.Segment-1)*size + (size - int64(ck.Offset)) + int64(pos.Offset)
+}
+
+func (e *Engine) checkpointSpaced() bool {
+	e.ckptMu.Lock()
+	at := e.checkpointAt
+	e.ckptMu.Unlock()
+
+	if at.IsZero() {
+		return true
+	}
+
+	gap := min(checkpointMaxGap, checkpointSpacing*time.Duration(e.stats.checkpointNanos.Load()))
+
+	return time.Since(at) >= gap
 }
 
 func (e *Engine) checkpointDue() bool {
