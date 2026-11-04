@@ -61,7 +61,11 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(entity) {
-		data = hook.ApplyPostReadHooksForEntity(username, entity, data)
+		guard := requestGuard(ctx)
+		data = hook.NewRequest(username).WithGuard(guard).PostRead(entity, data)
+		if guardStopped(ctx, guard) {
+			return
+		}
 	}
 
 	response, err := json.Marshal(data)

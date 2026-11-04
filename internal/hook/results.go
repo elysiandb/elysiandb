@@ -141,6 +141,7 @@ func (c *resultCache) reset() {
 		memory.HookResults.Release(it.res.bytes)
 	}
 	c.items = map[string]*cacheItem{}
+	c.refused = map[string]time.Time{}
 	c.lru.Init()
 }
 

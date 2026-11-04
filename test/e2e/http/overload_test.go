@@ -3,6 +3,8 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/taymour/elysiandb/internal/hook"
+	"github.com/taymour/elysiandb/internal/memory"
 	"net"
 	"regexp"
 	"strings"
@@ -271,5 +273,31 @@ func TestAbandonedRequestStopsItsWork(t *testing.T) {
 	page := s.mustDo(fasthttp.StatusOK, "GET", "/api/spin?filter%5Bn%5D%5Blt%5D=2", "").ids(t)
 	if strings.Join(page, ",") != "s000,s001" {
 		t.Fatalf("a client that waits is served as before, got %v", page)
+	}
+}
+
+func TestHookQueriesBeyondTheirMemoryShareAnswer503(t *testing.T) {
+	s := startAdminSession(t, withoutStrictSchema)
+	seedBusy(t, s)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/month", `{"id":"m1","label":"january"}`)
+	s.mustDo(fasthttp.StatusOK, "POST", "/api/hook/month", `{"name":"total","event":"post_read","language":"javascript","enabled":true,"bypass_acl":true,"script":"function postRead(ctx){ ctx.entity.purchases = ctx.query(\"busy\", {\"tags\": {\"all\": \"n,m\"}}).length }"}`)
+
+	memory.Configure(4 << 20)
+	t.Cleanup(func() { memory.Configure(0) })
+	hook.ResetQueryCache()
+	hook.ResetOutputMemo()
+
+	for _, path := range []string{"/api/month/m1", "/api/month"} {
+		resp := s.do("GET", path, "")
+		if resp.status != fasthttp.StatusServiceUnavailable || !strings.Contains(string(resp.body), "server busy") || resp.header("Retry-After") != "1" {
+			t.Fatalf("%s: a hook query that the budget cannot hold answers 503 server busy, got %d %s", path, resp.status, resp.body)
+		}
+	}
+
+	memory.Configure(0)
+	hook.ResetQueryCache()
+	doc := s.mustDo(fasthttp.StatusOK, "GET", "/api/month/m1", "")
+	if docs, _ := busySize(); !strings.Contains(string(doc.body), fmt.Sprintf(`"purchases":%d`, docs)) {
+		t.Fatalf("without a budget the hook runs as before, got %s", doc.body)
 	}
 }
