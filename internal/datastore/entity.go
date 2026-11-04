@@ -121,6 +121,8 @@ type entity struct {
 	passes   map[*buildPass]struct{}
 	queued   atomic.Bool
 	usage    sync.Map
+	metas    sync.Map
+	pins     sync.Map
 	stale    atomic.Int64
 }
 
@@ -382,6 +384,10 @@ func applyDocChange(spec IndexSpec, tree pagetree.Tree, seq uint32, oldDoc, newD
 		}
 
 		return updatePostings(tree, seq, nil, added), true
+	}
+
+	if spec.Kind == IndexComposite {
+		return applyCompositeChange(spec, tree, seq, oldDoc, newDoc)
 	}
 
 	oldKeys := uniqueKeys(extractKeys(spec, oldDoc))

@@ -38,6 +38,7 @@ func (e *Engine) maintenanceLoop() {
 		if time.Since(lastSweep) >= idleSweepInterval {
 			lastSweep = time.Now()
 			e.DropIdleIndexes(IndexIdleAfter)
+			e.Advise()
 		}
 
 		if time.Since(lastCompaction) >= compactionInterval {

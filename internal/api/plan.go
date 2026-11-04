@@ -666,6 +666,9 @@ func Plan(q ListQuery) *ListResult {
 	}
 
 	p := &planner{e: e, snap: snap, refs: snap.Refs(), inc: q.Includes != ""}
+	if docs, total, ok := p.compositePage(q); ok {
+		return &ListResult{snap: p.snap, guard: q.Guard, Docs: docs, Total: total}
+	}
 
 	hasFilter := len(q.Filters) > 0
 	hasNode := q.Node != nil && !nodeIsEverything(*q.Node)

@@ -63,15 +63,16 @@ type manifestIndex struct {
 }
 
 type manifestEntity struct {
-	Name    string          `json:"name"`
-	Gen     uint64          `json:"gen"`
-	NextSeq uint32          `json:"next_seq"`
-	Version uint64          `json:"version"`
-	Refs    []RefPath       `json:"refs,omitempty"`
-	Slots   pageRoot        `json:"slots"`
-	IDs     pageRoot        `json:"ids"`
-	Indexes []manifestIndex `json:"indexes,omitempty"`
-	Derived []manifestIndex `json:"derived_indexes,omitempty"`
+	Name    string            `json:"name"`
+	Gen     uint64            `json:"gen"`
+	NextSeq uint32            `json:"next_seq"`
+	Version uint64            `json:"version"`
+	Refs    []RefPath         `json:"refs,omitempty"`
+	Slots   pageRoot          `json:"slots"`
+	IDs     pageRoot          `json:"ids"`
+	Indexes []manifestIndex   `json:"indexes,omitempty"`
+	Derived []manifestIndex   `json:"derived_indexes,omitempty"`
+	Origins map[string]string `json:"index_origins,omitempty"`
 }
 
 func (me *manifestEntity) addIndex(spec IndexSpec, mi manifestIndex) {
@@ -537,6 +538,10 @@ func (e *Engine) restorePages(m *manifest) error {
 			indexes: map[string]*index{},
 		}
 
+		for name, origin := range me.Origins {
+			ent.meta(name).setOrigin(IndexOrigin(origin))
+		}
+
 		for _, mi := range append(append([]manifestIndex(nil), me.Indexes...), me.Derived...) {
 			spec, ok := ParseIndexName(mi.Name)
 			if !ok {
@@ -655,6 +660,7 @@ func (e *Engine) lastCheckpoint() checkpointState {
 }
 
 type entitySnapshot struct {
+	ent    *entity
 	name   string
 	r      *root
 	search bool
@@ -686,7 +692,7 @@ func (e *Engine) checkpoint(force bool) error {
 	snaps := make([]entitySnapshot, 0, len(ents))
 	for _, ent := range ents {
 		ent.apply.Lock()
-		snaps = append(snaps, entitySnapshot{name: ent.name, r: ent.root.Load()})
+		snaps = append(snaps, entitySnapshot{ent: ent, name: ent.name, r: ent.root.Load()})
 		ent.apply.Unlock()
 	}
 
@@ -723,6 +729,12 @@ func (e *Engine) checkpoint(force bool) error {
 
 		for _, name := range names {
 			idx := snap.r.indexes[name]
+			if origin := snap.ent.meta(name).Origin(); origin != OriginQuery {
+				if me.Origins == nil {
+					me.Origins = map[string]string{}
+				}
+				me.Origins[name] = string(origin)
+			}
 			switch {
 			case idx.dormant:
 				me.addIndex(idx.spec, manifestIndex{Name: name, Dormant: true})

@@ -27,6 +27,7 @@ type usageClock struct {
 }
 
 func (ent *entity) touch(name string) {
+	ent.meta(name).uses.Add(1)
 	now := time.Now().Unix()
 	if v, ok := ent.usage.Load(name); ok {
 		last := v.(*usageClock)
@@ -207,6 +208,7 @@ func (e *Engine) buildPass(ent *entity) bool {
 		containers = map[string][]byte{}
 	}
 
+	irregular := map[int]int64{}
 	bitmaps := map[int]map[string][]byte{}
 	for i, j := range jobs {
 		if j.spec.Kind == IndexBitmap {
@@ -224,6 +226,16 @@ func (e *Engine) buildPass(ent *entity) bool {
 				for _, k := range uniqueKeys(extractKeys(j.spec, doc)) {
 					key := bitmapKey(k, chunk)
 					m[key] = postingAdd(m[key], off)
+				}
+				continue
+			}
+			if j.spec.Kind == IndexComposite {
+				ck, irr := compositeKeys(j.spec, doc)
+				for _, k := range ck {
+					keys[i] = append(keys[i], k+seqKey(seq))
+				}
+				if irr {
+					irregular[i]++
 				}
 				continue
 			}
@@ -280,6 +292,9 @@ func (e *Engine) buildPass(ent *entity) bool {
 		sort.Strings(keys[i])
 		trees[i] = pagetree.FromSorted(e.pages, keys[i], nil)
 		keys[i] = nil
+		if n := irregular[i]; n > 0 {
+			trees[i] = addIrregular(trees[i].WithToken(nil), n)
+		}
 	}
 
 	requeue := e.commitPass(ent, snap, pass, jobs, trees)
@@ -374,7 +389,7 @@ func (e *Engine) DropIdleIndexes(idle time.Duration) int {
 		r := ent.root.Load()
 		var nr *root
 		for name, idx := range r.indexes {
-			if !idx.ready || idx.dormant {
+			if !idx.ready || idx.dormant || ent.pinned(idx.spec) {
 				continue
 			}
 
@@ -408,51 +423,4 @@ func (e *Engine) DropIdleIndexes(idle time.Duration) int {
 	}
 
 	return dropped
-}
-
-type IndexState struct {
-	Entity   string
-	Index    string
-	State    string
-	Entries  int
-	LastUsed time.Time
-}
-
-func (e *Engine) IndexStates() []IndexState {
-	e.catalogMu.RLock()
-	ents := make([]*entity, 0, len(e.entities))
-	for _, ent := range e.entities {
-		ents = append(ents, ent)
-	}
-	e.catalogMu.RUnlock()
-
-	out := []IndexState{}
-	for _, ent := range ents {
-		for name, idx := range ent.root.Load().indexes {
-			st := IndexState{Entity: ent.name, Index: name, LastUsed: ent.lastUse(name)}
-			if idx.spec.Kind == IndexSearch {
-				st.Index = "search"
-			}
-			switch {
-			case idx.dormant:
-				st.State = "released"
-			case idx.ready:
-				st.State = "ready"
-				st.Entries = idx.tree.Len()
-			default:
-				st.State = "building"
-			}
-			out = append(out, st)
-		}
-
-	}
-
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Entity != out[j].Entity {
-			return out[i].Entity < out[j].Entity
-		}
-		return out[i].Index < out[j].Index
-	})
-
-	return out
 }

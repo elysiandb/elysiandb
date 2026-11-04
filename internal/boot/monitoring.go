@@ -119,7 +119,7 @@ func indexStates() []metrics.IndexState {
 	states := e.IndexStates()
 	out := make([]metrics.IndexState, 0, len(states))
 	for _, st := range states {
-		item := metrics.IndexState{Entity: st.Entity, Index: st.Index, State: st.State, Entries: st.Entries}
+		item := metrics.IndexState{Entity: st.Entity, Index: st.Index, State: st.State, Entries: st.Entries, Kind: st.Kind, Origin: st.Origin, Pinned: st.Pinned, Bytes: st.Bytes, Uses: st.Uses}
 		if !st.LastUsed.IsZero() {
 			used := st.LastUsed
 			item.LastUsedAt = &used

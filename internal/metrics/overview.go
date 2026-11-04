@@ -250,6 +250,11 @@ type IndexState struct {
 	State      string     `json:"state"`
 	Entries    int        `json:"entries"`
 	LastUsedAt *time.Time `json:"last_used_at"`
+	Kind       string     `json:"kind,omitempty"`
+	Origin     string     `json:"origin,omitempty"`
+	Pinned     bool       `json:"pinned,omitempty"`
+	Bytes      int64      `json:"bytes,omitempty"`
+	Uses       int64      `json:"uses,omitempty"`
 }
 
 func CurrentDetails() Details {

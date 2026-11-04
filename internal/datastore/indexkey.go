@@ -15,11 +15,12 @@ import (
 type IndexKind byte
 
 const (
-	IndexFilter IndexKind = 'f'
-	IndexSort   IndexKind = 's'
-	IndexRefs   IndexKind = 'r'
-	IndexSearch IndexKind = 'g'
-	IndexBitmap IndexKind = 'b'
+	IndexFilter    IndexKind = 'f'
+	IndexSort      IndexKind = 's'
+	IndexRefs      IndexKind = 'r'
+	IndexSearch    IndexKind = 'g'
+	IndexBitmap    IndexKind = 'b'
+	IndexComposite IndexKind = 'c'
 )
 
 type IndexSpec struct {
@@ -28,7 +29,7 @@ type IndexSpec struct {
 }
 
 func (s IndexSpec) Derived() bool {
-	return s.Kind == IndexBitmap
+	return s.Kind == IndexBitmap || s.Kind == IndexComposite
 }
 
 func (s IndexSpec) Name() string {
@@ -41,7 +42,7 @@ func ParseIndexName(name string) (IndexSpec, bool) {
 	}
 
 	switch IndexKind(name[0]) {
-	case IndexFilter, IndexSort, IndexRefs, IndexSearch, IndexBitmap:
+	case IndexFilter, IndexSort, IndexRefs, IndexSearch, IndexBitmap, IndexComposite:
 		return IndexSpec{Kind: IndexKind(name[0]), Field: name[2:]}, true
 	}
 

@@ -74,20 +74,21 @@ type Engine struct {
 	checkpointBytes atomic.Int64
 	segmentLive     atomic.Pointer[map[uint32]int64]
 
-	dirty        atomic.Int64
-	flushNow     chan struct{}
-	flushed      chan struct{}
-	flushedMu    sync.Mutex
-	builds       chan *entity
-	buildOrder   atomic.Uint64
-	upgradeFrom  int
-	pageRemoval  []uint32
-	lastPageWalk time.Time
-	stop         chan struct{}
-	wg           sync.WaitGroup
-	closed       atomic.Bool
-	writers      sync.WaitGroup
-	migrated     *MigrationReport
+	dirty          atomic.Int64
+	flushNow       chan struct{}
+	flushed        chan struct{}
+	flushedMu      sync.Mutex
+	builds         chan *entity
+	buildOrder     atomic.Uint64
+	upgradeFrom    int
+	pageRemoval    []uint32
+	lastPageWalk   time.Time
+	pressureSweeps int
+	stop           chan struct{}
+	wg             sync.WaitGroup
+	closed         atomic.Bool
+	writers        sync.WaitGroup
+	migrated       *MigrationReport
 
 	stats engineStats
 }
@@ -589,8 +590,12 @@ func (s *Snapshot) RankOfSeq(seq uint32) int {
 }
 
 type IndexView struct {
-	s   *Snapshot
-	idx *index
+	s      *Snapshot
+	idx    *index
+	prefix string
+	base   int
+	end    int
+	sub    bool
 }
 
 func (s *Snapshot) Index(spec IndexSpec) (*IndexView, bool) {
@@ -618,6 +623,10 @@ func (s *Snapshot) IndexDormant(spec IndexSpec) bool {
 }
 
 func (v *IndexView) Len() int {
+	if v.sub {
+		return v.subLen()
+	}
+
 	if v.bitmap() {
 		return v.bitmapLen()
 	}
@@ -626,6 +635,10 @@ func (v *IndexView) Len() int {
 }
 
 func (v *IndexView) Rank(prefix []byte) int {
+	if v.sub {
+		return v.subRank(prefix)
+	}
+
 	if v.bitmap() {
 		return v.bitmapRank(prefix)
 	}
@@ -678,12 +691,21 @@ func prefixEnd(prefix []byte) []byte {
 }
 
 func (v *IndexView) AscendAt(i int, fn func(key string, seq uint32) bool) {
+	if v.sub {
+		v.subAscendAt(i, fn)
+		return
+	}
+
 	v.idx.tree.AscendAt(i, func(k string, _ []byte) bool {
 		return fn(k, keySeq(k))
 	})
 }
 
 func (v *IndexView) At(i int) (string, uint32, bool) {
+	if v.sub {
+		return v.subAt(i)
+	}
+
 	k, _, ok := v.idx.tree.At(i)
 	if !ok {
 		return "", 0, false
