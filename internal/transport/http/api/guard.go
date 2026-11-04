@@ -12,7 +12,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-const guardKey = "elysian.guard"
+const guardKey = observe.GuardKey
 
 const statusClientClosedRequest = 499
 

@@ -135,6 +135,8 @@ func Kind(method, route string) string {
 	return ""
 }
 
+const GuardKey = "elysian.guard"
+
 func Middleware(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
 		start := time.Now()
@@ -142,6 +144,10 @@ func Middleware(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 		ctx.SetUserValue(requestIDKey, requestID)
 
 		next(ctx)
+
+		if g, ok := ctx.UserValue(GuardKey).(interface{ ReleaseMemory() }); ok {
+			g.ReleaseMemory()
+		}
 
 		ctx.Response.Header.Set(RequestIDHeader, requestID)
 		finish(ctx, start, requestID)

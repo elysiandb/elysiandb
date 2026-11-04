@@ -259,6 +259,12 @@ func buildResult(targetEntity string, filters map[string]map[string]string, owne
 		}
 
 		res.rows = append(res.rows, b.build(doc, seq, lsn, len(raw)))
+		if len(res.rows)%1024 == 0 {
+			if err := guard.Charge(b.bytes - res.bytes); err != nil {
+				return nil, err
+			}
+			res.bytes = b.bytes
+		}
 	}
 
 	res.bytes = b.bytes + int64(cap(res.rows))*48

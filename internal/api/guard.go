@@ -4,6 +4,8 @@ import (
 	"errors"
 	"sync/atomic"
 	"time"
+
+	"github.com/taymour/elysiandb/internal/memory"
 )
 
 var (
@@ -19,6 +21,78 @@ type Guard struct {
 	Laned     bool
 	parent    *Guard
 	err       atomic.Pointer[error]
+	reserved  atomic.Int64
+	charged   atomic.Int64
+}
+
+const memoryChunk = 1 << 20
+
+func (g *Guard) root() *Guard {
+	for g != nil && g.parent != nil {
+		g = g.parent
+	}
+
+	return g
+}
+
+func (g *Guard) Charge(n int64) error {
+	r := g.root()
+	if r == nil || n <= 0 || memory.Requests.Limit() <= 0 {
+		return nil
+	}
+
+	used := r.charged.Add(n)
+	for {
+		reserved := r.reserved.Load()
+		if used <= reserved {
+			return nil
+		}
+
+		chunk := max(int64(memoryChunk), used-reserved)
+		if err := memory.Requests.Acquire(chunk, heavyQueueTimeout(), r.Check); err != nil {
+			if errors.Is(err, memory.ErrBusy) {
+				return r.fail(ErrBusy)
+			}
+			return err
+		}
+
+		r.reserved.Add(chunk)
+	}
+}
+
+func (g *Guard) Reserve(n int64) error {
+	r := g.root()
+	if r == nil || memory.Requests.Limit() <= 0 {
+		return nil
+	}
+
+	for {
+		reserved := r.reserved.Load()
+		if reserved >= n {
+			return nil
+		}
+
+		if err := memory.Requests.Acquire(n-reserved, heavyQueueTimeout(), r.Check); err != nil {
+			if errors.Is(err, memory.ErrBusy) {
+				return r.fail(ErrBusy)
+			}
+			return err
+		}
+
+		r.reserved.Add(n - reserved)
+	}
+}
+
+func (g *Guard) ReleaseMemory() {
+	r := g.root()
+	if r == nil {
+		return
+	}
+
+	r.charged.Store(0)
+	if n := r.reserved.Swap(0); n > 0 {
+		memory.Requests.Release(n)
+	}
 }
 
 func (g *Guard) Check() error {

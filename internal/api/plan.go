@@ -37,6 +37,7 @@ type ListQuery struct {
 
 type ListResult struct {
 	snap  *datastore.Snapshot
+	guard *Guard
 	Docs  []datastore.Doc
 	Total int
 	Err   error
@@ -55,11 +56,26 @@ func (r *ListResult) IDs() []string {
 	return ids
 }
 
+const decodedOverhead = 4
+
 func (r *ListResult) Decode() []map[string]any {
 	out := make([]map[string]any, 0, len(r.Docs))
-	for _, d := range r.Docs {
-		doc, err := d.Decode()
-		if err == nil {
+	for i, d := range r.Docs {
+		raw, err := d.Bytes()
+		if err != nil {
+			continue
+		}
+
+		if err := r.guard.Charge(int64(len(raw)) * decodedOverhead); err != nil {
+			return out[:0]
+		}
+
+		if i%guardInterval == guardInterval-1 && r.guard.Check() != nil {
+			return out[:0]
+		}
+
+		doc, err := datastore.DecodeMap(raw)
+		if err == nil && doc != nil {
 			out = append(out, doc)
 		}
 	}
@@ -635,7 +651,7 @@ func Plan(q ListQuery) *ListResult {
 		}
 	}
 
-	res := &ListResult{snap: snap}
+	res := &ListResult{snap: snap, guard: q.Guard}
 	reader := includeReader()
 
 	heavy := needsMatch && heavyPlan(snap, cand, evalIncludes)
@@ -737,6 +753,7 @@ const (
 	defaultQueueTimeout   = 5 * time.Second
 	heavyLanePollInterval = 20 * time.Millisecond
 	heavyLaneAfter        = 5 * time.Millisecond
+	heavyEnvelope         = 8 << 20
 )
 
 var (
@@ -826,6 +843,10 @@ func acquireHeavyLane(guard *Guard) (func(), error) {
 
 	slots := heavyLane()
 	release := func() { <-slots }
+
+	if err := guard.Reserve(heavyEnvelope); err != nil {
+		return nil, err
+	}
 
 	select {
 	case slots <- struct{}{}:

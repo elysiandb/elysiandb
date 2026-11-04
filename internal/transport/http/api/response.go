@@ -85,6 +85,11 @@ func writeDocuments(ctx *fasthttp.RequestCtx, docs []datastore.Doc, cacheEntity 
 		return err
 	}
 
+	if err := requestGuard(ctx).Charge(int64(size)); err != nil {
+		sendGuardError(ctx, err)
+		return nil
+	}
+
 	ctx.Response.Header.Set("Content-Type", "application/json")
 	if cacheHeader {
 		ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
