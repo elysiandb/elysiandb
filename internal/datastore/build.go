@@ -81,10 +81,6 @@ func (e *Engine) writeRecord(ent *entity, rec *entityRecord, ranges [][2][]byte)
 	a.finish()
 	ent.rec.Store(rec)
 
-	for _, r := range ranges {
-		e.scheduleCompaction(r)
-	}
-
 	return nil
 }
 
@@ -236,13 +232,24 @@ func (e *Engine) claim(ent *entity) (*buildJob, *pin, *entityRecord, []*indexMet
 		pending = pending[:maxJobIndexes]
 	}
 
+	next := rec.clone()
+	ranges := make([][2][]byte, 0, len(pending))
 	job := &buildJob{names: map[string]bool{}, gen: rec.gen, builtUpTo: -1, dirty: NewBitset(rec.nextSeq)}
-	for _, m := range pending {
+	for i, m := range pending {
 		job.names[m.name] = true
+		lo, hi := indexRange(next.id, m.no)
+		ranges = append(ranges, [2][]byte{lo, hi})
+		pending[i] = next.index(m.name)
+		pending[i].clear()
+	}
+
+	if err := e.writeRecord(ent, next, ranges); err != nil {
+		engineLog.Error("cannot start an index build", "entity", ent.name, "err", err)
+		return nil, nil, nil, nil
 	}
 	ent.job = job
 
-	return job, e.acquirePin(), rec, pending
+	return job, e.acquirePin(), next, pending
 }
 
 type builtDoc struct {
