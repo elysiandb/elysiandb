@@ -47,13 +47,16 @@ type Options struct {
 	OnWriteError    func(err error)
 }
 
+var engineInstances atomic.Uint64
+
 type Engine struct {
-	opts   Options
-	dir    string
-	lock   *os.File
-	j      *journal.Journal
-	inline bool
-	cache  *valueCache
+	instance uint64
+	opts     Options
+	dir      string
+	lock     *os.File
+	j        *journal.Journal
+	inline   bool
+	cache    *valueCache
 
 	catalogMu sync.RWMutex
 	entities  map[string]*entity
@@ -107,6 +110,7 @@ func Open(opts Options) (*Engine, error) {
 	}
 
 	e := &Engine{
+		instance: engineInstances.Add(1),
 		opts:     opts,
 		dir:      opts.Folder,
 		lock:     lock,
@@ -160,6 +164,10 @@ func (e *Engine) unlock() {
 		_ = e.lock.Close()
 		e.lock = nil
 	}
+}
+
+func (e *Engine) Instance() uint64 {
+	return e.instance
 }
 
 func (e *Engine) Folder() string {
