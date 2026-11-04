@@ -56,11 +56,11 @@ func holdHeavyLane(t *testing.T) *laneHolder {
 	h := &laneHolder{inside: make(chan struct{}), release: make(chan struct{}), done: make(chan *api_storage.ListResult, 1)}
 	var calls atomic.Int64
 	guard := &api_storage.Guard{Abandoned: func() bool {
-		if calls.Add(1) < 15 {
-			time.Sleep(time.Millisecond)
+		if calls.Add(1) < 3 {
+			time.Sleep(3 * time.Millisecond)
 			return false
 		}
-		if calls.Load() == 15 {
+		if calls.Load() == 3 {
 			close(h.inside)
 			<-h.release
 		}

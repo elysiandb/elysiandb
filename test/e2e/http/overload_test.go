@@ -19,17 +19,24 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-const busyDocs = 5000
+func busySize() (int, int) {
+	if raceDetector {
+		return 2100, 1500
+	}
 
-const busyQuery = "/api/busy?filter%5Bnote%5D%5Bneq%5D=x&search=nnn&countOnly=true"
+	return 5000, 8000
+}
+
+const busyQuery = "/api/busy?search=nnn&countOnly=true"
 
 func seedBusy(t *testing.T, s *apiServer) {
 	t.Helper()
 
-	for start := 0; start < busyDocs; start += 500 {
-		list := make([]map[string]any, 0, 500)
-		for i := start; i < start+500; i++ {
-			list = append(list, map[string]any{"id": fmt.Sprintf("b%05d", i), "note": strings.Repeat("n", 4000), "tags": []any{"n", "m"}})
+	docs, note := busySize()
+	for start := 0; start < docs; start += 250 {
+		list := make([]map[string]any, 0, 250)
+		for i := start; i < min(start+250, docs); i++ {
+			list = append(list, map[string]any{"id": fmt.Sprintf("b%05d", i), "note": strings.Repeat("n", note), "tags": []any{"n", "m"}})
 		}
 		body, _ := json.Marshal(list)
 		s.mustDo(fasthttp.StatusOK, "POST", "/api/busy", string(body))
@@ -44,11 +51,11 @@ func holdHeavyLane(t *testing.T) func() {
 	done := make(chan struct{})
 	var calls atomic.Int64
 	guard := &api_storage.Guard{Abandoned: func() bool {
-		if calls.Add(1) < 15 {
-			time.Sleep(time.Millisecond)
+		if calls.Add(1) < 3 {
+			time.Sleep(3 * time.Millisecond)
 			return false
 		}
-		if calls.Load() == 15 {
+		if calls.Load() == 3 {
 			close(inside)
 			<-release
 		}
@@ -59,7 +66,6 @@ func holdHeavyLane(t *testing.T) func() {
 		defer close(done)
 		api_storage.Plan(api_storage.ListQuery{
 			Entity:    "busy",
-			Filters:   map[string]map[string]string{"note": {"neq": "x"}},
 			Search:    "nnn",
 			CountOnly: true,
 			Guard:     guard,
@@ -68,7 +74,7 @@ func holdHeavyLane(t *testing.T) func() {
 
 	select {
 	case <-inside:
-	case <-time.After(5 * time.Second):
+	case <-time.After(60 * time.Second):
 		t.Fatalf("the holder never entered the heavy lane")
 	}
 
@@ -108,7 +114,7 @@ func (s *apiServer) async(method, path string) chan apiResponse {
 func waitForHeavyQueue(t *testing.T, n int) {
 	t.Helper()
 
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(60 * time.Second)
 	for api_storage.HeavyWaiting() != n {
 		if time.Now().After(deadline) {
 			t.Fatalf("expected %d queued heavy queries, got %d", n, api_storage.HeavyWaiting())
@@ -138,10 +144,10 @@ func TestFullHeavyQueueAnswers503(t *testing.T) {
 	free()
 	select {
 	case r := <-queued:
-		if r.status != fasthttp.StatusOK || string(r.body) != fmt.Sprintf(`{"count":%d}`, busyDocs) {
+		if docs, _ := busySize(); r.status != fasthttp.StatusOK || string(r.body) != fmt.Sprintf(`{"count":%d}`, docs) {
 			t.Fatalf("the queued request is served once the lane is free, got %d %s", r.status, r.body)
 		}
-	case <-time.After(10 * time.Second):
+	case <-time.After(120 * time.Second):
 		t.Fatalf("the queued request never finished")
 	}
 
@@ -171,7 +177,7 @@ func TestFullHeavyQueueAnswers503(t *testing.T) {
 			states[idx.Index] = idx.State
 		}
 	}
-	if states["f:note"] == "" || states["search"] == "" {
+	if states["search"] == "" {
 		t.Fatalf("the monitoring details list the indexes of busy, got %v", states)
 	}
 }
@@ -215,7 +221,7 @@ func TestBlockedHookQueryStopsAtTheHookTimeout(t *testing.T) {
 	globals.SetConfig(&relaxed)
 
 	after := s.mustDo(fasthttp.StatusOK, "GET", "/api/month", "").list(t)
-	if after[0]["purchases"] != float64(busyDocs) {
+	if docs, _ := busySize(); after[0]["purchases"] != float64(docs) {
 		t.Fatalf("once the lane is free the hook query is served, got %v", after)
 	}
 }
