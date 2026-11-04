@@ -56,9 +56,7 @@ func (e *Engine) maintenanceLoop() {
 
 func (e *Engine) LogSinceCheckpoint() int64 {
 	pos := e.j.Position()
-	e.ckptMu.Lock()
-	ck := e.checkpointPos
-	e.ckptMu.Unlock()
+	ck := e.lastCheckpoint().pos
 
 	if ck.Segment == 0 {
 		ck = journal.Position{Segment: 1, Offset: 16}
@@ -77,9 +75,7 @@ func (e *Engine) LogSinceCheckpoint() int64 {
 }
 
 func (e *Engine) checkpointSpaced() bool {
-	e.ckptMu.Lock()
-	at := e.checkpointAt
-	e.ckptMu.Unlock()
+	at := e.lastCheckpoint().at
 
 	if at.IsZero() {
 		return true
@@ -100,9 +96,7 @@ func (e *Engine) checkpointDue() bool {
 		return true
 	}
 
-	e.ckptMu.Lock()
-	at := e.checkpointAt
-	e.ckptMu.Unlock()
+	at := e.lastCheckpoint().at
 
 	return e.opts.CheckpointEvery > 0 && time.Since(at) >= e.opts.CheckpointEvery
 }
@@ -119,9 +113,7 @@ func (e *Engine) Compact(maxSegments int) (int, error) {
 		return 0, err
 	}
 
-	e.ckptMu.Lock()
-	ckpt := e.checkpointPos
-	e.ckptMu.Unlock()
+	ckpt := e.lastCheckpoint().pos
 
 	done := 0
 	for _, seg := range segments {

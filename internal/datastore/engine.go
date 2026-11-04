@@ -65,9 +65,7 @@ type Engine struct {
 	kv *kvStore
 
 	ckptMu          sync.Mutex
-	checkpointPos   journal.Position
-	checkpointLSN   uint64
-	checkpointAt    time.Time
+	ckState         atomic.Pointer[checkpointState]
 	checkpointBytes atomic.Int64
 	segmentLive     atomic.Pointer[map[uint32]int64]
 
@@ -217,8 +215,7 @@ func (e *Engine) load() error {
 		}
 
 		from = ck.pos
-		e.checkpointPos = ck.pos
-		e.checkpointLSN = ck.lastLSN
+		e.ckState.Store(&checkpointState{pos: ck.pos, lsn: ck.lastLSN})
 		e.j.SetNextLSN(ck.lastLSN + 1)
 	}
 

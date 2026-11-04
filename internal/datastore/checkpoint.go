@@ -473,6 +473,20 @@ func (e *Engine) restore(ck *checkpointData) error {
 	return nil
 }
 
+type checkpointState struct {
+	pos journal.Position
+	lsn uint64
+	at  time.Time
+}
+
+func (e *Engine) lastCheckpoint() checkpointState {
+	if st := e.ckState.Load(); st != nil {
+		return *st
+	}
+
+	return checkpointState{}
+}
+
 type entitySnapshot struct {
 	name   string
 	r      *root
@@ -490,7 +504,7 @@ func (e *Engine) checkpoint(force bool) error {
 	start := time.Now()
 	pos := e.j.Position()
 	lsn := e.j.NextLSN() - 1
-	if !force && pos == e.checkpointPos && !e.checkpointAt.IsZero() {
+	if last := e.lastCheckpoint(); !force && pos == last.pos && !last.at.IsZero() {
 		return nil
 	}
 
@@ -616,9 +630,7 @@ func (e *Engine) checkpoint(force bool) error {
 	}
 
 	e.removeOldCheckpoints(name)
-	e.checkpointPos = pos
-	e.checkpointLSN = lsn
-	e.checkpointAt = time.Now()
+	e.ckState.Store(&checkpointState{pos: pos, lsn: lsn, at: time.Now()})
 	e.segmentLive.Store(&live)
 	e.stats.checkpoints.Add(1)
 	e.stats.checkpointNanos.Store(int64(time.Since(start)))
