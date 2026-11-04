@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	autoMemoryShare  = 0.75
-	unlimitedCgroups = 1 << 60
+	autoMemoryShare   = 0.75
+	heapShareOfBudget = 0.90
+	unlimitedCgroups  = 1 << 60
 )
 
 var cgroupLimitFiles = []string{"/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"}
@@ -64,7 +65,11 @@ func ApplyMemoryLimit() {
 	}
 
 	if os.Getenv("GOMEMLIMIT") == "" {
-		debug.SetMemoryLimit(budget)
+		limit := budget
+		if explicit {
+			limit = int64(float64(budget) * heapShareOfBudget)
+		}
+		debug.SetMemoryLimit(limit)
 	}
 
 	if explicit {

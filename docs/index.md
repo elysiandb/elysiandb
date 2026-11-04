@@ -105,7 +105,7 @@ Every key added after 0.2.4 is optional. Their defaults keep the 0.2.4 answers, 
 | **store.crashRecovery.enabled**      | Writes each change to the log before answering, so that it survives a `kill -9` |
 | **store.crashRecovery.maxLogMB**     | Log written since the last checkpoint that triggers a new checkpoint                  |
 | **store.durability**                 | `default`, or `fsync` to sync the log once per group of writes, so that acknowledged writes survive a power cut |
-| **store.memory.limitMB**             | Memory budget. `0` (default) uses 75 % of the container memory limit when there is one, and no limit otherwise. It sets `GOMEMLIMIT`; when set explicitly, the whole process is kept within it whatever the volume (see Memory budget below) |
+| **store.memory.limitMB**             | Memory budget. `0` (default) uses 75 % of the container memory limit when there is one, and no limit otherwise. It sets `GOMEMLIMIT` (to 90 % of it when set explicitly, the rest being for goroutine stacks and the runtime); when set explicitly, the whole process is kept within it whatever the volume (see Memory budget below) |
 | **server.http**                      | Enables and configures the HTTP REST/KV interface                                     |
 | **server.http.cors.allowedOrigins**  | Origins allowed to call the HTTP API from a browser (see CORS below). Empty by default |
 | **server.http.trustedProxies**       | Addresses or CIDR ranges of the reverse proxies in front of ElysianDB (see Reverse proxy below). Empty by default |
