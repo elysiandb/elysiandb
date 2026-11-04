@@ -225,11 +225,7 @@ func (e *Engine) KVPut(key string, value []byte, expiresAt int64) error {
 	e.kv.setLocked(sh, key, &kvEntry{value: append([]byte(nil), value...), expiresAt: expiresAt, lsn: recs[0].LSN, loc: recs[0].Loc})
 	sh.mu.Unlock()
 
-	if err := ticket.Wait(); err != nil {
-		engineLog.Error("log write failed, the change stays in memory and will be retried", "err", err)
-	}
-
-	return nil
+	return e.waitDurable(ticket)
 }
 
 func (e *Engine) KVDelete(key string) bool {
@@ -259,9 +255,7 @@ func (e *Engine) kvDelete(key string, kind journal.Kind, onlyIfExpiresAt int64) 
 	sh.mu.Unlock()
 
 	if kind == journal.KindKVDelete {
-		if err := ticket.Wait(); err != nil {
-			engineLog.Error("log write failed, the change stays in memory and will be retried", "err", err)
-		}
+		_ = e.waitDurable(ticket)
 	}
 
 	return true
@@ -282,7 +276,7 @@ func (e *Engine) KVReset() error {
 	e.kv.clearLocked(0)
 	e.kv.unlockAll()
 
-	return ticket.Wait()
+	return e.waitDurable(ticket)
 }
 
 func (e *Engine) KVCount() (int64, int64) {

@@ -3,6 +3,7 @@ package datastore
 import (
 	"encoding/json"
 	"errors"
+	"github.com/taymour/elysiandb/internal/log"
 	"sort"
 	"time"
 
@@ -73,13 +74,41 @@ func (e *Engine) Update(fn func(tx *Tx) error) error {
 			return err
 		}
 
-		if err := ticket.Wait(); err != nil {
-			engineLog.Error("log write failed, the change stays in memory and will be retried", "err", err)
-		}
-
-		return nil
+		return e.waitDurable(ticket)
 	}
 }
+
+const (
+	retryFirst = 20 * time.Millisecond
+	retryMax   = time.Second
+)
+
+func (e *Engine) waitDurable(ticket journal.Ticket) error {
+	err := ticket.Wait()
+	if err == nil {
+		return nil
+	}
+
+	if suppressed, ok := writeFailures.Allow("log"); ok {
+		engineLog.Error("log write failed, the writer waits until the disk accepts it", log.WithSuppressed([]any{"err", err}, suppressed)...)
+	}
+
+	delay := retryFirst
+	for !e.closed.Load() {
+		time.Sleep(delay)
+		delay = min(2*delay, retryMax)
+
+		if err = e.j.Flush(); err == nil {
+			if err = ticket.Wait(); err == nil {
+				return nil
+			}
+		}
+	}
+
+	return ErrClosed
+}
+
+var writeFailures = log.NewThrottle(time.Minute)
 
 func (tx *Tx) lookup(entity, id string) (*txOp, bool) {
 	if i, ok := tx.overlay[docKey(entity, id)]; ok {
