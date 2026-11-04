@@ -35,6 +35,8 @@ func CreateHook(hook *Hook) error {
 		return fmt.Errorf("an error occurred while creating the hook: %v", err)
 	}
 
+	PrepareIndexes()
+
 	return nil
 }
 
@@ -50,6 +52,8 @@ func UpdateHook(hook *Hook) error {
 	if engine.UpdateEntityById(HookEntity, hook.ID, hook.ToDataMap()) == nil {
 		return fmt.Errorf("the hook '%s' does not exist", hook.Name)
 	}
+
+	PrepareIndexes()
 
 	return nil
 }
@@ -71,6 +75,7 @@ func DeleteHook(hookId string) error {
 	}
 
 	engine.DeleteEntityById(HookEntity, hookId)
+	PrepareIndexes()
 
 	return nil
 }

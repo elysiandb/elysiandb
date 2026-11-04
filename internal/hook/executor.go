@@ -163,6 +163,8 @@ func queryVersion(targetEntity string, bypassAcl bool) string {
 }
 
 func (r *Request) query(h Hook, targetEntity string, filters map[string]map[string]string, bypassAcl bool, guard *api_storage.Guard) (*result, string, error) {
+	prepared.observe(h.Script, targetEntity, filters)
+
 	key := targetEntity + "\x00" + r.owner(bypassAcl) + "\x00" + filtersKey(filters)
 
 	r.mu.Lock()

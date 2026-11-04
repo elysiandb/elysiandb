@@ -88,6 +88,12 @@ func (r *registry) load(e *datastore.Engine, snap *datastore.Snapshot) {
 	r.hooks = list
 	r.byEntity = map[string][]Hook{}
 	r.loaded = true
+
+	prepared.sync(e, list)
+}
+
+func PrepareIndexes() {
+	hooks.forEntity(HookEntity)
 }
 
 func hooksForEntity(entity string) []Hook {

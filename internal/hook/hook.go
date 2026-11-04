@@ -187,6 +187,7 @@ func InitHooks() {
 	}
 
 	if engine.EntityTypeExists(HookEntity) {
+		PrepareIndexes()
 		return
 	}
 
