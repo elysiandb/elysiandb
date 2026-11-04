@@ -2,8 +2,11 @@ package hook
 
 import (
 	"container/list"
+	"errors"
+	"github.com/taymour/elysiandb/internal/log"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -57,6 +60,7 @@ type resultCache struct {
 	items   map[string]*cacheItem
 	lru     *list.List
 	flights map[string]*flight
+	refused map[string]time.Time
 	hits    atomic.Int64
 	misses  atomic.Int64
 }
@@ -64,7 +68,7 @@ type resultCache struct {
 var results = newResultCache()
 
 func newResultCache() *resultCache {
-	return &resultCache{items: map[string]*cacheItem{}, lru: list.New(), flights: map[string]*flight{}}
+	return &resultCache{items: map[string]*cacheItem{}, lru: list.New(), flights: map[string]*flight{}, refused: map[string]time.Time{}}
 }
 
 func (c *resultCache) lookup(key, version string) (*result, *result) {
@@ -84,10 +88,11 @@ func (c *resultCache) lookup(key, version string) (*result, *result) {
 	return nil, it.res
 }
 
-func (c *resultCache) store(key string, res *result) {
+func (c *resultCache) store(key string, res *result) bool {
 	limit := memory.HookResults.Effective()
 	if limit > 0 && res.bytes > limit {
-		return
+		memory.HookResults.Refuse()
+		return false
 	}
 
 	c.mu.Lock()
@@ -105,6 +110,8 @@ func (c *resultCache) store(key string, res *result) {
 	memory.HookResults.Add(res.bytes)
 
 	c.evictLocked(memory.HookResults.Effective())
+
+	return true
 }
 
 func (c *resultCache) evictLocked(limit int64) {
@@ -158,6 +165,14 @@ func (c *resultCache) get(key, version string, guard *api_storage.Guard, build f
 		}
 
 		c.mu.Lock()
+		if until, ok := c.refused[key]; ok {
+			if time.Now().Before(until) {
+				c.mu.Unlock()
+				return nil, false, guard.Reject()
+			}
+			delete(c.refused, key)
+		}
+
 		f, busy := c.flights[key]
 		if !busy {
 			f = &flight{done: make(chan struct{})}
@@ -193,19 +208,34 @@ func (c *resultCache) fill(key, version string, f *flight, build func(prev *resu
 	f.res, f.err = build(prev)
 	if f.err == nil {
 		f.res.version = version
-		c.store(key, f.res)
+		if !c.store(key, f.res) {
+			f.res, f.err = nil, api_storage.ErrBusy
+		}
 	}
 
 	c.mu.Lock()
 	delete(c.flights, key)
+	if errors.Is(f.err, api_storage.ErrBusy) {
+		c.refused[key] = time.Now().Add(refusedFor)
+		entity, _, _ := strings.Cut(key, "\x00")
+		if suppressed, ok := oversized.Allow(entity); ok {
+			hookLog.Warn("hook query result larger than its share of the memory budget, refused", log.WithSuppressed([]any{"entity", entity, "share_mb", memory.HookResults.Effective() >> 20}, suppressed)...)
+		}
+	}
 	c.mu.Unlock()
 	close(f.done)
 }
+
+const refusedFor = 30 * time.Second
+
+var oversized = log.NewThrottle(time.Minute)
 
 func waitFlight(f *flight, guard *api_storage.Guard) (*result, bool, error) {
 	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
 
+	timeout := api_storage.QueueTimeout()
+	start := time.Now()
 	for {
 		select {
 		case <-f.done:
@@ -213,6 +243,9 @@ func waitFlight(f *flight, guard *api_storage.Guard) (*result, bool, error) {
 		case <-ticker.C:
 			if err := guard.Check(); err != nil {
 				return nil, false, err
+			}
+			if timeout >= 0 && time.Since(start) >= timeout {
+				return nil, false, guard.Reject()
 			}
 		}
 	}
@@ -419,7 +452,7 @@ func buildRows(docs []datastore.Doc, prev *result, keep func(map[string]any) boo
 				}
 
 				if (i-lo)%buildCheckEvery == buildCheckEvery-1 {
-					grown := total.Add(b.bytes - sizes[w])
+					grown := total.Add(b.bytes-sizes[w]) + int64(len(docs))*rowSliceBytes
 					sizes[w] = b.bytes
 					if limit := memory.HookResults.Effective(); limit > 0 && grown > limit {
 						refused.Store(true)

@@ -2,13 +2,16 @@ package hook_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"strings"
 	"testing"
+	"time"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/hook"
+	"github.com/taymour/elysiandb/internal/memory"
 )
 
 func seedOrders(t *testing.T, n int) {
@@ -300,6 +303,42 @@ func TestQueryResultsStayExactAcrossManyWrites(t *testing.T) {
 		out := runPostRead(t, script, map[string]any{"id": fmt.Sprintf("x%d", step)})
 		if out["ids"] != strings.Join(want, ",") {
 			t.Fatalf("step %d: the hook saw a different result than the query", step)
+		}
+	}
+}
+
+func TestOversizedQueryResultsAreRefusedQuickly(t *testing.T) {
+	setup(t, true)
+	hook.InitHooks()
+	if err := api_storage.CreateEntityType("big"); err != nil {
+		t.Fatal(err)
+	}
+
+	docs := make([]map[string]any, 0, 3000)
+	for i := 0; i < 3000; i++ {
+		docs = append(docs, map[string]any{"id": fmt.Sprintf("b%05d", i), "status": "ok", "body": strings.Repeat("x", 200)})
+	}
+	api_storage.WriteListOfEntities("big", docs)
+
+	h := &hook.Hook{Name: "big", Entity: "holder", Event: hook.HookEventPostRead, Language: "javascript", Enabled: true, ByPassACL: true,
+		Script: `function postRead(ctx) { ctx.entity.n = ctx.query("big", { status: { eq: "ok" } }).length }`}
+	if err := hook.CreateHook(h); err != nil {
+		t.Fatal(err)
+	}
+
+	memory.Configure(4 << 20)
+	t.Cleanup(func() { memory.Configure(0) })
+	hook.ResetQueryCache()
+
+	for i := 0; i < 2; i++ {
+		guard := &api_storage.Guard{}
+		start := time.Now()
+		out := hook.NewRequest("").WithGuard(guard).PostRead("holder", map[string]any{"id": fmt.Sprintf("x%d", i)})
+		if !errors.Is(guard.Err(), api_storage.ErrBusy) || out["n"] != nil {
+			t.Fatalf("run %d: a result larger than its share must be refused as busy, got %v and %v", i, guard.Err(), out)
+		}
+		if i == 1 && time.Since(start) > 200*time.Millisecond {
+			t.Fatalf("a refused result must be refused at once the second time, took %s", time.Since(start))
 		}
 	}
 }

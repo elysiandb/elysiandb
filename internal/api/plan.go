@@ -890,6 +890,10 @@ func heavyQueueTimeout() time.Duration {
 	return defaultQueueTimeout
 }
 
+func QueueTimeout() time.Duration {
+	return heavyQueueTimeout()
+}
+
 func HeavyWaiting() int {
 	return int(queries.waiting.Load() + hooks.waiting.Load())
 }
