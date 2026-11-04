@@ -30,15 +30,18 @@ func (l Level) String() string {
 var ErrBusy = errors.New("memory budget exhausted")
 
 const (
-	valuesShare   = 0.15
+	valuesShare   = 0.10
 	pagesShare    = 0.15
 	dirtyShare    = 0.04
-	hooksShare    = 0.08
+	hooksShare    = 0.12
 	buildsShare   = 0.06
 	requestsShare = 0.12
 
-	highShare     = 0.65
-	criticalShare = 0.80
+	highShare          = 0.65
+	criticalShare      = 0.80
+	totalHighShare     = 0.95
+	totalCriticalShare = 1.05
+	requestShareCap    = 0.5
 
 	defaultHookResults = 256 << 20
 	minBuildBytes      = 64 << 20
@@ -79,6 +82,10 @@ func (p *Pool) Peak() int64 {
 
 func (p *Pool) Refused() int64 {
 	return p.refused.Load()
+}
+
+func (p *Pool) Refuse() {
+	p.refused.Add(1)
 }
 
 func (p *Pool) setLimit(n int64) {
@@ -288,7 +295,7 @@ func Sample() {
 	live.Store(l)
 	total.Store(t)
 
-	next := levelFor(budget.Load(), l)
+	next := levelFor(budget.Load(), l, t)
 	prev := Level(level.Swap(int32(next)))
 	if next == prev {
 		return
@@ -308,19 +315,27 @@ func Sample() {
 	}
 }
 
-func levelFor(b, l int64) Level {
+func levelFor(b, l, t int64) Level {
 	if b <= 0 {
 		return Normal
 	}
 
 	switch {
-	case float64(l) >= criticalShare*float64(b):
+	case float64(l) >= criticalShare*float64(b) || float64(t) >= totalCriticalShare*float64(b):
 		return Critical
-	case float64(l) >= highShare*float64(b):
+	case float64(l) >= highShare*float64(b) || float64(t) >= totalHighShare*float64(b):
 		return High
 	}
 
 	return Normal
+}
+
+func RequestCap() int64 {
+	if limit := Requests.Limit(); limit > 0 {
+		return int64(float64(limit) * requestShareCap)
+	}
+
+	return 0
 }
 
 func Start() {

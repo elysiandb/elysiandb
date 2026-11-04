@@ -42,6 +42,11 @@ func (g *Guard) Charge(n int64) error {
 	}
 
 	used := r.charged.Add(n)
+	if limit := memory.RequestCap(); limit > 0 && used > limit {
+		memory.Requests.Refuse()
+		return r.fail(ErrBusy)
+	}
+
 	for {
 		reserved := r.reserved.Load()
 		if used <= reserved {
@@ -81,6 +86,14 @@ func (g *Guard) Reserve(n int64) error {
 
 		r.reserved.Add(n - reserved)
 	}
+}
+
+func (g *Guard) Reject() error {
+	if r := g.root(); r != nil {
+		return r.fail(ErrBusy)
+	}
+
+	return ErrBusy
 }
 
 func (g *Guard) ReleaseMemory() {

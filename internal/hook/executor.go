@@ -179,6 +179,9 @@ func (r *Request) query(h Hook, targetEntity string, filters map[string]map[stri
 	res, hit, err := results.get(key, version, guard, func(prev *result) (*result, error) {
 		return buildResult(targetEntity, filters, r.username, bypassAcl, guard, prev)
 	})
+	if errors.Is(err, api_storage.ErrBusy) {
+		return nil, key, r.guard.Reject()
+	}
 	if err != nil {
 		return nil, key, err
 	}

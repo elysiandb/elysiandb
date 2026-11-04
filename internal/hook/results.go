@@ -262,10 +262,10 @@ func buildResult(targetEntity string, filters map[string]map[string]string, owne
 
 		res.rows = append(res.rows, b.build(doc, seq, lsn, len(raw)))
 		if len(res.rows)%1024 == 0 {
-			if err := guard.Charge(b.bytes - res.bytes); err != nil {
-				return nil, err
+			if limit := memory.HookResults.Effective(); limit > 0 && b.bytes > limit {
+				memory.HookResults.Refuse()
+				return nil, api_storage.ErrBusy
 			}
-			res.bytes = b.bytes
 		}
 	}
 
