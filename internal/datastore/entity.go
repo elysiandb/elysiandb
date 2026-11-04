@@ -391,6 +391,10 @@ func applyDocChange(spec IndexSpec, tree pagetree.Tree, seq uint32, oldDoc, newD
 	}
 
 	removed, added := diffSorted(oldKeys, newKeys)
+	if spec.Kind == IndexBitmap {
+		return updateBitmap(tree, seq, removed, added), true
+	}
+
 	sk := seqKey(seq)
 	for _, k := range removed {
 		tree, _ = tree.Delete(k + sk)

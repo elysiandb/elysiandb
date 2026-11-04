@@ -207,9 +207,24 @@ func (e *Engine) buildPass(ent *entity) bool {
 		containers = map[string][]byte{}
 	}
 
+	bitmaps := map[int]map[string][]byte{}
+	for i, j := range jobs {
+		if j.spec.Kind == IndexBitmap {
+			bitmaps[i] = map[string][]byte{}
+		}
+	}
+
 	each(func(seq uint32, doc map[string]any) {
 		for i, j := range jobs {
 			if i == searchJob {
+				continue
+			}
+			if m := bitmaps[i]; m != nil {
+				chunk, off := seq>>postingChunkBits, uint16(seq&(postingChunk-1))
+				for _, k := range uniqueKeys(extractKeys(j.spec, doc)) {
+					key := bitmapKey(k, chunk)
+					m[key] = postingAdd(m[key], off)
+				}
 				continue
 			}
 			for _, k := range uniqueKeys(extractKeys(j.spec, doc)) {
@@ -246,6 +261,20 @@ func (e *Engine) buildPass(ent *entity) bool {
 	for i := range jobs {
 		if i == searchJob {
 			trees[i] = pagetree.FromSorted(e.pages, searchKeys, searchVals)
+			continue
+		}
+		if m := bitmaps[i]; m != nil {
+			bk := make([]string, 0, len(m))
+			for k := range m {
+				bk = append(bk, k)
+			}
+			sort.Strings(bk)
+			bv := make([][]byte, len(bk))
+			for n, k := range bk {
+				bv[n] = m[k]
+			}
+			trees[i] = pagetree.FromSorted(e.pages, bk, bv)
+			bitmaps[i] = nil
 			continue
 		}
 		sort.Strings(keys[i])

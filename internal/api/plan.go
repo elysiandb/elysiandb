@@ -250,6 +250,14 @@ func (p *planner) index(spec datastore.IndexSpec) (*datastore.IndexView, bool) {
 	return nil, false
 }
 
+func (p *planner) filterIndex(field string) (*datastore.IndexView, bool) {
+	if view, ok := p.snap.Index(datastore.IndexSpec{Kind: datastore.IndexBitmap, Field: field}); ok {
+		return view, true
+	}
+
+	return p.index(datastore.IndexSpec{Kind: datastore.IndexFilter, Field: field})
+}
+
 func (p *planner) leaf(field string, ops map[string]string) candidates {
 	if len(ops) == 0 {
 		return universe()
@@ -259,7 +267,7 @@ func (p *planner) leaf(field string, ops map[string]string) candidates {
 		return p.throughReferences(field, ops)
 	}
 
-	view, ok := p.index(datastore.IndexSpec{Kind: datastore.IndexFilter, Field: field})
+	view, ok := p.filterIndex(field)
 	if !ok {
 		return universe()
 	}
@@ -312,7 +320,7 @@ func (p *planner) throughReferences(field string, ops map[string]string) candida
 	}
 
 	result := &datastore.Bitset{}
-	if direct, ok := p.index(datastore.IndexSpec{Kind: datastore.IndexFilter, Field: field}); ok {
+	if direct, ok := p.filterIndex(field); ok {
 		key := []byte{datastore.KeyPresent}
 		collect(direct, key, afterTerm(key), result, nil)
 	} else {
@@ -369,12 +377,7 @@ func exactOf(kind byte, s string) []byte {
 }
 
 func collect(view *datastore.IndexView, lo, hi []byte, set *datastore.Bitset, keep func(key string) bool) {
-	view.ScanRange(lo, hi, func(key string, seq uint32) bool {
-		if keep == nil || keep(key) {
-			set.Set(seq)
-		}
-		return true
-	})
+	view.Collect(lo, hi, set, keep)
 }
 
 func afterTerm(term []byte) []byte {
@@ -1352,7 +1355,7 @@ func (p *planner) storedLeaf(field string, ops map[string]string) SeqFilter {
 		return nil
 	}
 
-	view, ok := p.index(datastore.IndexSpec{Kind: datastore.IndexFilter, Field: field})
+	view, ok := p.filterIndex(field)
 	if !ok {
 		return nil
 	}

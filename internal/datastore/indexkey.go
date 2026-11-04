@@ -19,11 +19,16 @@ const (
 	IndexSort   IndexKind = 's'
 	IndexRefs   IndexKind = 'r'
 	IndexSearch IndexKind = 'g'
+	IndexBitmap IndexKind = 'b'
 )
 
 type IndexSpec struct {
 	Kind  IndexKind
 	Field string
+}
+
+func (s IndexSpec) Derived() bool {
+	return s.Kind == IndexBitmap
 }
 
 func (s IndexSpec) Name() string {
@@ -36,7 +41,7 @@ func ParseIndexName(name string) (IndexSpec, bool) {
 	}
 
 	switch IndexKind(name[0]) {
-	case IndexFilter, IndexSort, IndexRefs, IndexSearch:
+	case IndexFilter, IndexSort, IndexRefs, IndexSearch, IndexBitmap:
 		return IndexSpec{Kind: IndexKind(name[0]), Field: name[2:]}, true
 	}
 
@@ -314,7 +319,7 @@ func extractKeys(spec IndexSpec, doc map[string]any) [][]byte {
 	}
 
 	switch spec.Kind {
-	case IndexFilter:
+	case IndexFilter, IndexBitmap:
 		return FilterKeys(doc, spec.Field)
 	case IndexSort:
 		return [][]byte{SortKey(doc, spec.Field)}

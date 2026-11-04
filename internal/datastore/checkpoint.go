@@ -71,6 +71,16 @@ type manifestEntity struct {
 	Slots   pageRoot        `json:"slots"`
 	IDs     pageRoot        `json:"ids"`
 	Indexes []manifestIndex `json:"indexes,omitempty"`
+	Derived []manifestIndex `json:"derived_indexes,omitempty"`
+}
+
+func (me *manifestEntity) addIndex(spec IndexSpec, mi manifestIndex) {
+	if spec.Derived() {
+		me.Derived = append(me.Derived, mi)
+		return
+	}
+
+	me.Indexes = append(me.Indexes, mi)
 }
 
 func rootOf(t pagetree.Tree) pageRoot {
@@ -527,7 +537,7 @@ func (e *Engine) restorePages(m *manifest) error {
 			indexes: map[string]*index{},
 		}
 
-		for _, mi := range me.Indexes {
+		for _, mi := range append(append([]manifestIndex(nil), me.Indexes...), me.Derived...) {
 			spec, ok := ParseIndexName(mi.Name)
 			if !ok {
 				return fmt.Errorf("%s names an unknown index %q", ManifestFile, mi.Name)
@@ -715,7 +725,7 @@ func (e *Engine) checkpoint(force bool) error {
 			idx := snap.r.indexes[name]
 			switch {
 			case idx.dormant:
-				me.Indexes = append(me.Indexes, manifestIndex{Name: name, Dormant: true})
+				me.addIndex(idx.spec, manifestIndex{Name: name, Dormant: true})
 			case idx.ready:
 				trees = append(trees, idx.tree)
 			}
@@ -730,10 +740,11 @@ func (e *Engine) checkpoint(force bool) error {
 		me.Slots, me.IDs = rootOf(snap.r.slots), rootOf(snap.r.ids)
 		for _, name := range names {
 			if idx := snap.r.indexes[name]; idx.ready {
-				me.Indexes = append(me.Indexes, manifestIndex{Name: name, Root: rootOf(idx.tree)})
+				me.addIndex(idx.spec, manifestIndex{Name: name, Root: rootOf(idx.tree)})
 			}
 		}
 		sort.Slice(me.Indexes, func(i, j int) bool { return me.Indexes[i].Name < me.Indexes[j].Name })
+		sort.Slice(me.Derived, func(i, j int) bool { return me.Derived[i].Name < me.Derived[j].Name })
 
 		m.Entities = append(m.Entities, me)
 	}

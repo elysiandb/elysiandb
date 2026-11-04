@@ -618,14 +618,27 @@ func (s *Snapshot) IndexDormant(spec IndexSpec) bool {
 }
 
 func (v *IndexView) Len() int {
+	if v.bitmap() {
+		return v.bitmapLen()
+	}
+
 	return v.idx.tree.Len()
 }
 
 func (v *IndexView) Rank(prefix []byte) int {
+	if v.bitmap() {
+		return v.bitmapRank(prefix)
+	}
+
 	return v.idx.tree.Rank(string(prefix))
 }
 
 func (v *IndexView) ScanPrefix(prefix []byte, fn func(key string, seq uint32) bool) {
+	if v.bitmap() {
+		v.bitmapScan(prefix, prefixEnd(prefix), fn)
+		return
+	}
+
 	p := string(prefix)
 	v.idx.tree.AscendFrom(p, func(k string, _ []byte) bool {
 		if len(k) < len(p)+4 || k[:len(p)] != p {
@@ -637,6 +650,11 @@ func (v *IndexView) ScanPrefix(prefix []byte, fn func(key string, seq uint32) bo
 }
 
 func (v *IndexView) ScanRange(lo, hi []byte, fn func(key string, seq uint32) bool) {
+	if v.bitmap() {
+		v.bitmapScan(lo, hi, fn)
+		return
+	}
+
 	h := string(hi)
 	v.idx.tree.AscendFrom(string(lo), func(k string, _ []byte) bool {
 		if hi != nil && k >= h {
@@ -645,6 +663,18 @@ func (v *IndexView) ScanRange(lo, hi []byte, fn func(key string, seq uint32) boo
 
 		return fn(k, keySeq(k))
 	})
+}
+
+func prefixEnd(prefix []byte) []byte {
+	end := append([]byte(nil), prefix...)
+	for i := len(end) - 1; i >= 0; i-- {
+		if end[i] < 0xff {
+			end[i]++
+			return end[:i+1]
+		}
+	}
+
+	return nil
 }
 
 func (v *IndexView) AscendAt(i int, fn func(key string, seq uint32) bool) {
