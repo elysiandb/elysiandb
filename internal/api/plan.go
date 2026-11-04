@@ -736,6 +736,7 @@ func Plan(q ListQuery) *ListResult {
 }
 
 const (
+	scanShare             = 4
 	detachedPage          = 1000
 	heavyCandidates       = 2048
 	guardInterval         = 64
@@ -987,7 +988,7 @@ func countMatches(snap *datastore.Snapshot, cand candidates, needsMatch, everyth
 }
 
 func iterateCandidates(snap *datastore.Snapshot, cand candidates, fn func(datastore.Doc) bool) {
-	if cand.all || cand.set.Count()*16 > snap.Len() {
+	if cand.all || cand.set.Count()*scanShare > snap.Len() {
 		snap.Ascend(0, fn)
 		return
 	}
