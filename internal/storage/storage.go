@@ -57,6 +57,7 @@ func Options(cfg *configuration.Config, mode OpenMode) datastore.Options {
 		CheckpointEvery: interval,
 		MaxLogBytes:     cfg.Store.CrashRecovery.MaxLogMB * 1024 * 1024,
 		CacheBytes:      ValueCacheBytes(cfg),
+		PageCacheBytes:  PageCacheBytes(cfg),
 		IndexWorkers:    cfg.Api.Index.Workers,
 		Background:      mode == ModeServer,
 		LegacyRecovery:  cfg.Store.CrashRecovery.Enabled,
@@ -73,6 +74,10 @@ func reportWriteError(err error) {
 }
 
 var ValueCacheBytes = func(cfg *configuration.Config) int64 {
+	return 0
+}
+
+var PageCacheBytes = func(cfg *configuration.Config) int64 {
 	return 0
 }
 

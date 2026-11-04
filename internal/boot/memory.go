@@ -13,7 +13,8 @@ import (
 
 const (
 	autoMemoryShare  = 0.75
-	valueCacheShare  = 0.5
+	valueCacheShare  = 0.25
+	pageCacheShare   = 0.25
 	unlimitedCgroups = 1 << 60
 )
 
@@ -66,6 +67,9 @@ func ApplyMemoryLimit() {
 	if explicit {
 		storage.ValueCacheBytes = func(*configuration.Config) int64 {
 			return int64(float64(budget) * valueCacheShare)
+		}
+		storage.PageCacheBytes = func(*configuration.Config) int64 {
+			return int64(float64(budget) * pageCacheShare)
 		}
 	}
 
