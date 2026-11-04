@@ -264,6 +264,10 @@ func (p *planner) leaf(field string, ops map[string]string) candidates {
 		result.exact = nil
 	}
 
+	if refined, ok := evaluateLeaf(view, ops, result); ok {
+		return refined
+	}
+
 	return result
 }
 
