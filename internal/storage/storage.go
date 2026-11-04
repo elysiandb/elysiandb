@@ -193,14 +193,6 @@ func WriteToDB() {
 	_ = Checkpoint()
 }
 
-func WriteStoreDB() {
-	_ = Checkpoint()
-}
-
-func WriteJsonDB() {
-	_ = Checkpoint()
-}
-
 var ErrKeyNotFound = errors.New("key not found")
 
 func GetByKey(key string) ([]byte, error) {
@@ -382,16 +374,6 @@ func KeyHasExpired(key string) bool {
 	return time.Now().Unix() >= exp
 }
 
-func CleanExpiratedKeys(now int64) {
-	if e := current.Load(); e != nil {
-		e.ExpireDue(now)
-	}
-}
-
-func CleanAllPastKeys() {
-	CleanExpiratedKeys(time.Now().Unix() - 1)
-}
-
 func CountJsonDocuments() uint64 {
 	e := current.Load()
 	if e == nil {
@@ -454,23 +436,6 @@ func PutJsonValue(key string, value map[string]any) error {
 
 	return e.Update(func(tx *datastore.Tx) error {
 		return tx.Put(entity, id, value)
-	})
-}
-
-func DeleteJsonByKey(key string) {
-	e := current.Load()
-	if e == nil {
-		return
-	}
-
-	entity, id, ok := ParseDocumentKey(key)
-	if !ok {
-		return
-	}
-
-	_ = e.Update(func(tx *datastore.Tx) error {
-		tx.Delete(entity, id)
-		return nil
 	})
 }
 
