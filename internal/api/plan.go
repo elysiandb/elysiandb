@@ -1016,6 +1016,10 @@ func (p *planner) orderFor(q ListQuery, cand candidates, needsMatch bool, verify
 					return datastore.Doc{}, false
 				}
 
+				if !needsMatch || (cand.exact != nil && cand.exact.Has(seq)) {
+					return snap.Indexed(seq), true
+				}
+
 				d, ok := snap.BySeq(seq)
 				if !ok || (needsMatch && !verify(d)) {
 					return datastore.Doc{}, false

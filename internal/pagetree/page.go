@@ -143,11 +143,26 @@ func str(b []byte) string {
 	return unsafe.String(&b[0], len(b))
 }
 
+func compareKeys(a, b []byte) int {
+	if len(a) == 4 && len(b) == 4 {
+		x, y := binary.BigEndian.Uint32(a), binary.BigEndian.Uint32(b)
+		switch {
+		case x < y:
+			return -1
+		case x > y:
+			return 1
+		}
+		return 0
+	}
+
+	return bytes.Compare(a, b)
+}
+
 func (p *Page) search(key []byte) (int, bool) {
 	lo, hi := 0, p.Len()
 	for lo < hi {
 		m := int(uint(lo+hi) >> 1)
-		if bytes.Compare(p.key(m), key) < 0 {
+		if compareKeys(p.key(m), key) < 0 {
 			lo = m + 1
 		} else {
 			hi = m
@@ -161,7 +176,7 @@ func (p *Page) childIndex(key []byte) int {
 	lo, hi := 0, p.Len()
 	for lo < hi {
 		m := int(uint(lo+hi) >> 1)
-		if bytes.Compare(p.key(m), key) > 0 {
+		if compareKeys(p.key(m), key) > 0 {
 			hi = m
 		} else {
 			lo = m + 1

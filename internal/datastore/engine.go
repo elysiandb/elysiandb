@@ -495,10 +495,21 @@ func (s *Snapshot) Refs() []RefPath {
 type Doc struct {
 	s    *Snapshot
 	slot slot
+	lazy bool
+}
+
+func (d Doc) resolved() slot {
+	if !d.lazy {
+		return d.slot
+	}
+
+	sl, _ := d.s.r.slotBySeq(d.slot.seq, true)
+
+	return sl
 }
 
 func (d Doc) ID() string {
-	return d.slot.id
+	return d.resolved().id
 }
 
 func (d Doc) Seq() uint32 {
@@ -506,25 +517,30 @@ func (d Doc) Seq() uint32 {
 }
 
 func (d Doc) LSN() uint64 {
-	return d.slot.lsn
+	return d.resolved().lsn
 }
 
 func (d Doc) Bytes() ([]byte, error) {
-	return d.s.e.slotBytes(d.slot)
+	return d.s.e.slotBytes(d.resolved())
 }
 
 func (d Doc) Decode() (map[string]any, error) {
-	b, err := d.Bytes()
+	sl := d.resolved()
+	b, err := d.s.e.slotBytes(sl)
 	if err != nil {
 		return nil, err
 	}
 
 	doc := decodeDoc(b)
 	if doc == nil {
-		return nil, fmt.Errorf("document %s is not a JSON object", d.slot.id)
+		return nil, fmt.Errorf("document %s is not a JSON object", sl.id)
 	}
 
 	return doc, nil
+}
+
+func (s *Snapshot) Indexed(seq uint32) Doc {
+	return Doc{s: s, slot: slot{seq: seq}, lazy: true}
 }
 
 func (s *Snapshot) Get(id string) (Doc, bool) {
