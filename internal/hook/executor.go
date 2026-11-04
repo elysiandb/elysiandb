@@ -272,7 +272,7 @@ func (r *Request) applyScript(h Hook, fnName string, entity map[string]any) erro
 
 	laned := false
 	if costs.heavy(h.Script) {
-		release, err := api_storage.AcquireHeavyLane(r.guard)
+		release, err := api_storage.AcquireHookLane(r.guard)
 		if err != nil {
 			return err
 		}

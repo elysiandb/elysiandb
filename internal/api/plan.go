@@ -839,12 +839,22 @@ const (
 	heavyEnvelope         = 8 << 20
 )
 
+type lane struct {
+	mu      sync.Mutex
+	slots   chan struct{}
+	size    int
+	waiting atomic.Int64
+	sizeFn  func() int
+}
+
 var (
-	heavyMu      sync.Mutex
-	heavySlots   chan struct{}
-	heavySize    int
-	heavyWaiting atomic.Int64
+	queries = &lane{sizeFn: HeavyLaneSize}
+	hooks   = &lane{sizeFn: hookLaneSize}
 )
+
+func hookLaneSize() int {
+	return max(1, runtime.GOMAXPROCS(0)/4)
+}
 
 func HeavyLaneSize() int {
 	if cfg := globals.GetConfig(); cfg != nil && cfg.Api.Query.Workers > 0 {
@@ -881,21 +891,21 @@ func heavyQueueTimeout() time.Duration {
 }
 
 func HeavyWaiting() int {
-	return int(heavyWaiting.Load())
+	return int(queries.waiting.Load() + hooks.waiting.Load())
 }
 
-func heavyLane() chan struct{} {
-	size := HeavyLaneSize()
+func (l *lane) current() chan struct{} {
+	size := l.sizeFn()
 
-	heavyMu.Lock()
-	defer heavyMu.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 
-	if heavySlots == nil || heavySize != size {
-		heavySlots = make(chan struct{}, size)
-		heavySize = size
+	if l.slots == nil || l.size != size {
+		l.slots = make(chan struct{}, size)
+		l.size = size
 	}
 
-	return heavySlots
+	return l.slots
 }
 
 func heavyPlan(snap *datastore.Snapshot, cand candidates, evalIncludes string) bool {
@@ -915,16 +925,20 @@ func heavyPlan(snap *datastore.Snapshot, cand candidates, evalIncludes string) b
 	return maybe > heavyCandidates
 }
 
-func AcquireHeavyLane(guard *Guard) (func(), error) {
-	return acquireHeavyLane(guard)
+func AcquireHookLane(guard *Guard) (func(), error) {
+	return hooks.acquire(guard)
 }
 
 func acquireHeavyLane(guard *Guard) (func(), error) {
+	return queries.acquire(guard)
+}
+
+func (l *lane) acquire(guard *Guard) (func(), error) {
 	if guard != nil && guard.Laned {
 		return func() {}, nil
 	}
 
-	slots := heavyLane()
+	slots := l.current()
 	release := func() { <-slots }
 
 	if err := guard.Reserve(heavyEnvelope); err != nil {
@@ -939,13 +953,13 @@ func acquireHeavyLane(guard *Guard) (func(), error) {
 	}
 
 	patient := guard == nil || guard.Admitted
-	if limit := heavyQueueLimit(cap(slots)); !patient && limit >= 0 && heavyWaiting.Load() >= limit {
+	if limit := heavyQueueLimit(cap(slots)); !patient && limit >= 0 && l.waiting.Load() >= limit {
 		metrics.HeavyRejected()
 		return nil, guard.fail(ErrBusy)
 	}
 
-	heavyWaiting.Add(1)
-	defer heavyWaiting.Add(-1)
+	l.waiting.Add(1)
+	defer l.waiting.Add(-1)
 
 	start := time.Now()
 	timeout := heavyQueueTimeout()
