@@ -437,6 +437,26 @@ func GetJsonByKeyNoCopy(key string) (map[string]any, error) {
 
 var GetJsonByKey = GetJsonByKeyNoCopy
 
+func DocumentVersion(key string) (string, bool) {
+	e := current.Load()
+	if e == nil {
+		return "", false
+	}
+
+	entity, id, ok := ParseDocumentKey(key)
+	if !ok {
+		return "", false
+	}
+
+	snap := e.Snapshot(entity)
+	doc, ok := snap.Get(id)
+	if !ok {
+		return "", false
+	}
+
+	return fmt.Sprintf("%d.%d.%d", e.Instance(), snap.Generation(), doc.LSN()), true
+}
+
 func PutJsonValue(key string, value map[string]any) error {
 	e := current.Load()
 	if e == nil {
