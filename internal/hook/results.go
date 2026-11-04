@@ -19,6 +19,8 @@ type result struct {
 	rows    []row
 	bytes   int64
 	bySeq   bool
+	aggOnce sync.Once
+	agg     *aggregates
 }
 
 func (r *result) reusable(seq uint32, lsn uint64) (row, bool) {

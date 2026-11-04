@@ -297,45 +297,64 @@ func (r *Request) applyScript(h Hook, fnName string, entity map[string]any) erro
 		det.install(vm)
 	}
 
+	fetch := func(name string, call goja.FunctionCall, args int) *result {
+		if len(call.Arguments) < args {
+			panic(vm.ToValue(name + " expected"))
+		}
+
+		targetEntity := call.Arguments[0].String()
+		if engine.IsCoreEntityType(targetEntity) {
+			return &result{}
+		}
+
+		params, _ := call.Arguments[1].Export().(map[string]any)
+
+		filters := make(map[string]map[string]string, len(params))
+		for field, cond := range params {
+			typed, ok := cond.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			condMap := make(map[string]string, len(typed))
+			for op, val := range typed {
+				condMap[op] = fmt.Sprintf("%v", val)
+			}
+
+			filters[field] = condMap
+		}
+
+		res, qkey, err := r.query(h, targetEntity, filters, h.ByPassACL, run)
+		if err != nil {
+			panic(vm.NewGoError(r.stopReason(err, reason)))
+		}
+
+		depsMu.Lock()
+		deps = append(deps, queryDep{target: targetEntity, owner: r.owner(h.ByPassACL), key: qkey, version: res.version, bypass: h.ByPassACL})
+		depsMu.Unlock()
+
+		return res
+	}
+
 	ctx := map[string]any{
 		"entity": entity,
 		"query": func(call goja.FunctionCall) goja.Value {
-			if len(call.Arguments) < 2 {
-				panic(vm.ToValue("query(entity, params) expected"))
+			return newArrayView(vm, fetch("query(entity, params)", call, 2).rows)
+		},
+		"count": func(call goja.FunctionCall) goja.Value {
+			return vm.ToValue(len(fetch("count(entity, params)", call, 2).rows))
+		},
+		"sum": func(call goja.FunctionCall) goja.Value {
+			res := fetch("sum(entity, params, field)", call, 3)
+			return vm.ToValue(res.sum(call.Arguments[2].String()))
+		},
+		"group": func(call goja.FunctionCall) goja.Value {
+			res := fetch("group(entity, params, field)", call, 3)
+			sumField := ""
+			if len(call.Arguments) > 3 && !goja.IsUndefined(call.Arguments[3]) && !goja.IsNull(call.Arguments[3]) {
+				sumField = call.Arguments[3].String()
 			}
-
-			targetEntity := call.Arguments[0].String()
-			if engine.IsCoreEntityType(targetEntity) {
-				return newArrayView(vm, nil)
-			}
-
-			params, _ := call.Arguments[1].Export().(map[string]any)
-
-			filters := make(map[string]map[string]string, len(params))
-			for field, cond := range params {
-				typed, ok := cond.(map[string]any)
-				if !ok {
-					continue
-				}
-
-				condMap := make(map[string]string, len(typed))
-				for op, val := range typed {
-					condMap[op] = fmt.Sprintf("%v", val)
-				}
-
-				filters[field] = condMap
-			}
-
-			res, qkey, err := r.query(h, targetEntity, filters, h.ByPassACL, run)
-			if err != nil {
-				panic(vm.NewGoError(r.stopReason(err, reason)))
-			}
-
-			depsMu.Lock()
-			deps = append(deps, queryDep{target: targetEntity, owner: r.owner(h.ByPassACL), key: qkey, version: res.version, bypass: h.ByPassACL})
-			depsMu.Unlock()
-
-			return newArrayView(vm, res.rows)
+			return groupObject(vm, res.groupBy(call.Arguments[2].String(), sumField), sumField != "")
 		},
 	}
 
