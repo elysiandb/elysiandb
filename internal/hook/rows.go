@@ -3,7 +3,6 @@ package hook
 import (
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/dop251/goja"
 	"github.com/taymour/elysiandb/internal/storage"
@@ -28,11 +27,6 @@ func (r *row) find(key string) int {
 	return -1
 }
 
-var (
-	primMu sync.Mutex
-	prim   = goja.New()
-)
-
 const (
 	internedMaxLen   = 32
 	internedMaxCount = 1 << 16
@@ -42,13 +36,14 @@ const (
 )
 
 type rowBuilder struct {
+	rt      *goja.Runtime
 	shapes  map[string][]string
 	strings map[string]goja.Value
 	bytes   int64
 }
 
 func newRowBuilder() *rowBuilder {
-	return &rowBuilder{shapes: map[string][]string{}, strings: map[string]goja.Value{}}
+	return &rowBuilder{rt: goja.New(), shapes: map[string][]string{}, strings: map[string]goja.Value{}}
 }
 
 func (b *rowBuilder) shape(doc map[string]any) []string {
@@ -76,7 +71,7 @@ func (b *rowBuilder) str(s string) goja.Value {
 		}
 	}
 
-	v := prim.ToValue(s)
+	v := b.rt.ToValue(s)
 	b.bytes += int64(len(s)) + 16
 	if len(s) <= internedMaxLen && len(b.strings) < internedMaxCount {
 		b.strings[s] = v
@@ -92,9 +87,6 @@ func (b *rowBuilder) build(doc map[string]any, seq uint32, lsn uint64, size int)
 	b.bytes += rowOverhead + int64(len(keys))*fieldOverhead
 	defer func() { r.size = uint32(min(b.bytes-before, 1<<31)) }()
 
-	primMu.Lock()
-	defer primMu.Unlock()
-
 	for i, k := range keys {
 		switch v := doc[k].(type) {
 		case nil:
@@ -102,7 +94,7 @@ func (b *rowBuilder) build(doc map[string]any, seq uint32, lsn uint64, size int)
 		case string:
 			r.vals[i] = b.str(v)
 		case float64, bool:
-			r.vals[i] = prim.ToValue(v)
+			r.vals[i] = b.rt.ToValue(v)
 		default:
 			if r.nested == nil {
 				r.nested = make([]any, len(keys))

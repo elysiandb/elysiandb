@@ -263,9 +263,11 @@ func TestQueryResultsStayExactAcrossManyWrites(t *testing.T) {
 	doc := func(i int) map[string]any {
 		return map[string]any{"id": fmt.Sprintf("i%05d", i), "status": []string{"ok", "annule", "draft"}[r.Intn(3)], "n": float64(r.Intn(100))}
 	}
-	for i := 0; i < 3000; i++ {
-		_ = api_storage.WriteEntity("item", doc(i))
+	initial := make([]map[string]any, 0, 9000)
+	for i := 0; i < 9000; i++ {
+		initial = append(initial, doc(i))
 	}
+	api_storage.WriteListOfEntities("item", initial)
 
 	script := `function postRead(ctx) {
   var rows = ctx.query("item", { status: { neq: "annule" } })
@@ -274,7 +276,7 @@ func TestQueryResultsStayExactAcrossManyWrites(t *testing.T) {
   ctx.entity.ids = ids.join(",")
 }`
 	filters := map[string]map[string]string{"status": {"neq": "annule"}}
-	next := 3000
+	next := 9000
 	for step := 0; step < 400; step++ {
 		switch op := r.Intn(10); {
 		case op < 4:

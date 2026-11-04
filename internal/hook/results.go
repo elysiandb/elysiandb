@@ -2,6 +2,7 @@ package hook
 
 import (
 	"container/list"
+	"runtime"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -137,48 +138,68 @@ func (c *resultCache) reset() {
 }
 
 func (c *resultCache) get(key, version string, guard *api_storage.Guard, build func(prev *result) (*result, error)) (*result, bool, error) {
-	if version != "" {
-		if res, _ := c.lookup(key, version); res != nil {
-			c.hits.Add(1)
-			return res, true, nil
-		}
-	}
-
-	c.misses.Add(1)
-
 	if version == "" {
 		res, err := build(nil)
 		return res, false, err
 	}
 
-	fkey := key + "\x00" + version
-	c.mu.Lock()
-	if f, ok := c.flights[fkey]; ok {
-		c.mu.Unlock()
-		return waitFlight(f, guard)
-	}
+	missed := false
+	for {
+		if res, _ := c.lookup(key, version); res != nil {
+			if !missed {
+				c.hits.Add(1)
+			}
+			return res, !missed, nil
+		}
 
-	f := &flight{done: make(chan struct{})}
-	c.flights[fkey] = f
-	c.mu.Unlock()
-
-	go func() {
-		_, prev := c.lookup(key, version)
-		f.res, f.err = build(prev)
-		if f.err == nil {
-			f.res.version = version
-			c.store(key, f.res)
+		if !missed {
+			c.misses.Add(1)
+			missed = true
 		}
 
 		c.mu.Lock()
-		delete(c.flights, fkey)
+		f, busy := c.flights[key]
+		if !busy {
+			f = &flight{done: make(chan struct{})}
+			c.flights[key] = f
+			c.mu.Unlock()
+
+			go c.fill(key, version, f, build)
+
+			res, _, err := waitFlight(f, guard)
+			return res, false, err
+		}
 		c.mu.Unlock()
-		close(f.done)
-	}()
 
-	res, _, err := waitFlight(f, guard)
+		res, _, err := waitFlight(f, guard)
+		if err != nil {
+			return nil, false, err
+		}
 
-	return res, false, err
+		if res != nil && res.version == version {
+			return res, false, nil
+		}
+	}
+}
+
+func (c *resultCache) fill(key, version string, f *flight, build func(prev *result) (*result, error)) {
+	c.mu.Lock()
+	var prev *result
+	if it, ok := c.items[key]; ok {
+		prev = it.res
+	}
+	c.mu.Unlock()
+
+	f.res, f.err = build(prev)
+	if f.err == nil {
+		f.res.version = version
+		c.store(key, f.res)
+	}
+
+	c.mu.Lock()
+	delete(c.flights, key)
+	c.mu.Unlock()
+	close(f.done)
 }
 
 func waitFlight(f *flight, guard *api_storage.Guard) (*result, bool, error) {
@@ -243,43 +264,17 @@ func buildResult(targetEntity string, filters map[string]map[string]string, owne
 	res.gen, res.lsn = snap.Generation(), snap.Version()
 	res.frontier = new(atomic.Int64)
 
-	res.rows = make([]row, 0, len(planned.Docs))
-	last := uint32(0)
-	for i, d := range planned.Docs {
-		if i%1024 == 1023 {
-			if err := guard.Check(); err != nil {
-				return nil, err
-			}
-		}
+	rows, built, err := buildRows(planned.Docs, prev, keep)
+	if err != nil {
+		return nil, err
+	}
 
-		seq, lsn := d.Seq(), d.LSN()
-		if len(res.rows) > 0 && seq <= last {
+	res.rows = rows
+	b.bytes += built
+	for i := 1; i < len(rows); i++ {
+		if rows[i].seq <= rows[i-1].seq {
 			res.bySeq = false
-		}
-		last = seq
-
-		if r, ok := prev.reusable(seq, lsn); ok {
-			res.rows = append(res.rows, r)
-			b.bytes += int64(r.size)
-			continue
-		}
-
-		raw, err := d.Bytes()
-		if err != nil {
-			continue
-		}
-
-		doc, err := datastore.DecodeMap(raw)
-		if err != nil || doc == nil || !keep(doc) {
-			continue
-		}
-
-		res.rows = append(res.rows, b.build(doc, seq, lsn, len(raw)))
-		if len(res.rows)%1024 == 0 {
-			if limit := memory.HookResults.Effective(); limit > 0 && b.bytes > limit {
-				memory.HookResults.Refuse()
-				return nil, api_storage.ErrBusy
-			}
+			break
 		}
 	}
 
@@ -379,6 +374,83 @@ func (r *result) advance(snap *datastore.Snapshot, filters map[string]map[string
 	next.frontier.Store(int64(len(next.rows)))
 
 	return next, true
+}
+
+const (
+	parallelBuildRows = 8192
+	buildCheckEvery   = 1024
+)
+
+func buildRows(docs []datastore.Doc, prev *result, keep func(map[string]any) bool) ([]row, int64, error) {
+	workers := 1
+	if len(docs) >= parallelBuildRows {
+		workers = max(1, min(4, runtime.GOMAXPROCS(0)/2))
+	}
+
+	parts := make([][]row, workers)
+	sizes := make([]int64, workers)
+	var total atomic.Int64
+	var refused atomic.Bool
+	per := (len(docs) + workers - 1) / workers
+
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		lo, hi := w*per, min((w+1)*per, len(docs))
+		if lo >= hi {
+			continue
+		}
+
+		wg.Add(1)
+		go func(w, lo, hi int) {
+			defer wg.Done()
+
+			b := newRowBuilder()
+			out := make([]row, 0, hi-lo)
+			for i := lo; i < hi && !refused.Load(); i++ {
+				d := docs[i]
+				seq, lsn := d.Seq(), d.LSN()
+				if r, ok := prev.reusable(seq, lsn); ok {
+					out = append(out, r)
+					b.bytes += int64(r.size)
+				} else if raw, err := d.Bytes(); err == nil {
+					if doc, err := datastore.DecodeMap(raw); err == nil && doc != nil && keep(doc) {
+						out = append(out, b.build(doc, seq, lsn, len(raw)))
+					}
+				}
+
+				if (i-lo)%buildCheckEvery == buildCheckEvery-1 {
+					grown := total.Add(b.bytes - sizes[w])
+					sizes[w] = b.bytes
+					if limit := memory.HookResults.Effective(); limit > 0 && grown > limit {
+						refused.Store(true)
+					}
+				}
+			}
+
+			sizes[w] = b.bytes
+			parts[w] = out
+		}(w, lo, hi)
+	}
+	wg.Wait()
+
+	if refused.Load() {
+		memory.HookResults.Refuse()
+		return nil, 0, api_storage.ErrBusy
+	}
+
+	n := 0
+	for _, p := range parts {
+		n += len(p)
+	}
+
+	rows := make([]row, 0, n)
+	var built int64
+	for w, p := range parts {
+		rows = append(rows, p...)
+		built += sizes[w]
+	}
+
+	return rows, built, nil
 }
 
 func ResetQueryCache() {
