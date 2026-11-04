@@ -1,7 +1,6 @@
 package datastore
 
 import (
-	"context"
 	"encoding/binary"
 	"os"
 	"path/filepath"
@@ -727,7 +726,7 @@ func (e *Engine) compactRange(r [2][]byte) {
 	}
 
 	start := time.Now()
-	if err := e.db.Compact(context.Background(), r[0], r[1], false); err != nil {
+	if err := e.db.Compact(e.ctx, r[0], r[1], false); err != nil {
 		if !e.closed.Load() {
 			engineLog.Debug("range compaction failed", "err", err)
 		}

@@ -89,7 +89,6 @@ func includeReader() func(entity, id string) map[string]any {
 }
 
 func newDocReader() func(entity, id string) map[string]any {
-	snaps := map[string]*datastore.Snapshot{}
 	cache := map[string][]byte{}
 
 	return func(entity, id string) map[string]any {
@@ -106,20 +105,9 @@ func newDocReader() func(entity, id string) map[string]any {
 			return nil
 		}
 
-		snap := snaps[entity]
-		if snap == nil {
-			snap = e.Snapshot(entity)
-			snaps[entity] = snap
-		}
-
-		doc, ok := snap.Get(id)
+		b, ok := e.Read(entity, id)
 		if !ok {
 			cache[key] = nil
-			return nil
-		}
-
-		b, err := doc.Bytes()
-		if err != nil {
 			return nil
 		}
 

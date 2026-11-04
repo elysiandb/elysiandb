@@ -398,12 +398,7 @@ func CountJsonDocuments() uint64 {
 		return 0
 	}
 
-	total := uint64(0)
-	for _, snap := range e.SnapshotAll() {
-		total += uint64(snap.Len())
-	}
-
-	return total
+	return uint64(e.Stats().Documents)
 }
 
 func ParseDocumentKey(key string) (string, string, bool) {
@@ -431,12 +426,17 @@ func GetJsonByKeyNoCopy(key string) (map[string]any, error) {
 		return nil, fmt.Errorf("key not found: %s", key)
 	}
 
-	doc, ok := e.Snapshot(entity).Get(id)
+	b, ok := e.Read(entity, id)
 	if !ok {
 		return nil, fmt.Errorf("key not found: %s", key)
 	}
 
-	return doc.Decode()
+	doc, err := datastore.DecodeMap(b)
+	if err == nil && doc == nil {
+		err = fmt.Errorf("document %s is not a JSON object", id)
+	}
+
+	return doc, err
 }
 
 var GetJsonByKey = GetJsonByKeyNoCopy

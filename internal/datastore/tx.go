@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/cockroachdb/pebble/v2"
@@ -72,18 +73,56 @@ func (e *Engine) newTx() *Tx {
 	return &Tx{e: e, reads: map[string]uint64{}, cache: map[string]readEntry{}, overlay: map[string]int{}, resets: map[string]bool{}}
 }
 
-func (e *Engine) enter() bool {
-	e.writers.Add(1)
-	if e.closed.Load() {
-		e.writers.Done()
+type gate struct {
+	mu     sync.Mutex
+	inside int
+	shut   bool
+	done   chan struct{}
+}
+
+func (g *gate) enter() bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if g.shut {
 		return false
 	}
+	g.inside++
 
 	return true
 }
 
+func (g *gate) leave() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	g.inside--
+	if g.shut && g.inside == 0 && g.done != nil {
+		close(g.done)
+		g.done = nil
+	}
+}
+
+func (g *gate) shutAndWait() {
+	g.mu.Lock()
+	g.shut = true
+	if g.inside == 0 {
+		g.mu.Unlock()
+		return
+	}
+
+	done := make(chan struct{})
+	g.done = done
+	g.mu.Unlock()
+	<-done
+}
+
+func (e *Engine) enter() bool {
+	return !e.closed.Load() && e.writers.enter()
+}
+
 func (e *Engine) leave() {
-	e.writers.Done()
+	e.writers.leave()
 }
 
 func (e *Engine) Update(fn func(tx *Tx) error) error {
@@ -161,6 +200,19 @@ func (e *Engine) readDoc(entityID uint32, id string) (readEntry, error) {
 	}
 
 	return readEntry{value: value, lsn: lsn, seq: seq, found: true}, nil
+}
+
+func (e *Engine) Read(entity, id string) ([]byte, bool) {
+	if e.closed.Load() {
+		return nil, false
+	}
+
+	r, err := e.readLatest(entity, id)
+	if err != nil || !r.found {
+		return nil, false
+	}
+
+	return r.value, true
 }
 
 func (tx *Tx) ReadBytes(entity, id string) ([]byte, bool) {

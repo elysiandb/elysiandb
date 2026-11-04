@@ -1,6 +1,7 @@
 package datastore
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -93,7 +94,9 @@ type Engine struct {
 	stop       chan struct{}
 	wg         sync.WaitGroup
 	closed     atomic.Bool
-	writers    sync.WaitGroup
+	writers    gate
+	ctx        context.Context
+	cancel     context.CancelFunc
 	migrated   *MigrationReport
 	unclean    bool
 	walBytes   int64
@@ -156,24 +159,28 @@ func Open(opts Options) (*Engine, error) {
 		compacts: make(chan [2][]byte, 64),
 		stop:     make(chan struct{}),
 	}
+	e.ctx, e.cancel = context.WithCancel(context.Background())
+
+	fail := func(err error) (*Engine, error) {
+		e.cancel()
+		e.unlock()
+		return nil, err
+	}
 
 	start := time.Now()
 	report, err := e.migrateIfNeeded()
 	if err != nil {
-		e.unlock()
-		return nil, err
+		return fail(err)
 	}
 	e.migrated = report
 
 	if err := e.openDB(filepath.Join(opts.Folder, PebbleFolder)); err != nil {
-		e.unlock()
-		return nil, err
+		return fail(err)
 	}
 
 	if err := e.load(); err != nil {
-		e.closeDB()
-		e.unlock()
-		return nil, err
+		_ = e.closeDB()
+		return fail(err)
 	}
 
 	if opts.Background {
@@ -508,8 +515,9 @@ func (e *Engine) Close() error {
 	}
 
 	close(e.stop)
+	e.cancel()
 	e.wg.Wait()
-	e.writers.Wait()
+	e.writers.shutAndWait()
 
 	var errs []error
 	if _, err := os.Stat(filepath.Join(e.dir, PebbleFolder)); err != nil {
@@ -550,8 +558,9 @@ func (e *Engine) Abandon() {
 	}
 
 	close(e.stop)
+	e.cancel()
 	e.wg.Wait()
-	e.writers.Wait()
+	e.writers.shutAndWait()
 	e.closeLost()
 	e.unlock()
 }
@@ -636,6 +645,19 @@ func (e *Engine) TypeExists(name string) bool {
 	defer e.catalogMu.RUnlock()
 
 	return slices.Contains(e.types, name)
+}
+
+func (e *Engine) Count(name string) int {
+	ent := e.entity(name, false)
+	if ent == nil {
+		return 0
+	}
+
+	if rec := ent.rec.Load(); rec != nil {
+		return int(rec.count)
+	}
+
+	return 0
 }
 
 func (e *Engine) EntityVersion(name string) (uint64, uint64) {

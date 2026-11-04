@@ -278,17 +278,12 @@ func ReadEntityById(entity, id string) map[string]any {
 		return nil
 	}
 
-	doc, ok := e.Snapshot(entity).Get(id)
+	b, ok := e.Read(entity, id)
 	if !ok {
 		return nil
 	}
 
-	data, err := doc.Decode()
-	if err != nil {
-		return nil
-	}
-
-	return data
+	return decodeMap(b)
 }
 
 func ReadEntityBytesById(entity, id string) ([]byte, bool) {
@@ -297,14 +292,7 @@ func ReadEntityBytesById(entity, id string) ([]byte, bool) {
 		return nil, false
 	}
 
-	doc, ok := e.Snapshot(entity).Get(id)
-	if !ok {
-		return nil, false
-	}
-
-	b, err := doc.Bytes()
-
-	return b, err == nil
+	return e.Read(entity, id)
 }
 
 func ListEntities(
@@ -517,7 +505,7 @@ func EntityExists(entity, id string) bool {
 		return false
 	}
 
-	_, ok := e.Snapshot(entity).Get(id)
+	_, ok := e.Read(entity, id)
 
 	return ok
 }
@@ -528,7 +516,7 @@ func CountEntities(entity string) int {
 		return 0
 	}
 
-	return e.Snapshot(entity).Len()
+	return e.Count(entity)
 }
 
 func CountEntitiesPerType() map[string]int {
