@@ -3,6 +3,8 @@ package hook_test
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"strings"
 	"testing"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
@@ -248,5 +250,54 @@ func TestFailingScriptsAreNotReused(t *testing.T) {
 
 	if after := hook.OutputMemo(); after.Hits != before.Hits {
 		t.Fatalf("a failing script must run every time")
+	}
+}
+
+func TestQueryResultsStayExactAcrossManyWrites(t *testing.T) {
+	setup(t, true)
+	if err := api_storage.CreateEntityType("item"); err != nil {
+		t.Fatal(err)
+	}
+
+	r := rand.New(rand.NewSource(5))
+	doc := func(i int) map[string]any {
+		return map[string]any{"id": fmt.Sprintf("i%05d", i), "status": []string{"ok", "annule", "draft"}[r.Intn(3)], "n": float64(r.Intn(100))}
+	}
+	for i := 0; i < 3000; i++ {
+		_ = api_storage.WriteEntity("item", doc(i))
+	}
+
+	script := `function postRead(ctx) {
+  var rows = ctx.query("item", { status: { neq: "annule" } })
+  var ids = []
+  for (var i = 0; i < rows.length; i++) { ids.push(rows[i].id + ":" + rows[i].n) }
+  ctx.entity.ids = ids.join(",")
+}`
+	filters := map[string]map[string]string{"status": {"neq": "annule"}}
+	next := 3000
+	for step := 0; step < 400; step++ {
+		switch op := r.Intn(10); {
+		case op < 4:
+			_ = api_storage.WriteEntity("item", doc(next))
+			next++
+		case op < 8:
+			_ = api_storage.WriteEntity("item", doc(r.Intn(next)))
+		default:
+			api_storage.DeleteEntityById("item", fmt.Sprintf("i%05d", r.Intn(next)))
+		}
+
+		if step%7 != 0 {
+			continue
+		}
+
+		want := []string{}
+		for _, d := range api_storage.ListEntities("item", 0, 0, "", true, filters, "", "") {
+			want = append(want, fmt.Sprintf("%s:%v", d["id"], d["n"]))
+		}
+
+		out := runPostRead(t, script, map[string]any{"id": fmt.Sprintf("x%d", step)})
+		if out["ids"] != strings.Join(want, ",") {
+			t.Fatalf("step %d: the hook saw a different result than the query", step)
+		}
 	}
 }

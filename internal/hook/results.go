@@ -15,12 +15,15 @@ import (
 )
 
 type result struct {
-	version string
-	rows    []row
-	bytes   int64
-	bySeq   bool
-	aggOnce sync.Once
-	agg     *aggregates
+	version  string
+	rows     []row
+	bytes    int64
+	bySeq    bool
+	gen      uint64
+	lsn      uint64
+	frontier *atomic.Int64
+	aggOnce  sync.Once
+	agg      *aggregates
 }
 
 func (r *result) reusable(seq uint32, lsn uint64) (row, bool) {
@@ -224,10 +227,17 @@ func buildResult(targetEntity string, filters map[string]map[string]string, owne
 		return res, nil
 	}
 
-	planned := api_storage.Plan(api_storage.ListQuery{Entity: targetEntity, Filters: filters, Guard: guard})
+	snap := api_storage.Snapshot(targetEntity)
+	if next, ok := prev.advance(snap, filters, keep, b); ok {
+		return next, nil
+	}
+
+	planned := api_storage.Plan(api_storage.ListQuery{Entity: targetEntity, Filters: filters, Guard: guard, Snapshot: snap})
 	if planned.Err != nil {
 		return nil, planned.Err
 	}
+	res.gen, res.lsn = snap.Generation(), snap.Version()
+	res.frontier = new(atomic.Int64)
 
 	res.rows = make([]row, 0, len(planned.Docs))
 	last := uint32(0)
@@ -270,8 +280,101 @@ func buildResult(targetEntity string, filters map[string]map[string]string, owne
 	}
 
 	res.bytes = b.bytes + int64(cap(res.rows))*48
+	res.frontier.Store(int64(len(res.rows)))
 
 	return res, nil
+}
+
+const rowSliceBytes = 72
+
+func (r *result) advance(snap *datastore.Snapshot, filters map[string]map[string]string, keep func(map[string]any) bool, b *rowBuilder) (*result, bool) {
+	if r == nil || !r.bySeq || r.frontier == nil || r.gen != snap.Generation() || r.lsn > snap.Version() {
+		return nil, false
+	}
+
+	seqs, ok := snap.ChangedSince(r.lsn)
+	if !ok || len(seqs) > len(r.rows)/4+64 {
+		return nil, false
+	}
+	sort.Slice(seqs, func(i, j int) bool { return seqs[i] < seqs[j] })
+
+	updates := make(map[uint32]*row, len(seqs))
+	for _, seq := range seqs {
+		updates[seq] = nil
+		d, ok := snap.BySeq(seq)
+		if !ok {
+			continue
+		}
+
+		raw, err := d.Bytes()
+		if err != nil {
+			return nil, false
+		}
+
+		doc, err := datastore.DecodeMap(raw)
+		if err != nil || doc == nil || !api_storage.FiltersMatchEntity(doc, filters) || !keep(doc) {
+			continue
+		}
+
+		built := b.build(doc, seq, d.LSN(), len(raw))
+		updates[seq] = &built
+	}
+
+	next := &result{bySeq: true, gen: snap.Generation(), lsn: snap.Version(), bytes: r.bytes + b.bytes}
+	last := uint32(0)
+	if n := len(r.rows); n > 0 {
+		last = r.rows[n-1].seq
+	}
+
+	added := make([]row, 0, len(seqs))
+	appendOnly := true
+	for _, seq := range seqs {
+		if seq <= last {
+			appendOnly = false
+			break
+		}
+		if u := updates[seq]; u != nil {
+			added = append(added, *u)
+		}
+	}
+
+	if appendOnly {
+		n := len(r.rows)
+		if cap(r.rows) >= n+len(added) && r.frontier.CompareAndSwap(int64(n), int64(n+len(added))) {
+			next.rows = append(r.rows[:n:n+len(added)], added...)
+			next.frontier = r.frontier
+		} else {
+			next.rows = make([]row, n+len(added), (n+len(added))*5/4+1024)
+			copy(next.rows, r.rows)
+			copy(next.rows[n:], added)
+			next.frontier = new(atomic.Int64)
+			next.frontier.Store(int64(len(next.rows)))
+			next.bytes += int64(cap(next.rows)-cap(r.rows)) * rowSliceBytes
+		}
+
+		return next, true
+	}
+
+	next.rows = make([]row, 0, len(r.rows)+len(seqs))
+	i := 0
+	for _, seq := range seqs {
+		for i < len(r.rows) && r.rows[i].seq < seq {
+			next.rows = append(next.rows, r.rows[i])
+			i++
+		}
+		if i < len(r.rows) && r.rows[i].seq == seq {
+			next.bytes -= int64(r.rows[i].size)
+			i++
+		}
+		if u := updates[seq]; u != nil {
+			next.rows = append(next.rows, *u)
+		}
+	}
+	next.rows = append(next.rows, r.rows[i:]...)
+	next.frontier = new(atomic.Int64)
+	next.frontier.Store(int64(len(next.rows)))
+
+	return next, true
 }
 
 func ResetQueryCache() {

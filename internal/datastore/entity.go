@@ -123,6 +123,7 @@ type entity struct {
 	usage    sync.Map
 	metas    sync.Map
 	pins     sync.Map
+	changes  changeLog
 	stale    atomic.Int64
 }
 
@@ -249,6 +250,7 @@ func (d *draft) put(rec *journal.Record, doc map[string]any, replay bool) {
 		return
 	}
 
+	d.ent.changes.add(d.r.version, rec.LSN, s.seq)
 	d.r.version = rec.LSN
 
 	if doc == nil {
@@ -293,6 +295,7 @@ func (d *draft) del(rec *journal.Record, replay bool) {
 
 	d.r.slots, _ = d.r.slots.Delete(seqKey(old.seq))
 	d.r.ids, _ = d.r.ids.Delete(old.id)
+	d.ent.changes.add(d.r.version, rec.LSN, old.seq)
 	d.r.version = rec.LSN
 	d.e.cache.drop(old.lsn)
 	d.e.live.add(old.loc.Segment, -int64(old.loc.Length))
@@ -320,6 +323,7 @@ func (d *draft) reset(rec *journal.Record) {
 		d.released = append(d.released, d.r.slots)
 	}
 
+	d.ent.changes.reset()
 	fresh := d.e.emptyRoot(rec.Gen, rec.LSN)
 	d.r = *fresh
 	d.r.slots = d.r.slots.WithToken(d.tok)
