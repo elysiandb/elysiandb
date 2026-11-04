@@ -77,8 +77,11 @@ api:
     timeoutMs: 2000
     requestBudgetMs: 0
   query:
-    workers: 0            # size of the heavy lane, 0 = GOMAXPROCS
+    workers: 0            # size of the heavy lane, 0 = half of GOMAXPROCS
     timeoutMs: 0          # 0 = no deadline
+    maxQueued: 0          # 0 = 4 × workers, -1 = no limit
+    queueTimeoutMs: 0     # 0 = 5000, -1 = wait as long as needed
+    cancelOnDisconnect: true
   response:
     spoolMB: 8
 adminui:
@@ -90,7 +93,7 @@ monitoring:
     enabled: false
 ```
 
-Every key added after 0.2.4 is optional, and its default keeps the 0.2.4 behavior.
+Every key added after 0.2.4 is optional. Their defaults keep the 0.2.4 answers, except under overload, where the heavy lane answers `503` instead of letting requests pile up (see Overload and timeouts below).
 
 ### Configuration Fields
 
@@ -120,8 +123,11 @@ Every key added after 0.2.4 is optional, and its default keeps the 0.2.4 behavio
 | **api.cache.enabled**                | Enables REST API caching for repeated queries                                         |
 | **api.cache.maxMB**                  | Size limit of the API cache. Default `128`                                            |
 | **api.cache.maxEntryKB**             | Responses larger than this are not cached. Default `1024`                             |
-| **api.query.workers**                | Requests that must check many documents run at most this many at a time. `0` (default) uses the number of threads (`GOMAXPROCS`) |
-| **api.query.timeoutMs**              | Deadline of a request that checks documents; past it the answer is `503` `{"error":"request deadline exceeded"}`. `0` (default) means no deadline |
+| **api.query.workers**                | Requests that must check many documents (the heavy lane) run at most this many at a time. `0` (default) uses half of the threads (`GOMAXPROCS / 2`, at least 1), so that the other requests keep threads |
+| **api.query.timeoutMs**              | Deadline of a request: the documents it checks and its hooks stop there, and the answer is `503` `{"error":"request deadline exceeded"}`. `0` (default) means no deadline |
+| **api.query.maxQueued**              | Heavy requests that may wait for a slot. Past it, a heavy request is answered `503` `{"error":"server busy"}` with `Retry-After: 1`. `0` (default) means 4 × `api.query.workers`, `-1` no limit |
+| **api.query.queueTimeoutMs**         | Longest wait for a slot of the heavy lane, then `503` `{"error":"server busy"}`. `0` (default) means 5000, `-1` no limit |
+| **api.query.cancelOnDisconnect**     | Stops the work of a request whose client closed the connection. Default `true` |
 | **api.response.spoolMB**             | A response built by hooks, includes or `fields` is kept in memory up to this size, then in a temporary file, and sent once complete. Default `8` |
 | **api.schema.enabled**               | Enables automatic schema inference and validation                                     |
 | **api.schema.strict**                | If true and schema is manual, new fields are rejected and deep validation is enforced |
@@ -138,6 +144,27 @@ Every key added after 0.2.4 is optional, and its default keeps the 0.2.4 behavio
 | **monitoring.prometheus.enabled**    | Serves `GET /metrics` in the Prometheus text format (see Monitoring below). Off by default |
 | **monitoring.prometheus.token**      | Bearer token for `GET /metrics`. Without it, `/metrics` takes the same credentials as the admin endpoints |
 | **monitoring.pprof.enabled**         | Serves the Go profiler under `GET /debug/pprof/` for admins. Off by default           |
+
+### Overload and timeouts
+
+A request that must check many documents one by one (a filter that no index answers exactly, a search, a filter through references) runs in the heavy lane, which runs `api.query.workers` of them at a time. The others wait in a queue of at most `api.query.maxQueued` requests, for at most `api.query.queueTimeoutMs`; past either limit the request is answered `503` `{"error":"server busy"}` with `Retry-After: 1`, so that a burst does not leave minutes of work behind it. Hooks, `ctx.query` and internal reads are never refused: they wait for a slot, within their own time limits.
+
+ElysianDB stops the work of a request as soon as its client has closed the connection (`api.query.cancelOnDisconnect`): the documents it was checking, its queued place in the heavy lane and its remaining hooks. Such a request is counted in `abandoned_rps` and logged with status `499`. A client that closes only its sending side while it waits for the answer is seen as gone, as with most HTTP servers; set `cancelOnDisconnect: false` for such clients. Behind a reverse proxy, keep the proxy's default of closing the upstream connection when its client leaves (`proxy_ignore_client_abort off` in nginx).
+
+`api.hooks.timeoutMs` bounds each hook run, including the `ctx.query` calls it makes: a `ctx.query` that would wait longer is stopped with the script, which leaves the document as it was and logs `hook script stopped after …`. `api.hooks.requestBudgetMs` bounds the hook time of a request, and `api.query.timeoutMs` the whole request.
+
+Recommended values for clients that give up after 10 seconds:
+
+```yaml
+api:
+  query:
+    timeoutMs: 8000         # below the client timeout, so that ElysianDB answers before the client leaves
+  hooks:
+    timeoutMs: 2000
+    requestBudgetMs: 3000
+```
+
+and, with nginx in front, `proxy_read_timeout` above `api.query.timeoutMs` (for example `15s`). The defaults of `maxQueued`, `queueTimeoutMs` and `cancelOnDisconnect` suit most loads; the series `heavy_waiting`, `heavy_wait_p95_ms`, `heavy_rejected_rps` and `abandoned_rps` show whether they do.
 
 Keys that ElysianDB does not know are ignored, and a warning listing them is printed at startup (for example `field authentication not found in type configuration.Config` when `authentication:` is written at the root instead of under `security:`).
 
@@ -185,7 +212,7 @@ The same data is served by admin endpoints, which take the same credentials as `
 | -------- | ------- |
 | `GET /monitoring/overview` | Instance, status and problems, traffic, data, persistence, runtime, connections and log counters |
 | `GET /monitoring/series?range=15m\|1h\|24h&since=<unix ms>` | Time series with one point per second (`15m`), 10 seconds (`1h`) or minute (`24h`). With `since`, only newer points |
-| `GET /monitoring/details` | Top routes, hook statistics and documents per entity type |
+| `GET /monitoring/details` | Top routes, hook statistics, documents per entity type, and the indexes of each entity type with their state (`ready`, `building` or `released`), entries and last use |
 | `GET /monitoring/logs?level=&component=&q=&user=&request_id=&since=&until=&before=&after=&limit=` | Log lines, newest first. `404` when `log.bufferLines` is `0` |
 | `GET /monitoring/logs/download?...` | The same lines as an NDJSON file |
 | `GET /monitoring/logs/level`, `PUT /monitoring/logs/level` | The current log level; `{"level": "debug", "minutes": 15}` changes it for 1 to 1440 minutes, then it goes back to `log.level` by itself |
@@ -211,7 +238,7 @@ The status is `healthy`, `warning` or `critical`, with these problems:
 
 With `monitoring.prometheus.enabled: true`, `GET /metrics` serves the counters, gauges and latency histograms in the Prometheus text format, for example `elysiandb_http_requests_total{status_class="5xx"}`, `elysiandb_http_request_duration_seconds`, `elysiandb_tcp_commands_total{command="GET"}`, `elysiandb_kv_keys` and `elysiandb_entities{entity_type="books"}`. Set `monitoring.prometheus.token` to let Prometheus authenticate with `Authorization: Bearer <token>`, since a scraper cannot log in with a session cookie in `user` mode.
 
-The CPU series are given two ways: `cpu_percent` is a share of all the threads the process may use (`gomaxprocs`), so 100 % means every thread is busy, and `cpu_cores` is the number of busy threads. The engine adds `log_since_checkpoint_bytes`, `log_bytes` (log on disk), `live_bytes` (data the log still holds), `checkpoint_ms`, `value_cache_hit_ratio` and `resident_bytes`, the heavy lane adds `heavy_queries_rps` and `heavy_queued_rps`, and `tcp_auth_p95_ms` is the duration of TCP `AUTH`. Hook statistics give the number of `ctx.query` calls, the rows they read and their cache hits.
+The CPU series are given two ways: `cpu_percent` is a share of all the threads the process may use (`gomaxprocs`), so 100 % means every thread is busy, and `cpu_cores` is the number of busy threads. The engine adds `log_since_checkpoint_bytes`, `log_bytes` (log on disk), `live_bytes` (data the log still holds), `checkpoint_ms`, `value_cache_hit_ratio` and `resident_bytes`, the heavy lane adds `heavy_queries_rps`, `heavy_queued_rps` (requests that waited for a slot), `heavy_waiting` (requests waiting now), `heavy_wait_p95_ms`, `heavy_rejected_rps` (answered `503` `server busy`) and `abandoned_rps` (requests stopped because their client left), and `tcp_auth_p95_ms` is the duration of TCP `AUTH`. Prometheus exports them as `elysiandb_heavy_queries_total`, `elysiandb_heavy_queued_total`, `elysiandb_heavy_rejected_total`, `elysiandb_requests_abandoned_total` and `elysiandb_heavy_waiting`. Hook statistics give the number of `ctx.query` calls, the rows they read and their cache hits.
 
 With `monitoring.pprof.enabled: true`, admins can profile a running instance, for example `go tool pprof http://localhost:8089/debug/pprof/profile?seconds=30`.
 
@@ -458,6 +485,7 @@ All of them fix defects of 0.2.4:
 * Sessions are kept in memory and `sessions.json` is written when they change. Expired sessions are removed at the next session change instead of during a request, and a change made to `sessions.json` by hand needs a restart.
 * The `elysiandb` commands open the data folder without background work and close it cleanly, so the next start no longer reports an unclean shutdown. They cannot run on the folder of a running server.
 * The REST API filters through references (for example `filter[author.name]`) and the sort indexes use the referenced documents' current values.
+* Under overload, heavy requests beyond `api.query.maxQueued`, or waiting longer than `api.query.queueTimeoutMs`, are answered `503` `{"error":"server busy"}` with `Retry-After: 1` instead of waiting; set both to `-1` to wait as 0.2.4 did. The work of a request whose client left is stopped (`api.query.cancelOnDisconnect`).
 
 ### Upgrading from 0.2.1
 
@@ -599,9 +627,9 @@ This section describes the `internal` engine.
 
 **Entity state.** For each entity, the engine keeps in memory the position of each document in the log, its insertion order, the id directory and the indexes, as persistent trees. A write builds new versions of the few nodes it touches and publishes them at once: a reader works on a consistent snapshot without any lock, and a write locks only its entity for a few microseconds. Deleting a document costs the same at 1,000 or 1,000,000 documents, and `DELETE /api/<entity>` is immediate. Writes that read a document first (updates, sub-entity merges) are checked at commit and replayed if another write changed that document meanwhile, so no update is lost.
 
-**Indexes.** A field gets a sort index the first time it is sorted on, and a filter index the first time it is filtered on. Indexes are built in the background while queries keep working without them, then kept up to date by every write. They only narrow the candidates: the same filter functions as before decide which documents match, so results do not depend on the indexes. Search uses an index of three-character sequences, and filters through references (`filter[author.name]`) use the index of the referenced entity and the reverse references.
+**Indexes.** A field gets a sort index the first time it is sorted on, and a filter index the first time it is filtered on. Indexes are built in the background while queries keep working without them, then kept up to date by every write. The indexes an entity is waiting for are built together, in one pass over its documents, oldest request first; an entity of up to 512 documents gets its indexes at once. An index unused for an hour is released (its memory and its upkeep on writes) and rebuilt at its next use. Indexes never change results: a filter is answered from the index entries with the same filter functions as before (a day range on a date field, for example, is counted on the index without reading the documents), and the documents an index cannot decide on are checked one by one. Search uses an index of three-character sequences, rebuilt at startup for the entities searched before, and filters through references (`filter[author.name]`) use the index of the referenced entity and the reverse references.
 
-**Checkpoints and restarts.** Every `store.flushIntervalSeconds`, or when `store.crashRecovery.maxLogMB` of log has been written, the engine writes a checkpoint of its structures (never the documents again) and switches `MANIFEST` to it. A restart loads the last checkpoint and replays the log written after it, so its time depends on the recent writes, not on the size of the database. A torn last batch, left by a crash, is dropped.
+**Checkpoints and restarts.** Every `store.flushIntervalSeconds`, or when `store.crashRecovery.maxLogMB` of log has been written, the engine writes a checkpoint of its structures (never the documents again) and switches `MANIFEST` to it. A checkpoint never starts sooner after the previous one than ten times its duration (at most five minutes), so that checkpoints take at most a tenth of the time under load. A restart loads the last checkpoint and replays the log written after it, so its time depends on the recent writes, not on the size of the database. A torn last batch, left by a crash, is dropped.
 
 **Compaction.** In the background, a segment with less than half of live data is rewritten into the current one, and segments that no longer hold live data are deleted after a checkpoint.
 
