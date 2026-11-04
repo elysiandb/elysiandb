@@ -54,9 +54,13 @@ func holdHeavyLane(t *testing.T) *laneHolder {
 	t.Helper()
 
 	h := &laneHolder{inside: make(chan struct{}), release: make(chan struct{}), done: make(chan *api_storage.ListResult, 1)}
-	var once atomic.Bool
+	var calls atomic.Int64
 	guard := &api_storage.Guard{Abandoned: func() bool {
-		if once.CompareAndSwap(false, true) {
+		if calls.Add(1) < 15 {
+			time.Sleep(time.Millisecond)
+			return false
+		}
+		if calls.Load() == 15 {
 			close(h.inside)
 			<-h.release
 		}
@@ -84,6 +88,13 @@ func (h *laneHolder) free() {
 	}
 }
 
+func slowGuard(gone *atomic.Bool) *api_storage.Guard {
+	return &api_storage.Guard{Abandoned: func() bool {
+		time.Sleep(time.Millisecond)
+		return gone != nil && gone.Load()
+	}}
+}
+
 func waitForQueue(t *testing.T, n int) {
 	t.Helper()
 
@@ -101,21 +112,21 @@ func TestHeavyLaneRejectsRequestsWhenItsQueueIsFull(t *testing.T) {
 	holder := holdHeavyLane(t)
 
 	queued := make(chan *api_storage.ListResult, 1)
-	go func() { queued <- api_storage.Plan(heavyQuery(&api_storage.Guard{})) }()
+	go func() { queued <- api_storage.Plan(heavyQuery(slowGuard(nil))) }()
 	waitForQueue(t, 1)
 
-	guard := &api_storage.Guard{}
+	guard := slowGuard(nil)
 	start := time.Now()
 	res := api_storage.Plan(heavyQuery(guard))
 	if !errors.Is(res.Err, api_storage.ErrBusy) || !errors.Is(guard.Err(), api_storage.ErrBusy) {
 		t.Fatalf("a request beyond the queue limit is rejected, got %v / %v", res.Err, guard.Err())
 	}
 	if time.Since(start) > time.Second {
-		t.Fatalf("the rejection is immediate, took %s", time.Since(start))
+		t.Fatalf("the rejection comes after a few milliseconds of work, took %s", time.Since(start))
 	}
 
 	internal := make(chan *api_storage.ListResult, 1)
-	go func() { internal <- api_storage.Plan(heavyQuery(nil)) }()
+	go func() { internal <- api_storage.Plan(heavyQuery(slowGuard(nil).Until(time.Now().Add(time.Minute)))) }()
 	waitForQueue(t, 2)
 
 	holder.free()
@@ -138,7 +149,7 @@ func TestQueuedHeavyQueryLeavesWhenItsClientIsGone(t *testing.T) {
 	var gone atomic.Bool
 	result := make(chan *api_storage.ListResult, 1)
 	go func() {
-		result <- api_storage.Plan(heavyQuery(&api_storage.Guard{Abandoned: gone.Load}))
+		result <- api_storage.Plan(heavyQuery(slowGuard(&gone)))
 	}()
 	waitForQueue(t, 1)
 
@@ -165,7 +176,7 @@ func TestQueuedHeavyQueryGivesUpAfterTheQueueTimeout(t *testing.T) {
 	holder := holdHeavyLane(t)
 
 	start := time.Now()
-	res := api_storage.Plan(heavyQuery(&api_storage.Guard{}))
+	res := api_storage.Plan(heavyQuery(slowGuard(nil)))
 	waited := time.Since(start)
 	if !errors.Is(res.Err, api_storage.ErrBusy) {
 		t.Fatalf("expected busy after the queue timeout, got %v", res.Err)
@@ -176,7 +187,7 @@ func TestQueuedHeavyQueryGivesUpAfterTheQueueTimeout(t *testing.T) {
 
 	admitted := make(chan *api_storage.ListResult, 1)
 	go func() {
-		admitted <- api_storage.Plan(heavyQuery((&api_storage.Guard{}).Until(time.Now().Add(time.Minute))))
+		admitted <- api_storage.Plan(heavyQuery(slowGuard(nil).Until(time.Now().Add(time.Minute))))
 	}()
 	time.Sleep(300 * time.Millisecond)
 	if api_storage.HeavyWaiting() != 1 {
@@ -221,4 +232,21 @@ func TestAbandonStopsAScanAndKeepsItsError(t *testing.T) {
 	if nilGuard.Check() != nil || nilGuard.Err() != nil || nilGuard.Stopped() {
 		t.Fatalf("a nil guard never stops")
 	}
+}
+
+func TestACheapPlanNeverWaitsForTheHeavyLane(t *testing.T) {
+	initOverloadStore(t, configuration.ApiQueryConfig{Workers: 1, MaxQueued: 1, QueueTimeoutMs: -1})
+	holder := holdHeavyLane(t)
+
+	start := time.Now()
+	res := api_storage.Plan(api_storage.ListQuery{Entity: "big", Search: "nnn", Limit: 10, Guard: &api_storage.Guard{}})
+	if res.Err != nil || len(res.Docs) != 10 {
+		t.Fatalf("a search page is served while the lane is held, got %d %v", len(res.Docs), res.Err)
+	}
+	if time.Since(start) > time.Second || api_storage.HeavyWaiting() != 0 {
+		t.Fatalf("a search page does not queue, took %s with %d waiting", time.Since(start), api_storage.HeavyWaiting())
+	}
+
+	holder.free()
+	<-holder.done
 }

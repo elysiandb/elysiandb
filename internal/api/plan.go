@@ -638,17 +638,17 @@ func Plan(q ListQuery) *ListResult {
 	res := &ListResult{snap: snap}
 	reader := includeReader()
 
-	if needsMatch && heavyPlan(snap, cand, evalIncludes) {
-		release, err := acquireHeavyLane(q.Guard)
-		if err != nil {
-			res.Err = err
-			return res
+	heavy := needsMatch && heavyPlan(snap, cand, evalIncludes)
+	var release func()
+	defer func() {
+		if release != nil {
+			release()
 		}
-		defer release()
-	}
+	}()
 
 	verified := 0
 	expired := false
+	var started time.Time
 	verify := func(d datastore.Doc) bool {
 		if match == nil || expired {
 			return !expired
@@ -662,10 +662,25 @@ func Plan(q ListQuery) *ListResult {
 			return true
 		}
 
+		if verified == 0 {
+			started = time.Now()
+		}
+
 		verified++
-		if verified%guardInterval == 0 && q.Guard.Check() != nil {
-			expired = true
-			return false
+		if verified%guardInterval == 0 {
+			if heavy && release == nil && time.Since(started) >= heavyLaneAfter {
+				r, err := acquireHeavyLane(q.Guard)
+				if err != nil {
+					expired = true
+					return false
+				}
+				release = r
+			}
+
+			if q.Guard.Check() != nil {
+				expired = true
+				return false
+			}
 		}
 
 		doc, err := d.Decode()
@@ -706,6 +721,7 @@ const (
 	defaultQueuePerWorker = 4
 	defaultQueueTimeout   = 5 * time.Second
 	heavyLanePollInterval = 20 * time.Millisecond
+	heavyLaneAfter        = 5 * time.Millisecond
 )
 
 var (

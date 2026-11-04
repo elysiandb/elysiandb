@@ -26,12 +26,14 @@ const busyQuery = "/api/busy?filter%5Bnote%5D%5Bneq%5D=x&search=nnn&countOnly=tr
 func seedBusy(t *testing.T, s *apiServer) {
 	t.Helper()
 
-	list := make([]map[string]any, 0, busyDocs)
-	for i := 0; i < busyDocs; i++ {
-		list = append(list, map[string]any{"id": fmt.Sprintf("b%05d", i), "note": strings.Repeat("n", 20), "tags": []any{"n", "m"}})
+	for start := 0; start < busyDocs; start += 500 {
+		list := make([]map[string]any, 0, 500)
+		for i := start; i < start+500; i++ {
+			list = append(list, map[string]any{"id": fmt.Sprintf("b%05d", i), "note": strings.Repeat("n", 4000), "tags": []any{"n", "m"}})
+		}
+		body, _ := json.Marshal(list)
+		s.mustDo(fasthttp.StatusOK, "POST", "/api/busy", string(body))
 	}
-	body, _ := json.Marshal(list)
-	s.mustDo(fasthttp.StatusOK, "POST", "/api/busy", string(body))
 }
 
 func holdHeavyLane(t *testing.T) func() {
@@ -40,9 +42,13 @@ func holdHeavyLane(t *testing.T) func() {
 	inside := make(chan struct{})
 	release := make(chan struct{})
 	done := make(chan struct{})
-	var once atomic.Bool
+	var calls atomic.Int64
 	guard := &api_storage.Guard{Abandoned: func() bool {
-		if once.CompareAndSwap(false, true) {
+		if calls.Add(1) < 15 {
+			time.Sleep(time.Millisecond)
+			return false
+		}
+		if calls.Load() == 15 {
 			close(inside)
 			<-release
 		}
