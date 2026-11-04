@@ -674,12 +674,12 @@ A change is acknowledged only once the log has accepted it. When a log write fai
 | ----- | ------------- | ------------------ |
 | Documents read most often | 10 % | The least used ones leave memory and are read back from disk |
 | Pages of the engine structures | 15 % | The least used pages leave memory and are read back from disk |
-| Pages changed since the last checkpoint | 4 % | A checkpoint starts; at twice the share, writers wait for it |
+| Pages changed since the last checkpoint | 8 % | A checkpoint starts; at twice the share, writers wait for it |
 | Results of hook queries | 12 % | The least used results are dropped; a result that cannot fit is refused with `503` |
 | Index builds | 6 % | The next build waits for the current one |
 | Working memory of requests | 12 % | A request waits for memory, then is answered `503` `server busy` |
 
-The API cache keeps its own limit, `api.cache.maxMB` (128 MB by default), and responses of more than `api.response.spoolMB` are spooled to disk. The rest, about 40 %, is left for the runtime and the garbage collector, so that the live memory stays far below the budget and the garbage collector never runs continuously. ElysianDB also follows the memory the process holds: above 65 % of the budget in use after a garbage collection, or 95 % held in total, the shares of documents, pages, index builds and requests are halved, and above 80 % or 105 % they and the results of hook queries are quartered, until the memory comes back down. A request reserves memory for the documents it decodes, the response it builds and, when it runs heavy work, an envelope of 8 MB; it gives it back when it ends.
+The API cache keeps its own limit, `api.cache.maxMB` (128 MB by default), and responses of more than `api.response.spoolMB` are spooled to disk. The rest, more than a third, is left for the runtime and the garbage collector, so that the live memory stays far below the budget and the garbage collector never runs continuously. ElysianDB also follows the memory the process holds: above 65 % of the budget in use after a garbage collection, or 95 % held in total, the shares of documents, pages, index builds and requests are halved, and above 80 % or 105 % they and the results of hook queries are quartered, until the memory comes back down. A request reserves memory for the documents it decodes, the response it builds and, when it runs heavy work, an envelope of 8 MB; it gives it back when it ends.
 
 **One process per folder.** The engine locks `elysiandb.lock` in the data folder. A second process on the same folder, `elysiandb backup` on the folder of a running server for example, stops with an error.
 

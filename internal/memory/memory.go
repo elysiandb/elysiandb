@@ -32,7 +32,7 @@ var ErrBusy = errors.New("memory budget exhausted")
 const (
 	valuesShare   = 0.10
 	pagesShare    = 0.15
-	dirtyShare    = 0.04
+	dirtyShare    = 0.08
 	hooksShare    = 0.12
 	buildsShare   = 0.06
 	requestsShare = 0.12
