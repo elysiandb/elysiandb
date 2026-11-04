@@ -46,6 +46,7 @@ type manifest struct {
 	Types      []string         `json:"types,omitempty"`
 	Entities   []manifestEntity `json:"entities,omitempty"`
 	Live       map[string]int64 `json:"live,omitempty"`
+	Previous   uint64           `json:"previous_lsn,omitempty"`
 }
 
 type pageRoot struct {
@@ -163,7 +164,9 @@ func (e *Engine) chooseManifest() (*manifest, *manifest, error) {
 			continue
 		}
 
-		previous = m
+		if chosen.Previous != 0 && chosen.Previous == m.LSN && m.Format == manifestFormatPages {
+			previous = m
+		}
 	}
 
 	if chosen == nil && len(stored) > 0 {
@@ -726,6 +729,9 @@ func (e *Engine) checkpoint(force bool) error {
 	}
 
 	m.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	if e.current != nil {
+		m.Previous = e.current.LSN
+	}
 	data, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		return err

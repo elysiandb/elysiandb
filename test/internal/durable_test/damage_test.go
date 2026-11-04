@@ -190,3 +190,27 @@ func TestAFullDiskNeverAcknowledgesALostWrite(t *testing.T) {
 	checkLedger(t, "after a full disk", e, l)
 	e.Abandon()
 }
+
+func TestAPreviousManifestFromAnotherChainIsIgnored(t *testing.T) {
+	dir := t.TempDir()
+	fs, l := filledDisk(t, dir)
+
+	fs.mutate(filepath.Join(dir, durable.PreviousManifest), func(n *memNode) {
+		n.data = []byte(`{"format": 2, "lsn": 1, "segment": 1, "offset": 16, "entities": [{"name": "a", "slots": {"id": 999999999999, "size": 64}, "ids": {"id": 999999999999, "size": 64}}]}`)
+		n.synced = n.data
+	})
+
+	for round := 0; round < 3; round++ {
+		e, err := datastore.Open(engineOptions(dir, fs))
+		if err != nil {
+			t.Fatalf("round %d: %v", round, err)
+		}
+		checkLedger(t, fmt.Sprintf("round %d", round), e, l)
+		if _, err := e.CompactPages(); err != nil {
+			t.Fatalf("round %d: cleaning must ignore the foreign manifest: %v", round, err)
+		}
+		if err := e.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
