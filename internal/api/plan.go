@@ -815,7 +815,15 @@ func heavyPlan(snap *datastore.Snapshot, cand candidates, evalIncludes string) b
 	return maybe > heavyCandidates
 }
 
+func AcquireHeavyLane(guard *Guard) (func(), error) {
+	return acquireHeavyLane(guard)
+}
+
 func acquireHeavyLane(guard *Guard) (func(), error) {
+	if guard != nil && guard.Laned {
+		return func() {}, nil
+	}
+
 	slots := heavyLane()
 	release := func() { <-slots }
 

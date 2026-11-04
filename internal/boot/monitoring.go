@@ -5,6 +5,7 @@ import (
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/taymour/elysiandb/internal/metrics"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/storage"
@@ -19,6 +20,7 @@ func MonitoringSources() metrics.Sources {
 		IndexBacklog:    api_storage.IndexBacklog,
 		RecoverySizes:   storageLogSizes,
 		Engine:          engineSample,
+		HookCaches:      hookCaches,
 		HeavyWaiting:    api_storage.HeavyWaiting,
 		Indexes:         indexStates,
 		Transactions:    transaction.OpenTransactions,
@@ -100,6 +102,12 @@ func engineSample() metrics.EngineSample {
 		DirtyPageBytes:     st.DirtyPageBytes,
 		CheckpointMs:       st.LastCheckpointMs,
 	}
+}
+
+func hookCaches() metrics.HookCacheSample {
+	q, o := hook.QueryCache(), hook.OutputMemo()
+
+	return metrics.HookCacheSample{QueryHits: q.Hits, QueryMisses: q.Misses, OutputHits: o.Hits, OutputMisses: o.Misses}
 }
 
 func indexStates() []metrics.IndexState {

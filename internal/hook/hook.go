@@ -1,11 +1,13 @@
 package hook
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
 	"time"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
@@ -243,6 +245,9 @@ func (r *Request) apply(entity string, data map[string]any, event, phase, fnName
 		start := time.Now()
 		err := r.applyScript(h, fnName, data)
 		r.spent.Add(int64(time.Since(start)))
+		if errors.Is(err, api_storage.ErrBusy) || errors.Is(err, api_storage.ErrAbandoned) {
+			break
+		}
 		observeHook(h, entity, phase, start, err)
 	}
 

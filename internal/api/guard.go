@@ -16,6 +16,7 @@ type Guard struct {
 	Deadline  time.Time
 	Abandoned func() bool
 	Admitted  bool
+	Laned     bool
 	parent    *Guard
 	err       atomic.Pointer[error]
 }
