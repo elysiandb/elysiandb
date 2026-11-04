@@ -54,7 +54,9 @@ func (e *Engine) maintenanceLoop() {
 		if volume || ((compacted || e.checkpointDue()) && (e.checkpointSpaced() || e.LogSinceCheckpoint() >= e.forcedCheckpointLog())) {
 			compacted = false
 			if err := e.checkpoint(volume); err != nil {
-				engineLog.Error("checkpoint failed", "err", err)
+				if suppressed, ok := writeFailures.Allow("checkpoint"); ok {
+					engineLog.Error("checkpoint failed", log.WithSuppressed([]any{"err", err}, suppressed)...)
+				}
 			}
 			e.measureDirty()
 			e.signalFlushed()
