@@ -284,3 +284,41 @@ func TestRestartRebuildsSearchIndexesAndKeepsReleasedIndexes(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 }
+
+func TestResetReleasesTheCachedValues(t *testing.T) {
+	opts := options(t.TempDir())
+	opts.Background = true
+	opts.SegmentSize = 0
+	opts.CacheBytes = 256 << 20
+	e, err := datastore.Open(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.Close()
+
+	putDocs(t, e, "cached", 0, 20000, workDoc)
+	putDocs(t, e, "kept", 0, 1000, workDoc)
+	before := e.Stats().ValueCacheBytes
+	if before < 1<<20 {
+		t.Fatalf("the values should be cached, got %d bytes", before)
+	}
+
+	if err := e.Update(func(tx *datastore.Tx) error {
+		tx.ResetEntity("cached")
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	deadline := time.Now().Add(5 * time.Second)
+	for e.Stats().ValueCacheBytes > before/10 {
+		if time.Now().After(deadline) {
+			t.Fatalf("the values of a reset entity leave the cache, %d of %d bytes left", e.Stats().ValueCacheBytes, before)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	if e.Stats().ValueCacheBytes == 0 {
+		t.Fatalf("the values of other entities stay cached")
+	}
+}

@@ -384,6 +384,9 @@ func (e *Engine) applyBatch(recs []journal.Record, docs []map[string]any, replay
 
 	for _, name := range order {
 		drafts[name].publish()
+		if released := drafts[name].released; len(released) > 0 {
+			e.releaseValues(released)
+		}
 	}
 }
 

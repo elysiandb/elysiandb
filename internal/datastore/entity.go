@@ -70,6 +70,7 @@ type draft struct {
 	indexes  map[string]*index
 	cloned   bool
 	refsSeen map[RefPath]bool
+	released []ptree.Tree[*slot]
 }
 
 func (e *Engine) newDraft(ent *entity) *draft {
@@ -225,6 +226,10 @@ func (d *draft) reset(rec *journal.Record) {
 	indexes := map[string]*index{}
 	for name, idx := range d.indexes {
 		indexes[name] = &index{spec: idx.spec, ready: idx.ready, dormant: idx.dormant}
+	}
+
+	if d.r.slots.Len() > 0 {
+		d.released = append(d.released, d.r.slots)
 	}
 
 	d.r = root{gen: rec.Gen, version: rec.LSN}

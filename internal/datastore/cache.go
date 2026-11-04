@@ -125,16 +125,23 @@ func (s *cacheShard) evictOne() {
 	}
 }
 
-func (c *valueCache) drop(lsn uint64) {
+func (c *valueCache) drop(lsn uint64) int64 {
 	s := c.shard(lsn)
 	s.mu.Lock()
-	if i, ok := s.index[lsn]; ok {
-		s.bytes -= int64(len(s.entries[i].data))
-		s.entries[i] = cacheEntry{}
-		s.free = append(s.free, i)
-		delete(s.index, lsn)
+	defer s.mu.Unlock()
+
+	i, ok := s.index[lsn]
+	if !ok {
+		return 0
 	}
-	s.mu.Unlock()
+
+	size := int64(len(s.entries[i].data))
+	s.bytes -= size
+	s.entries[i] = cacheEntry{}
+	s.free = append(s.free, i)
+	delete(s.index, lsn)
+
+	return size
 }
 
 func (c *valueCache) size() int64 {
