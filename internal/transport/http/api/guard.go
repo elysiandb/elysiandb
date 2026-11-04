@@ -8,6 +8,7 @@ import (
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/metrics"
 	"github.com/taymour/elysiandb/internal/query"
+	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -35,10 +36,12 @@ func sendGuardError(ctx *fasthttp.RequestCtx, err error) {
 
 	switch {
 	case errors.Is(err, api_storage.ErrBusy):
+		observe.SetRejected(ctx, "server busy")
 		ctx.Response.Header.Set("Retry-After", "1")
 		ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 		ctx.SetBodyString(`{"error":"server busy"}`)
 	case errors.Is(err, api_storage.ErrAbandoned):
+		observe.SetRejected(ctx, "client gone")
 		metrics.RequestAbandoned()
 		ctx.SetStatusCode(statusClientClosedRequest)
 		ctx.SetBodyString(`{"error":"request abandoned by the client"}`)

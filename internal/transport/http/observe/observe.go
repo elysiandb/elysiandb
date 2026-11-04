@@ -23,6 +23,7 @@ const (
 	RequestIDHeader = "X-Request-Id"
 	errorKey        = "elysiandb.error"
 	loggedKey       = "elysiandb.error_logged"
+	rejectedKey     = "elysiandb.rejected"
 	requestIDKey    = "elysiandb.request_id"
 	maxRequestIDLen = 64
 	unmatchedRoute  = "unmatched"
@@ -34,6 +35,7 @@ var (
 	unauthorizedThrottle = log.NewThrottle(time.Minute)
 	forbiddenThrottle    = log.NewThrottle(time.Minute)
 	slowThrottle         = log.NewThrottle(time.Minute)
+	rejectedThrottle     = log.NewThrottle(time.Minute)
 	idPrefix             = newIDPrefix()
 	idCounter            atomic.Uint64
 )
@@ -56,12 +58,17 @@ func ResetThrottles() {
 	unauthorizedThrottle = log.NewThrottle(time.Minute)
 	forbiddenThrottle = log.NewThrottle(time.Minute)
 	slowThrottle = log.NewThrottle(time.Minute)
+	rejectedThrottle = log.NewThrottle(time.Minute)
 }
 
 func SetError(ctx *fasthttp.RequestCtx, err error) {
 	if err != nil {
 		ctx.SetUserValue(errorKey, err)
 	}
+}
+
+func SetRejected(ctx *fasthttp.RequestCtx, reason string) {
+	ctx.SetUserValue(rejectedKey, reason)
 }
 
 func RequestID(ctx *fasthttp.RequestCtx) string {
@@ -178,7 +185,17 @@ func finish(ctx *fasthttp.RequestCtx, start time.Time, requestID string) {
 		metrics.ObserveHTTP(method, route, status, d, Kind(method, route))
 	}
 
+	reason, rejected := ctx.UserValue(rejectedKey).(string)
+
 	switch {
+	case rejected:
+		if suppressed, ok := rejectedThrottle.Allow(method + " " + route + " " + reason); ok {
+			args := []any{"method", method, "route", route, "status", status, "reason", reason, "request_id", requestID}
+			if user != "" {
+				args = append(args, "user", user)
+			}
+			httpLog.Warn("request rejected", log.WithSuppressed(args, suppressed)...)
+		}
 	case status >= 500:
 		if ctx.UserValue(loggedKey) == nil {
 			args := []any{"method", method, "route", route, "status", status, "request_id", requestID, "duration_ms", durationMs}
