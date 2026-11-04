@@ -533,3 +533,53 @@ func TestKill9LosesNoAcknowledgedWrite(t *testing.T) {
 		t.Fatalf("the child wrote nothing")
 	}
 }
+
+func TestOldSnapshotsReadPagesOfCleanedSegments(t *testing.T) {
+	dir := t.TempDir()
+	opts := options(dir)
+	opts.CacheBytes = 4 << 10
+	opts.PageCacheBytes = 16 << 10
+	opts.PageSegmentSize = 64 << 10
+	e, err := datastore.Open(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.Close()
+
+	for i := 0; i < 3000; i++ {
+		_ = e.Update(func(tx *datastore.Tx) error {
+			return tx.Put("a", fmt.Sprintf("d%05d", i), map[string]any{"v": i, "pad": strings.Repeat("x", 40)})
+		})
+	}
+
+	if err := e.Checkpoint(); err != nil {
+		t.Fatal(err)
+	}
+
+	old := e.Snapshot("a")
+	_ = e.Update(func(tx *datastore.Tx) error {
+		tx.ResetEntity("a")
+		return tx.Put("a", "fresh", map[string]any{"v": -1})
+	})
+
+	if _, err := e.CompactPages(); err != nil {
+		t.Fatal(err)
+	}
+
+	seen := 0
+	old.Ascend(0, func(d datastore.Doc) bool {
+		if _, err := d.Decode(); err != nil {
+			t.Fatalf("an old snapshot cannot read %s: %v", d.ID(), err)
+		}
+		seen++
+		return true
+	})
+
+	if seen != 3000 {
+		t.Fatalf("an old snapshot keeps all its documents after the pages are cleaned, saw %d", seen)
+	}
+
+	if e.Snapshot("a").Len() != 1 {
+		t.Fatalf("the reset entity holds only the new document")
+	}
+}

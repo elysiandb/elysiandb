@@ -47,6 +47,7 @@ type chunk struct {
 }
 
 type retiredFile struct {
+	id    uint32
 	file  File
 	since time.Time
 }
@@ -442,6 +443,14 @@ func (j *Journal) writeChunks(chunks []*chunk) error {
 func (j *Journal) fileFor(segment uint32, create bool) (File, error) {
 	j.filesMu.RLock()
 	f := j.files[segment]
+	if f == nil && !create {
+		for _, r := range j.retired {
+			if r.id == segment {
+				f = r.file
+				break
+			}
+		}
+	}
 	j.filesMu.RUnlock()
 	if f != nil {
 		return f, nil
@@ -754,16 +763,23 @@ func (j *Journal) Retire(id uint32) error {
 		return fmt.Errorf("journal: segment %d is still active", id)
 	}
 
+	path := filepath.Join(j.dir, SegmentName(id))
+
 	j.filesMu.Lock()
 	f := j.files[id]
+	if f == nil {
+		if opened, err := j.fs.OpenFile(path, os.O_RDONLY, 0o600); err == nil {
+			f = opened
+		}
+	}
 	delete(j.files, id)
 	delete(j.dirty, id)
 	if f != nil {
-		j.retired = append(j.retired, retiredFile{file: f, since: time.Now()})
+		j.retired = append(j.retired, retiredFile{id: id, file: f, since: time.Now()})
 	}
 	j.filesMu.Unlock()
 
-	return j.fs.Remove(filepath.Join(j.dir, SegmentName(id)))
+	return j.fs.Remove(path)
 }
 
 func (j *Journal) closeRetired(all bool) {

@@ -33,6 +33,13 @@ func valueCacheLimit(bytes int64) int64 {
 func (e *Engine) releaseValues(trees []pagetree.Tree) {
 	run := func() {
 		var freed int64
+		defer func() {
+			if r := recover(); r != nil {
+				engineLog.Warn("cannot release the values of a reset entity", "err", r)
+			}
+			returnMemory(freed)
+		}()
+
 		for _, t := range trees {
 			t.AscendAt(0, func(k string, v []byte) bool {
 				s := decodeSlotValue(keySeq(k), v, true)
@@ -41,8 +48,6 @@ func (e *Engine) releaseValues(trees []pagetree.Tree) {
 				return true
 			})
 		}
-
-		returnMemory(freed)
 	}
 
 	if e.opts.Background {

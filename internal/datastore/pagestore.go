@@ -45,9 +45,10 @@ type pageStore struct {
 	bufStart int64
 	unsynced map[uint32]*os.File
 
-	rmu   sync.RWMutex
-	files map[uint32]*os.File
-	sizes map[uint32]int64
+	rmu     sync.RWMutex
+	files   map[uint32]*os.File
+	sizes   map[uint32]int64
+	retired map[uint32]*os.File
 
 	cmu      sync.Mutex
 	ring     []cachedPage
@@ -80,7 +81,7 @@ func openPageStore(dir string, limit, segSize int64) (*pageStore, error) {
 		segSize = pageSegmentSize
 	}
 
-	s := &pageStore{dir: dir, segSize: segSize, files: map[uint32]*os.File{}, sizes: map[uint32]int64{}, unsynced: map[uint32]*os.File{}}
+	s := &pageStore{dir: dir, segSize: segSize, files: map[uint32]*os.File{}, sizes: map[uint32]int64{}, retired: map[uint32]*os.File{}, unsynced: map[uint32]*os.File{}}
 	s.limit.Store(limit)
 
 	entries, err := os.ReadDir(dir)
@@ -165,6 +166,9 @@ func (s *pageStore) read(id uint64, size uint32) ([]byte, error) {
 
 	s.rmu.RLock()
 	f := s.files[seg]
+	if f == nil {
+		f = s.retired[seg]
+	}
 	s.rmu.RUnlock()
 	if f == nil {
 		return nil, fmt.Errorf("page segment %d is missing", seg)
@@ -380,11 +384,12 @@ func (s *pageStore) remove(ids []uint32) {
 
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 
-	var retired []*os.File
+	var retired []uint32
 	s.rmu.Lock()
 	for _, id := range ids {
 		if f := s.files[id]; f != nil {
-			retired = append(retired, f)
+			s.retired[id] = f
+			retired = append(retired, id)
 		}
 		delete(s.files, id)
 		delete(s.sizes, id)
@@ -395,8 +400,13 @@ func (s *pageStore) remove(ids []uint32) {
 	_ = syncDir(s.dir)
 
 	time.AfterFunc(pageCloseDelay, func() {
-		for _, f := range retired {
-			_ = f.Close()
+		s.rmu.Lock()
+		defer s.rmu.Unlock()
+		for _, id := range retired {
+			if f := s.retired[id]; f != nil {
+				_ = f.Close()
+				delete(s.retired, id)
+			}
 		}
 	})
 }
@@ -417,6 +427,10 @@ func (s *pageStore) close() error {
 	for id, f := range s.files {
 		_ = f.Close()
 		delete(s.files, id)
+	}
+	for id, f := range s.retired {
+		_ = f.Close()
+		delete(s.retired, id)
 	}
 	s.rmu.Unlock()
 
