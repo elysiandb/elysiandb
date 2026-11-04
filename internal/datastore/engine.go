@@ -39,6 +39,7 @@ type Options struct {
 	CacheBytes      int64
 	PageCacheBytes  int64
 	PageSegmentSize int64
+	DirtyFlushBytes int64
 	IndexWorkers    int
 	Background      bool
 	SegmentSize     int64
@@ -73,6 +74,10 @@ type Engine struct {
 	checkpointBytes atomic.Int64
 	segmentLive     atomic.Pointer[map[uint32]int64]
 
+	dirty        atomic.Int64
+	flushNow     chan struct{}
+	flushed      chan struct{}
+	flushedMu    sync.Mutex
 	builds       chan *entity
 	buildOrder   atomic.Uint64
 	upgradeFrom  int
@@ -124,6 +129,8 @@ func Open(opts Options) (*Engine, error) {
 		entities: map[string]*entity{},
 		kv:       newKVStore(opts.Shards),
 		builds:   make(chan *entity, 1024),
+		flushNow: make(chan struct{}, 1),
+		flushed:  make(chan struct{}),
 		stop:     make(chan struct{}),
 	}
 
@@ -275,10 +282,11 @@ func (e *Engine) load() error {
 }
 
 func (e *Engine) startBackground() {
-	e.wg.Add(3)
+	e.wg.Add(4)
 	go e.expiryLoop()
 	go e.maintenanceLoop()
 	go e.buildLoop()
+	go e.dirtyLoop()
 
 	if e.inline {
 		go e.warmValues()

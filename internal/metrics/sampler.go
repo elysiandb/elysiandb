@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"github.com/taymour/elysiandb/internal/memory"
 	"math"
 	"os"
 	"path/filepath"
@@ -28,6 +29,7 @@ type Sources struct {
 	MongoPoolInUse       func() int
 	DefaultAdminPassword func() bool
 	Engine               func() EngineSample
+	HookCaches           func() HookCacheSample
 	HeavyWaiting         func() int
 	Indexes              func() []IndexState
 }
@@ -39,7 +41,16 @@ type EngineSample struct {
 	ValueCacheHits     int64
 	ValueCacheMisses   int64
 	ResidentBytes      int64
+	ValueCacheBytes    int64
+	DirtyPageBytes     int64
 	CheckpointMs       float64
+}
+
+type HookCacheSample struct {
+	QueryHits    int64
+	QueryMisses  int64
+	OutputHits   int64
+	OutputMisses int64
 }
 
 type resolution struct {
@@ -69,6 +80,9 @@ type snapshot struct {
 
 	valueCacheHits   int64
 	valueCacheMisses int64
+	memoryRefused    int64
+	hookQuery        [2]int64
+	hookOutput       [2]int64
 }
 
 type slowValues struct {
@@ -409,8 +423,27 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 		s.gauges[sLiveBytes] = float64(eng.LiveBytes)
 		s.gauges[sResidentBytes] = float64(eng.ResidentBytes)
 		s.gauges[sCheckpointMs] = eng.CheckpointMs
+		s.gauges[sValueCacheBytes] = float64(eng.ValueCacheBytes)
+		s.gauges[sPageCacheBytes] = float64(eng.ResidentBytes)
+		s.gauges[sDirtyPageBytes] = float64(eng.DirtyPageBytes)
 		s.valueCacheHits = eng.ValueCacheHits
 		s.valueCacheMisses = eng.ValueCacheMisses
+	}
+
+	if src.HookCaches != nil {
+		hc := src.HookCaches()
+		s.hookQuery = [2]int64{hc.QueryHits, hc.QueryMisses}
+		s.hookOutput = [2]int64{hc.OutputHits, hc.OutputMisses}
+	}
+
+	s.gauges[sMemoryBudget] = float64(memory.Budget())
+	s.gauges[sHeapLiveBytes] = float64(memory.Live())
+	s.gauges[sMemoryPressure] = float64(memory.Current())
+	s.gauges[sHookResultsBytes] = float64(memory.HookResults.Used())
+	s.gauges[sIndexBuildBytes] = float64(memory.Builds.Used())
+	s.gauges[sRequestReservedBytes] = float64(memory.Requests.Used())
+	for _, p := range memory.Pools() {
+		s.memoryRefused += p.Refused()
 	}
 
 	s.gauges[sTCPConns] = float64(tcpOpen.Load())

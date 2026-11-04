@@ -6,6 +6,7 @@ import (
 )
 
 type valueCache struct {
+	limit  atomic.Int64
 	shards []*cacheShard
 	hits   atomic.Int64
 	misses atomic.Int64
@@ -34,11 +35,28 @@ func newValueCache(limit int64, shards int) *valueCache {
 	}
 
 	c := &valueCache{shards: make([]*cacheShard, shards)}
+	c.limit.Store(limit)
 	for i := range c.shards {
 		c.shards[i] = &cacheShard{index: map[uint64]int{}, limit: max(limit/int64(shards), 1)}
 	}
 
 	return c
+}
+
+func (c *valueCache) setLimit(limit int64) {
+	if c.limit.Swap(limit) == limit {
+		return
+	}
+
+	per := max(limit/int64(len(c.shards)), 1)
+	for _, s := range c.shards {
+		s.mu.Lock()
+		s.limit = per
+		for s.bytes > s.limit && len(s.index) > 0 {
+			s.evictOne()
+		}
+		s.mu.Unlock()
+	}
 }
 
 func (c *valueCache) shard(lsn uint64) *cacheShard {

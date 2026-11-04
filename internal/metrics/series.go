@@ -81,6 +81,18 @@ const (
 	sHeavyWaiting
 	sHeavyWaitP95
 	sAbandonedRps
+	sMemoryBudget
+	sHeapLiveBytes
+	sMemoryPressure
+	sMemoryRefusedRps
+	sValueCacheBytes
+	sPageCacheBytes
+	sDirtyPageBytes
+	sHookResultsBytes
+	sIndexBuildBytes
+	sRequestReservedBytes
+	sHookQueryHitRatio
+	sHookOutputHitRatio
 	numSeries
 )
 
@@ -161,6 +173,18 @@ var seriesNames = [numSeries]string{
 	sHeavyWaiting:            "heavy_waiting",
 	sHeavyWaitP95:            "heavy_wait_p95_ms",
 	sAbandonedRps:            "abandoned_rps",
+	sMemoryBudget:            "memory_budget_bytes",
+	sHeapLiveBytes:           "heap_live_bytes",
+	sMemoryPressure:          "memory_pressure",
+	sMemoryRefusedRps:        "memory_refused_rps",
+	sValueCacheBytes:         "value_cache_bytes",
+	sPageCacheBytes:          "page_cache_bytes",
+	sDirtyPageBytes:          "dirty_page_bytes",
+	sHookResultsBytes:        "hook_results_bytes",
+	sIndexBuildBytes:         "index_build_bytes",
+	sRequestReservedBytes:    "request_reserved_bytes",
+	sHookQueryHitRatio:       "hook_query_hit_ratio",
+	sHookOutputHitRatio:      "hook_output_hit_ratio",
 }
 
 func SeriesNames() []string {
@@ -286,11 +310,27 @@ func derive(prev, cur *snapshot) Point {
 		p.V[sValueCacheHitRatio] = float64(hits) / float64(hits+misses)
 	}
 
+	if cur.memoryRefused >= prev.memoryRefused {
+		p.V[sMemoryRefusedRps] = float64(cur.memoryRefused-prev.memoryRefused) / elapsed
+	}
+
+	p.V[sHookQueryHitRatio] = ratio(cur.hookQuery, prev.hookQuery)
+	p.V[sHookOutputHitRatio] = ratio(cur.hookOutput, prev.hookOutput)
+
 	for s, v := range cur.gauges {
 		p.V[s] = v
 	}
 
 	return p
+}
+
+func ratio(cur, prev [2]int64) float64 {
+	hits, misses := cur[0]-prev[0], cur[1]-prev[1]
+	if hits < 0 || misses < 0 || hits+misses == 0 {
+		return math.NaN()
+	}
+
+	return float64(hits) / float64(hits+misses)
 }
 
 type Number float64

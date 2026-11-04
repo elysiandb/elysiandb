@@ -8,13 +8,12 @@ import (
 
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/memory"
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
 const (
 	autoMemoryShare  = 0.75
-	valueCacheShare  = 0.25
-	pageCacheShare   = 0.25
 	unlimitedCgroups = 1 << 60
 )
 
@@ -56,6 +55,10 @@ func MemoryBudget(cfg *configuration.Config) (int64, bool) {
 func ApplyMemoryLimit() {
 	cfg := globals.GetConfig()
 	budget, explicit := MemoryBudget(cfg)
+	if !explicit {
+		memory.Configure(0)
+	}
+
 	if budget <= 0 {
 		return
 	}
@@ -65,11 +68,16 @@ func ApplyMemoryLimit() {
 	}
 
 	if explicit {
+		memory.Configure(budget)
+		memory.Start()
 		storage.ValueCacheBytes = func(*configuration.Config) int64 {
-			return int64(float64(budget) * valueCacheShare)
+			return memory.Values.Limit()
 		}
 		storage.PageCacheBytes = func(*configuration.Config) int64 {
-			return int64(float64(budget) * pageCacheShare)
+			return memory.Pages.Limit()
+		}
+		storage.DirtyFlushBytes = func(*configuration.Config) int64 {
+			return memory.Dirty.Limit()
 		}
 	}
 

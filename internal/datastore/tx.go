@@ -52,6 +52,8 @@ func (e *Engine) Update(fn func(tx *Tx) error) error {
 	e.writers.Add(1)
 	defer e.writers.Done()
 
+	e.waitForDirty()
+
 	for attempt := 0; ; attempt++ {
 		tx := e.newTx()
 		if err := fn(tx); err != nil {

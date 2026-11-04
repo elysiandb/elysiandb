@@ -96,6 +96,8 @@ func engineSample() metrics.EngineSample {
 		ValueCacheHits:     st.ValueCacheHits,
 		ValueCacheMisses:   st.ValueCacheMisses,
 		ResidentBytes:      st.ResidentStructBytes,
+		ValueCacheBytes:    st.ValueCacheBytes,
+		DirtyPageBytes:     st.DirtyPageBytes,
 		CheckpointMs:       st.LastCheckpointMs,
 	}
 }

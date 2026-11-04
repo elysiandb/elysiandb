@@ -26,10 +26,13 @@ func (e *Engine) maintenanceLoop() {
 	lastSweep := time.Now()
 	compacted := false
 	for {
+		volume := false
 		select {
 		case <-e.stop:
 			return
 		case <-ticker.C:
+		case <-e.flushNow:
+			volume = true
 		}
 
 		if time.Since(lastSweep) >= idleSweepInterval {
@@ -46,11 +49,14 @@ func (e *Engine) maintenanceLoop() {
 			}
 		}
 
-		if (compacted || e.checkpointDue()) && (e.checkpointSpaced() || e.LogSinceCheckpoint() >= e.forcedCheckpointLog()) {
+		volume = volume || e.dirty.Load() >= e.dirtyFlushBytes()
+		if volume || ((compacted || e.checkpointDue()) && (e.checkpointSpaced() || e.LogSinceCheckpoint() >= e.forcedCheckpointLog())) {
 			compacted = false
-			if err := e.checkpoint(false); err != nil {
+			if err := e.checkpoint(volume); err != nil {
 				engineLog.Error("checkpoint failed", "err", err)
 			}
+			e.measureDirty()
+			e.signalFlushed()
 		}
 	}
 }
@@ -274,6 +280,7 @@ type EngineStats struct {
 	LogBytes            int64
 	LiveBytes           int64
 	PendingBytes        int
+	DirtyPageBytes      int64
 	Inline              bool
 	Documents           int64
 	ResidentStructBytes int64
@@ -293,6 +300,7 @@ func (e *Engine) Stats() EngineStats {
 		ValueCacheHits:     e.cache.hits.Load(),
 		ValueCacheMisses:   e.cache.misses.Load(),
 		PendingBytes:       e.j.PendingBytes(),
+		DirtyPageBytes:     e.dirty.Load(),
 		Inline:             e.inline,
 	}
 
