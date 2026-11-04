@@ -206,6 +206,14 @@ func BenchmarkSearch(b *testing.B) {
 	}
 }
 
+func BenchmarkSearchCount(b *testing.B) {
+	setup(b)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		get(b, "GET", "/api/work?search=dragon&countOnly=true", "")
+	}
+}
+
 func BenchmarkQueryAPIMultiSort(b *testing.B) {
 	setup(b)
 	body := `{"entity":"work","filters":{"and":[{"status":{"eq":"published"}},{"year":{"gte":1950}}]},"sorts":{"rating":"desc","year":"asc"},"limit":20}`
