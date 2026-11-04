@@ -4,8 +4,7 @@ store:
   flushIntervalSeconds: 5
   crashRecovery: { enabled: true, maxLogMB: 100 }
 engine:
-  name: "internal"  # options: "internal" (recommended), "mongodb" (beta)
-  uri: "mongodb://elysian:elysian@localhost:27017/elysiandb"  # Only for non internal engine
+  name: "internal"
 server:
   http: { enabled: true,  host: 0.0.0.0, port: 8089 }
   tcp:  { enabled: true,  host: 0.0.0.0, port: 8088 }
