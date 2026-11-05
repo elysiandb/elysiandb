@@ -30,6 +30,7 @@ const (
 	relocateBatch       = 256
 	reclaimAboveBytes   = 128 << 20
 	reclaimQuietLog     = 16 << 20
+	compactPagesRounds  = 6
 )
 
 var (
@@ -822,7 +823,7 @@ func (e *Engine) reclaimRound() error {
 
 func (e *Engine) CompactPages() (int, error) {
 	before := len(e.pages.SegmentSizes())
-	for round := 0; round < 3; round++ {
+	for round := 0; round < compactPagesRounds; round++ {
 		e.ckptMu.Lock()
 		e.lastPageWalk = time.Time{}
 		e.ckptMu.Unlock()
@@ -845,16 +846,17 @@ func (e *Engine) cleanPages(snaps []entitySnapshot) {
 	}
 	e.lastPageWalk = time.Now()
 
-	live := map[uint32]int64{}
+	before := map[uint32]int64{}
 	if e.previous != nil && e.previous.Format == manifestFormatPages {
 		for _, r := range e.previous.roots() {
 			e.openTree(r).WalkStored(func(id uint64, size uint32) {
 				seg, _ := durable.SplitPageID(id)
-				live[seg] += int64(size) + durable.PageHeaderSize
+				before[seg] += int64(size) + durable.PageHeaderSize
 			})
 		}
 	}
 
+	now := map[uint32]int64{}
 	for _, snap := range snaps {
 		trees := []pagetree.Tree{snap.r.slots, snap.r.ids}
 		for _, idx := range snap.r.indexes {
@@ -866,7 +868,7 @@ func (e *Engine) cleanPages(snaps []entitySnapshot) {
 		for _, t := range trees {
 			t.WalkStored(func(id uint64, size uint32) {
 				seg, _ := durable.SplitPageID(id)
-				live[seg] += int64(size) + durable.PageHeaderSize
+				now[seg] += int64(size) + durable.PageHeaderSize
 			})
 		}
 	}
@@ -879,18 +881,21 @@ func (e *Engine) cleanPages(snaps []entitySnapshot) {
 	}
 	var candidates []candidate
 	var total, held int64
+	leaving := 0
 	for seg, size := range e.pages.SegmentSizes() {
 		total += size
-		held += live[seg]
+		held += now[seg]
 		if seg >= current {
 			continue
 		}
 
 		switch {
-		case live[seg] == 0:
+		case now[seg] == 0 && before[seg] == 0:
 			dead = append(dead, seg)
-		case live[seg]*2 < size:
-			candidates = append(candidates, candidate{seg: seg, ratio: float64(live[seg]) / float64(size)})
+		case now[seg] == 0:
+			leaving++
+		case now[seg]*2 < size:
+			candidates = append(candidates, candidate{seg: seg, ratio: float64(now[seg]) / float64(size)})
 		}
 	}
 
@@ -907,7 +912,7 @@ func (e *Engine) cleanPages(snaps []entitySnapshot) {
 	e.pages.Remove(dead)
 	e.pageRemoval = victims
 
-	if garbage := total - held; garbage >= reclaimAboveBytes && garbage*4 >= total && len(dead)+len(victims) > 0 {
+	if garbage := total - held; garbage >= reclaimAboveBytes && garbage*4 >= total && len(dead)+len(victims)+leaving > 0 {
 		e.reclaim.Store(max(e.reclaim.Load(), 1))
 	}
 
