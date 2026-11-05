@@ -321,3 +321,23 @@ func TestInitDBMigratesA024FolderWithAPendingRecoveryLog(t *testing.T) {
 		t.Fatalf("the admin ACL of books should be created at startup")
 	}
 }
+
+func TestAnExplicitBudgetStaysUnderTheContainerLimit(t *testing.T) {
+	setupLog(t)
+
+	gb := int64(1) << 30
+	cases := []struct {
+		budget, container, want int64
+	}{
+		{4 * gb, 8 * gb, 4 * gb},
+		{4 * gb, 0, 4 * gb},
+		{9 * gb, 8 * gb, int64(float64(8*gb) * 0.90)},
+		{8 * gb, 8 * gb, int64(float64(8*gb) * 0.90)},
+	}
+
+	for _, c := range cases {
+		if got := boot.BudgetWithinContainer(c.budget, c.container); got != c.want {
+			t.Fatalf("budget %d in a container of %d: %d, expected %d", c.budget, c.container, got, c.want)
+		}
+	}
+}

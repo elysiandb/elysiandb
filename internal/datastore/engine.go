@@ -286,13 +286,33 @@ func (e *Engine) load() error {
 		e.j.SetNextLSN(ck.lastLSN + 1)
 	}
 
+	began := time.Now()
+	pending := e.j.BytesFrom(from)
+	if pending >= replayAnnounceBytes {
+		engineLog.Info("replaying the log", "bytes", pending, "estimated_seconds", pending/replayBytesPerSecond+1)
+	}
+
+	lastNote := began
+	applied := 0
 	stats, err := e.j.Replay(from, func(recs []journal.Record) error {
 		e.applyBatch(recs, nil, true)
+		if e.backlogBytes.Load() >= e.backlogLimit() {
+			e.settleAll()
+		}
+
+		applied += len(recs)
+		if time.Since(lastNote) >= replayNoteEvery {
+			lastNote = time.Now()
+			engineLog.Info("log replay in progress", "records", applied, "elapsed_ms", log.Since(began))
+		}
+
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("cannot replay the log: %w", err)
 	}
+
+	e.settleAll()
 
 	e.stats.replayedRecords.Store(int64(stats.Records))
 	if stats.Truncated > 0 {
@@ -304,7 +324,7 @@ func (e *Engine) load() error {
 	}
 
 	if stats.Records > 0 {
-		engineLog.Warn("unclean shutdown detected, log replayed", "batches", stats.Batches, "records", stats.Records)
+		engineLog.Warn("unclean shutdown detected, log replayed", "batches", stats.Batches, "records", stats.Records, "duration_ms", log.Since(began))
 	}
 
 	e.j.Start()
@@ -389,6 +409,12 @@ func (e *Engine) Abandon() {
 	e.pages.Close()
 	e.unlock()
 }
+
+const (
+	replayAnnounceBytes  = 64 << 10
+	replayBytesPerSecond = 32 << 20
+	replayNoteEvery      = 5 * time.Second
+)
 
 const (
 	diskCheckEvery  = time.Second
@@ -526,7 +552,7 @@ func (e *Engine) applyBatch(recs []journal.Record, docs []map[string]any, replay
 		}
 
 		d := e.newDraft(e.entity(name, true))
-		d.deferred = d.deferred || (e.opts.Background && !replay && len(recs) >= bulkBatchRecords)
+		d.deferred = d.deferred || (e.opts.Background && (replay || len(recs) >= bulkBatchRecords))
 		drafts[name] = d
 		order = append(order, name)
 

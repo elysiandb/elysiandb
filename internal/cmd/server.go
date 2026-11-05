@@ -35,10 +35,10 @@ func announceReady() {
 		time.Sleep(readyPoll)
 	}
 
-	globals.SetStarting(false)
 	took := time.Since(metrics.StartedAt())
 	metrics.SetStartup(took)
 	serverLog.Info("ready to serve", "startup_ms", took.Milliseconds())
+	globals.SetStarting(false)
 }
 
 func StartServer() {

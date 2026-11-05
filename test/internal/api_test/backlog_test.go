@@ -227,3 +227,76 @@ func TestAnIndexInBacklogIsRebuiltAfterACrash(t *testing.T) {
 		t.Fatalf("the index holds %d of 400 documents", found)
 	}
 }
+
+func TestLogReplayKeepsIndexesExact(t *testing.T) {
+	e := openBackgroundStore(t)
+
+	r := rand.New(rand.NewSource(23))
+	docs := make([]map[string]any, 0, 3000)
+	for i := 0; i < 3000; i++ {
+		docs = append(docs, randomDiffDoc(r, fmt.Sprintf("q%05d", i)))
+	}
+	api_storage.WriteListOfEntities("forms", docs)
+
+	specs := []datastore.IndexSpec{
+		{Kind: datastore.IndexFilter, Field: "a"},
+		{Kind: datastore.IndexFilter, Field: "b"},
+		{Kind: datastore.IndexBitmap, Field: "list.x"},
+		{Kind: datastore.IndexSort, Field: "a"},
+		{Kind: datastore.IndexSearch},
+		datastore.CompositeSpec("b", "a"),
+	}
+	for _, spec := range specs {
+		for !e.EnsureIndex("forms", spec) {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	if _, ok := e.IndexedSnapshot("forms").Index(specs[0]); !ok {
+		t.Fatal("the index is not usable")
+	}
+
+	if err := e.Checkpoint(); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 600; i++ {
+		id := fmt.Sprintf("q%05d", r.Intn(3000))
+		if i%6 == 0 {
+			api_storage.DeleteEntityById("forms", id)
+		} else {
+			api_storage.WriteEntity("forms", randomDiffDoc(r, id))
+		}
+	}
+
+	more := make([]map[string]any, 0, 500)
+	for i := 3000; i < 3500; i++ {
+		more = append(more, randomDiffDoc(r, fmt.Sprintf("q%05d", i)))
+	}
+	api_storage.WriteListOfEntities("forms", more)
+	if err := e.FlushLog(); err != nil {
+		t.Fatal(err)
+	}
+
+	e.Abandon()
+	if err := storage.Open(storage.ModeServer); err != nil {
+		t.Fatal(err)
+	}
+	e = storage.Engine()
+
+	if e.ReplayedRecords() == 0 {
+		t.Fatal("this test should replay the log")
+	}
+
+	if e.IndexBacklogBytes() != 0 {
+		t.Fatalf("a replay should leave no backlog: %d bytes", e.IndexBacklogBytes())
+	}
+
+	for _, spec := range specs {
+		for !e.EnsureIndex("forms", spec) {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	checkPlannerAgainstScan(t, r, "forms", 60)
+}

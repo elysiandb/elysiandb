@@ -670,3 +670,19 @@ func TestWritesAreRefusedWithoutDiskAndComeBack(t *testing.T) {
 		t.Fatalf("writes resume: %d %s", status, body)
 	}
 }
+
+func TestTheHealthRouteAnswersOnceTheServerCanServe(t *testing.T) {
+	s := startLiveServer(t, nil)
+
+	globals.SetStarting(true)
+	t.Cleanup(func() { globals.SetStarting(false) })
+
+	if status, _ := s.do("GET", "/health", nil, ""); status != http.StatusServiceUnavailable {
+		t.Fatalf("while starting: %d", status)
+	}
+
+	globals.SetStarting(false)
+	if status, _ := s.do("GET", "/health", nil, ""); status != http.StatusOK {
+		t.Fatalf("once ready: %d", status)
+	}
+}

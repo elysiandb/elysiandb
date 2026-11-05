@@ -42,15 +42,19 @@ func containerMemoryLimit() int64 {
 	return 0
 }
 
+func BudgetWithinContainer(budget, container int64) int64 {
+	if container <= 0 || float64(budget) <= float64(container)*containerShare {
+		return budget
+	}
+
+	bootLog.Warn("the memory budget is above the container limit, it is lowered", "limit_mb", budget>>20, "container_mb", container>>20)
+
+	return int64(float64(container) * containerShare)
+}
+
 func MemoryBudget(cfg *configuration.Config) (int64, bool) {
 	if cfg.Store.Memory.LimitMB > 0 {
-		budget := cfg.Store.Memory.LimitMB << 20
-		if limit := containerMemoryLimit(); limit > 0 && float64(budget) > float64(limit)*containerShare {
-			bootLog.Warn("the memory budget is above the container limit, it is lowered", "limit_mb", budget>>20, "container_mb", limit>>20)
-			budget = int64(float64(limit) * containerShare)
-		}
-
-		return budget, true
+		return BudgetWithinContainer(cfg.Store.Memory.LimitMB<<20, containerMemoryLimit()), true
 	}
 
 	if limit := containerMemoryLimit(); limit > 0 {

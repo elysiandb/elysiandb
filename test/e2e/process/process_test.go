@@ -461,6 +461,35 @@ func killRounds(t *testing.T, extra string) {
 	}
 }
 
+func TestAStartAfterACrashAnnouncesItsDuration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns servers")
+	}
+
+	folder := filepath.Join(t.TempDir(), "data")
+	s := start(t, folder, "")
+	for b := 0; b < 3; b++ {
+		docs := make([]string, 0, 200)
+		for i := 0; i < 200; i++ {
+			docs = append(docs, fmt.Sprintf(`{"id":"d%d-%d","pad":%q}`, b, i, strings.Repeat("p", 1000)))
+		}
+		if status, body, err := s.do("POST", "/api/announced", "["+strings.Join(docs, ",")+"]"); err != nil || status >= 300 {
+			t.Fatalf("%d %v %s", status, err, body)
+		}
+	}
+	s.kill()
+
+	s = start(t, folder, "")
+	s.terminate()
+
+	logs := s.log.String()
+	for _, want := range []string{"replaying the log", "estimated_seconds", "log replayed", "ready to serve", "startup_ms"} {
+		if !strings.Contains(logs, want) {
+			t.Fatalf("%q is missing from the logs:\n%s", want, logs)
+		}
+	}
+}
+
 func TestKillAtAnyMomentLosesNoConfirmedWrite(t *testing.T) {
 	killRounds(t, "")
 }

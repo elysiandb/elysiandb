@@ -652,6 +652,27 @@ type SegmentInfo struct {
 	Size int64
 }
 
+func (j *Journal) BytesFrom(from Position) int64 {
+	segments, err := j.Segments()
+	if err != nil {
+		return 0
+	}
+
+	var n int64
+	for _, seg := range segments {
+		if seg.ID < from.Segment {
+			continue
+		}
+
+		n += seg.Size
+		if seg.ID == from.Segment {
+			n -= int64(from.Offset)
+		}
+	}
+
+	return max(n, 0)
+}
+
 func (j *Journal) Segments() ([]SegmentInfo, error) {
 	entries, err := j.fs.ReadDir(j.dir)
 	if err != nil {
