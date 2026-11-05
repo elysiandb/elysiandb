@@ -81,6 +81,12 @@ var promGauges = []struct {
 	{"elysiandb_oldest_transaction_seconds", "Age of the oldest open transaction.", sOldestTransaction},
 	{"elysiandb_mongodb_ping_seconds", "MongoDB ping latency.", sMongoPingMs},
 	{"elysiandb_mongodb_pool_in_use", "MongoDB pool connections in use.", sMongoPoolInUse},
+	{"elysiandb_disk_free_bytes", "Free space on the disk of the data folder.", sDiskFreeBytes},
+	{"elysiandb_index_upkeep_bytes", "Index changes of large batches waiting to be applied.", sIndexUpkeepBytes},
+	{"elysiandb_backup_running", "Backups running now.", sBackupRunning},
+	{"elysiandb_backup_last_ok", "Whether the last backup succeeded, absent before the first one.", sBackupLastOK},
+	{"elysiandb_backup_last_bytes", "Size of the last backup.", sBackupBytes},
+	{"elysiandb_backup_age_seconds", "Seconds since the last backup ended.", sBackupAgeSeconds},
 }
 
 func Prometheus() []byte {
@@ -122,6 +128,10 @@ func Prometheus() []byte {
 		}
 	}
 
+	if latest != nil {
+		writeDiskCounters(&b, latest)
+	}
+
 	names := make([]string, 0, len(counts))
 	for name := range counts {
 		names = append(names, name)
@@ -141,6 +151,26 @@ func Prometheus() []byte {
 	writeHistogram(&b, "elysiandb_hook_duration_seconds", "Hook script duration.", &hookLatency)
 
 	return b.Bytes()
+}
+
+func writeDiskCounters(b *bytes.Buffer, latest *snapshot) {
+	writeHeader(b, "elysiandb_disk_read_bytes_total", "Bytes read from the data folder.", "counter")
+	writeSample(b, "elysiandb_disk_read_bytes_total", "", float64(latest.disk.ReadBytes))
+	writeHeader(b, "elysiandb_disk_write_bytes_total", "Bytes written to the data folder.", "counter")
+	writeSample(b, "elysiandb_disk_write_bytes_total", "", float64(latest.disk.WriteBytes))
+	writeHeader(b, "elysiandb_disk_syncs_total", "Synchronizations of files and folders to the disk.", "counter")
+	writeSample(b, "elysiandb_disk_syncs_total", "", float64(latest.disk.Syncs))
+	writeHeader(b, "elysiandb_disk_sync_seconds_total", "Time spent in synchronizations.", "counter")
+	writeSample(b, "elysiandb_disk_sync_seconds_total", "", float64(latest.disk.SyncNanos)/1e9)
+	writeHeader(b, "elysiandb_refused_writes_total", "Writes refused because the disk is full or failing.", "counter")
+	writeSample(b, "elysiandb_refused_writes_total", "", float64(latest.disk.RefusedWrites))
+	writeHeader(b, "elysiandb_backups_total", "Backups by result.", "counter")
+	writeSample(b, "elysiandb_backups_total", `result="ok"`, float64(latest.backup.Completed))
+	writeSample(b, "elysiandb_backups_total", `result="failed"`, float64(latest.backup.Failed))
+	writeHeader(b, "elysiandb_backup_last_duration_seconds", "Duration of the last backup.", "gauge")
+	writeSample(b, "elysiandb_backup_last_duration_seconds", "", latest.backup.Duration.Seconds())
+	writeHeader(b, "elysiandb_startup_seconds", "Time from the start of the process until it could serve.", "gauge")
+	writeSample(b, "elysiandb_startup_seconds", "", Startup().Seconds())
 }
 
 func writeHeader(b *bytes.Buffer, name, help, kind string) {

@@ -82,6 +82,7 @@ security:
 api:
   schema: { enabled: false }
   hooks: { enabled: true }
+monitoring: { prometheus: { enabled: true } }
 log: { level: info, format: text }
 `, folder, extra, port)
 
@@ -458,6 +459,81 @@ func killRounds(t *testing.T, extra string) {
 	logs := s.log.String()
 	if strings.Contains(logs, "level=ERROR") {
 		t.Fatalf("errors in the logs:\n%s", logs)
+	}
+}
+
+func metricValue(t *testing.T, s *server, name string) float64 {
+	t.Helper()
+
+	status, body, err := s.do("GET", "/metrics", "")
+	if err != nil || status != http.StatusOK {
+		t.Fatalf("metrics: %d %v", status, err)
+	}
+
+	for _, line := range strings.Split(string(body), "\n") {
+		if rest, ok := strings.CutPrefix(line, name+" "); ok {
+			var v float64
+			if _, err := fmt.Sscanf(rest, "%g", &v); err != nil {
+				t.Fatal(err)
+			}
+			return v
+		}
+	}
+
+	t.Fatalf("%s is missing:\n%s", name, body)
+
+	return 0
+}
+
+func TestBackupsLeaveNothingBehindInAServer(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns a server")
+	}
+
+	s := start(t, filepath.Join(t.TempDir(), "data"), "")
+	defer s.terminate()
+
+	docs := make([]string, 0, 2000)
+	for i := 0; i < 2000; i++ {
+		docs = append(docs, fmt.Sprintf(`{"id":"d%d","pad":%q}`, i, strings.Repeat("p", 500)))
+	}
+	if status, body, err := s.do("POST", "/api/steady", "["+strings.Join(docs, ",")+"]"); err != nil || status >= 300 {
+		t.Fatalf("%d %v %s", status, err, body)
+	}
+
+	round := func(n int) {
+		for i := 0; i < n; i++ {
+			resp, err := s.client.Get(s.url + "/api/backup")
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+
+			resp, err = s.client.Get(s.url + "/api/backup")
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = io.CopyN(io.Discard, resp.Body, 16)
+			resp.Body.Close()
+		}
+		s.client.CloseIdleConnections()
+		time.Sleep(11 * time.Second)
+	}
+
+	round(3)
+	goroutines, files := metricValue(t, s, "elysiandb_goroutines"), metricValue(t, s, "elysiandb_open_fds")
+
+	round(10)
+	if got := metricValue(t, s, "elysiandb_goroutines"); got > goroutines+8 {
+		t.Fatalf("goroutines grow with backups: %v then %v", goroutines, got)
+	}
+	if got := metricValue(t, s, "elysiandb_open_fds"); got > files+8 {
+		t.Fatalf("file descriptors grow with backups: %v then %v", files, got)
+	}
+
+	if completed := metricValue(t, s, `elysiandb_backups_total{result="ok"}`); completed < 13 {
+		t.Fatalf("completed backups: %v", completed)
 	}
 }
 

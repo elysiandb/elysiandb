@@ -97,6 +97,19 @@ const (
 	sIndexBytes
 	sHeldBytes
 	sHookFoldHitRatio
+	sDiskReadBytesRps
+	sDiskWriteBytesRps
+	sDiskSyncsRps
+	sDiskSyncMs
+	sDiskFreeBytes
+	sRefusedWritesRps
+	sIndexUpkeepBytes
+	sBackupRunning
+	sBackupLastOK
+	sBackupDurationMs
+	sBackupBytes
+	sBackupAgeSeconds
+	sStartupMs
 	numSeries
 )
 
@@ -193,6 +206,19 @@ var seriesNames = [numSeries]string{
 	sHookFoldHitRatio:        "hook_fold_hit_ratio",
 	sIndexCount:              "index_count",
 	sIndexBytes:              "index_bytes",
+	sDiskReadBytesRps:        "disk_read_bytes_rps",
+	sDiskWriteBytesRps:       "disk_write_bytes_rps",
+	sDiskSyncsRps:            "disk_syncs_rps",
+	sDiskSyncMs:              "disk_sync_ms",
+	sDiskFreeBytes:           "disk_free_bytes",
+	sRefusedWritesRps:        "refused_writes_rps",
+	sIndexUpkeepBytes:        "index_upkeep_bytes",
+	sBackupRunning:           "backup_running",
+	sBackupLastOK:            "backup_last_ok",
+	sBackupDurationMs:        "backup_duration_ms",
+	sBackupBytes:             "backup_bytes",
+	sBackupAgeSeconds:        "backup_age_seconds",
+	sStartupMs:               "startup_ms",
 }
 
 func SeriesNames() []string {
@@ -320,6 +346,22 @@ func derive(prev, cur *snapshot) Point {
 
 	if cur.memoryRefused >= prev.memoryRefused {
 		p.V[sMemoryRefusedRps] = float64(cur.memoryRefused-prev.memoryRefused) / elapsed
+	}
+
+	if cur.disk.ReadBytes >= prev.disk.ReadBytes && cur.disk.WriteBytes >= prev.disk.WriteBytes {
+		p.V[sDiskReadBytesRps] = float64(cur.disk.ReadBytes-prev.disk.ReadBytes) / elapsed
+		p.V[sDiskWriteBytesRps] = float64(cur.disk.WriteBytes-prev.disk.WriteBytes) / elapsed
+	}
+
+	if done := cur.disk.Syncs - prev.disk.Syncs; done >= 0 {
+		p.V[sDiskSyncsRps] = float64(done) / elapsed
+		if done > 0 {
+			p.V[sDiskSyncMs] = float64(cur.disk.SyncNanos-prev.disk.SyncNanos) / float64(done) / 1e6
+		}
+	}
+
+	if cur.disk.RefusedWrites >= prev.disk.RefusedWrites {
+		p.V[sRefusedWritesRps] = float64(cur.disk.RefusedWrites-prev.disk.RefusedWrites) / elapsed
 	}
 
 	p.V[sHookQueryHitRatio] = ratio(cur.hookQuery, prev.hookQuery)

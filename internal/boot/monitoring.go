@@ -2,7 +2,9 @@ package boot
 
 import (
 	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/backup"
 	"github.com/taymour/elysiandb/internal/cache"
+	"github.com/taymour/elysiandb/internal/durable"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/hook"
@@ -32,6 +34,12 @@ func MonitoringSources() metrics.Sources {
 			return cache.CacheStore.Entries()
 		},
 	}
+
+	if engine.IsEngineInternal() {
+		sources.Disk = diskSample
+	}
+
+	sources.Backup = backupSample
 
 	if security.UserAuthenticationIsEnabled() {
 		sources.AdminSessions = security.ActiveSessionCount
@@ -104,6 +112,27 @@ func engineSample() metrics.EngineSample {
 		IndexBytes:         st.IndexBytes,
 		CheckpointMs:       st.LastCheckpointMs,
 	}
+}
+
+func diskSample() metrics.DiskSample {
+	io := durable.Stats()
+	sample := metrics.DiskSample{ReadBytes: io.ReadBytes, WriteBytes: io.WriteBytes, Syncs: io.Syncs, SyncNanos: io.SyncNanos, RefusedWrites: storage.RefusedWrites()}
+
+	if free, err := durable.FreeBytes(globals.GetConfig().Store.Folder); err == nil {
+		sample.FreeBytes = free
+	}
+
+	if e := storage.Engine(); e != nil {
+		sample.IndexUpkeepBytes = e.IndexBacklogBytes()
+	}
+
+	return sample
+}
+
+func backupSample() metrics.BackupSample {
+	st := backup.CurrentStatus()
+
+	return metrics.BackupSample{Running: st.Running, Completed: st.Completed, Failed: st.Failed, LastOK: st.LastOK, LastAt: st.LastAt, Duration: st.Duration, Bytes: st.Bytes}
 }
 
 func hookCaches() metrics.HookCacheSample {

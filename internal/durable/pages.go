@@ -42,6 +42,8 @@ type PageStore struct {
 	dir     string
 	segSize int64
 
+	closeDelay time.Duration
+
 	wmu        sync.Mutex
 	cur        File
 	curID      uint32
@@ -94,7 +96,7 @@ func OpenPageStore(fs FS, dir string, limit, segSize int64) (*PageStore, error) 
 		segSize = pageSegmentSize
 	}
 
-	s := &PageStore{fs: fs, dir: dir, segSize: segSize, files: map[uint32]File{}, sizes: map[uint32]int64{}, retired: map[uint32]File{}, unsynced: map[uint32]File{}}
+	s := &PageStore{fs: fs, dir: dir, segSize: segSize, closeDelay: pageCloseDelay, files: map[uint32]File{}, sizes: map[uint32]int64{}, retired: map[uint32]File{}, unsynced: map[uint32]File{}}
 	s.limit.Store(limit)
 
 	entries, err := fs.ReadDir(dir)
@@ -132,6 +134,12 @@ func OpenPageStore(fs FS, dir string, limit, segSize int64) (*PageStore, error) 
 	}
 
 	return s, nil
+}
+
+func (s *PageStore) CloseRetiredAfter(d time.Duration) {
+	if d > 0 {
+		s.closeDelay = d
+	}
 }
 
 func (s *PageStore) Pace(fn func(synced time.Duration) time.Duration) {
@@ -530,7 +538,7 @@ func (s *PageStore) Remove(ids []uint32) {
 }
 
 func (s *PageStore) closeLater(ids []uint32) {
-	time.AfterFunc(pageCloseDelay, func() {
+	time.AfterFunc(s.closeDelay, func() {
 		if s.holds.Load() > 0 {
 			s.closeLater(ids)
 			return

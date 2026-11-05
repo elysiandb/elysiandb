@@ -38,6 +38,7 @@ var ErrClosed = errors.New("journal: closed")
 type Options struct {
 	Mode          Mode
 	SegmentSize   int64
+	RetireGrace   time.Duration
 	FlushInterval time.Duration
 	MaxPending    int
 	FS            FS
@@ -111,6 +112,9 @@ func Open(dir string, opts Options) (*Journal, error) {
 
 	if opts.SegmentSize <= 0 {
 		opts.SegmentSize = DefaultSegmentSize
+	}
+	if opts.RetireGrace <= 0 {
+		opts.RetireGrace = retireGrace
 	}
 
 	if opts.MaxPending <= 0 {
@@ -987,7 +991,7 @@ func (j *Journal) closeRetired(all bool) {
 	j.filesMu.Lock()
 	kept := j.retired[:0]
 	for _, r := range j.retired {
-		if all || time.Since(r.since) > retireGrace {
+		if all || time.Since(r.since) > j.opts.RetireGrace {
 			_ = r.file.Close()
 			continue
 		}

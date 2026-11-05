@@ -33,25 +33,26 @@ var (
 )
 
 type Options struct {
-	Folder          string
-	Shards          int
-	Durability      journal.Mode
-	FlushInterval   time.Duration
-	CheckpointEvery time.Duration
-	MaxLogBytes     int64
-	CacheBytes      int64
-	PageCacheBytes  int64
-	PageSegmentSize int64
-	DirtyFlushBytes int64
-	IndexWorkers    int
-	Background      bool
-	SegmentSize     int64
-	FS              journal.FS
-	LegacyRecovery  bool
-	OnKVExpired     func(n int)
-	OnWriteError    func(err error)
-	MinFreeBytes    int64
-	FreeSpace       func() (int64, error)
+	Folder           string
+	Shards           int
+	Durability       journal.Mode
+	FlushInterval    time.Duration
+	CheckpointEvery  time.Duration
+	MaxLogBytes      int64
+	CacheBytes       int64
+	PageCacheBytes   int64
+	PageSegmentSize  int64
+	DirtyFlushBytes  int64
+	IndexWorkers     int
+	Background       bool
+	SegmentSize      int64
+	FS               journal.FS
+	LegacyRecovery   bool
+	OnKVExpired      func(n int)
+	OnWriteError     func(err error)
+	MinFreeBytes     int64
+	FreeSpace        func() (int64, error)
+	RetiredFileGrace time.Duration
 }
 
 var engineInstances atomic.Uint64
@@ -168,6 +169,7 @@ func Open(opts Options) (*Engine, error) {
 	e.pages = pages
 	if opts.Background {
 		pages.Pace(e.flushPause)
+		pages.CloseRetiredAfter(opts.RetiredFileGrace)
 	}
 
 	if err := e.load(); err != nil {
@@ -237,6 +239,7 @@ func (e *Engine) journalOptions() journal.Options {
 		Mode:          e.opts.Durability,
 		FlushInterval: e.opts.FlushInterval,
 		SegmentSize:   e.opts.SegmentSize,
+		RetireGrace:   e.opts.RetiredFileGrace,
 		FS:            e.opts.FS,
 		OnWriteError:  e.opts.OnWriteError,
 	}

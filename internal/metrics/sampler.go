@@ -32,6 +32,28 @@ type Sources struct {
 	HookCaches           func() HookCacheSample
 	HeavyWaiting         func() int
 	Indexes              func() []IndexState
+	Disk                 func() DiskSample
+	Backup               func() BackupSample
+}
+
+type DiskSample struct {
+	ReadBytes        int64
+	WriteBytes       int64
+	Syncs            int64
+	SyncNanos        int64
+	FreeBytes        int64
+	RefusedWrites    int64
+	IndexUpkeepBytes int64
+}
+
+type BackupSample struct {
+	Running   int64
+	Completed int64
+	Failed    int64
+	LastOK    bool
+	LastAt    time.Time
+	Duration  time.Duration
+	Bytes     int64
 }
 
 type EngineSample struct {
@@ -88,6 +110,8 @@ type snapshot struct {
 	hookQuery        [2]int64
 	hookOutput       [2]int64
 	hookFold         [2]int64
+	disk             DiskSample
+	backup           BackupSample
 }
 
 type slowValues struct {
@@ -447,6 +471,30 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 		s.hookFold = [2]int64{hc.FoldHits, hc.FoldPasses}
 	}
 
+	if src.Disk != nil {
+		s.disk = src.Disk()
+		s.gauges[sDiskFreeBytes] = float64(s.disk.FreeBytes)
+		s.gauges[sIndexUpkeepBytes] = float64(s.disk.IndexUpkeepBytes)
+	}
+
+	if src.Backup != nil {
+		s.backup = src.Backup()
+		s.gauges[sBackupRunning] = float64(s.backup.Running)
+		if !s.backup.LastAt.IsZero() {
+			s.gauges[sBackupLastOK] = 0
+			if s.backup.LastOK {
+				s.gauges[sBackupLastOK] = 1
+			}
+			s.gauges[sBackupDurationMs] = float64(s.backup.Duration) / float64(time.Millisecond)
+			s.gauges[sBackupBytes] = float64(s.backup.Bytes)
+			s.gauges[sBackupAgeSeconds] = now.Sub(s.backup.LastAt).Seconds()
+		}
+	}
+
+	if took := Startup(); took > 0 {
+		s.gauges[sStartupMs] = float64(took) / float64(time.Millisecond)
+	}
+
 	s.gauges[sHeldBytes] += s.gauges[sTotalBytes]
 	s.gauges[sMemoryBudget] = float64(memory.Budget())
 	s.gauges[sHeapLiveBytes] = float64(memory.Live())
@@ -482,12 +530,13 @@ func uintValue(v metrics.Value) float64 {
 }
 
 func openFileDescriptors() float64 {
-	entries, err := os.ReadDir("/proc/self/fd")
-	if err != nil {
-		return math.NaN()
+	for _, folder := range []string{"/proc/self/fd", "/dev/fd"} {
+		if entries, err := os.ReadDir(folder); err == nil {
+			return float64(len(entries))
+		}
 	}
 
-	return float64(len(entries))
+	return math.NaN()
 }
 
 func folderSize(folder string) float64 {
