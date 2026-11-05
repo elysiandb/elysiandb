@@ -24,7 +24,7 @@ func TestFoldersOfTheFormatTwoEngineAreRead(t *testing.T) {
 	}
 	want := golden["full"]
 
-	for _, variant := range []string{"format2", "format2-crash"} {
+	for _, variant := range []string{"format2", "format2-crash", "e68e64f", "e68e64f-crash"} {
 		folder := copyFolder(t, filepath.Join(format2FixturesDir, variant))
 
 		for round := 0; round < 2; round++ {
@@ -39,7 +39,7 @@ func TestFoldersOfTheFormatTwoEngineAreRead(t *testing.T) {
 				}
 			}
 
-			if variant == "format2-crash" {
+			if strings.HasSuffix(variant, "-crash") {
 				if got := s.run(fixtureRequest{Method: "GET", Path: "/kv/extra:key"}); got.Status != 200 || !strings.Contains(got.Body, `"value":"after the checkpoint"`) {
 					t.Fatalf("%s round %d: the write after the last checkpoint is replayed, got %d %q", variant, round, got.Status, got.Body)
 				}
