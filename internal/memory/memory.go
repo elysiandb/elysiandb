@@ -43,6 +43,10 @@ const (
 	totalCriticalShare = 1.05
 	requestShareCap    = 0.5
 
+	elasticCeiling     = 0.30
+	elasticGrowBelow   = 0.48
+	elasticShrinkAbove = 0.56
+	elasticStep        = 64
 	defaultHookResults = 256 << 20
 	minBuildBytes      = 64 << 20
 	sampleInterval     = 100 * time.Millisecond
@@ -221,10 +225,11 @@ func Pools() []*Pool {
 }
 
 var (
-	budget atomic.Int64
-	level  atomic.Int32
-	live   atomic.Int64
-	total  atomic.Int64
+	budget  atomic.Int64
+	level   atomic.Int32
+	live    atomic.Int64
+	total   atomic.Int64
+	elastic atomic.Int64
 
 	listenersMu sync.Mutex
 	listeners   []func(Level)
@@ -296,6 +301,7 @@ func Sample() {
 	total.Store(t)
 
 	next := levelFor(budget.Load(), l, t)
+	followSpare(budget.Load(), l, next)
 	prev := Level(level.Swap(int32(next)))
 	if next == prev {
 		return
@@ -313,6 +319,27 @@ func Sample() {
 			fn(next)
 		}
 	}
+}
+
+func followSpare(b, l int64, lv Level) {
+	if b <= 0 || lv != Normal {
+		elastic.Store(0)
+		return
+	}
+
+	cur := elastic.Load()
+	switch {
+	case float64(l) >= elasticShrinkAbove*float64(b):
+		cur -= 4 * b / elasticStep
+	case float64(l) < elasticGrowBelow*float64(b):
+		cur += b / elasticStep
+	}
+
+	elastic.Store(max(0, min(cur, share(b, elasticCeiling))))
+}
+
+func Elastic() int64 {
+	return elastic.Load()
 }
 
 func levelFor(b, l, t int64) Level {

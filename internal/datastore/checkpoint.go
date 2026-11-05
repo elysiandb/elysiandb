@@ -25,8 +25,11 @@ const (
 	manifestFormat      = 1
 	manifestFormatPages = 2
 	LegacyCheckpoints   = "legacy-checkpoint"
-	pageWalkEvery       = time.Minute
-	pageVictimsPerCycle = 2
+	pageWalkEvery       = 15 * time.Second
+	pageVictimsPerCycle = 4
+	relocateBatch       = 256
+	reclaimAboveBytes   = 128 << 20
+	reclaimQuietLog     = 16 << 20
 )
 
 var (
@@ -685,10 +688,16 @@ func (e *Engine) checkpoint(force bool) error {
 			}
 		}
 
-		for _, t := range trees {
-			if err := e.pages.FlushTree(t); err != nil {
-				return fmt.Errorf("cannot write the pages of %s: %w", snap.name, err)
+		var flushErr error
+		durable.RunGently(func() {
+			for _, t := range trees {
+				if flushErr = e.pages.FlushTree(t); flushErr != nil {
+					return
+				}
 			}
+		})
+		if flushErr != nil {
+			return fmt.Errorf("cannot write the pages of %s: %w", snap.name, flushErr)
 		}
 
 		me.Slots, me.IDs = rootOf(snap.r.slots), rootOf(snap.r.ids)
@@ -703,8 +712,10 @@ func (e *Engine) checkpoint(force bool) error {
 		m.Entities = append(m.Entities, me)
 	}
 
-	if err := e.pages.Sync(); err != nil {
-		return fmt.Errorf("cannot sync the pages: %w", err)
+	var syncErr error
+	durable.RunGently(func() { syncErr = e.pages.Sync() })
+	if syncErr != nil {
+		return fmt.Errorf("cannot sync the pages: %w", syncErr)
 	}
 
 	live := map[uint32]int64{}
@@ -783,6 +794,32 @@ func (e *Engine) removeOldCheckpoints() {
 	}
 }
 
+func (e *Engine) reclaimDue() bool {
+	if e.reclaim.Load() <= 0 || e.dirty.Load() >= e.dirtyFlushBytes()/8 || e.LogSinceCheckpoint() >= reclaimQuietLog {
+		return false
+	}
+
+	return e.lastReclaim.IsZero() || time.Since(e.lastReclaim) >= reclaimSpacing
+}
+
+func (e *Engine) reclaimRound() error {
+	e.lastReclaim = time.Now()
+	e.ckptMu.Lock()
+	e.lastPageWalk = time.Time{}
+	e.ckptMu.Unlock()
+
+	left := e.reclaim.Add(-1)
+	if err := e.checkpoint(true); err != nil {
+		return err
+	}
+
+	if left <= 0 && e.reclaim.Load() <= 0 {
+		returnMemory(returnMemoryAbove)
+	}
+
+	return nil
+}
+
 func (e *Engine) CompactPages() (int, error) {
 	before := len(e.pages.SegmentSizes())
 	for round := 0; round < 3; round++ {
@@ -835,8 +872,16 @@ func (e *Engine) cleanPages(snaps []entitySnapshot) {
 	}
 
 	current := e.pages.CurrentSegment()
-	var dead, victims []uint32
+	var dead []uint32
+	type candidate struct {
+		seg   uint32
+		ratio float64
+	}
+	var candidates []candidate
+	var total, held int64
 	for seg, size := range e.pages.SegmentSizes() {
+		total += size
+		held += live[seg]
 		if seg >= current {
 			continue
 		}
@@ -844,13 +889,27 @@ func (e *Engine) cleanPages(snaps []entitySnapshot) {
 		switch {
 		case live[seg] == 0:
 			dead = append(dead, seg)
-		case live[seg]*2 < size && len(victims) < pageVictimsPerCycle:
-			victims = append(victims, seg)
+		case live[seg]*2 < size:
+			candidates = append(candidates, candidate{seg: seg, ratio: float64(live[seg]) / float64(size)})
 		}
+	}
+
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].ratio < candidates[j].ratio })
+	limit := pageVictimsPerCycle
+	if e.dirty.Load() >= e.dirtyFlushBytes()/2 {
+		limit = 1
+	}
+	victims := make([]uint32, 0, limit)
+	for i := 0; i < len(candidates) && i < limit; i++ {
+		victims = append(victims, candidates[i].seg)
 	}
 
 	e.pages.Remove(dead)
 	e.pageRemoval = victims
+
+	if garbage := total - held; garbage >= reclaimAboveBytes && garbage*4 >= total && len(dead)+len(victims) > 0 {
+		e.reclaim.Store(max(e.reclaim.Load(), 1))
+	}
 
 	if len(victims) == 0 {
 		return
@@ -876,33 +935,53 @@ func (e *Engine) relocatePages(victim func(id uint64) bool) {
 	e.catalogMu.RUnlock()
 
 	for _, ent := range ents {
-		ent.apply.Lock()
 		cur := ent.root.Load()
-		tok := pagetree.NewToken()
-		nr := *cur
-		moved := 0
-
-		relocate := func(t pagetree.Tree) pagetree.Tree {
-			out, n := t.WithToken(tok).Relocate(victim)
-			moved += n
-			return out.WithToken(nil)
-		}
-
-		nr.slots = relocate(cur.slots)
-		nr.ids = relocate(cur.ids)
-		nr.indexes = cloneIndexes(cur.indexes)
-		for name, idx := range cur.indexes {
+		cur.slots.Preload(victim)
+		cur.ids.Preload(victim)
+		for _, idx := range cur.indexes {
 			if idx.ready {
-				nr.indexes[name] = &index{spec: idx.spec, ready: true, tree: relocate(idx.tree)}
+				idx.tree.Preload(victim)
 			}
 		}
 
-		tok.Freeze()
-		if moved > 0 {
-			ent.root.Store(&nr)
+		for e.relocateBatch(ent, victim) >= relocateBatch && !e.closed.Load() {
 		}
-		ent.apply.Unlock()
 	}
+}
+
+func (e *Engine) relocateBatch(ent *entity, victim func(id uint64) bool) int {
+	ent.apply.Lock()
+	defer ent.apply.Unlock()
+
+	cur := ent.root.Load()
+	tok := pagetree.NewToken()
+	defer tok.Freeze()
+
+	nr := *cur
+	moved := 0
+	relocate := func(t pagetree.Tree) pagetree.Tree {
+		if moved >= relocateBatch {
+			return t
+		}
+		out, n := t.WithToken(tok).Relocate(victim, relocateBatch-moved)
+		moved += n
+		return out.WithToken(nil)
+	}
+
+	nr.slots = relocate(cur.slots)
+	nr.ids = relocate(cur.ids)
+	nr.indexes = cloneIndexes(cur.indexes)
+	for name, idx := range cur.indexes {
+		if idx.ready {
+			nr.indexes[name] = &index{spec: idx.spec, ready: true, tree: relocate(idx.tree)}
+		}
+	}
+
+	if moved > 0 {
+		ent.root.Store(&nr)
+	}
+
+	return moved
 }
 
 func (e *Engine) retireDeadSegments(pos journal.Position, live map[uint32]int64) {

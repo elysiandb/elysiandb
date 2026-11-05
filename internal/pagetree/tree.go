@@ -770,19 +770,40 @@ func (t Tree) walkStored(r *Ref, level int, fn func(uint64, uint32)) {
 	}
 }
 
-func (t Tree) Relocate(victim func(id uint64) bool) (Tree, int) {
+func (t Tree) Preload(victim func(id uint64) bool) {
+	if t.root == nil {
+		return
+	}
+
+	t.preload(t.root, t.height(), victim)
+}
+
+func (t Tree) preload(r *Ref, level int, victim func(uint64) bool) {
+	if level == 1 {
+		if id := r.ID(); id != 0 && victim(id) {
+			t.page(r)
+		}
+		return
+	}
+
+	for _, kid := range t.page(r).kids {
+		t.preload(kid, level-1, victim)
+	}
+}
+
+func (t Tree) Relocate(victim func(id uint64) bool, limit int) (Tree, int) {
 	if t.root == nil {
 		return t, 0
 	}
 
 	moved := 0
-	t.root = t.relocate(t.root, t.height(), victim, &moved)
+	t.root = t.relocate(t.root, t.height(), victim, &moved, limit)
 
 	return t, moved
 }
 
-func (t Tree) relocate(r *Ref, level int, victim func(uint64) bool, moved *int) *Ref {
-	isVictim := r.ID() != 0 && victim(r.ID())
+func (t Tree) relocate(r *Ref, level int, victim func(uint64) bool, moved *int, limit int) *Ref {
+	isVictim := r.ID() != 0 && victim(r.ID()) && *moved < limit
 	if level == 1 && !isVictim {
 		return r
 	}
@@ -797,7 +818,7 @@ func (t Tree) relocate(r *Ref, level int, victim func(uint64) bool, moved *int) 
 
 	if level > 1 {
 		for i, kid := range p.kids {
-			nk := t.relocate(kid, level-1, victim, moved)
+			nk := t.relocate(kid, level-1, victim, moved, limit)
 			if nk == kid {
 				continue
 			}

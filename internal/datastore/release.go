@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	returnMemoryAbove = 64 << 20
-	returnMemoryEvery = time.Minute
-	warmBatch         = 4096
+	returnMemoryAbove   = 64 << 20
+	returnMemoryEvery   = time.Minute
+	criticalReturnEvery = 30 * time.Second
+	warmBatch           = 4096
 )
 
 var memoryReturn struct {
@@ -86,6 +87,19 @@ func returnMemory(freed int64) {
 	memoryReturn.last = time.Now()
 	memoryReturn.mu.Unlock()
 	debug.FreeOSMemory()
+}
+
+func releaseUnderCriticalPressure() {
+	memoryReturn.mu.Lock()
+	due := !memoryReturn.pending && time.Since(memoryReturn.last) >= criticalReturnEvery
+	if due {
+		memoryReturn.last = time.Now()
+	}
+	memoryReturn.mu.Unlock()
+
+	if due {
+		go debug.FreeOSMemory()
+	}
 }
 
 func (e *Engine) warmValues() {

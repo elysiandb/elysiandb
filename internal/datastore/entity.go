@@ -126,6 +126,7 @@ type entity struct {
 	changes  changeLog
 	watched  atomic.Pointer[map[string]*fieldStamps]
 	stale    atomic.Int64
+	advised  atomic.Int64
 }
 
 func (e *Engine) newEntity(name string) *entity {
@@ -318,15 +319,13 @@ func (d *draft) reset(rec *journal.Record) {
 
 	indexes := map[string]*index{}
 	for name, idx := range d.indexes {
-		next := &index{spec: idx.spec, ready: idx.ready, dormant: idx.dormant}
-		if idx.ready {
-			next.tree = pagetree.New(d.e.pages)
-		}
-		indexes[name] = next
+		indexes[name] = &index{spec: idx.spec, ready: true, tree: pagetree.New(d.e.pages)}
 	}
+	clear(d.ent.building)
 
 	if d.r.slots.Len() > 0 {
 		d.released = append(d.released, d.r.slots)
+		d.e.reclaim.Store(reclaimRounds)
 	}
 
 	d.ent.changes.reset()

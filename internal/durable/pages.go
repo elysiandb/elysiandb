@@ -23,7 +23,8 @@ const (
 	pageSegmentSuffix = ".pgs"
 	pageSegmentSize   = 64 << 20
 	PageHeaderSize    = 8
-	pageCloseDelay    = 15 * time.Minute
+	pageCloseDelay    = 5 * time.Minute
+	pageFlushBytes    = 4 << 20
 )
 
 var (
@@ -41,13 +42,19 @@ type PageStore struct {
 	dir     string
 	segSize int64
 
-	wmu      sync.Mutex
-	cur      File
-	curID    uint32
-	curOff   int64
-	buf      []byte
-	bufStart int64
+	wmu        sync.Mutex
+	cur        File
+	curID      uint32
+	curOff     int64
+	buf        []byte
+	bufStart   int64
+	flushing   []byte
+	flushStart int64
+	spare      []byte
+
+	ioMu     sync.Mutex
 	unsynced map[uint32]File
+	pace     func(synced time.Duration) time.Duration
 
 	rmu     sync.RWMutex
 	files   map[uint32]File
@@ -126,6 +133,12 @@ func OpenPageStore(fs FS, dir string, limit, segSize int64) (*PageStore, error) 
 	return s, nil
 }
 
+func (s *PageStore) Pace(fn func(synced time.Duration) time.Duration) {
+	s.ioMu.Lock()
+	s.pace = fn
+	s.ioMu.Unlock()
+}
+
 func (s *PageStore) SetLimit(limit int64) {
 	s.limit.Store(limit)
 	s.evict()
@@ -159,12 +172,21 @@ func (s *PageStore) read(id uint64, size uint32) ([]byte, error) {
 	seg, off := SplitPageID(id)
 
 	s.wmu.Lock()
-	if seg == s.curID && s.cur != nil && off >= s.bufStart {
-		start := off - s.bufStart
-		if start+PageHeaderSize+int64(size) <= int64(len(s.buf)) {
-			b := append([]byte(nil), s.buf[start+PageHeaderSize:start+PageHeaderSize+int64(size)]...)
-			s.wmu.Unlock()
-			return b, nil
+	if seg == s.curID && s.cur != nil {
+		if off >= s.bufStart {
+			start := off - s.bufStart
+			if start+PageHeaderSize+int64(size) <= int64(len(s.buf)) {
+				b := append([]byte(nil), s.buf[start+PageHeaderSize:start+PageHeaderSize+int64(size)]...)
+				s.wmu.Unlock()
+				return b, nil
+			}
+		} else if s.flushing != nil && off >= s.flushStart {
+			start := off - s.flushStart
+			if start+PageHeaderSize+int64(size) <= int64(len(s.flushing)) {
+				b := append([]byte(nil), s.flushing[start+PageHeaderSize:start+PageHeaderSize+int64(size)]...)
+				s.wmu.Unlock()
+				return b, nil
+			}
 		}
 	}
 	s.wmu.Unlock()
@@ -260,29 +282,37 @@ func (s *PageStore) Write(ref *pagetree.Ref, p *pagetree.Page) error {
 		return err
 	}
 
+	s.ioMu.Lock()
+	defer s.ioMu.Unlock()
+
 	s.wmu.Lock()
-	if s.cur == nil || s.curOff+int64(len(payload))+PageHeaderSize > s.segSize {
-		if err := s.rotateLocked(); err != nil {
-			s.wmu.Unlock()
+	rotate := s.cur == nil || s.curOff+int64(len(payload))+PageHeaderSize > s.segSize
+	s.wmu.Unlock()
+
+	if rotate {
+		if err := s.rotate(); err != nil {
 			return err
 		}
 	}
 
-	off := s.curOff
 	var header [PageHeaderSize]byte
 	binary.LittleEndian.PutUint32(header[:], uint32(len(payload)))
 	binary.LittleEndian.PutUint32(header[4:], crc32.Checksum(payload, castagnoli))
+
+	s.wmu.Lock()
+	off := s.curOff
 	s.buf = append(append(s.buf, header[:]...), payload...)
 	s.curOff += int64(len(payload)) + PageHeaderSize
 	id := pageID(s.curID, off)
+	full := len(s.buf) >= pageFlushBytes
+	s.wmu.Unlock()
 
-	if len(s.buf) >= 4<<20 {
-		if err := s.flushBufLocked(); err != nil {
-			s.wmu.Unlock()
+	if full {
+		if err := s.flush(); err != nil {
 			return err
 		}
+		s.settle()
 	}
-	s.wmu.Unlock()
 
 	ref.Persisted(id, uint32(len(payload)))
 	s.writes.Add(1)
@@ -295,12 +325,36 @@ func (s *PageStore) Write(ref *pagetree.Ref, p *pagetree.Page) error {
 	return nil
 }
 
-func (s *PageStore) rotateLocked() error {
-	if err := s.flushBufLocked(); err != nil {
+func (s *PageStore) settle() {
+	if s.pace == nil {
+		return
+	}
+
+	s.wmu.Lock()
+	id, f := s.curID, s.cur
+	s.wmu.Unlock()
+
+	start := time.Now()
+	if err := f.Sync(); err != nil {
+		return
+	}
+	took := time.Since(start)
+	delete(s.unsynced, id)
+
+	if pause := s.pace(took); pause > 0 {
+		time.Sleep(pause)
+	}
+}
+
+func (s *PageStore) rotate() error {
+	if err := s.flush(); err != nil {
 		return err
 	}
 
+	s.wmu.Lock()
 	id := s.curID + 1
+	s.wmu.Unlock()
+
 	path := filepath.Join(s.dir, pageSegmentName(id))
 	f, err := s.fs.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
 	if err != nil {
@@ -317,27 +371,45 @@ func (s *PageStore) rotateLocked() error {
 	s.sizes[id] = 0
 	s.rmu.Unlock()
 
+	s.wmu.Lock()
 	s.cur, s.curID, s.curOff, s.bufStart = f, id, 0, 0
+	s.wmu.Unlock()
 	s.unsynced[id] = f
 
 	return nil
 }
 
-func (s *PageStore) flushBufLocked() error {
+func (s *PageStore) flush() error {
+	s.wmu.Lock()
 	if s.cur == nil || len(s.buf) == 0 {
+		s.wmu.Unlock()
 		return nil
 	}
 
-	if _, err := s.cur.WriteAt(s.buf, s.bufStart); err != nil {
+	data, start, seg, f := s.buf, s.bufStart, s.curID, s.cur
+	s.flushing, s.flushStart = data, start
+	s.buf = s.spare[:0]
+	s.spare = nil
+	s.bufStart = start + int64(len(data))
+	s.wmu.Unlock()
+
+	_, err := f.WriteAt(data, start)
+
+	s.wmu.Lock()
+	s.flushing = nil
+	if err != nil {
+		s.buf = append(data, s.buf...)
+		s.bufStart = start
+		s.wmu.Unlock()
 		return err
 	}
+	s.spare = data[:0]
+	s.wmu.Unlock()
 
-	s.bufStart += int64(len(s.buf))
-	s.buf = s.buf[:0]
-	s.unsynced[s.curID] = s.cur
+	s.unsynced[seg] = f
 
 	s.rmu.Lock()
-	s.sizes[s.curID] = s.bufStart
+	s.sizes[seg] = start + int64(len(data))
 	s.rmu.Unlock()
 
 	return nil
@@ -350,10 +422,10 @@ func (s *PageStore) FlushTree(t pagetree.Tree) error {
 }
 
 func (s *PageStore) Sync() error {
-	s.wmu.Lock()
-	defer s.wmu.Unlock()
+	s.ioMu.Lock()
+	defer s.ioMu.Unlock()
 
-	if err := s.flushBufLocked(); err != nil {
+	if err := s.flush(); err != nil {
 		return err
 	}
 
@@ -421,16 +493,18 @@ func (s *PageStore) Remove(ids []uint32) {
 }
 
 func (s *PageStore) Close() error {
-	s.wmu.Lock()
-	err := s.flushBufLocked()
+	s.ioMu.Lock()
+	err := s.flush()
 	for id, f := range s.unsynced {
 		if serr := f.Sync(); serr != nil && err == nil {
 			err = serr
 		}
 		delete(s.unsynced, id)
 	}
+	s.wmu.Lock()
 	s.cur = nil
 	s.wmu.Unlock()
+	s.ioMu.Unlock()
 
 	s.rmu.Lock()
 	for id, f := range s.files {

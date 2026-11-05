@@ -14,7 +14,7 @@ import (
 
 const (
 	autoMemoryShare   = 0.75
-	heapShareOfBudget = 0.90
+	heapShareOfBudget = 0.85
 	unlimitedCgroups  = 1 << 60
 )
 

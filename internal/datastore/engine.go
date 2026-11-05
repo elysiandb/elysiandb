@@ -87,6 +87,8 @@ type Engine struct {
 	upgradeFrom    int
 	pageRemoval    []uint32
 	lastPageWalk   time.Time
+	lastReclaim    time.Time
+	reclaim        atomic.Int32
 	pressureSweeps int
 	stop           chan struct{}
 	wg             sync.WaitGroup
@@ -155,6 +157,9 @@ func Open(opts Options) (*Engine, error) {
 		return nil, err
 	}
 	e.pages = pages
+	if opts.Background {
+		pages.Pace(e.flushPause)
+	}
 
 	if err := e.load(); err != nil {
 		e.pages.Close()

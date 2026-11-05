@@ -369,7 +369,7 @@ func TestRelocateMovesOnlyVictimPages(t *testing.T) {
 	}
 
 	loadsBefore := store.loads
-	moved, n := tr.WithToken(pagetree.NewToken()).Relocate(func(id uint64) bool { return victims[id] })
+	moved, n := tr.WithToken(pagetree.NewToken()).Relocate(func(id uint64) bool { return victims[id] }, 1<<30)
 	if n != len(victims) {
 		t.Fatalf("moved %d pages, want %d", n, len(victims))
 	}

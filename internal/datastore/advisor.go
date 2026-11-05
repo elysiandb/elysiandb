@@ -9,6 +9,7 @@ import (
 
 const (
 	advisorMinDocs      = 4096
+	advisorFillShare    = 20
 	bitmapMaxDistinct   = 64
 	orderedMinDistinct  = 1024
 	pressureReleaseIdle = 10 * time.Minute
@@ -68,7 +69,8 @@ func (e *Engine) Advise() {
 
 	for _, ent := range e.allEntities() {
 		r := ent.root.Load()
-		if r.slots.Len() < advisorMinDocs {
+		seen := ent.advised.Swap(int64(r.slots.Len()))
+		if r.slots.Len() < advisorMinDocs || (seen > 0 && int64(r.slots.Len()) > seen+seen/advisorFillShare) {
 			continue
 		}
 

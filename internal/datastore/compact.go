@@ -14,6 +14,9 @@ const (
 	checkpointSpacing     = 10
 	checkpointMaxGap      = 5 * time.Minute
 	forcedCheckpointBytes = 256 << 20
+	reclaimRounds         = 3
+	reclaimSpacing        = 2 * time.Second
+	maxFlushPause         = 250 * time.Millisecond
 )
 
 func (e *Engine) maintenanceLoop() {
@@ -48,6 +51,18 @@ func (e *Engine) maintenanceLoop() {
 			} else if n > 0 {
 				compacted = true
 			}
+		}
+
+		if !volume && e.dirty.Load() < e.dirtyFlushBytes() && e.reclaimDue() {
+			compacted = false
+			if err := e.reclaimRound(); err != nil {
+				if suppressed, ok := writeFailures.Allow("checkpoint"); ok {
+					engineLog.Error("checkpoint failed", log.WithSuppressed([]any{"err", err}, suppressed)...)
+				}
+			}
+			e.measureDirty()
+			e.signalFlushed()
+			continue
 		}
 
 		volume = volume || e.dirty.Load() >= e.dirtyFlushBytes()
@@ -85,11 +100,15 @@ func (e *Engine) LogSinceCheckpoint() int64 {
 }
 
 func (e *Engine) forcedCheckpointLog() int64 {
-	if e.opts.MaxLogBytes > 0 {
-		return e.opts.MaxLogBytes
+	return max(2*e.opts.MaxLogBytes, forcedCheckpointBytes)
+}
+
+func (e *Engine) flushPause(synced time.Duration) time.Duration {
+	if e.closed.Load() || e.dirty.Load() >= e.dirtyFlushBytes()*3/2 {
+		return 0
 	}
 
-	return forcedCheckpointBytes
+	return min(synced, maxFlushPause)
 }
 
 func (e *Engine) checkpointSpaced() bool {

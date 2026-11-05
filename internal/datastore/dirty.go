@@ -15,7 +15,7 @@ const (
 
 func (e *Engine) dirtyFlushBytes() int64 {
 	if e.opts.DirtyFlushBytes > 0 {
-		return e.opts.DirtyFlushBytes
+		return e.opts.DirtyFlushBytes + min(memory.Elastic()/2, e.opts.DirtyFlushBytes)
 	}
 
 	return defaultDirtyFlushBytes
@@ -136,12 +136,17 @@ func scaled(base int64, level memory.Level) int64 {
 
 func (e *Engine) followPressure() {
 	level := memory.Current()
+	elastic := memory.Elastic()
 
 	if e.opts.CacheBytes > 0 {
-		e.cache.setLimit(scaled(e.opts.CacheBytes, level))
+		e.cache.setLimit(scaled(e.opts.CacheBytes+elastic/4, level))
 	}
 
 	if e.opts.PageCacheBytes > 0 {
-		e.pages.SetLimit(scaled(e.opts.PageCacheBytes, level))
+		e.pages.SetLimit(scaled(e.opts.PageCacheBytes+elastic*3/4, level))
+	}
+
+	if level == memory.Critical {
+		releaseUnderCriticalPressure()
 	}
 }
