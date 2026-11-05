@@ -3,6 +3,7 @@ package backup
 import (
 	"archive/tar"
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/base64"
@@ -250,6 +251,8 @@ func pauseFor(w io.Writer) func(time.Duration) {
 	return nil
 }
 
+var escapedByTheStore = []byte(`\u`)
+
 func writeDocuments(w io.Writer, snap *datastore.Snapshot, pace func(time.Duration)) (int, error) {
 	encoder := newEncoder(w)
 	count := 0
@@ -266,7 +269,7 @@ func writeDocuments(w io.Writer, snap *datastore.Snapshot, pace func(time.Durati
 			return true
 		}
 
-		if id, ok := simpleDocumentID(raw); ok && id != "" {
+		if id, ok := simpleDocumentID(raw); ok && id != "" && !bytes.Contains(raw, escapedByTheStore) {
 			count++
 			if _, failed = w.Write(raw); failed != nil {
 				return false

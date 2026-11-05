@@ -462,6 +462,99 @@ func killRounds(t *testing.T, extra string) {
 	}
 }
 
+func TestTheWayBackToThePreviousBinaryKeepsTheData(t *testing.T) {
+	previous := os.Getenv("ELYSIANDB_PREVIOUS_BINARY")
+	if previous == "" {
+		t.Skip("needs a binary of the previous commit in ELYSIANDB_PREVIOUS_BINARY")
+	}
+
+	current := binary
+	t.Cleanup(func() { binary = current })
+
+	for _, crash := range []bool{false, true} {
+		folder := filepath.Join(t.TempDir(), "data")
+		binary = current
+		s := start(t, folder, "")
+
+		for i := 0; i < 50; i++ {
+			if status, _, err := s.do("GET", "/api/way?filter[tag][eq]=t1&limit=1", ""); err != nil || status != http.StatusOK {
+				t.Fatalf("%d %v", status, err)
+			}
+		}
+
+		ids := map[string]bool{}
+		for b := 0; b < 8; b++ {
+			docs := make([]string, 0, 300)
+			for i := 0; i < 300; i++ {
+				id := fmt.Sprintf("d%d-%d", b, i)
+				ids[id] = true
+				docs = append(docs, fmt.Sprintf(`{"id":%q,"tag":"t%d","pad":%q}`, id, i%5, strings.Repeat("w", 200)))
+			}
+			if status, body, err := s.do("POST", "/api/way", "["+strings.Join(docs, ",")+"]"); err != nil || status >= 300 {
+				t.Fatalf("%d %v %s", status, err, body)
+			}
+			if b == 4 {
+				time.Sleep(1500 * time.Millisecond)
+			}
+		}
+		if status, _, err := s.do("PUT", "/kv/way", "back"); err != nil || status != http.StatusNoContent {
+			t.Fatalf("%d %v", status, err)
+		}
+
+		if crash {
+			s.kill()
+		} else {
+			s.terminate()
+		}
+
+		check := func(s *server, label string, want int) {
+			t.Helper()
+
+			status, body, err := s.do("GET", "/api/way?fields=id", "")
+			if err != nil || status != http.StatusOK {
+				t.Fatalf("%s: %d %v", label, status, err)
+			}
+			var listed []map[string]any
+			if err := json.Unmarshal(body, &listed); err != nil {
+				t.Fatalf("%s: %v", label, err)
+			}
+			if len(listed) != want {
+				t.Fatalf("%s: %d documents, %d expected", label, len(listed), want)
+			}
+
+			status, body, err = s.do("GET", "/api/way?fields=id&filter[tag][eq]=t1", "")
+			if err != nil || status != http.StatusOK {
+				t.Fatalf("%s: %d %v", label, status, err)
+			}
+			var filtered []map[string]any
+			if err := json.Unmarshal(body, &filtered); err != nil {
+				t.Fatalf("%s: %v", label, err)
+			}
+			if len(filtered) < want/5 {
+				t.Fatalf("%s: the filter finds %d documents of %d", label, len(filtered), want)
+			}
+
+			status, body, err = s.do("GET", "/kv/way", "")
+			if err != nil || status != http.StatusOK || !strings.Contains(string(body), "back") {
+				t.Fatalf("%s: key %d %v %s", label, status, err, body)
+			}
+		}
+
+		binary = previous
+		old := start(t, folder, "")
+		check(old, fmt.Sprintf("previous binary, crash %v", crash), len(ids))
+		if status, body, err := old.do("POST", "/api/way", `{"id":"written-by-the-previous-binary","tag":"t1"}`); err != nil || status >= 300 {
+			t.Fatalf("%d %v %s", status, err, body)
+		}
+		old.terminate()
+
+		binary = current
+		again := start(t, folder, "")
+		check(again, fmt.Sprintf("this binary again, crash %v", crash), len(ids)+1)
+		again.terminate()
+	}
+}
+
 func metricValue(t *testing.T, s *server, name string) float64 {
 	t.Helper()
 
