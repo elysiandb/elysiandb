@@ -125,7 +125,7 @@ Every key added after 0.2.4 is optional. Their defaults keep the 0.2.4 answers, 
 | **api.cache.maxEntryKB**             | Responses larger than this are not cached. Default `1024`                             |
 | **api.query.workers**                | Requests that must check many documents (the heavy lane) run at most this many at a time. `0` (default) uses half of the threads (`GOMAXPROCS / 2`, at least 1), so that the other requests keep threads |
 | **api.query.timeoutMs**              | Deadline of a request: the documents it checks and its hooks stop there, and the answer is `503` `{"error":"request deadline exceeded"}`. `0` (default) means no deadline |
-| **api.query.maxQueued**              | Heavy requests that may wait for a slot. Past it, a heavy request is answered `503` `{"error":"server busy"}` with `Retry-After: 1`. `0` (default) means 4 × `api.query.workers`, `-1` no limit |
+| **api.query.maxQueued**              | Heavy requests that may wait for a slot. Past it, a heavy request is answered `503` `{"error":"server busy"}` with `Retry-After: 1`. `0` (default) means 4 × `api.query.workers` (32 per slot for the lane of expensive hooks), `-1` no limit |
 | **api.query.queueTimeoutMs**         | Longest wait for a slot of the heavy lane, then `503` `{"error":"server busy"}`. `0` (default) means 5000, `-1` no limit |
 | **api.query.cancelOnDisconnect**     | Stops the work of a request whose client closed the connection. Default `true` |
 | **api.response.spoolMB**             | A response built by hooks, includes or `fields` is kept in memory up to this size, then in a temporary file, and sent once complete. Default `8` |
@@ -675,7 +675,7 @@ A change is acknowledged only once the log has accepted it. When a log write fai
 | Documents read most often | 10 % | The least used ones leave memory and are read back from disk |
 | Pages of the engine structures | 15 % | The least used pages leave memory and are read back from disk |
 | Pages changed since the last checkpoint | 8 % | A checkpoint starts; at twice the share, writers wait for it |
-| Results of hook queries | 12 % | The least used results are dropped; a result that cannot fit is refused with `503` |
+| Results of hook queries, views and kept sums | 12 % | The least used results are dropped; a result that cannot fit is refused with `503`; a view larger than half of the share is not kept and its loops run in JavaScript |
 | Index builds | 6 % | The next build waits for the current one |
 | Working memory of requests | 12 % | A request waits for memory, then is answered `503` `server busy` |
 
