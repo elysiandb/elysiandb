@@ -3,12 +3,16 @@ package hook_test
 import (
 	"fmt"
 	"math/rand"
+	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/hook"
+	"github.com/taymour/elysiandb/internal/storage"
 )
 
 const budgetScript = `function monthsBetween(from, to) {
@@ -326,4 +330,153 @@ func TestFoldStaysExactUnderConcurrentWrites(t *testing.T) {
 	wg.Wait()
 
 	compareBudget(t, 36, "after the writers")
+}
+
+func TestResultsFollowTheEntitiesReachedByTheirFilters(t *testing.T) {
+	setup(t, true)
+	_ = api_storage.CreateEntityType("author")
+	_ = api_storage.CreateEntityType("book")
+	_ = api_storage.WriteEntity("author", map[string]any{"id": "a1", "name": "first"})
+	_ = api_storage.WriteEntity("book", map[string]any{"id": "b1", "author": map[string]any{"@entity": "author", "id": "a1"}})
+
+	script := `function postRead(ctx) {
+  ctx.entity.n = ctx.query("book", { "author.name": { eq: "first" } }).length
+}`
+	run := func() any {
+		hook.ResetOutputMemo()
+		out := map[string]any{"id": "x"}
+		if err := hook.ApplyPostReadScript("", script, out, true); err != nil {
+			t.Fatal(err)
+		}
+		return out["n"]
+	}
+
+	if got := fmt.Sprint(run()); got != "1" {
+		t.Fatalf("the book is found through its author, got %s", got)
+	}
+
+	api_storage.UpdateEntityById("author", "a1", map[string]any{"name": "second"})
+	if got := fmt.Sprint(run()); got != "0" {
+		t.Fatalf("a change of the author must be seen at once, got %s", got)
+	}
+}
+
+func TestEqualityKeysCoverEveryKindOfValue(t *testing.T) {
+	setup(t, true)
+	_ = api_storage.CreateEntityType("mixed")
+
+	values := []any{"a", "A", "1", "true", "x", 1.0, 0.0, true, false, nil, []any{"a"}, []any{"x", "y"}, []any{"1"}, "2026-01-01", map[string]any{"a": 1.0}}
+	filters := []string{"a", "A", "1", "0", "true", "false", "x", "x,y", "y,x", "2026-01-01", ""}
+	r := rand.New(rand.NewSource(9))
+
+	ids := []string{}
+	for i := 0; i < 80; i++ {
+		id := fmt.Sprintf("m%03d", i)
+		ids = append(ids, id)
+		_ = api_storage.WriteEntity("mixed", map[string]any{"id": id, "f": values[r.Intn(len(values))]})
+	}
+
+	script := `function postRead(ctx) {
+  ctx.entity.ids = ctx.query("mixed", { f: { eq: ctx.entity.want } }).map(function (d) { return d.id }).join(",")
+}`
+	run := func(f string) string {
+		t.Helper()
+		hook.ResetOutputMemo()
+		out := map[string]any{"id": "x", "want": f}
+		if err := hook.ApplyPostReadScript("", script, out, true); err != nil {
+			t.Fatal(err)
+		}
+		return fmt.Sprint(out["ids"])
+	}
+
+	check := func() {
+		t.Helper()
+		for _, f := range filters {
+			kept := run(f)
+
+			want := []string{}
+			for _, id := range ids {
+				d := api_storage.ReadEntityById("mixed", id)
+				if d != nil && api_storage.FiltersMatchEntity(d, map[string]map[string]string{"f": {"eq": f}}) {
+					want = append(want, id)
+				}
+			}
+
+			got := strings.Split(kept, ",")
+			if kept == "" {
+				got = []string{}
+			}
+			sort.Strings(got)
+			if strings.Join(got, ",") != strings.Join(want, ",") {
+				t.Fatalf("eq %q: kept result %q, documents %q", f, kept, strings.Join(want, ","))
+			}
+		}
+
+		for _, f := range filters {
+			kept := run(f)
+			hook.ResetQueryCache()
+			if fresh := run(f); fresh != kept {
+				t.Fatalf("eq %q: kept result %q, new result %q", f, kept, fresh)
+			}
+		}
+	}
+
+	check()
+	for round := 0; round < 200; round++ {
+		id := ids[r.Intn(len(ids))]
+		if r.Intn(8) == 0 {
+			api_storage.DeleteEntityById("mixed", id)
+			_ = api_storage.WriteEntity("mixed", map[string]any{"id": id, "f": values[r.Intn(len(values))]})
+		} else {
+			api_storage.UpdateEntityById("mixed", id, map[string]any{"f": values[r.Intn(len(values))]})
+		}
+		if round%10 == 0 {
+			check()
+		}
+	}
+	check()
+}
+
+func TestViewsFollowWritesBeforeAnyRead(t *testing.T) {
+	setup(t, true)
+	if err := storage.Open(storage.ModeServer); err != nil {
+		t.Fatal(err)
+	}
+	hook.InitHooks()
+	_ = api_storage.CreateEntityType("purchase")
+
+	h := &hook.Hook{Name: "budget", Entity: "month", Event: hook.HookEventPostRead, Language: "javascript", Enabled: true, ByPassACL: true, Script: budgetScript}
+	if err := hook.CreateHook(h); err != nil {
+		t.Fatal(err)
+	}
+	hook.PrepareIndexes()
+
+	r := rand.New(rand.NewSource(1))
+	for i := 0; i < 2000; i++ {
+		_ = api_storage.WriteEntity("purchase", randomPurchase(r, fmt.Sprintf("p%05d", i)))
+	}
+
+	deadline := time.Now().Add(10 * time.Second)
+	for hook.Folds().Bytes == 0 {
+		if time.Now().After(deadline) {
+			t.Fatalf("the view should be built without a read, stats %+v", hook.Folds())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	time.Sleep(600 * time.Millisecond)
+
+	before := hook.QueryCache()
+	out := runBudget(t, monthID(1))
+	after := hook.QueryCache()
+	if after.Misses != before.Misses || after.Hits == before.Hits {
+		t.Fatalf("the first read should find the view ready: %+v -> %+v", before, after)
+	}
+
+	hook.SetFoldsEnabled(false)
+	defer hook.SetFoldsEnabled(true)
+	hook.ResetOutputMemo()
+	if slow := runBudget(t, monthID(1)); !sameDocs(out, slow) {
+		t.Fatalf("view %v, script %v", out, slow)
+	}
 }

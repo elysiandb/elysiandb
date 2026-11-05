@@ -397,7 +397,9 @@ func (r *Request) applyScript(h Hook, fnName string, entity map[string]any) erro
 	}
 
 	load := func(target string, filters map[string]map[string]string) *result {
+		began := time.Now()
 		res, qkey, err := r.query(h, target, filters, h.ByPassACL, run)
+		outside.Add(int64(time.Since(began)))
 		if err != nil {
 			panic(vm.NewGoError(r.stopReason(err, reason)))
 		}

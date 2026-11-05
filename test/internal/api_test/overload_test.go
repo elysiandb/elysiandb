@@ -252,8 +252,49 @@ func TestACheapPlanNeverWaitsForTheHeavyLane(t *testing.T) {
 	<-holder.done
 }
 
+func TestTheHookLaneQueueIsLongerThanTheHeavyOne(t *testing.T) {
+	previous := runtime.GOMAXPROCS(2)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previous) })
+	globals.SetConfig(&configuration.Config{Api: configuration.ApiConfig{Query: configuration.ApiQueryConfig{QueueTimeoutMs: -1}}})
+
+	free, err := api_storage.AcquireHookLane(&api_storage.Guard{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const waiting = 32
+	errs := make(chan error, waiting)
+	for i := 0; i < waiting; i++ {
+		go func() {
+			release, err := api_storage.AcquireHookLane(&api_storage.Guard{})
+			if err == nil {
+				release()
+			}
+			errs <- err
+		}()
+	}
+	waitForQueue(t, waiting)
+
+	if _, err := api_storage.AcquireHookLane(&api_storage.Guard{}); !errors.Is(err, api_storage.ErrBusy) {
+		t.Fatalf("beyond its queue the lane refuses, got %v", err)
+	}
+
+	free()
+	for i := 0; i < waiting; i++ {
+		select {
+		case err := <-errs:
+			if err != nil {
+				t.Fatalf("a queued hook is served, got %v", err)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("the queued hooks never got a slot")
+		}
+	}
+	waitForQueue(t, 0)
+}
+
 func TestARequestCountsOnceInTheHookLaneQueue(t *testing.T) {
-	previous := runtime.GOMAXPROCS(4)
+	previous := runtime.GOMAXPROCS(2)
 	t.Cleanup(func() { runtime.GOMAXPROCS(previous) })
 	globals.SetConfig(&configuration.Config{Api: configuration.ApiConfig{Query: configuration.ApiQueryConfig{MaxQueued: 2, QueueTimeoutMs: -1}}})
 

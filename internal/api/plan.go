@@ -872,6 +872,7 @@ const (
 	heavyCandidates       = 2048
 	guardInterval         = 64
 	defaultQueuePerWorker = 4
+	hookQueuePerWorker    = 32
 	defaultQueueTimeout   = 5 * time.Second
 	heavyLanePollInterval = 20 * time.Millisecond
 	heavyLaneAfter        = 5 * time.Millisecond
@@ -879,21 +880,22 @@ const (
 )
 
 type lane struct {
-	mu      sync.Mutex
-	slots   chan struct{}
-	size    int
-	waiting atomic.Int64
-	sizeFn  func() int
-	bit     uint32
+	mu        sync.Mutex
+	slots     chan struct{}
+	size      int
+	waiting   atomic.Int64
+	sizeFn    func() int
+	bit       uint32
+	perWorker int
 }
 
 var (
-	queries = &lane{sizeFn: HeavyLaneSize, bit: 1}
-	hooks   = &lane{sizeFn: hookLaneSize, bit: 2}
+	queries = &lane{sizeFn: HeavyLaneSize, bit: 1, perWorker: defaultQueuePerWorker}
+	hooks   = &lane{sizeFn: hookLaneSize, bit: 2, perWorker: hookQueuePerWorker}
 )
 
 func hookLaneSize() int {
-	return max(1, runtime.GOMAXPROCS(0)/4)
+	return max(1, (3*runtime.GOMAXPROCS(0)+7)/8)
 }
 
 func HeavyLaneSize() int {
@@ -904,7 +906,7 @@ func HeavyLaneSize() int {
 	return max(1, runtime.GOMAXPROCS(0)/2)
 }
 
-func heavyQueueLimit(size int) int64 {
+func queueLimit(size, perWorker int) int64 {
 	if cfg := globals.GetConfig(); cfg != nil {
 		switch {
 		case cfg.Api.Query.MaxQueued > 0:
@@ -914,7 +916,7 @@ func heavyQueueLimit(size int) int64 {
 		}
 	}
 
-	return int64(size * defaultQueuePerWorker)
+	return int64(size * perWorker)
 }
 
 func heavyQueueTimeout() time.Duration {
@@ -999,7 +1001,7 @@ func (l *lane) acquire(guard *Guard) (func(), error) {
 	}
 
 	patient := guard == nil || guard.Admitted
-	if limit := heavyQueueLimit(cap(slots)); first && !patient && limit >= 0 && l.waiting.Load() >= limit {
+	if limit := queueLimit(cap(slots), l.perWorker); first && !patient && limit >= 0 && l.waiting.Load() >= limit {
 		metrics.HeavyRejected()
 		return nil, guard.fail(ErrBusy)
 	}

@@ -32,9 +32,10 @@ type output struct {
 }
 
 type outputItem struct {
-	key string
-	out []*output
-	el  *list.Element
+	key  string
+	out  []*output
+	el   *list.Element
+	used int64
 }
 
 type outputFlight struct {
@@ -108,6 +109,7 @@ func (m *outputMemo) find(key string, valid func(*output) bool) *output {
 	if ok {
 		candidates = append(candidates, it.out...)
 		m.lru.MoveToFront(it.el)
+		it.used = time.Now().Unix()
 	}
 	m.mu.Unlock()
 
@@ -155,6 +157,7 @@ func (m *outputMemo) store(key string, o *output) {
 	} else {
 		m.lru.MoveToFront(it.el)
 	}
+	it.used = time.Now().Unix()
 
 	if len(it.out) >= maxOutputsPerInput {
 		memory.HookResults.Release(it.out[0].bytes)
@@ -173,6 +176,27 @@ func (m *outputMemo) store(key string, o *output) {
 			memory.HookResults.Release(x.bytes)
 		}
 	}
+}
+
+func (m *outputMemo) sweep(cutoff int64) int64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var freed int64
+	for key, it := range m.items {
+		if it.used >= cutoff {
+			continue
+		}
+
+		m.lru.Remove(it.el)
+		delete(m.items, key)
+		for _, o := range it.out {
+			memory.HookResults.Release(o.bytes)
+			freed += o.bytes
+		}
+	}
+
+	return freed
 }
 
 func (m *outputMemo) reset() {

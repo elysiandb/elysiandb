@@ -173,6 +173,7 @@ func (c *resultCache) sweep(e *datastore.Engine) {
 	}
 	c.mu.Unlock()
 
+	freed += outputs.sweep(cutoff)
 	if freed >= releaseAfterSweep {
 		debug.FreeOSMemory()
 	}
