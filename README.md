@@ -146,6 +146,15 @@ With the MongoDB engine, which is in beta, performance is bounded by MongoDB and
 
 These are real API scenarios, not synthetic microbenchmarks.
 
+## Running in Production
+
+* **Hot backup:** `GET /api/backup`, or `elysiandb backup --url <address> --user <name> --output <folder>` with the password in `ELYSIANDB_PASSWORD`. One consistent instant, in a stream, without stopping the server or holding writes. Archives keep format v1 and travel both ways between versions.
+* **Durability:** with `store.crashRecovery.enabled`, a `kill -9` at any moment loses no confirmed write; add `store.durability: fsync` and neither does a power cut. Torn writes are detected by checksums and never read as valid.
+* **Degraded cases:** a full or failing disk refuses writes with a clear error, keeps serving reads and recovers by itself. `GET /health` answers once the server can serve.
+* **Upgrades:** folders are read without action, and the previous binary reads them back.
+
+See [Backup and Restore](docs/index.md#backup-and-restore) and [Storage engine internals](docs/index.md#storage-engine-internals).
+
 ## When to Use ElysianDB
 
 Rapid prototyping and MVPs

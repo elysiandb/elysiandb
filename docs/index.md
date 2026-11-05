@@ -105,6 +105,10 @@ Every key added after 0.2.4 is optional. Their defaults keep the 0.2.4 answers, 
 | **store.crashRecovery.enabled**      | Writes each change to the log before answering, so that it survives a `kill -9` |
 | **store.crashRecovery.maxLogMB**     | Log written since the last checkpoint that triggers a new checkpoint                  |
 | **store.durability**                 | `default`, or `fsync` to sync the log once per group of writes, so that acknowledged writes survive a power cut |
+| **store.minFreeDiskMB**              | Free disk space under which writes are refused (see Degraded cases below). `0` (default) means 64, `-1` turns the check off |
+| **store.backup.folder**              | Folder of the periodic backups. Empty by default: no periodic backup |
+| **store.backup.everyMinutes**        | Period of the backups written to `store.backup.folder`. `0` (default) turns them off |
+| **store.backup.keep**                | Periodic backups kept in the folder, the oldest ones are removed. `0` (default) means 7 |
 | **store.memory.limitMB**             | Memory budget. `0` (default) uses 75 % of the container memory limit when there is one, and no limit otherwise. It sets `GOMEMLIMIT` (to 85 % of it when set explicitly, the rest being for goroutine stacks and the runtime); when set explicitly, the whole process is kept within it whatever the volume (see Memory budget below) |
 | **server.http**                      | Enables and configures the HTTP REST/KV interface                                     |
 | **server.http.cors.allowedOrigins**  | Origins allowed to call the HTTP API from a browser (see CORS below). Empty by default |
@@ -243,6 +247,8 @@ The status is `healthy`, `warning` or `critical`, with these problems:
 With `monitoring.prometheus.enabled: true`, `GET /metrics` serves the counters, gauges and latency histograms in the Prometheus text format, for example `elysiandb_http_requests_total{status_class="5xx"}`, `elysiandb_http_request_duration_seconds`, `elysiandb_tcp_commands_total{command="GET"}`, `elysiandb_kv_keys` and `elysiandb_entities{entity_type="books"}`. Set `monitoring.prometheus.token` to let Prometheus authenticate with `Authorization: Bearer <token>`, since a scraper cannot log in with a session cookie in `user` mode.
 
 The CPU series are given two ways: `cpu_percent` is a share of all the threads the process may use (`gomaxprocs`), so 100 % means every thread is busy, and `cpu_cores` is the number of busy threads. The engine adds `log_since_checkpoint_bytes`, `log_bytes` (log on disk), `live_bytes` (data the log still holds), `checkpoint_ms`, `value_cache_hit_ratio` and `resident_bytes`, the heavy lane adds `heavy_queries_rps`, `heavy_queued_rps` (requests that waited for a slot), `heavy_waiting` (requests waiting now), `heavy_wait_p95_ms`, `heavy_rejected_rps` (answered `503` `server busy`) and `abandoned_rps` (requests stopped because their client left), and `tcp_auth_p95_ms` is the duration of TCP `AUTH`. Prometheus exports them as `elysiandb_heavy_queries_total`, `elysiandb_heavy_queued_total`, `elysiandb_heavy_rejected_total`, `elysiandb_requests_abandoned_total` and `elysiandb_heavy_waiting`. Hook statistics give the number of `ctx.query` calls, the rows they read, their cache hits and the time per run spent in them (`avg_query_ms`, the rest of `avg_ms` being the script).
+
+The disk adds `disk_read_bytes_rps` and `disk_write_bytes_rps` (the data folder), `disk_syncs_rps` and `disk_sync_ms` (synchronizations and their average duration), `disk_free_bytes`, `refused_writes_rps` (writes refused for a full or failing disk) and `index_upkeep_bytes` (index changes of large batches waiting to be applied, see Mass inserts). `disk_bytes`, `goroutines` and `open_fds` give the size of the data folder, the goroutines and the file descriptors. Backups add `backup_running`, `backup_last_ok` (`1` or `0`, absent before the first backup), `backup_duration_ms`, `backup_bytes` and `backup_age_seconds`, and `startup_ms` is the time from the start of the process until it could serve. Prometheus exports them as `elysiandb_disk_read_bytes_total`, `elysiandb_disk_write_bytes_total`, `elysiandb_disk_syncs_total`, `elysiandb_disk_sync_seconds_total`, `elysiandb_disk_free_bytes`, `elysiandb_refused_writes_total`, `elysiandb_index_upkeep_bytes`, `elysiandb_backups_total{result}`, `elysiandb_backup_running`, `elysiandb_backup_last_ok`, `elysiandb_backup_last_bytes`, `elysiandb_backup_last_duration_seconds`, `elysiandb_backup_age_seconds` and `elysiandb_startup_seconds`.
 
 The memory budget adds `memory_budget_bytes`, `heap_live_bytes` (memory the garbage collector found in use at its last cycle), `memory_pressure` (`0` normal, `1` high, `2` critical), `memory_refused_rps` (requests refused for memory), and one series per share: `value_cache_bytes`, `page_cache_bytes`, `dirty_page_bytes` (pages waiting for a checkpoint), `hook_results_bytes`, `index_build_bytes` and `request_reserved_bytes`. Hooks add `hook_query_hit_ratio` and `hook_output_hit_ratio` (`ctx.query` results and hook results reused or brought up to date without reading the entity again) and `hook_fold_hit_ratio` (aggregation loops answered without going through the whole view), and indexes `index_count` and `index_bytes`. `total_bytes` is the memory mapped by the runtime since it started, which never goes down, including what it has given back to the system; `held_bytes` is what it holds now, and is the figure the budget follows. The Admin UI shows them in the Memory budget section of the System tab, the Hooks tab and the Indexes section of the Data tab, which lists every index.
 
@@ -396,7 +402,15 @@ curl -b cookies --data-binary @elysiandb-backup-20261101T091400Z.tar.gz http://l
 
 `GET /api/backup` answers `application/gzip` with `Content-Disposition: attachment; filename="elysiandb-backup-20261101T091400Z.tar.gz"`. `POST /api/restore` takes the archive as the request body, or as the file of a `multipart/form-data` upload. Any file name is accepted: the date, version and content of an archive come from its manifest, never from its name.
 
-From the command line, while ElysianDB is stopped (this is the upgrade path). A command cannot open a data folder that a running server holds: use `GET /api/backup` on a running server.
+From the command line, on a running server, through its address. The password comes from `ELYSIANDB_PASSWORD`, or use `--token` with a token of the instance:
+
+```bash
+ELYSIANDB_PASSWORD=... elysiandb backup --url http://localhost:8089 --user admin --output /backups
+```
+
+The command needs no configuration and no access to the data folder. It writes a temporary file in the folder, syncs it, checks it as a restore would (`--no-verify` skips this check), then gives it its final name, so that a file with the final name is always a whole archive.
+
+From the command line, while ElysianDB is stopped. A command cannot open a data folder that a running server holds:
 
 ```bash
 elysiandb backup --output /backups
@@ -404,6 +418,30 @@ elysiandb restore /backups/elysiandb-backup-20261101T091400Z.tar.gz
 ```
 
 `backup` writes `<folder>/elysiandb-backup-<date>.tar.gz` (the current folder without `--output`) and refuses to overwrite an existing file. `restore` checks the archive, then asks for a typed `yes`; `--force` skips the question. Both use the configuration given with `--config`, before the command: `elysiandb --config elysian.yaml backup`.
+
+Periodic backups are off by default. With `store.backup.folder` and `store.backup.everyMinutes` set, a running server writes an archive to the folder at that period and keeps the last `store.backup.keep` ones.
+
+### Hot backup
+
+A backup of a running server does not stop it, and blocks writes for a few milliseconds at most, the time to note where every entity stands:
+
+* the archive holds every write confirmed before the backup started, and nothing written after this instant;
+* a transaction is either whole in the archive or not there at all;
+* the entities and the KV keys are those of the same instant.
+
+Writes go on during the backup, which reads the data as it was at that instant. The archive is sent as it is produced, nothing is prepared on disk or in memory first, and the response has no `Content-Length`. The manifest comes first in the archive and holds the checksum of every file, so the data is read twice: once for the checksums, during which the response only carries keep-alive blocks of the compressed stream, and once to send it. A client that stops reading for more than 10 minutes loses the backup, and an archive cut short is refused at restore.
+
+The reads go through the disk at a limited rate, at the lowest disk and CPU priority on Linux, and do not enter the caches, so requests keep their memory. Backups of a large instance can therefore take long: the 3-second limit of `server.http.writeTimeoutSeconds` does not apply to this route.
+
+**Disk space.** On the server, a backup needs no temporary file. It only keeps the log and page segments of its instant until it ends, even when compaction retires them: the additional space is at most what is rewritten during the backup. The destination needs the size of the archive.
+
+### Production procedure
+
+1. Back up without stopping anything, from another machine or a mounted folder, and check the exit code:
+   `ELYSIANDB_PASSWORD=... elysiandb backup --url http://<host>:8089 --user admin --output /backups`
+2. Follow `backup_last_ok` and `backup_age_seconds` in the monitoring.
+3. To restore: stop the clients that write, run `curl -b cookies --data-binary @<archive> http://<host>:8089/api/restore`, log in again with the accounts of the archive, then restart the clients. On a stopped instance, or for the fastest restore of a large archive, use `elysiandb restore <archive> --force`.
+4. Space for a restore: the compressed size of the archive in the data folder for `POST /api/restore`, plus the restored data. The replaced data is given back by compaction after the restore.
 
 The date is UTC, in ISO 8601 basic format (`20261101T091400Z`), so names are valid on every filesystem and sort by date.
 
@@ -435,7 +473,7 @@ Two backups of the same data hold the same files; only `created_at` in the manif
 { "status": "restore completed", "entities": { "book": 2, "empty": 0 }, "schemas": 3, "kv_keys": 12, "kv_keys_expired": 0 }
 ```
 
-If the data cannot be written once the restore has started (a MongoDB error, a full disk), the answer is `500` and the instance is left partly restored: run the restore again.
+If the data cannot be written once the restore has started (a MongoDB error, a full disk), the answer is `500` and the instance is left partly restored: run the restore again. A restore stopped by a crash leaves a mark in the data folder: the next start logs an `ERROR` that the data is partial, until a restore completes.
 
 Stop the clients that write to ElysianDB during a restore: their writes would be lost or mixed with the restored data.
 
@@ -449,9 +487,9 @@ The manifest records the engine and the ElysianDB version, but the archive does 
 
 ### Limits
 
-The HTTP server accepts request bodies up to 4 MB and sends a response within 3 seconds. A larger archive is refused with `400 Error when parsing request`, and a large backup may not download in time. For large databases, use the command line.
+`GET /api/backup` and `POST /api/restore` have no size limit and do not follow the 4 MB and 3-second limits of the other routes. `POST /api/restore` stops when the client sends nothing for 5 minutes. It writes the archive received to a temporary file in the data folder, checks it, and only then replaces the data, so a bad archive leaves the data as it was; such files left by a crash are removed at the next start.
 
-The backup is staged in the system temporary folder (`TMPDIR`), which needs as much free space as the uncompressed data, for `GET /api/backup` and `elysiandb backup` alike.
+Other routes keep their limits. On a stopped instance, `elysiandb backup` reads the data folder directly, and needs no temporary folder with the internal engine; with MongoDB, the backup is staged in the system temporary folder (`TMPDIR`), which needs as much free space as the uncompressed data.
 
 `GET /api/backup` and `POST /api/restore` take precedence over the generic routes: an entity named `backup` cannot be listed, and documents cannot be created in an entity named `restore`, as with `export`, `import` and `query`.
 
@@ -471,7 +509,11 @@ At the first start on a 0.2.4 data folder (`elysiandb.json`, `elysiandbjson.json
 
 `users.key` and `sessions.json` keep their place and format. Backup archives keep format v1: archives of 0.2.4 restore on this version, and archives of this version restore on 0.2.4.
 
+The first start announces the migration and its estimated duration in the logs, and refuses to start if the disk does not have the space the first step asks for. An interruption at any step leaves the 0.2.4 files in place, and the next start finishes the job.
+
 Data folders written by earlier builds of this version are read as they are: `MANIFEST` format 1 is upgraded at the first start (see Storage engine internals), and format 2 folders gain the bitmap and composite indexes, `MANIFEST.prev` and the `previous_lsn`, `derived_indexes` and `index_origins` fields of `MANIFEST`. A build of this version from before these additions still reads such a folder: it ignores these fields and `MANIFEST.prev`, rebuilds the indexes it needs and cleans up the pages it does not use.
+
+The storage format did not change since the previous builds of this version. To upgrade, stop the server and start the new binary on the same folder. To go back, stop it and start the previous binary on the same folder, even after a crash: an index that was not up to date in the last checkpoint is marked as to be rebuilt, which every build understands, and files that set aside a damaged part of the log are ignored. Take a backup first, as for every upgrade.
 
 To go back to 0.2.4:
 
@@ -491,10 +533,12 @@ All of them fix defects of 0.2.4:
 * Writes made during a flush or a shutdown are no longer lost, and a crash during a write to disk no longer prevents the next start.
 * `countOnly` no longer runs `post_read` hooks, which cannot change a count.
 * Sessions are kept in memory and `sessions.json` is written when they change. Expired sessions are removed at the next session change instead of during a request, and a change made to `sessions.json` by hand needs a restart.
+* `GET /api/backup` and `POST /api/restore` no longer have the limits of the other routes, and `GET /api/backup` no longer answers with a `Content-Length`.
+* `GET /health` answers `503` until the server can serve, which includes the first computation of the hook views.
 * The `elysiandb` commands open the data folder without background work and close it cleanly, so the next start no longer reports an unclean shutdown. They cannot run on the folder of a running server.
 * The REST API filters through references (for example `filter[author.name]`) and the sort indexes use the referenced documents' current values.
 * Under overload, heavy requests beyond `api.query.maxQueued`, or waiting longer than `api.query.queueTimeoutMs`, are answered `503` `{"error":"server busy"}` with `Retry-After: 1` instead of waiting; set both to `-1` to wait as 0.2.4 did. The work of a request whose client left is stopped (`api.query.cancelOnDisconnect`). With an explicit `store.memory.limitMB`, a request that the memory budget cannot hold gets the same answer.
-* A write is answered only once the log has accepted it: on a full disk, writers wait instead of being acknowledged with a change that a crash would lose.
+* A write is answered only once the log has accepted it: on a full disk, it is refused with `507` instead of being acknowledged with a change that a crash would lose (see Degraded cases).
 
 ### Upgrading from 0.2.1
 
@@ -664,7 +708,28 @@ This section describes the `internal` engine.
 | `store.durability: fsync` | The log is synced once per group of writes before the answer: it survives a power cut |
 | `POST /save`, TCP `SAVE` | Writes a checkpoint and syncs it, without blocking other requests |
 
-A change is acknowledged only once the log has accepted it. When a log write fails, on a full disk for example, the writers wait unanswered and the write is retried until the disk accepts it; reads keep working and checkpoints resume once the disk has room. Every file the engine writes goes through one durability layer (log segments, page segments, `MANIFEST` and the key-value checkpoint), which syncs a file before the directory entry that names it and names a new file only once it is complete. Its tests cut the power at every single write, sync and rename of a workload with checkpoints and compaction, and check that every acknowledged write is there after the restart; they also damage, truncate or remove each kind of file, fill the disk, and restart the engine many times in a row.
+A change is acknowledged only once the log has accepted it. Every file the engine writes goes through one durability layer (log segments, page segments, `MANIFEST` and the key-value checkpoint), which syncs a file before the directory entry that names it and names a new file only once it is complete. Its tests cut the power at every single write, sync and rename of a workload with checkpoints and compaction, and check that every acknowledged write is there after the restart; they also damage, truncate or remove each kind of file, fill the disk, and restart the engine many times in a row.
+
+What each case gives:
+
+| Event | `store.crashRecovery.enabled` | With `store.durability: fsync` too |
+| ----- | ------------------------------ | ---------------------------------- |
+| `kill -9`, at any moment (mass insert, checkpoint, compaction, backup, migration, cleaning, shutdown) | No confirmed write lost, no corruption, automatic recovery | Same |
+| Power cut | No corruption, automatic recovery; the last confirmed writes that were not synced yet are lost (the log is synced in the background every 8 MB) | No confirmed write lost, no corruption, automatic recovery |
+
+With `fsync`, concurrent writers share one sync, which covers all of them: its cost does not grow with the number of requests, even on a mechanical disk, but each write waits for one sync. Files are synced before the directory entry that names them, and the directory is synced after each rename.
+
+Every batch of the log has a checksum and its position, every page has a checksum, and `MANIFEST` is written whole under a new name with the previous one kept in `MANIFEST.prev`. So:
+
+* a torn or truncated end of log is dropped at the next start and logged at `WARN`: those writes were never acknowledged with `fsync`;
+* damage before the end of the log stops the replay there, since what follows may depend on it: the rest of the segment is kept in `<segment>.tail.damaged`, the following segments are renamed `<segment>.damaged`, an `ERROR` is logged and the server starts with what comes before. Keep these files for analysis, and restore a backup if the lost writes matter;
+* a partly written page or an interrupted checkpoint is never read as valid: the start falls back on the previous complete checkpoint, or on the log.
+
+Limits to know: the documents in the log are checked at the replay, not at each read, so a disk that corrupts data at rest after the checkpoint is not noticed until the data is copied elsewhere. A corrupt page is detected when it is read: the request fails with `500` and an `ERROR` is logged, and only a restore repairs it. `fsync` relies on the disk honouring its flushes: a controller with a volatile write cache without battery can lose data whatever the software does.
+
+These guarantees are tested by cutting the process and the power at every write, sync and rename of a mixed workload with a simulated file system that loses what was not synced, and by killing the real server under load.
+
+**Mass inserts.** A large batch does not read the pages of the indexes under the write lock of its entity. The index changes of a batch of 64 documents or more are queued, sorted by key and applied in the background, outside the lock, so that each page is read and written once for many changes. Their document ids are read before the lock is taken. A request that uses an index first brings it up to date, and can never read an index that lags. When the queue reaches the share of changed pages, writers wait for it. Page and log segments are preallocated on Linux, which keeps their blocks together on a mechanical disk and spares the file system an allocation at every write. Checkpoints are written in slices with pauses as long as the syncs, as described above, unless the changed pages reach one and a half times their share.
 
 **Memory.** Documents and pages are kept as bytes, with no pointers for the garbage collector to scan. With `store.memory.limitMB` set, only the most read documents and pages stay in memory and the others are read from disk on demand, so the process stays within the budget at any volume (see Memory budget below). Without it, everything read stays in memory. After `DELETE /api/<entity>`, the memory of its documents is released and returned to the system. Large lists are streamed: their memory does not grow with their size.
 
@@ -683,7 +748,21 @@ The API cache keeps its own limit, `api.cache.maxMB` (128 MB by default), and re
 
 **One process per folder.** The engine locks `elysiandb.lock` in the data folder. A second process on the same folder, `elysiandb backup` on the folder of a running server for example, stops with an error.
 
-**Shutdown.** On `SIGTERM`, ElysianDB stops accepting requests, lets the requests in flight finish (up to 10 seconds), writes a checkpoint and closes the log.
+**Shutdown.** On `SIGTERM`, ElysianDB stops accepting requests, lets the requests in flight finish (up to 5 seconds), writes the log, then writes a last checkpoint for up to 3 seconds. It therefore leaves within the 10 seconds that `docker stop` gives it. When the checkpoint cannot finish in time, a `WARN` says so and the next start replays the log without any loss.
+
+**Starting.** A start reads the last checkpoint, then replays the log written since. The log is bounded: a checkpoint starts at `store.crashRecovery.maxLogMB`, and another one follows at once if the log reaches twice that value, or 256 MB when that is more. The index changes of a replay are grouped like those of a mass insert, so the duration of a start follows the size of this log, not the volume of the data. The logs announce it: `replaying the log` with the size and an estimate, `log replay in progress` every 5 seconds, `log replayed` with the duration, and `ready to serve` with the total. `GET /health` answers `503` until then, for at most 5 minutes while the hook views are computed for the first time.
+
+**Degraded cases.**
+
+| Case | Behaviour |
+| ---- | --------- |
+| Free space under `store.minFreeDiskMB`, or the disk answers that it is full | Writes that add data are refused with `507` `{"error":"disk full"}` and `Retry-After: 30`, TCP answers `ERR`, an `ERROR` is logged and `refused_writes_rps` counts them. Reads, queries and deletions are served, since deleting is how space comes back. Writes resume by themselves once the space is back |
+| Disk error on the log | Writes are refused with `503` `{"error":"storage write failed"}` and `Retry-After: 30`, an `ERROR` is logged, reads are served and the log write is retried until it succeeds |
+| Failed checkpoint | An `ERROR` is logged and the problem `flush_failing` is raised. Nothing is lost: the data stays in the log and the checkpoint is tried again |
+| Memory at the container limit | With an explicit `store.memory.limitMB`, a budget above 90 % of the limit of the container is lowered to it with a `WARN`, and the process stays within it (see Memory budget) |
+
+A write caught by a full disk while it was being written can be answered `507` and appear after the next start: it is the only uncertainty, never the opposite, a write answered as done that is lost.
+
 
 ---
 
