@@ -95,6 +95,8 @@ const (
 	sHookOutputHitRatio
 	sIndexCount
 	sIndexBytes
+	sHeldBytes
+	sHookFoldHitRatio
 	numSeries
 )
 
@@ -187,6 +189,8 @@ var seriesNames = [numSeries]string{
 	sRequestReservedBytes:    "request_reserved_bytes",
 	sHookQueryHitRatio:       "hook_query_hit_ratio",
 	sHookOutputHitRatio:      "hook_output_hit_ratio",
+	sHeldBytes:               "held_bytes",
+	sHookFoldHitRatio:        "hook_fold_hit_ratio",
 	sIndexCount:              "index_count",
 	sIndexBytes:              "index_bytes",
 }
@@ -320,6 +324,7 @@ func derive(prev, cur *snapshot) Point {
 
 	p.V[sHookQueryHitRatio] = ratio(cur.hookQuery, prev.hookQuery)
 	p.V[sHookOutputHitRatio] = ratio(cur.hookOutput, prev.hookOutput)
+	p.V[sHookFoldHitRatio] = ratio(cur.hookFold, prev.hookFold)
 
 	for s, v := range cur.gauges {
 		p.V[s] = v

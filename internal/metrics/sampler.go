@@ -53,6 +53,8 @@ type HookCacheSample struct {
 	QueryMisses  int64
 	OutputHits   int64
 	OutputMisses int64
+	FoldHits     int64
+	FoldPasses   int64
 }
 
 type resolution struct {
@@ -85,6 +87,7 @@ type snapshot struct {
 	memoryRefused    int64
 	hookQuery        [2]int64
 	hookOutput       [2]int64
+	hookFold         [2]int64
 }
 
 type slowValues struct {
@@ -334,6 +337,7 @@ func (s *sampler) refreshSlow(src Sources, ticks int64) slowValues {
 var runtimeSamples = []metrics.Sample{
 	{Name: "/memory/classes/heap/objects:bytes"},
 	{Name: "/memory/classes/total:bytes"},
+	{Name: "/memory/classes/heap/released:bytes"},
 	{Name: "/sched/goroutines:goroutines"},
 	{Name: "/gc/cycles/total:gc-cycles"},
 	{Name: "/sched/pauses/total/gc:seconds"},
@@ -368,6 +372,8 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 			s.gauges[sHeapBytes] = uintValue(sample.Value)
 		case "/memory/classes/total:bytes":
 			s.gauges[sTotalBytes] = uintValue(sample.Value)
+		case "/memory/classes/heap/released:bytes":
+			s.gauges[sHeldBytes] = -uintValue(sample.Value)
 		case "/sched/goroutines:goroutines":
 			s.gauges[sGoroutines] = uintValue(sample.Value)
 		case "/gc/cycles/total:gc-cycles":
@@ -438,8 +444,10 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 		hc := src.HookCaches()
 		s.hookQuery = [2]int64{hc.QueryHits, hc.QueryMisses}
 		s.hookOutput = [2]int64{hc.OutputHits, hc.OutputMisses}
+		s.hookFold = [2]int64{hc.FoldHits, hc.FoldPasses}
 	}
 
+	s.gauges[sHeldBytes] += s.gauges[sTotalBytes]
 	s.gauges[sMemoryBudget] = float64(memory.Budget())
 	s.gauges[sHeapLiveBytes] = float64(memory.Live())
 	s.gauges[sMemoryPressure] = float64(memory.Current())

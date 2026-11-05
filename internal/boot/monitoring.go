@@ -107,9 +107,9 @@ func engineSample() metrics.EngineSample {
 }
 
 func hookCaches() metrics.HookCacheSample {
-	q, o := hook.QueryCache(), hook.OutputMemo()
+	q, o, f := hook.QueryCache(), hook.OutputMemo(), hook.Folds()
 
-	return metrics.HookCacheSample{QueryHits: q.Hits, QueryMisses: q.Misses, OutputHits: o.Hits, OutputMisses: o.Misses}
+	return metrics.HookCacheSample{QueryHits: q.Hits, QueryMisses: q.Misses, OutputHits: o.Hits, OutputMisses: o.Misses, FoldHits: f.Cached + f.Incremental, FoldPasses: f.FullPasses}
 }
 
 func indexStates() []metrics.IndexState {
