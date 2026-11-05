@@ -766,7 +766,7 @@ func (e *Engine) checkpoint(force bool) error {
 		retain = journal.Position{Segment: e.previous.Segment, Offset: e.previous.Offset}
 	}
 	e.retireDeadSegments(retain, live)
-	e.cleanPages(snaps)
+	e.guarded("page cleaning", func() { e.cleanPages(snaps) })
 	e.pages.Sweep()
 
 	engineLog.Debug("checkpoint written", "lsn", lsn, "entities", len(snaps), "kv_keys", len(kv), "duration_ms", log.Since(start))

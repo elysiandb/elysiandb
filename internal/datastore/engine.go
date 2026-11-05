@@ -450,6 +450,21 @@ func (e *Engine) refuse(err error) error {
 	return err
 }
 
+func (e *Engine) guarded(task string, fn func()) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
+		}
+
+		if suppressed, ok := writeFailures.Allow(task); ok {
+			engineLog.Error("a background task failed, it will run again", log.WithSuppressed([]any{"task", task, "err", r}, suppressed)...)
+		}
+	}()
+
+	fn()
+}
+
 func (e *Engine) entity(name string, create bool) *entity {
 	e.catalogMu.RLock()
 	ent := e.entities[name]

@@ -946,6 +946,10 @@ func (j *Journal) Release() {
 	}
 }
 
+func (j *Journal) CloseRetired() {
+	j.closeRetired(false)
+}
+
 func (j *Journal) closeRetired(all bool) {
 	if !all && j.holds.Load() > 0 {
 		return

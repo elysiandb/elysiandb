@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/journal"
@@ -45,33 +44,42 @@ func (e *Engine) migrateIfNeeded() (*MigrationReport, error) {
 		return nil, nil
 	}
 
+	files := e.files()
 	start := time.Now()
-	_ = os.RemoveAll(filepath.Join(e.dir, LogFolder))
-	_ = os.RemoveAll(filepath.Join(e.dir, durable.PagesFolder))
+	if err := removeTree(files, filepath.Join(e.dir, LogFolder)); err != nil {
+		return nil, err
+	}
+	if err := removeTree(files, filepath.Join(e.dir, durable.PagesFolder)); err != nil {
+		return nil, err
+	}
 	tmp := filepath.Join(e.dir, migrationFolder)
-	_ = os.RemoveAll(tmp)
+	if err := removeTree(files, tmp); err != nil {
+		return nil, err
+	}
 
 	if err := checkFreeSpace(e.dir); err != nil {
 		return nil, err
 	}
+
+	engineLog.Info("migrating a 0.2.4 data folder, the first start takes longer", "bytes", legacyBytes(e.dir), "estimated_seconds", legacyBytes(e.dir)/migrationBytesPerSecond+1)
 
 	data, err := legacy.Read(e.dir, e.opts.LegacyRecovery, time.Now())
 	if err != nil {
 		return nil, fmt.Errorf("cannot read the 0.2.4 data files: %w", err)
 	}
 
-	report, err := writeMigration(tmp, data, e.opts.Shards)
+	report, err := writeMigration(tmp, data, e.opts.Shards, e.opts.FS)
 	if err != nil {
-		_ = os.RemoveAll(tmp)
+		_ = removeTree(files, tmp)
 		return nil, fmt.Errorf("migration failed, the 0.2.4 files are untouched: %w", err)
 	}
 
-	if err := verifyMigration(tmp, data, e.opts.Shards); err != nil {
-		_ = os.RemoveAll(tmp)
+	if err := verifyMigration(tmp, data, e.opts.Shards, e.opts.FS); err != nil {
+		_ = removeTree(files, tmp)
 		return nil, fmt.Errorf("migration check failed, the 0.2.4 files are untouched: %w", err)
 	}
 
-	entries, err := os.ReadDir(tmp)
+	entries, err := files.ReadDir(tmp)
 	if err != nil {
 		return nil, err
 	}
@@ -82,17 +90,26 @@ func (e *Engine) migrateIfNeeded() (*MigrationReport, error) {
 			continue
 		}
 
-		if err := os.Rename(filepath.Join(tmp, name), filepath.Join(e.dir, name)); err != nil {
+		if err := files.Rename(filepath.Join(tmp, name), filepath.Join(e.dir, name)); err != nil {
 			return nil, err
 		}
 	}
 
-	if err := os.Rename(filepath.Join(tmp, ManifestFile), filepath.Join(e.dir, ManifestFile)); err != nil {
+	if err := files.SyncDir(e.dir); err != nil {
 		return nil, err
 	}
 
-	_ = durable.OS.SyncDir(e.dir)
-	_ = os.RemoveAll(tmp)
+	if err := files.Rename(filepath.Join(tmp, ManifestFile), filepath.Join(e.dir, ManifestFile)); err != nil {
+		return nil, err
+	}
+
+	if err := files.SyncDir(e.dir); err != nil {
+		return nil, err
+	}
+
+	if err := removeTree(files, tmp); err != nil {
+		engineLog.Warn("cannot remove the migration folder", "err", err)
+	}
 	e.moveLegacyFiles()
 
 	report.Replayed = data.Replayed
@@ -108,6 +125,49 @@ func (e *Engine) migrateIfNeeded() (*MigrationReport, error) {
 	)
 
 	return report, nil
+}
+
+const migrationBytesPerSecond = 32 << 20
+
+func removeTree(files durable.FS, path string) error {
+	entries, err := files.ReadDir(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	for _, entry := range entries {
+		child := filepath.Join(path, entry.Name())
+		if entry.IsDir() {
+			if err := removeTree(files, child); err != nil {
+				return err
+			}
+			continue
+		}
+
+		if err := files.Remove(child); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+
+	if err := files.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
+}
+
+func legacyBytes(dir string) int64 {
+	var used int64
+	for _, name := range legacy.FilesIn(dir) {
+		if info, err := os.Stat(filepath.Join(dir, name)); err == nil {
+			used += info.Size()
+		}
+	}
+
+	return used
 }
 
 func (e *Engine) moveLegacyFiles() {
@@ -138,19 +198,13 @@ func (e *Engine) moveLegacyFiles() {
 }
 
 func checkFreeSpace(dir string) error {
-	var used int64
-	for _, name := range legacy.FilesIn(dir) {
-		if info, err := os.Stat(filepath.Join(dir, name)); err == nil {
-			used += info.Size()
-		}
-	}
+	used := legacyBytes(dir)
 
-	var st syscall.Statfs_t
-	if err := syscall.Statfs(dir, &st); err != nil {
+	free, err := durable.FreeBytes(dir)
+	if err != nil {
 		return nil
 	}
 
-	free := int64(st.Bavail) * int64(st.Bsize)
 	if free < 2*used {
 		return fmt.Errorf("not enough free space to migrate the data folder: %d bytes free, %d needed", free, 2*used)
 	}
@@ -158,8 +212,8 @@ func checkFreeSpace(dir string) error {
 	return nil
 }
 
-func writeMigration(dir string, data *legacy.Data, shards int) (*MigrationReport, error) {
-	e, err := Open(Options{Folder: dir, Shards: shards, Durability: journal.ModeWrite})
+func writeMigration(dir string, data *legacy.Data, shards int, files durable.FS) (*MigrationReport, error) {
+	e, err := Open(Options{Folder: dir, Shards: shards, Durability: journal.ModeWrite, FS: files})
 	if err != nil {
 		return nil, err
 	}
@@ -220,8 +274,8 @@ func writeMigration(dir string, data *legacy.Data, shards int) (*MigrationReport
 	return report, nil
 }
 
-func verifyMigration(dir string, data *legacy.Data, shards int) error {
-	e, err := Open(Options{Folder: dir, Shards: shards, Durability: journal.ModeWrite})
+func verifyMigration(dir string, data *legacy.Data, shards int, files durable.FS) error {
+	e, err := Open(Options{Folder: dir, Shards: shards, Durability: journal.ModeWrite, FS: files})
 	if err != nil {
 		return err
 	}

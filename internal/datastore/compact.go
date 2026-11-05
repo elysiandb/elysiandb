@@ -17,6 +17,7 @@ const (
 	reclaimRounds         = 3
 	reclaimSpacing        = 2 * time.Second
 	maxFlushPause         = 250 * time.Millisecond
+	maxCompactionBatch    = 8
 )
 
 func (e *Engine) maintenanceLoop() {
@@ -38,44 +39,72 @@ func (e *Engine) maintenanceLoop() {
 			volume = true
 		}
 
-		if time.Since(lastSweep) >= idleSweepInterval {
-			lastSweep = time.Now()
-			e.DropIdleIndexes(IndexIdleAfter)
-			e.Advise()
-		}
-
-		if time.Since(lastCompaction) >= compactionInterval {
-			lastCompaction = time.Now()
-			if n, err := e.Compact(1); err != nil {
-				engineLog.Error("compaction failed", "err", err)
-			} else if n > 0 {
-				compacted = true
+		e.guarded("maintenance", func() {
+			if time.Since(lastSweep) >= idleSweepInterval {
+				lastSweep = time.Now()
+				e.DropIdleIndexes(IndexIdleAfter)
+				e.Advise()
+				e.j.CloseRetired()
 			}
-		}
 
-		if !volume && e.dirty.Load() < e.dirtyFlushBytes() && e.reclaimDue() {
-			compacted = false
-			if err := e.reclaimRound(); err != nil {
-				if suppressed, ok := writeFailures.Allow("checkpoint"); ok {
-					engineLog.Error("checkpoint failed", log.WithSuppressed([]any{"err", err}, suppressed)...)
+			if time.Since(lastCompaction) >= compactionInterval {
+				lastCompaction = time.Now()
+				if n, err := e.Compact(e.compactionBudget()); err != nil {
+					engineLog.Error("compaction failed", "err", err)
+				} else if n > 0 {
+					compacted = true
 				}
 			}
-			e.measureDirty()
-			e.signalFlushed()
-			continue
-		}
+		})
 
-		volume = volume || e.dirty.Load() >= e.dirtyFlushBytes()
-		if volume || ((compacted || e.checkpointDue()) && (e.checkpointSpaced() || e.LogSinceCheckpoint() >= e.forcedCheckpointLog())) {
-			compacted = false
-			if err := e.checkpoint(volume); err != nil {
-				if suppressed, ok := writeFailures.Allow("checkpoint"); ok {
-					engineLog.Error("checkpoint failed", log.WithSuppressed([]any{"err", err}, suppressed)...)
-				}
-			}
-			e.measureDirty()
-			e.signalFlushed()
+		e.guarded("checkpoint", func() { e.maintain(volume, &compacted) })
+	}
+}
+
+func (e *Engine) compactionBudget() int {
+	segments, err := e.j.Segments()
+	if err != nil {
+		return 1
+	}
+
+	livePtr := e.segmentLive.Load()
+	if livePtr == nil {
+		return 1
+	}
+
+	reclaimable := 0
+	for _, seg := range segments {
+		if seg.Size > 0 && float64((*livePtr)[seg.ID])/float64(seg.Size) < compactionRatio {
+			reclaimable++
 		}
+	}
+
+	return max(1, min(maxCompactionBatch, reclaimable/2))
+}
+
+func (e *Engine) maintain(volume bool, compacted *bool) {
+	if !volume && e.dirty.Load() < e.dirtyFlushBytes() && e.reclaimDue() {
+		*compacted = false
+		if err := e.reclaimRound(); err != nil {
+			if suppressed, ok := writeFailures.Allow("checkpoint"); ok {
+				engineLog.Error("checkpoint failed", log.WithSuppressed([]any{"err", err}, suppressed)...)
+			}
+		}
+		e.measureDirty()
+		e.signalFlushed()
+		return
+	}
+
+	volume = volume || e.dirty.Load() >= e.dirtyFlushBytes()
+	if volume || ((*compacted || e.checkpointDue()) && (e.checkpointSpaced() || e.LogSinceCheckpoint() >= e.forcedCheckpointLog())) {
+		*compacted = false
+		if err := e.checkpoint(volume); err != nil {
+			if suppressed, ok := writeFailures.Allow("checkpoint"); ok {
+				engineLog.Error("checkpoint failed", log.WithSuppressed([]any{"err", err}, suppressed)...)
+			}
+		}
+		e.measureDirty()
+		e.signalFlushed()
 	}
 }
 

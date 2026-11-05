@@ -86,7 +86,7 @@ func (e *Engine) buildLoop() {
 					<-sem
 					running.Done()
 				}()
-				e.buildEntity(ent, true)
+				e.guarded("index build", func() { e.buildEntity(ent, true) })
 			}()
 		}
 	}
