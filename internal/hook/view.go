@@ -477,9 +477,19 @@ func (v *view) current(e *datastore.Engine, guard *api_storage.Guard) (*viewStat
 	}
 }
 
-func (v *view) advance(e *datastore.Engine) error {
+func (v *view) advance(e *datastore.Engine) (err error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+
+	defer func() {
+		if r := recover(); r != nil {
+			v.state.Store(nil)
+			panic(r)
+		}
+		if err != nil {
+			v.state.Store(nil)
+		}
+	}()
 
 	snap := e.Snapshot(v.entity)
 	st := v.state.Load()
@@ -1303,7 +1313,10 @@ func (r *Request) foldOnView(h Hook, def *foldDef, tok *viewToken, regs, free []
 		return nil, nil, nil
 	}
 
-	patient := r.guard.Until(time.Time{})
+	var patient *api_storage.Guard
+	if r.guard != nil {
+		patient = r.guard.Until(time.Time{})
+	}
 	lane := func() (func(), error) { return api_storage.AcquireHookLane(patient) }
 	check := func() error { return r.guard.Check() }
 
