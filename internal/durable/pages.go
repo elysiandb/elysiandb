@@ -379,7 +379,7 @@ func (s *PageStore) rotate() error {
 	}
 
 	s.wmu.Lock()
-	id := s.curID + 1
+	id, previous := s.curID+1, s.cur
 	s.wmu.Unlock()
 
 	path := filepath.Join(s.dir, pageSegmentName(id))
@@ -392,6 +392,11 @@ func (s *PageStore) rotate() error {
 		f.Close()
 		return err
 	}
+
+	if previous != nil {
+		TrimPreallocated(previous)
+	}
+	Preallocate(f, s.dir, s.segSize)
 
 	s.rmu.Lock()
 	s.files[id] = f
@@ -440,6 +445,20 @@ func (s *PageStore) flush() error {
 	s.rmu.Unlock()
 
 	return nil
+}
+
+func (s *PageStore) Rotate() error {
+	s.ioMu.Lock()
+	defer s.ioMu.Unlock()
+
+	s.wmu.Lock()
+	empty := s.cur == nil || s.curOff == 0
+	s.wmu.Unlock()
+	if empty {
+		return nil
+	}
+
+	return s.rotate()
 }
 
 func (s *PageStore) FlushTree(t pagetree.Tree) error {
@@ -538,6 +557,9 @@ func (s *PageStore) Close() error {
 		delete(s.unsynced, id)
 	}
 	s.wmu.Lock()
+	if s.cur != nil {
+		TrimPreallocated(s.cur)
+	}
 	s.cur = nil
 	s.wmu.Unlock()
 	s.ioMu.Unlock()

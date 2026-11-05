@@ -413,6 +413,7 @@ func (e *Engine) DropIdleIndexes(idle time.Duration) int {
 				nr = &c
 			}
 			nr.indexes[name] = &index{spec: idx.spec, dormant: true}
+			e.forgetBacklog(ent, name)
 			dropped++
 		}
 

@@ -128,6 +128,7 @@ func (e *Engine) dropIndex(ent *entity, name string) {
 	nr.indexes = cloneIndexes(r.indexes)
 	delete(nr.indexes, name)
 	delete(ent.building, name)
+	e.forgetBacklog(ent, name)
 	ent.root.Store(&nr)
 	ent.metas.Delete(name)
 	ent.usage.Delete(name)
@@ -182,5 +183,6 @@ func (e *Engine) releaseIndex(ent *entity, name string) {
 	nr := *r
 	nr.indexes = cloneIndexes(r.indexes)
 	nr.indexes[name] = &index{spec: idx.spec, dormant: true}
+	e.forgetBacklog(ent, name)
 	ent.root.Store(&nr)
 }

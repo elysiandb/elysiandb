@@ -194,6 +194,9 @@ func (e *Engine) ReleaseIndexes() {
 			r.indexes[name] = &index{spec: idx.spec, dormant: true}
 		}
 		clear(ent.building)
+		e.forgetAllBacklog(ent)
+		r.lagging = false
+		ent.backlog.lagging.Store(false)
 		ent.root.Store(&r)
 		ent.apply.Unlock()
 	}

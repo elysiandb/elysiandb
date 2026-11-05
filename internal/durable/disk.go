@@ -37,3 +37,29 @@ func FreeBytes(dir string) (int64, error) {
 
 	return int64(st.Bavail) * int64(st.Bsize), nil
 }
+
+const preallocateFreeFactor = 8
+
+func Preallocate(f File, dir string, size int64) {
+	c, ok := f.(countedFile)
+	if !ok || size <= 0 {
+		return
+	}
+
+	if free, err := FreeBytes(dir); err != nil || free < preallocateFreeFactor*size {
+		return
+	}
+
+	preallocate(c.File, size)
+}
+
+func TrimPreallocated(f File) {
+	c, ok := f.(countedFile)
+	if !ok {
+		return
+	}
+
+	if st, err := c.Stat(); err == nil {
+		_ = c.Truncate(st.Size())
+	}
+}

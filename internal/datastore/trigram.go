@@ -417,12 +417,12 @@ func (e *Engine) SearchCandidates(name string, pattern string) (*Bitset, bool) {
 		return &Bitset{}, true
 	}
 
-	snap := e.Snapshot(name)
+	snap := e.IndexedSnapshot(name)
 	view, ok := snap.Index(searchSpec())
 	if !ok {
 		if snap.Len() > 0 && (!snap.HasIndex(searchSpec()) || snap.IndexDormant(searchSpec())) {
 			e.EnsureIndex(name, searchSpec())
-			snap = e.Snapshot(name)
+			snap = e.IndexedSnapshot(name)
 			view, ok = snap.Index(searchSpec())
 		}
 		if !ok {

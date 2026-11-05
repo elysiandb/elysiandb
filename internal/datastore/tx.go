@@ -58,6 +58,7 @@ func (e *Engine) Update(fn func(tx *Tx) error) error {
 	defer e.writers.Done()
 
 	e.waitForDirty()
+	e.waitForBacklog()
 
 	for attempt := 0; ; attempt++ {
 		tx := e.newTx()
@@ -306,6 +307,10 @@ func (e *Engine) commit(tx *Tx) (journal.Ticket, error) {
 		sorted = append(sorted, name)
 	}
 	sort.Strings(sorted)
+
+	if e.opts.Background && len(tx.ops) >= bulkBatchRecords {
+		e.readAhead(tx)
+	}
 
 	ents := make([]*entity, len(sorted))
 	for i, name := range sorted {

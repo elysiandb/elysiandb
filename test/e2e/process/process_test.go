@@ -248,6 +248,17 @@ func writeLoad(s *server, c *confirmed, round int, stop *atomic.Bool, wg *sync.W
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		for !stop.Load() {
+			if _, _, err := s.do("GET", fmt.Sprintf("/api/bulk?filter[round][eq]=%d&limit=1", round), ""); err != nil {
+				return
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 		for n := 0; !stop.Load(); n++ {
 			key := fmt.Sprintf("k%d-%d", round, n%10)
 			status, _, err := s.do("PUT", "/kv/"+key, fmt.Sprintf("%d", n))
@@ -342,6 +353,30 @@ func verifyConfirmed(t *testing.T, s *server, c *confirmed, label string) {
 			if !present[id] {
 				t.Fatalf("%s: confirmed bulk document %s is lost", label, id)
 			}
+		}
+
+		byRound := map[string]int{}
+		for id := range c.bulk {
+			byRound[strings.SplitN(id, "-", 3)[1][1:]]++
+		}
+
+		for attempt := 0; attempt < 3; attempt++ {
+			for round, want := range byRound {
+				status, body, err := s.do("GET", "/api/bulk?fields=id&filter[round][eq]="+round, "")
+				if err != nil || status != http.StatusOK {
+					t.Fatalf("%s: cannot filter the bulk documents: %d %v", label, status, err)
+				}
+
+				var found []map[string]any
+				if err := json.Unmarshal(body, &found); err != nil {
+					t.Fatalf("%s: the filtered list is corrupt: %v", label, err)
+				}
+
+				if len(found) < want {
+					t.Fatalf("%s: the filter on round %s finds %d documents, %d were confirmed", label, round, len(found), want)
+				}
+			}
+			time.Sleep(200 * time.Millisecond)
 		}
 	}
 

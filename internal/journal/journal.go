@@ -366,7 +366,7 @@ func (j *Journal) syncer() {
 	for {
 		select {
 		case <-j.syncKick:
-			durable.RunGently(func() { _ = j.syncDirty() })
+			_ = j.syncDirty()
 		case <-j.stop:
 			return
 		}
@@ -543,6 +543,14 @@ func (j *Journal) fileFor(segment uint32, create bool) (File, error) {
 	if create {
 		if err := j.fs.SyncDir(j.dir); err != nil {
 			return nil, err
+		}
+		durable.Preallocate(f, j.dir, j.opts.SegmentSize)
+
+		j.filesMu.RLock()
+		previous := j.files[segment-1]
+		j.filesMu.RUnlock()
+		if previous != nil {
+			durable.TrimPreallocated(previous)
 		}
 	}
 
@@ -1000,6 +1008,9 @@ func (j *Journal) Close() error {
 	}
 
 	j.filesMu.Lock()
+	if last := j.files[j.active]; last != nil {
+		durable.TrimPreallocated(last)
+	}
 	for id, f := range j.files {
 		_ = f.Close()
 		delete(j.files, id)

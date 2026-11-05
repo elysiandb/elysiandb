@@ -83,6 +83,7 @@ type Engine struct {
 	segmentLive     atomic.Pointer[map[uint32]int64]
 
 	dirty          atomic.Int64
+	backlogBytes   atomic.Int64
 	flushNow       chan struct{}
 	flushed        chan struct{}
 	flushedMu      sync.Mutex
@@ -312,11 +313,12 @@ func (e *Engine) load() error {
 }
 
 func (e *Engine) startBackground() {
-	e.wg.Add(4)
+	e.wg.Add(5)
 	go e.expiryLoop()
 	go e.maintenanceLoop()
 	go e.buildLoop()
 	go e.dirtyLoop()
+	go e.backlogLoop()
 
 	if e.inline {
 		go e.warmValues()
@@ -353,6 +355,7 @@ func (e *Engine) Close() error {
 	close(e.stop)
 	e.wg.Wait()
 	e.writers.Wait()
+	e.settleAll()
 
 	var errs []error
 	if err := e.checkpoint(true); err != nil {
@@ -523,6 +526,7 @@ func (e *Engine) applyBatch(recs []journal.Record, docs []map[string]any, replay
 		}
 
 		d := e.newDraft(e.entity(name, true))
+		d.deferred = d.deferred || (e.opts.Background && !replay && len(recs) >= bulkBatchRecords)
 		drafts[name] = d
 		order = append(order, name)
 
@@ -766,7 +770,7 @@ type IndexView struct {
 func (s *Snapshot) Index(spec IndexSpec) (*IndexView, bool) {
 	name := spec.Name()
 	idx, ok := s.r.indexes[name]
-	if !ok || !idx.ready {
+	if !ok || !idx.ready || s.r.lagging {
 		return nil, false
 	}
 
@@ -939,7 +943,10 @@ func (e *Engine) DropIndexes(name string) {
 	ent.apply.Lock()
 	r := *ent.root.Load()
 	r.indexes = map[string]*index{}
+	r.lagging = false
 	ent.building = map[string]*buildState{}
+	e.forgetAllBacklog(ent)
+	ent.backlog.lagging.Store(false)
 	ent.root.Store(&r)
 	ent.apply.Unlock()
 }

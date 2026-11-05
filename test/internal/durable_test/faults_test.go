@@ -775,3 +775,38 @@ func TestAMigrationInterruptedAtAnyStepCompletesAtTheNextStart(t *testing.T) {
 		}
 	}
 }
+
+func TestPreallocatedSpaceChangesNothingInAFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "segment")
+
+	f, err := durable.OS.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	durable.Preallocate(f, dir, 1<<20)
+	if st, _ := f.Stat(); st.Size() != 0 {
+		t.Fatalf("the visible size should not change, got %d", st.Size())
+	}
+
+	if _, err := f.WriteAt([]byte("hello"), 0); err != nil {
+		t.Fatal(err)
+	}
+
+	durable.TrimPreallocated(f)
+
+	st, err := f.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Size() != 5 {
+		t.Fatalf("trimming should keep the data, size %d", st.Size())
+	}
+
+	got := make([]byte, 5)
+	if _, err := f.ReadAt(got, 0); err != nil || string(got) != "hello" {
+		t.Fatalf("%q %v", got, err)
+	}
+}

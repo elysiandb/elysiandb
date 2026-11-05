@@ -84,6 +84,7 @@ type root struct {
 	indexes map[string]*index
 	version uint64
 	refs    []RefPath
+	lagging bool
 }
 
 func (r *root) slotBySeq(seq uint32, shared bool) (slot, bool) {
@@ -127,6 +128,7 @@ type entity struct {
 	watched  atomic.Pointer[map[string]*fieldStamps]
 	stale    atomic.Int64
 	advised  atomic.Int64
+	backlog  indexBacklog
 }
 
 func (e *Engine) newEntity(name string) *entity {
@@ -151,6 +153,8 @@ type draft struct {
 	tok      *pagetree.Token
 	stamps   []pendingStamp
 	floors   []*fieldStamps
+	deferred bool
+	ops      map[string][]indexOp
 }
 
 func (e *Engine) newDraft(ent *entity) *draft {
@@ -159,7 +163,7 @@ func (e *Engine) newDraft(ent *entity) *draft {
 	r.slots = r.slots.WithToken(tok)
 	r.ids = r.ids.WithToken(tok)
 
-	return &draft{e: e, ent: ent, r: r, indexes: r.indexes, tok: tok}
+	return &draft{e: e, ent: ent, r: r, indexes: r.indexes, tok: tok, deferred: e.opts.Background && ent.backlog.active()}
 }
 
 func (d *draft) mutableIndexes() map[string]*index {
@@ -197,6 +201,12 @@ func (d *draft) publish() {
 		})
 		d.r.refs = refs
 	}
+
+	if len(d.ops) > 0 {
+		d.e.mergeBacklog(d.ent, d.ops)
+		d.r.lagging = true
+	}
+	d.ent.backlog.lagging.Store(d.r.lagging)
 
 	r := d.r
 	d.ent.root.Store(&r)
@@ -328,6 +338,8 @@ func (d *draft) reset(rec *journal.Record) {
 		d.e.reclaim.Store(reclaimRounds)
 	}
 
+	d.ops = nil
+	d.e.forgetAllBacklog(d.ent)
 	d.ent.changes.reset()
 	fresh := d.e.emptyRoot(rec.Gen, rec.LSN)
 	d.r = *fresh
@@ -361,6 +373,13 @@ func (d *draft) updateIndexes(seq uint32, oldDoc, newDoc map[string]any) {
 				changed = map[string]*index{}
 			}
 			changed[name] = &index{spec: idx.spec, dormant: true}
+			delete(d.ops, name)
+			d.e.forgetBacklog(d.ent, name)
+			continue
+		}
+
+		if d.deferred {
+			d.queue(name, changeOps(idx.spec, seq, oldDoc, newDoc))
 			continue
 		}
 

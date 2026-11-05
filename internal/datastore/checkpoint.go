@@ -610,6 +610,7 @@ type entitySnapshot struct {
 	name   string
 	r      *root
 	search bool
+	lag    map[string]bool
 }
 
 func (e *Engine) Checkpoint() error {
@@ -638,7 +639,7 @@ func (e *Engine) checkpoint(force bool) error {
 	snaps := make([]entitySnapshot, 0, len(ents))
 	for _, ent := range ents {
 		ent.apply.Lock()
-		snaps = append(snaps, entitySnapshot{ent: ent, name: ent.name, r: ent.root.Load()})
+		snaps = append(snaps, entitySnapshot{ent: ent, name: ent.name, r: ent.root.Load(), lag: ent.backlog.lagNames()})
 		ent.apply.Unlock()
 	}
 
@@ -684,6 +685,9 @@ func (e *Engine) checkpoint(force bool) error {
 			switch {
 			case idx.dormant:
 				me.addIndex(idx.spec, manifestIndex{Name: name, Dormant: true})
+			case idx.ready && snap.lag[name]:
+				me.addIndex(idx.spec, manifestIndex{Name: name, Dormant: true})
+				trees = append(trees, idx.tree)
 			case idx.ready:
 				trees = append(trees, idx.tree)
 			}
@@ -703,7 +707,7 @@ func (e *Engine) checkpoint(force bool) error {
 
 		me.Slots, me.IDs = rootOf(snap.r.slots), rootOf(snap.r.ids)
 		for _, name := range names {
-			if idx := snap.r.indexes[name]; idx.ready {
+			if idx := snap.r.indexes[name]; idx.ready && !snap.lag[name] {
 				me.addIndex(idx.spec, manifestIndex{Name: name, Root: rootOf(idx.tree)})
 			}
 		}
@@ -810,6 +814,10 @@ func (e *Engine) reclaimRound() error {
 	e.ckptMu.Unlock()
 
 	left := e.reclaim.Add(-1)
+	if err := e.pages.Rotate(); err != nil {
+		return err
+	}
+
 	if err := e.checkpoint(true); err != nil {
 		return err
 	}
@@ -978,7 +986,7 @@ func (e *Engine) relocateBatch(ent *entity, victim func(id uint64) bool) int {
 	nr.ids = relocate(cur.ids)
 	nr.indexes = cloneIndexes(cur.indexes)
 	for name, idx := range cur.indexes {
-		if idx.ready {
+		if idx.ready && !ent.backlog.isRunning(name) {
 			nr.indexes[name] = &index{spec: idx.spec, ready: true, tree: relocate(idx.tree)}
 		}
 	}

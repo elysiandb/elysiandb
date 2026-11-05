@@ -47,7 +47,7 @@ type ListResult struct {
 
 func Snapshot(entity string) *datastore.Snapshot {
 	if e := db(); e != nil {
-		return e.Snapshot(entity)
+		return e.IndexedSnapshot(entity)
 	}
 
 	return nil
@@ -252,7 +252,7 @@ func (p *planner) index(spec datastore.IndexSpec) (*datastore.IndexView, bool) {
 	registered := p.snap.HasIndex(spec)
 	if ((!registered && len(p.e.IndexNames(p.snap.Name())) < maxIndexesPerEntity) || p.snap.IndexDormant(spec)) && p.snap.Len() > 0 {
 		if p.e.EnsureIndex(p.snap.Name(), spec) {
-			p.snap = p.e.Snapshot(p.snap.Name())
+			p.snap = p.e.IndexedSnapshot(p.snap.Name())
 			return p.snap.Index(spec)
 		}
 	}
@@ -342,7 +342,7 @@ func (p *planner) throughReferences(field string, ops map[string]string) candida
 			continue
 		}
 
-		targetSnap := p.e.Snapshot(ref.Target)
+		targetSnap := p.e.IndexedSnapshot(ref.Target)
 		target := &planner{e: p.e, snap: targetSnap, refs: targetSnap.Refs(), inc: true, depth: p.depth + 1}
 		matched := target.leaf(rest, ops)
 		if matched.all {
@@ -710,7 +710,7 @@ func Plan(q ListQuery) *ListResult {
 
 	snap := q.Snapshot
 	if snap == nil {
-		snap = e.Snapshot(q.Entity)
+		snap = e.IndexedSnapshot(q.Entity)
 	}
 
 	p := &planner{e: e, snap: snap, refs: snap.Refs(), inc: q.Includes != ""}
