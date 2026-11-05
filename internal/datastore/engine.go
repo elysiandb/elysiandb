@@ -224,13 +224,18 @@ func (e *Engine) Migration() *MigrationReport {
 }
 
 func (e *Engine) journalOptions() journal.Options {
-	return journal.Options{
+	o := journal.Options{
 		Mode:          e.opts.Durability,
 		FlushInterval: e.opts.FlushInterval,
 		SegmentSize:   e.opts.SegmentSize,
 		FS:            e.opts.FS,
 		OnWriteError:  e.opts.OnWriteError,
 	}
+	if e.opts.Background {
+		o.SyncBytes = logSyncBytes
+	}
+
+	return o
 }
 
 func (e *Engine) load() error {
@@ -626,7 +631,10 @@ func (s *Snapshot) Ascend(offset int, fn func(Doc) bool) {
 	})
 }
 
-const scanWindowBytes = 4 << 20
+const (
+	scanWindowBytes = 4 << 20
+	logSyncBytes    = 8 << 20
+)
 
 func (s *Snapshot) ScanValues(fn func(d Doc, raw []byte, err error) bool) {
 	window := journal.NewReadWindow(scanWindowBytes)

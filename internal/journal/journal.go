@@ -3,6 +3,7 @@ package journal
 import (
 	"errors"
 	"fmt"
+	"github.com/taymour/elysiandb/internal/durable"
 	"os"
 	"path/filepath"
 	"sort"
@@ -37,6 +38,7 @@ type Options struct {
 	MaxPending    int
 	FS            FS
 	OnWriteError  func(error)
+	SyncBytes     int64
 }
 
 type chunk struct {
@@ -77,6 +79,11 @@ type Journal struct {
 	stop    chan struct{}
 	stopped chan struct{}
 
+	syncMu   sync.Mutex
+	syncKick chan struct{}
+	syncDone chan struct{}
+	unsynced uint64
+
 	filesMu sync.RWMutex
 	files   map[uint32]File
 	dirty   map[uint32]bool
@@ -110,15 +117,17 @@ func Open(dir string, opts Options) (*Journal, error) {
 	}
 
 	j := &Journal{
-		dir:     dir,
-		opts:    opts,
-		fs:      opts.FS,
-		nextLSN: 1,
-		kick:    make(chan struct{}, 1),
-		stop:    make(chan struct{}),
-		stopped: make(chan struct{}),
-		files:   map[uint32]File{},
-		dirty:   map[uint32]bool{},
+		dir:      dir,
+		opts:     opts,
+		fs:       opts.FS,
+		nextLSN:  1,
+		kick:     make(chan struct{}, 1),
+		stop:     make(chan struct{}),
+		stopped:  make(chan struct{}),
+		syncKick: make(chan struct{}, 1),
+		syncDone: make(chan struct{}),
+		files:    map[uint32]File{},
+		dirty:    map[uint32]bool{},
 	}
 	j.done = sync.NewCond(&j.mu)
 
@@ -132,6 +141,7 @@ func (j *Journal) Dir() string {
 func (j *Journal) Start() {
 	if j.started.CompareAndSwap(false, true) {
 		go j.writer()
+		go j.syncer()
 	}
 }
 
@@ -308,24 +318,60 @@ func (j *Journal) Flush() error {
 }
 
 func (j *Journal) syncDirty() error {
+	j.syncMu.Lock()
+	defer j.syncMu.Unlock()
+
 	j.filesMu.Lock()
-	dirty := make([]File, 0, len(j.dirty))
+	dirty := make(map[uint32]File, len(j.dirty))
 	for id := range j.dirty {
 		if f := j.files[id]; f != nil {
-			dirty = append(dirty, f)
+			dirty[id] = f
 		}
 	}
 	j.dirty = map[uint32]bool{}
 	j.filesMu.Unlock()
 
 	var errs []error
-	for _, f := range dirty {
+	for id, f := range dirty {
 		if err := f.Sync(); err != nil {
 			errs = append(errs, err)
+			j.filesMu.Lock()
+			j.dirty[id] = true
+			j.filesMu.Unlock()
 		}
 	}
 
 	return errors.Join(errs...)
+}
+
+func (j *Journal) syncer() {
+	defer close(j.syncDone)
+
+	for {
+		select {
+		case <-j.syncKick:
+			durable.RunGently(func() { _ = j.syncDirty() })
+		case <-j.stop:
+			return
+		}
+	}
+}
+
+func (j *Journal) noteWritten(n uint64) {
+	if j.opts.Mode == ModeSync || j.opts.SyncBytes <= 0 {
+		return
+	}
+
+	j.unsynced += n
+	if j.unsynced < uint64(j.opts.SyncBytes) {
+		return
+	}
+
+	j.unsynced = 0
+	select {
+	case j.syncKick <- struct{}{}:
+	default:
+	}
 }
 
 func (j *Journal) writer() {
@@ -384,6 +430,9 @@ func (j *Journal) writeOnce() error {
 	err := j.writeChunks(chunks)
 	if err == nil && j.opts.Mode == ModeSync {
 		err = j.syncDirty()
+	}
+	if err == nil {
+		j.noteWritten(uint64(pendingLen))
 	}
 
 	if err != nil && j.opts.OnWriteError != nil {
@@ -886,6 +935,7 @@ func (j *Journal) stopWriter() {
 	if j.started.Load() {
 		close(j.stop)
 		<-j.stopped
+		<-j.syncDone
 	}
 }
 
