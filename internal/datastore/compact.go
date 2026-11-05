@@ -311,6 +311,7 @@ type EngineStats struct {
 	PageCacheLimit      int64
 	PageLoads           int64
 	PageWrites          int64
+	LivePageBytes       int64
 }
 
 func (e *Engine) Stats() EngineStats {
@@ -326,6 +327,7 @@ func (e *Engine) Stats() EngineStats {
 		PendingBytes:       e.j.PendingBytes(),
 		DirtyPageBytes:     e.dirty.Load(),
 		Inline:             e.inline,
+		LivePageBytes:      e.stats.livePages.Load(),
 	}
 
 	if !e.inline {

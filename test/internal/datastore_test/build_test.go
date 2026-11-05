@@ -367,8 +367,9 @@ func TestFragmentedPageSegmentsAreCleaned(t *testing.T) {
 		t.Fatal(err)
 	}
 	after := pagesOnDisk()
-	if removed == 0 || after*2 > before {
-		t.Fatalf("fragmented page segments are cleaned: %d removed, %d bytes before, %d after", removed, before, after)
+	live := e.Stats().LivePageBytes
+	if removed == 0 || live == 0 || after > 2*live {
+		t.Fatalf("fragmented page segments are cleaned: %d removed, %d bytes before, %d after, %d live", removed, before, after, live)
 	}
 
 	check := func(e *datastore.Engine) {

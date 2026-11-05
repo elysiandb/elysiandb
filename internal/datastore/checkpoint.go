@@ -911,6 +911,7 @@ func (e *Engine) cleanPages(snaps []entitySnapshot) {
 
 	e.pages.Remove(dead)
 	e.pageRemoval = victims
+	e.stats.livePages.Store(held)
 
 	if garbage := total - held; garbage >= reclaimAboveBytes && garbage*4 >= total && len(dead)+len(victims)+leaving > 0 {
 		e.reclaim.Store(max(e.reclaim.Load(), 1))

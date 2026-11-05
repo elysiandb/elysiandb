@@ -107,6 +107,7 @@ type engineStats struct {
 	compactedBytes    atomic.Int64
 	conflicts         atomic.Int64
 	replayedRecords   atomic.Int64
+	livePages         atomic.Int64
 }
 
 func Open(opts Options) (*Engine, error) {
