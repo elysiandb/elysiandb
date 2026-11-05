@@ -184,3 +184,31 @@ func (e *Engine) measureIndexes() {
 		}
 	}
 }
+
+func (e *Engine) ReleaseIndexes() {
+	for _, ent := range e.allEntities() {
+		ent.apply.Lock()
+		r := *ent.root.Load()
+		r.indexes = make(map[string]*index, len(r.indexes))
+		for name, idx := range ent.root.Load().indexes {
+			r.indexes[name] = &index{spec: idx.spec, dormant: true}
+		}
+		clear(ent.building)
+		ent.root.Store(&r)
+		ent.apply.Unlock()
+	}
+}
+
+func (e *Engine) WakeIndexes() {
+	if !e.opts.Background {
+		return
+	}
+
+	for _, ent := range e.allEntities() {
+		for _, idx := range ent.root.Load().indexes {
+			if idx.dormant {
+				e.EnsureIndex(ent.name, idx.spec)
+			}
+		}
+	}
+}

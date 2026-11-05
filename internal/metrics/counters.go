@@ -614,3 +614,13 @@ func (a *addressCounter) worst() (string, int) {
 
 	return worstAddr, worstCount
 }
+
+var startupNanos atomic.Int64
+
+func SetStartup(d time.Duration) {
+	startupNanos.Store(int64(d))
+}
+
+func Startup() time.Duration {
+	return time.Duration(startupNanos.Load())
+}

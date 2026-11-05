@@ -65,7 +65,8 @@ func RunRestore(args []string, in io.Reader) (*backup.Report, error) {
 
 	defer f.Close()
 
-	if _, err := backup.Verify(f); err != nil {
+	manifest, err := backup.Verify(f)
+	if err != nil {
 		return nil, err
 	}
 
@@ -77,7 +78,7 @@ func RunRestore(args []string, in io.Reader) (*backup.Report, error) {
 		return nil, err
 	}
 
-	return backup.Restore(f)
+	return backup.Apply(f, manifest)
 }
 
 func confirmRestore(in io.Reader) bool {

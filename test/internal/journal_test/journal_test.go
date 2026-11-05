@@ -153,7 +153,7 @@ func TestTornLastBatchIsDropped(t *testing.T) {
 	}
 }
 
-func TestCorruptionInASealedSegmentStopsTheReplay(t *testing.T) {
+func TestCorruptionInASealedSegmentEndsTheReplayAndKeepsTheRestAside(t *testing.T) {
 	dir := t.TempDir()
 	j := openJournal(t, dir, journal.Options{Mode: journal.ModeWrite, SegmentSize: 256})
 	j.Start()
@@ -168,11 +168,31 @@ func TestCorruptionInASealedSegmentStopsTheReplay(t *testing.T) {
 	data[len(data)-3] ^= 0xff
 	_ = os.WriteFile(path, data, 0o600)
 
+	before, _ := filepath.Glob(filepath.Join(dir, "*.seg"))
+
 	j = openJournal(t, dir, journal.Options{})
-	_, err := j.Replay(journal.Position{Segment: 1}, func([]journal.Record) error { return nil })
+	replayed := 0
+	stats, err := j.Replay(journal.Position{Segment: 1}, func(recs []journal.Record) error {
+		replayed += len(recs)
+		return nil
+	})
 	j.Abandon()
-	if !errors.Is(err, journal.ErrCorrupt) {
-		t.Fatalf("expected a corruption error, got %v", err)
+	if err != nil {
+		t.Fatalf("damage is not a reason to refuse to start: %v", err)
+	}
+
+	if replayed == 0 || replayed >= 20 || stats.Truncated == 0 {
+		t.Fatalf("the replay stops at the damage, %d records, %+v", replayed, stats)
+	}
+
+	if len(stats.SetAside) != len(before)-1 {
+		t.Fatalf("every later segment is set aside, %d of %d: %+v", len(stats.SetAside), len(before)-1, stats)
+	}
+
+	damaged, _ := filepath.Glob(filepath.Join(dir, "*.damaged"))
+	left, _ := filepath.Glob(filepath.Join(dir, "*.seg"))
+	if len(damaged) != len(stats.SetAside) || len(left) != 1 {
+		t.Fatalf("segments are kept aside, never deleted: %v, %v", damaged, left)
 	}
 }
 

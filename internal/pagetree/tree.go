@@ -770,6 +770,50 @@ func (t Tree) walkStored(r *Ref, level int, fn func(uint64, uint32)) {
 	}
 }
 
+type Peeker interface {
+	Peek(ref *Ref) (*Page, error)
+}
+
+func (t Tree) Scan(fn func(key string, val []byte) bool) {
+	if t.root == nil {
+		return
+	}
+
+	t.scan(t.root, t.height(), fn)
+}
+
+func (t Tree) scan(r *Ref, level int, fn func(string, []byte) bool) bool {
+	if level > 1 {
+		for _, kid := range t.page(r).kids {
+			if !t.scan(kid, level-1, fn) {
+				return false
+			}
+		}
+		return true
+	}
+
+	p := r.mem.Load()
+	if p == nil {
+		peeker, ok := t.ld.(Peeker)
+		if !ok {
+			p = t.page(r)
+		} else {
+			var err error
+			if p, err = peeker.Peek(r); err != nil {
+				panic(fmt.Sprintf("pagetree: cannot read page %d: %v", r.ID(), err))
+			}
+		}
+	}
+
+	for i := 0; i < p.Len(); i++ {
+		if !fn(str(p.key(i)), p.val(i)) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (t Tree) Preload(victim func(id uint64) bool) {
 	if t.root == nil {
 		return

@@ -63,7 +63,16 @@ func main() {
 		return
 	}
 
-	boot.InitTool()
+	if cmd.RunsWithoutStorage(args) {
+		handler()
+		return
+	}
+
+	if args[0] == cmd.RestoreCommand {
+		boot.InitBulkTool()
+	} else {
+		boot.InitTool()
+	}
 	initAdmin()
 	defer cmd.CloseStorage()
 	handler()

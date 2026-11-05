@@ -24,10 +24,12 @@ const (
 )
 
 var (
-	ErrLocked   = errors.New("the data folder is used by another ElysianDB process")
-	ErrClosed   = errors.New("datastore: closed")
-	ErrConflict = errors.New("datastore: write conflict")
-	engineLog   = log.For("storage")
+	ErrLocked      = errors.New("the data folder is used by another ElysianDB process")
+	ErrClosed      = errors.New("datastore: closed")
+	ErrConflict    = errors.New("datastore: write conflict")
+	ErrDiskFull    = errors.New("disk full")
+	ErrWriteFailed = errors.New("storage write failed")
+	engineLog      = log.For("storage")
 )
 
 type Options struct {
@@ -48,6 +50,8 @@ type Options struct {
 	LegacyRecovery  bool
 	OnKVExpired     func(n int)
 	OnWriteError    func(err error)
+	MinFreeBytes    int64
+	FreeSpace       func() (int64, error)
 }
 
 var engineInstances atomic.Uint64
@@ -89,6 +93,8 @@ type Engine struct {
 	lastPageWalk   time.Time
 	lastReclaim    time.Time
 	reclaim        atomic.Int32
+	diskLow        atomic.Bool
+	lastDiskCheck  time.Time
 	pressureSweeps int
 	stop           chan struct{}
 	wg             sync.WaitGroup
@@ -108,6 +114,7 @@ type engineStats struct {
 	conflicts         atomic.Int64
 	replayedRecords   atomic.Int64
 	livePages         atomic.Int64
+	refusedWrites     atomic.Int64
 }
 
 func Open(opts Options) (*Engine, error) {
@@ -291,6 +298,10 @@ func (e *Engine) load() error {
 		engineLog.Warn("torn batch dropped at the end of the log", "bytes", stats.Truncated)
 	}
 
+	if len(stats.SetAside) > 0 || len(stats.Damaged) > 0 {
+		engineLog.Error("the log is damaged before its end, what follows the damage is set aside and not replayed", "segments", stats.SetAside, "damaged_tails", stats.Damaged, "suffix", ".damaged")
+	}
+
 	if stats.Records > 0 {
 		engineLog.Warn("unclean shutdown detected, log replayed", "batches", stats.Batches, "records", stats.Records)
 	}
@@ -374,6 +385,69 @@ func (e *Engine) Abandon() {
 	e.j.Abandon()
 	e.pages.Close()
 	e.unlock()
+}
+
+const (
+	diskCheckEvery  = time.Second
+	diskRecoverGain = 4
+)
+
+func (e *Engine) checkDisk() {
+	if e.opts.MinFreeBytes <= 0 || time.Since(e.lastDiskCheck) < diskCheckEvery {
+		return
+	}
+	e.lastDiskCheck = time.Now()
+
+	read := e.opts.FreeSpace
+	if read == nil {
+		read = func() (int64, error) { return durable.FreeBytes(e.dir) }
+	}
+
+	free, err := read()
+	if err != nil {
+		return
+	}
+
+	threshold := e.opts.MinFreeBytes
+	switch {
+	case free < threshold && e.diskLow.CompareAndSwap(false, true):
+		engineLog.Error("disk almost full, writes are refused until space comes back", "free_bytes", free, "min_free_bytes", threshold)
+	case free >= threshold+threshold/diskRecoverGain && e.diskLow.CompareAndSwap(true, false):
+		engineLog.Info("disk space is back, writes are accepted again", "free_bytes", free, "min_free_bytes", threshold)
+	}
+}
+
+func (e *Engine) WriteRefusal() error {
+	if err := e.j.Failure(); err != nil {
+		if errors.Is(err, syscall.ENOSPC) {
+			return ErrDiskFull
+		}
+		return ErrWriteFailed
+	}
+
+	if e.diskLow.Load() {
+		return ErrDiskFull
+	}
+
+	return nil
+}
+
+func (e *Engine) NoteRefusedWrite() {
+	e.stats.refusedWrites.Add(1)
+}
+
+func (e *Engine) FlushLog() error {
+	return e.j.Flush()
+}
+
+func (e *Engine) RefusedWrites() int64 {
+	return e.stats.refusedWrites.Load()
+}
+
+func (e *Engine) refuse(err error) error {
+	e.stats.refusedWrites.Add(1)
+
+	return err
 }
 
 func (e *Engine) entity(name string, create bool) *entity {
@@ -638,9 +712,19 @@ const (
 )
 
 func (s *Snapshot) ScanValues(fn func(d Doc, raw []byte, err error) bool) {
-	window := journal.NewReadWindow(scanWindowBytes)
-	s.Ascend(0, func(d Doc) bool {
-		sl := d.slot
+	s.ScanValuesPaced(nil, fn)
+}
+
+func (s *Snapshot) ScanValuesPaced(pace func(time.Duration), fn func(d Doc, raw []byte, err error) bool) {
+	window := journal.NewReadWindow(scanWindowBytes, pace)
+	s.r.slots.Scan(func(k string, v []byte) bool {
+		sl := decodeSlotValue(keySeq(k), v, true)
+		d := Doc{s: s, slot: sl}
+		if s.e.closed.Load() {
+			fn(d, nil, ErrClosed)
+			return false
+		}
+
 		if b, ok := s.e.cache.peek(sl.lsn); ok {
 			return fn(d, b, nil)
 		}

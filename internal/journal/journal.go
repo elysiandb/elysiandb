@@ -1,9 +1,12 @@
 package journal
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/taymour/elysiandb/internal/durable"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -27,6 +30,7 @@ const (
 	defaultMaxPending  = 16 << 20
 	retireGrace        = 2 * time.Minute
 	segmentSuffix      = ".seg"
+	damagedSuffix      = ".damaged"
 )
 
 var ErrClosed = errors.New("journal: closed")
@@ -79,6 +83,7 @@ type Journal struct {
 	stop    chan struct{}
 	stopped chan struct{}
 
+	holds    atomic.Int32
 	syncMu   sync.Mutex
 	syncKick chan struct{}
 	syncDone chan struct{}
@@ -322,18 +327,22 @@ func (j *Journal) syncDirty() error {
 	defer j.syncMu.Unlock()
 
 	j.filesMu.Lock()
-	dirty := make(map[uint32]File, len(j.dirty))
+	ids := make([]uint32, 0, len(j.dirty))
+	files := make(map[uint32]File, len(j.dirty))
 	for id := range j.dirty {
 		if f := j.files[id]; f != nil {
-			dirty[id] = f
+			ids = append(ids, id)
+			files[id] = f
 		}
 	}
 	j.dirty = map[uint32]bool{}
 	j.filesMu.Unlock()
 
+	sort.Slice(ids, func(a, b int) bool { return ids[a] < ids[b] })
+
 	var errs []error
-	for id, f := range dirty {
-		if err := f.Sync(); err != nil {
+	for _, id := range ids {
+		if err := files[id].Sync(); err != nil {
 			errs = append(errs, err)
 			j.filesMu.Lock()
 			j.dirty[id] = true
@@ -342,6 +351,13 @@ func (j *Journal) syncDirty() error {
 	}
 
 	return errors.Join(errs...)
+}
+
+func (j *Journal) Failure() error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+
+	return j.writeErr
 }
 
 func (j *Journal) syncer() {
@@ -571,10 +587,11 @@ type ReadWindow struct {
 	segment uint32
 	start   uint32
 	size    uint32
+	pace    func(time.Duration)
 }
 
-func NewReadWindow(size int) *ReadWindow {
-	return &ReadWindow{buf: make([]byte, size)}
+func NewReadWindow(size int, pace func(time.Duration)) *ReadWindow {
+	return &ReadWindow{buf: make([]byte, size), pace: pace}
 }
 
 func (j *Journal) ReadThrough(loc Location, w *ReadWindow) ([]byte, error) {
@@ -589,7 +606,11 @@ func (j *Journal) ReadThrough(loc Location, w *ReadWindow) ([]byte, error) {
 			return nil, err
 		}
 
+		start := time.Now()
 		n, err := f.ReadAt(w.buf, int64(loc.Offset))
+		if w.pace != nil {
+			w.pace(time.Since(start))
+		}
 		if n < int(loc.Length) {
 			w.size = 0
 			if err == nil {
@@ -666,6 +687,8 @@ func (j *Journal) ActiveSegment() uint32 {
 }
 
 type ReplayStats struct {
+	SetAside  []uint32
+	Damaged   []uint32
 	Batches   int
 	Records   int
 	Truncated int64
@@ -691,13 +714,23 @@ func (j *Journal) Replay(from Position, apply func(recs []Record) error) (Replay
 			start = from.Offset
 		}
 
-		stop, truncated, err := j.replaySegment(seg.ID, start, last, apply, &stats)
+		stop, truncated, torn, err := j.replaySegment(seg.ID, start, apply, &stats)
 		if err != nil {
 			return stats, err
 		}
 
 		stats.Truncated += truncated
 		end = Position{Segment: seg.ID, Offset: stop}
+
+		if torn && !last {
+			for _, later := range segments[idx+1:] {
+				stats.SetAside = append(stats.SetAside, later.ID)
+				if err := j.setAside(later.ID); err != nil {
+					return stats, err
+				}
+			}
+			break
+		}
 	}
 
 	j.mu.Lock()
@@ -716,69 +749,97 @@ func (j *Journal) Replay(from Position, apply func(recs []Record) error) (Replay
 	return stats, nil
 }
 
-func (j *Journal) replaySegment(id uint32, start uint32, last bool, apply func([]Record) error, stats *ReplayStats) (uint32, int64, error) {
+func validBatchAfter(data []byte, from int, segment uint32) bool {
+	var magic [4]byte
+	binary.LittleEndian.PutUint32(magic[:], batchMagic)
+
+	for from < len(data) {
+		i := bytes.Index(data[from:], magic[:])
+		if i < 0 {
+			return false
+		}
+
+		from += i
+		if _, _, err := decodeBatch(data[from:], segment, uint32(from)); err == nil {
+			return true
+		}
+		from++
+	}
+
+	return false
+}
+
+func (j *Journal) keepDamagedTail(id uint32, tail []byte) error {
+	path := filepath.Join(j.dir, SegmentName(id)+".tail"+damagedSuffix)
+
+	return durable.WriteFileAtomic(j.fs, path, func(w io.Writer) error {
+		_, err := w.Write(tail)
+		return err
+	})
+}
+
+func (j *Journal) setAside(id uint32) error {
+	path := filepath.Join(j.dir, SegmentName(id))
+
+	return j.fs.Rename(path, path+damagedSuffix)
+}
+
+func (j *Journal) replaySegment(id uint32, start uint32, apply func([]Record) error, stats *ReplayStats) (uint32, int64, bool, error) {
 	path := filepath.Join(j.dir, SegmentName(id))
 	f, err := j.fs.OpenFile(path, os.O_RDWR, 0o600)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, false, err
 	}
 
 	info, err := f.Stat()
 	if err != nil {
 		_ = f.Close()
-		return 0, 0, err
+		return 0, 0, false, err
 	}
 
 	data := make([]byte, info.Size())
 	if _, err := f.ReadAt(data, 0); err != nil && int64(len(data)) != info.Size() {
 		_ = f.Close()
-		return 0, 0, err
+		return 0, 0, false, err
 	}
 
-	if len(data) < segmentHeaderSize {
-		if !last {
-			_ = f.Close()
-			return 0, 0, fmt.Errorf("%w: segment %d is %d bytes long", ErrBadSegment, id, len(data))
-		}
-
+	if len(data) < segmentHeaderSize || checkSegmentHeader(data, id) != nil {
 		if err := f.Truncate(0); err != nil {
 			_ = f.Close()
-			return 0, 0, err
+			return 0, 0, false, err
 		}
 
 		if _, err := f.WriteAt(segmentHeader(id), 0); err != nil {
 			_ = f.Close()
-			return 0, 0, err
+			return 0, 0, false, err
 		}
 
 		j.adoptFile(id, f)
 
-		return segmentHeaderSize, int64(len(data)), nil
-	}
-
-	if err := checkSegmentHeader(data, id); err != nil {
-		_ = f.Close()
-		return 0, 0, err
+		return segmentHeaderSize, int64(len(data)), true, nil
 	}
 
 	pos := int(start)
 	for pos < len(data) {
 		recs, n, err := decodeBatch(data[pos:], id, uint32(pos))
 		if err != nil {
-			if !last {
-				_ = f.Close()
-				return 0, 0, fmt.Errorf("segment %d offset %d: %w", id, pos, err)
+			if validBatchAfter(data, pos+1, id) {
+				if err := j.keepDamagedTail(id, data[pos:]); err != nil {
+					_ = f.Close()
+					return 0, 0, false, err
+				}
+				stats.Damaged = append(stats.Damaged, id)
 			}
 
 			truncated := int64(len(data) - pos)
 			if err := f.Truncate(int64(pos)); err != nil {
 				_ = f.Close()
-				return 0, 0, err
+				return 0, 0, false, err
 			}
 
 			j.adoptFile(id, f)
 
-			return uint32(pos), truncated, nil
+			return uint32(pos), truncated, true, nil
 		}
 
 		for i := range recs {
@@ -789,7 +850,7 @@ func (j *Journal) replaySegment(id uint32, start uint32, last bool, apply func([
 
 		if err := apply(recs); err != nil {
 			_ = f.Close()
-			return 0, 0, err
+			return 0, 0, false, err
 		}
 
 		stats.Batches++
@@ -799,7 +860,7 @@ func (j *Journal) replaySegment(id uint32, start uint32, last bool, apply func([
 
 	j.adoptFile(id, f)
 
-	return uint32(pos), 0, nil
+	return uint32(len(data)), 0, false, nil
 }
 
 func (j *Journal) adoptFile(id uint32, f File) {
@@ -875,7 +936,21 @@ func (j *Journal) Retire(id uint32) error {
 	return j.fs.Remove(path)
 }
 
+func (j *Journal) Hold() {
+	j.holds.Add(1)
+}
+
+func (j *Journal) Release() {
+	if j.holds.Add(-1) == 0 {
+		j.closeRetired(false)
+	}
+}
+
 func (j *Journal) closeRetired(all bool) {
+	if !all && j.holds.Load() > 0 {
+		return
+	}
+
 	j.filesMu.Lock()
 	kept := j.retired[:0]
 	for _, r := range j.retired {

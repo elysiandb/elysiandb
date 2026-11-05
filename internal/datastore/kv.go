@@ -213,6 +213,10 @@ func (e *Engine) KVPut(key string, value []byte, expiresAt int64) error {
 		return ErrClosed
 	}
 
+	if err := e.WriteRefusal(); err != nil {
+		return e.refuse(err)
+	}
+
 	sh := e.kv.shard(key)
 	sh.mu.Lock()
 	recs := []journal.Record{{Kind: journal.KindKVPut, Key: key, Value: value, ExpiresAt: expiresAt}}
@@ -255,7 +259,9 @@ func (e *Engine) kvDelete(key string, kind journal.Kind, onlyIfExpiresAt int64) 
 	sh.mu.Unlock()
 
 	if kind == journal.KindKVDelete {
-		_ = e.waitDurable(ticket)
+		if err := e.waitDurable(ticket); err != nil {
+			return false
+		}
 	}
 
 	return true

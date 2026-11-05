@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type File interface {
@@ -27,8 +28,39 @@ type FS interface {
 
 type osFS struct{}
 
+type countedFile struct {
+	*os.File
+}
+
+func (f countedFile) ReadAt(p []byte, off int64) (int, error) {
+	n, err := f.File.ReadAt(p, off)
+	ioReadBytes.Add(int64(n))
+
+	return n, err
+}
+
+func (f countedFile) WriteAt(p []byte, off int64) (int, error) {
+	n, err := f.File.WriteAt(p, off)
+	ioWriteBytes.Add(int64(n))
+
+	return n, err
+}
+
+func (f countedFile) Sync() error {
+	start := time.Now()
+	err := f.File.Sync()
+	noteSync(start)
+
+	return err
+}
+
 func (osFS) OpenFile(name string, flag int, perm os.FileMode) (File, error) {
-	return os.OpenFile(name, flag, perm)
+	f, err := os.OpenFile(name, flag, perm)
+	if err != nil {
+		return nil, err
+	}
+
+	return countedFile{f}, nil
 }
 
 func (osFS) Remove(name string) error {
@@ -55,7 +87,9 @@ func (osFS) SyncDir(name string) error {
 
 	defer d.Close()
 
+	start := time.Now()
 	_ = d.Sync()
+	noteSync(start)
 
 	return nil
 }

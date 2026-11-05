@@ -14,6 +14,7 @@ import (
 
 const (
 	autoMemoryShare   = 0.75
+	containerShare    = 0.90
 	heapShareOfBudget = 0.85
 	unlimitedCgroups  = 1 << 60
 )
@@ -43,7 +44,13 @@ func containerMemoryLimit() int64 {
 
 func MemoryBudget(cfg *configuration.Config) (int64, bool) {
 	if cfg.Store.Memory.LimitMB > 0 {
-		return cfg.Store.Memory.LimitMB << 20, true
+		budget := cfg.Store.Memory.LimitMB << 20
+		if limit := containerMemoryLimit(); limit > 0 && float64(budget) > float64(limit)*containerShare {
+			bootLog.Warn("the memory budget is above the container limit, it is lowered", "limit_mb", budget>>20, "container_mb", limit>>20)
+			budget = int64(float64(limit) * containerShare)
+		}
+
+		return budget, true
 	}
 
 	if limit := containerMemoryLimit(); limit > 0 {

@@ -64,7 +64,68 @@ func Options(cfg *configuration.Config, mode OpenMode) datastore.Options {
 		LegacyRecovery:  cfg.Store.CrashRecovery.Enabled,
 		OnKVExpired:     metrics.KVExpired,
 		OnWriteError:    reportWriteError,
+		MinFreeBytes:    minFreeBytes(cfg),
+		FreeSpace:       FreeSpaceProbe,
 	}
+}
+
+var FreeSpaceProbe func() (int64, error)
+
+const defaultMinFreeDiskMB = 64
+
+func minFreeBytes(cfg *configuration.Config) int64 {
+	switch {
+	case cfg.Store.MinFreeDiskMB < 0:
+		return 0
+	case cfg.Store.MinFreeDiskMB == 0:
+		return defaultMinFreeDiskMB << 20
+	}
+
+	return cfg.Store.MinFreeDiskMB << 20
+}
+
+func WriteRefusal() error {
+	if e := current.Load(); e != nil {
+		return e.WriteRefusal()
+	}
+
+	return nil
+}
+
+func NoteRefusedWrite() {
+	if e := current.Load(); e != nil {
+		e.NoteRefusedWrite()
+	}
+}
+
+func CloseWithin(limit time.Duration) error {
+	e := current.Load()
+	if e == nil {
+		return nil
+	}
+
+	if err := e.FlushLog(); err != nil {
+		storageLog.Error("cannot flush the log at shutdown", "err", err)
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- Close() }()
+
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(limit):
+		storageLog.Warn("the last checkpoint did not finish in time, the log will be replayed at the next start", "limit_ms", limit.Milliseconds())
+		return nil
+	}
+}
+
+func RefusedWrites() int64 {
+	if e := current.Load(); e != nil {
+		return e.RefusedWrites()
+	}
+
+	return 0
 }
 
 func reportWriteError(err error) {
@@ -337,6 +398,18 @@ func ClearAll() {
 		return nil
 	}); err != nil {
 		storageLog.Error("clear failed", "err", err)
+	}
+}
+
+func ReleaseIndexes() {
+	if e := current.Load(); e != nil {
+		e.ReleaseIndexes()
+	}
+}
+
+func WakeIndexes() {
+	if e := current.Load(); e != nil {
+		e.WakeIndexes()
 	}
 }
 

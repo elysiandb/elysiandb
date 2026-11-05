@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/taymour/elysiandb/internal/backup"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/engine"
@@ -50,8 +51,16 @@ func listener(server configuration.ServerConfig) string {
 	return fmt.Sprintf("%s:%d", server.Host, server.Port)
 }
 
+func warnAboutInterruptedRestore() {
+	backup.RemoveAbandonedUploads()
+	if backup.RestoreWasInterrupted() {
+		bootLog.Error("a restore was interrupted before its end: the data is incomplete, run the restore again")
+	}
+}
+
 func InitDB() {
 	cfg := globals.GetConfig()
+	warnAboutInterruptedRestore()
 
 	if cfg.Api.Cache.Enabled {
 		cache.InitCache(time.Duration(cfg.Api.Cache.CleanupIntervalSeconds) * time.Second)
@@ -77,13 +86,22 @@ func InitDB() {
 	BootApiCacheCleaner()
 }
 
+func InitBulkTool() {
+	ApplyMemoryLimit()
+	openTool(storage.ModeServer)
+}
+
 func InitTool() {
+	openTool(storage.ModeTool)
+}
+
+func openTool(mode storage.OpenMode) {
 	cfg := globals.GetConfig()
 
 	start := time.Now()
-	if err := storage.Open(storage.ModeTool); err != nil {
+	if err := storage.Open(mode); err != nil {
 		log.Fatal("cannot open the data folder", "component", "storage", "folder", cfg.Store.Folder, "err", err,
-			"hint", "stop the server first, or use GET /api/backup on the running server")
+			"hint", "stop the server first, or use GET /api/backup or elysiandb backup --url on the running server")
 	}
 
 	logStorageLoaded(cfg, start)

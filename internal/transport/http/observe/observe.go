@@ -137,6 +137,8 @@ func Kind(method, route string) string {
 
 const GuardKey = "elysian.guard"
 
+const deferredKey = "observeDeferred"
+
 func Middleware(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
 		start := time.Now()
@@ -178,7 +180,20 @@ func validRequestID(id string) bool {
 	return true
 }
 
+func Defer(ctx *fasthttp.RequestCtx) {
+	ctx.SetUserValue(deferredKey, true)
+}
+
+func FinishDeferred(ctx *fasthttp.RequestCtx) {
+	ctx.SetUserValue(deferredKey, nil)
+	finish(ctx, ctx.Time(), RequestID(ctx))
+}
+
 func finish(ctx *fasthttp.RequestCtx, start time.Time, requestID string) {
+	if ctx.UserValue(deferredKey) != nil {
+		return
+	}
+
 	d := time.Since(start)
 	status := ctx.Response.StatusCode()
 	method := string(ctx.Method())

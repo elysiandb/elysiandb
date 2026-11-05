@@ -1,33 +1,24 @@
 package api
 
 import (
+	"bufio"
 	"fmt"
-	"io"
-	"os"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/backup"
+	"github.com/taymour/elysiandb/internal/durable"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
-type temporaryFile struct {
-	*os.File
-}
-
-func (f temporaryFile) Close() error {
-	err := f.File.Close()
-	os.Remove(f.Name())
-
-	return err
-}
+const backupWriteIdle = 10 * time.Minute
 
 func BackupController(ctx *fasthttp.RequestCtx) {
 	now := time.Now().UTC()
-
 	start := time.Now()
-	file, size, err := createTemporaryBackup(now)
+
+	src, err := backup.Prepare(now)
 	if err != nil {
 		observe.SetError(ctx, err)
 		ctx.Response.Header.Set("Content-Type", "application/json")
@@ -38,32 +29,42 @@ func BackupController(ctx *fasthttp.RequestCtx) {
 
 	ctx.Response.Header.Set("Content-Type", "application/gzip")
 	ctx.Response.Header.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, backup.FileName(now)))
-	observe.Audit(ctx, "backup created", "output", "download", "bytes", size, "duration_ms", log.Since(start))
 	ctx.SetStatusCode(fasthttp.StatusOK)
-	ctx.SetBodyStream(file, int(size))
+
+	audit := observe.AuditContext(ctx)
+	conn := ctx.Conn()
+	beat := func() { _ = conn.SetWriteDeadline(time.Now().Add(backupWriteIdle)) }
+
+	ctx.SetBodyStreamWriter(func(w *bufio.Writer) {
+		defer src.Close()
+
+		counted := &writtenBytes{w: w}
+		var err error
+		durable.RunGently(func() {
+			err = src.WriteArchive(counted, backup.Options{Beat: beat, Flush: w.Flush, Pace: true})
+		})
+		if err == nil {
+			err = w.Flush()
+		}
+
+		if err != nil {
+			audit("backup failed", "output", "download", "err", err.Error(), "duration_ms", log.Since(start))
+			_ = conn.Close()
+			return
+		}
+
+		audit("backup created", "output", "download", "bytes", counted.n, "duration_ms", log.Since(start))
+	})
 }
 
-func createTemporaryBackup(now time.Time) (*temporaryFile, int64, error) {
-	file, err := os.CreateTemp("", "elysiandb-backup-*"+backup.FileNameExtension)
-	if err != nil {
-		return nil, 0, err
-	}
+type writtenBytes struct {
+	w *bufio.Writer
+	n int64
+}
 
-	tmp := &temporaryFile{File: file}
-	if _, err := backup.Create(file, now); err != nil {
-		tmp.Close()
-		return nil, 0, err
-	}
+func (c *writtenBytes) Write(p []byte) (int, error) {
+	n, err := c.w.Write(p)
+	c.n += int64(n)
 
-	size, err := file.Seek(0, io.SeekCurrent)
-	if err == nil {
-		_, err = file.Seek(0, io.SeekStart)
-	}
-
-	if err != nil {
-		tmp.Close()
-		return nil, 0, err
-	}
-
-	return tmp, size, nil
+	return n, err
 }

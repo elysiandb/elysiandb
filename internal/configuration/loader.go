@@ -79,6 +79,14 @@ type StoreConfig struct {
 	CrashRecovery        CrashRecoveryConfig `yaml:"crashRecovery"`
 	Durability           string              `yaml:"durability"`
 	Memory               StoreMemoryConfig   `yaml:"memory"`
+	MinFreeDiskMB        int64               `yaml:"minFreeDiskMB"`
+	Backup               StoreBackupConfig   `yaml:"backup"`
+}
+
+type StoreBackupConfig struct {
+	Folder       string `yaml:"folder"`
+	EveryMinutes int    `yaml:"everyMinutes"`
+	Keep         int    `yaml:"keep"`
 }
 
 type StoreMemoryConfig struct {

@@ -78,6 +78,7 @@ func (e *Engine) dirtyLoop() {
 		}
 
 		e.followPressure()
+		e.checkDisk()
 	}
 }
 
@@ -97,7 +98,7 @@ func (e *Engine) signalFlushed() {
 
 func (e *Engine) waitForDirty() {
 	limit := 2 * e.dirtyFlushBytes()
-	if !e.opts.Background || e.dirty.Load() < limit {
+	if !e.opts.Background || e.dirty.Load() < limit || e.WriteRefusal() != nil {
 		return
 	}
 

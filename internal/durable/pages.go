@@ -69,6 +69,7 @@ type PageStore struct {
 
 	loads  atomic.Int64
 	writes atomic.Int64
+	holds  atomic.Int32
 }
 
 func pageSegmentName(id uint32) string {
@@ -142,6 +143,32 @@ func (s *PageStore) Pace(fn func(synced time.Duration) time.Duration) {
 func (s *PageStore) SetLimit(limit int64) {
 	s.limit.Store(limit)
 	s.evict()
+}
+
+func (s *PageStore) Hold() {
+	s.holds.Add(1)
+}
+
+func (s *PageStore) Release() {
+	s.holds.Add(-1)
+}
+
+func (s *PageStore) Peek(ref *pagetree.Ref) (*pagetree.Page, error) {
+	if p := ref.Resident(); p != nil {
+		return p, nil
+	}
+
+	b, err := s.read(ref.ID(), ref.Size())
+	if err != nil {
+		return nil, err
+	}
+
+	p, err := pagetree.Decode(b)
+	if err != nil {
+		return nil, fmt.Errorf("page %x: %w", ref.ID(), err)
+	}
+
+	return p, nil
 }
 
 func (s *PageStore) Load(ref *pagetree.Ref) (*pagetree.Page, error) {
@@ -480,10 +507,19 @@ func (s *PageStore) Remove(ids []uint32) {
 
 	_ = s.fs.SyncDir(s.dir)
 
+	s.closeLater(retired)
+}
+
+func (s *PageStore) closeLater(ids []uint32) {
 	time.AfterFunc(pageCloseDelay, func() {
+		if s.holds.Load() > 0 {
+			s.closeLater(ids)
+			return
+		}
+
 		s.rmu.Lock()
 		defer s.rmu.Unlock()
-		for _, id := range retired {
+		for _, id := range ids {
 			if f := s.retired[id]; f != nil {
 				_ = f.Close()
 				delete(s.retired, id)

@@ -33,7 +33,7 @@ func GetAvailableCommands() map[string]string {
 		DeleteUserCommand:     "Delete an existing user (needs security.authentication.mode = basic or user)",
 		ChangePasswordCommand: "Change password for an existing user (needs security.authentication.mode = basic or user)",
 		ResetCommand:          "Reset the database by deleting all stored data and resets users (asks for yes, requires --force)",
-		BackupCommand:         "Write a full backup archive: elysiandb backup [--output <folder>]",
+		BackupCommand:         "Write a full backup archive: elysiandb backup [--output <folder>] [--url <address of a live instance> [--user <name>] [--token <token>]]",
 		RestoreCommand:        "Replace all the data with a backup archive: elysiandb restore <file> [--force]",
 		ExportLegacyCommand:   "Write the data as a 0.2.4 data folder: elysiandb export-legacy --output <folder>",
 		HelpCommand:           "List available commands",

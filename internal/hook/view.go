@@ -1343,6 +1343,16 @@ func (r *Request) foldOnView(h Hook, def *foldDef, tok *viewToken, regs, free []
 	return out, names, nil
 }
 
+func ViewsReady() bool {
+	for _, v := range views.list() {
+		if v.pinned.Load() && v.state.Load() == nil && time.Now().Unix() >= v.refused.Load() {
+			return false
+		}
+	}
+
+	return true
+}
+
 type FoldStats struct {
 	Cached      int64
 	Incremental int64

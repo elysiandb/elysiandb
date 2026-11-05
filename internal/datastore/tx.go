@@ -5,12 +5,16 @@ import (
 	"errors"
 	"github.com/taymour/elysiandb/internal/log"
 	"sort"
+	"syscall"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/journal"
 )
 
-const maxCommitAttempts = 64
+const (
+	maxCommitAttempts = 64
+	failedWriteWait   = 2 * time.Second
+)
 
 type txOp struct {
 	kind   journal.Kind
@@ -90,11 +94,12 @@ func (e *Engine) waitDurable(ticket journal.Ticket) error {
 	}
 
 	if suppressed, ok := writeFailures.Allow("log"); ok {
-		engineLog.Error("log write failed, the writer waits until the disk accepts it", log.WithSuppressed([]any{"err", err}, suppressed)...)
+		engineLog.Error("log write failed, writes are refused until the disk accepts them", log.WithSuppressed([]any{"err", err}, suppressed)...)
 	}
 
 	delay := retryFirst
-	for !e.closed.Load() {
+	deadline := time.Now().Add(failedWriteWait)
+	for !e.closed.Load() && time.Now().Before(deadline) {
 		time.Sleep(delay)
 		delay = min(2*delay, retryMax)
 
@@ -105,7 +110,15 @@ func (e *Engine) waitDurable(ticket journal.Ticket) error {
 		}
 	}
 
-	return ErrClosed
+	if e.closed.Load() {
+		return ErrClosed
+	}
+
+	if errors.Is(err, syscall.ENOSPC) {
+		return e.refuse(ErrDiskFull)
+	}
+
+	return e.refuse(ErrWriteFailed)
 }
 
 var writeFailures = log.NewThrottle(time.Minute)
@@ -254,9 +267,23 @@ func (tx *Tx) Empty() bool {
 	return len(tx.ops) == 0
 }
 
+func (tx *Tx) addsData() bool {
+	for _, op := range tx.ops {
+		if op.kind == journal.KindDocPut || op.kind == journal.KindEntityCreate {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (e *Engine) commit(tx *Tx) (journal.Ticket, error) {
 	if len(tx.ops) == 0 {
 		return journal.Ticket{}, nil
+	}
+
+	if err := e.WriteRefusal(); err != nil && (tx.addsData() || e.j.Failure() != nil) {
+		return journal.Ticket{}, e.refuse(err)
 	}
 
 	names := map[string]bool{}
