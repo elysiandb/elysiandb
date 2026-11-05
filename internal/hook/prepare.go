@@ -107,6 +107,7 @@ type preparedIndexes struct {
 	seen     sync.Map
 	mu       sync.Mutex
 	engine   *datastore.Engine
+	running  *datastore.Engine
 	pinned   map[indexNeed]bool
 	observed map[string]map[indexNeed]bool
 }
@@ -151,6 +152,12 @@ func (p *preparedIndexes) sync(e *datastore.Engine, list []registeredHook) {
 	}
 
 	p.apply(e, want)
+	views.sync(e, list)
+
+	if e != p.running {
+		p.running = e
+		e.RunBackground(func(stop <-chan struct{}) { views.maintain(e, stop) })
+	}
 }
 
 func (p *preparedIndexes) apply(e *datastore.Engine, want map[indexNeed]bool) {

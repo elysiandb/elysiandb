@@ -517,6 +517,44 @@ func (j *Journal) ReadValue(loc Location) ([]byte, error) {
 	return nil, err
 }
 
+type ReadWindow struct {
+	buf     []byte
+	segment uint32
+	start   uint32
+	size    uint32
+}
+
+func NewReadWindow(size int) *ReadWindow {
+	return &ReadWindow{buf: make([]byte, size)}
+}
+
+func (j *Journal) ReadThrough(loc Location, w *ReadWindow) ([]byte, error) {
+	end := uint64(loc.Segment)<<32 | uint64(loc.Offset+loc.Length)
+	if loc.Length == 0 || int(loc.Length) > len(w.buf) || end > j.flushed.Load() {
+		return j.ReadValue(loc)
+	}
+
+	if w.size == 0 || w.segment != loc.Segment || loc.Offset < w.start || loc.Offset+loc.Length > w.start+w.size {
+		f, err := j.fileFor(loc.Segment, false)
+		if err != nil {
+			return nil, err
+		}
+
+		n, err := f.ReadAt(w.buf, int64(loc.Offset))
+		if n < int(loc.Length) {
+			w.size = 0
+			if err == nil {
+				err = fmt.Errorf("journal: short read on segment %d", loc.Segment)
+			}
+			return nil, err
+		}
+
+		w.segment, w.start, w.size = loc.Segment, loc.Offset, uint32(n)
+	}
+
+	return w.buf[loc.Offset-w.start : loc.Offset-w.start+loc.Length], nil
+}
+
 func copyFromChunks(out []byte, loc Location, chunks []*chunk) bool {
 	for _, c := range chunks {
 		if c.segment != loc.Segment || loc.Offset < c.offset || loc.Offset+loc.Length > c.offset+uint32(len(c.data)) {

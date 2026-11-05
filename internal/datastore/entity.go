@@ -124,6 +124,7 @@ type entity struct {
 	metas    sync.Map
 	pins     sync.Map
 	changes  changeLog
+	watched  atomic.Pointer[map[string]*fieldStamps]
 	stale    atomic.Int64
 }
 
@@ -147,6 +148,8 @@ type draft struct {
 	refsSeen map[RefPath]bool
 	released []pagetree.Tree
 	tok      *pagetree.Token
+	stamps   []pendingStamp
+	floors   []*fieldStamps
 }
 
 func (e *Engine) newDraft(ent *entity) *draft {
@@ -196,6 +199,7 @@ func (d *draft) publish() {
 
 	r := d.r
 	d.ent.root.Store(&r)
+	d.applyStamps()
 }
 
 func (d *draft) hasRef(ref RefPath) bool {
@@ -213,7 +217,7 @@ func (d *draft) hasRef(ref RefPath) bool {
 }
 
 func (d *draft) needsDecode() bool {
-	return len(d.indexes) > 0 || len(d.ent.building) > 0 || len(d.ent.passes) > 0
+	return len(d.indexes) > 0 || len(d.ent.building) > 0 || len(d.ent.passes) > 0 || d.ent.watched.Load() != nil
 }
 
 func (d *draft) put(rec *journal.Record, doc map[string]any, replay bool) {
@@ -272,9 +276,10 @@ func (d *draft) put(rec *journal.Record, doc map[string]any, replay bool) {
 
 	var oldDoc map[string]any
 	if exists {
-		oldDoc = d.e.decodeSlot(old)
+		oldDoc = d.e.decodeOld(old)
 	}
 
+	d.stampChange(oldDoc, doc, !exists || oldDoc != nil)
 	d.updateIndexes(s.seq, oldDoc, doc)
 }
 
@@ -290,7 +295,7 @@ func (d *draft) del(rec *journal.Record, replay bool) {
 
 	var oldDoc map[string]any
 	if d.needsDecode() {
-		oldDoc = d.e.decodeSlot(old)
+		oldDoc = d.e.decodeOld(old)
 	}
 
 	d.r.slots, _ = d.r.slots.Delete(seqKey(old.seq))
@@ -300,6 +305,7 @@ func (d *draft) del(rec *journal.Record, replay bool) {
 	d.e.cache.drop(old.lsn)
 	d.e.live.add(old.loc.Segment, -int64(old.loc.Length))
 
+	d.stampChange(oldDoc, nil, oldDoc != nil)
 	if oldDoc != nil {
 		d.updateIndexes(old.seq, oldDoc, nil)
 	}
@@ -482,6 +488,19 @@ func (e *Engine) slotBytes(s slot) ([]byte, error) {
 	e.cache.put(s.lsn, b)
 
 	return b, nil
+}
+
+func (e *Engine) decodeOld(s slot) map[string]any {
+	if b, ok := e.cache.get(s.lsn); ok {
+		return decodeDoc(b)
+	}
+
+	b, err := e.j.ReadValue(s.loc)
+	if err != nil {
+		return nil
+	}
+
+	return decodeDoc(b)
 }
 
 func (e *Engine) decodeSlot(s slot) map[string]any {

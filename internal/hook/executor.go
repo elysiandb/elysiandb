@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -63,6 +64,7 @@ type Request struct {
 	username string
 	mu       sync.Mutex
 	memo     map[string]*result
+	pins     map[*view]*viewState
 	budget   time.Duration
 	spent    atomic.Int64
 	skipped  atomic.Bool
@@ -134,7 +136,26 @@ func entityVersion(entity string) string {
 
 	snap := e.Snapshot(entity)
 
-	return fmt.Sprintf("%d.%d.%d", e.Instance(), snap.Generation(), snap.Version())
+	return strconv.FormatUint(e.Instance(), 10) + "." + strconv.FormatUint(snap.Generation(), 10) + "." + strconv.FormatUint(snap.Version(), 10)
+}
+
+func keyVersion(entity string, filters map[string]map[string]string) string {
+	e := storage.Engine()
+	if e == nil || !engine.IsEngineInternal() {
+		return ""
+	}
+
+	snap := e.Snapshot(entity)
+	version := snap.Version()
+	if field, terms, ok := api_storage.EqKey(filters); ok {
+		if v, watched := snap.FieldVersion(field, terms); watched {
+			version = v
+		} else {
+			e.WatchField(entity, field)
+		}
+	}
+
+	return strconv.FormatUint(e.Instance(), 10) + "." + strconv.FormatUint(snap.Generation(), 10) + "." + strconv.FormatUint(version, 10)
 }
 
 func listForHook(targetEntity string, filters map[string]map[string]string, guard *api_storage.Guard) ([]map[string]any, error) {
@@ -153,8 +174,12 @@ func (r *Request) owner(bypassAcl bool) string {
 	return r.username
 }
 
-func queryVersion(targetEntity string, bypassAcl bool) string {
-	version := entityVersion(targetEntity)
+func queryVersion(targetEntity string, filters map[string]map[string]string, bypassAcl bool) string {
+	if api_storage.ExtractAutoIncludes(filters) != "" {
+		return ""
+	}
+
+	version := keyVersion(targetEntity, filters)
 	if version != "" && !bypassAcl {
 		version += "/" + entityVersion(acl.ACLEntity)
 	}
@@ -176,7 +201,7 @@ func (r *Request) query(h Hook, targetEntity string, filters map[string]map[stri
 		return res, key, nil
 	}
 
-	version := queryVersion(targetEntity, bypassAcl)
+	version := queryVersion(targetEntity, filters, bypassAcl)
 	res, hit, err := results.get(key, version, guard, func(prev *result) (*result, error) {
 		return buildResult(targetEntity, filters, r.username, bypassAcl, nil, prev)
 	})
@@ -214,7 +239,7 @@ func (r *Request) stillValid(o *output) bool {
 		pinned, ok := r.memo[d.key]
 		r.mu.Unlock()
 
-		current := queryVersion(d.target, d.bypass)
+		current := queryVersion(d.target, d.filters, d.bypass)
 		if ok {
 			current = pinned.version
 		}
@@ -252,6 +277,11 @@ func (r *Request) applyScript(h Hook, fnName string, entity map[string]any) erro
 		return err
 	}
 
+	plan := planFor(h.Script, fnName)
+	if plan != nil {
+		program = plan.program
+	}
+
 	var key string
 	var before map[string][]byte
 	if input, ok := canonical(entity); ok {
@@ -285,14 +315,43 @@ func (r *Request) applyScript(h Hook, fnName string, entity map[string]any) erro
 	run := r.guard.Until(stopAt)
 	run.Laned = laned
 
+	var outside atomic.Int64
 	start := time.Now()
-	defer func() { costs.observe(h.Script, time.Since(start)) }()
+	defer func() { costs.observe(h.Script, max(0, time.Since(start)-time.Duration(outside.Load()))) }()
 
 	vm := goja.New()
+	var timerMu sync.Mutex
 	timer := time.AfterFunc(time.Until(stopAt), func() {
 		vm.Interrupt(reason)
 	})
-	defer timer.Stop()
+	defer func() {
+		timerMu.Lock()
+		timer.Stop()
+		timerMu.Unlock()
+	}()
+
+	pause := func() func() {
+		began := time.Now()
+		timerMu.Lock()
+		running := timer.Stop()
+		timerMu.Unlock()
+
+		return func() {
+			spent := time.Since(began)
+			outside.Add(int64(spent))
+			if !running {
+				return
+			}
+
+			stopAt = stopAt.Add(spent)
+			if r.guard != nil && !r.guard.Deadline.IsZero() && r.guard.Deadline.Before(stopAt) {
+				stopAt = r.guard.Deadline
+			}
+			timerMu.Lock()
+			timer.Reset(time.Until(stopAt))
+			timerMu.Unlock()
+		}
+	}
 
 	det := &determinism{}
 	var deps []queryDep
@@ -301,14 +360,14 @@ func (r *Request) applyScript(h Hook, fnName string, entity map[string]any) erro
 		det.install(vm)
 	}
 
-	fetch := func(name string, call goja.FunctionCall, args int) *result {
+	parseArgs := func(name string, call goja.FunctionCall, args int) (string, map[string]map[string]string, bool) {
 		if len(call.Arguments) < args {
 			panic(vm.ToValue(name + " expected"))
 		}
 
 		targetEntity := call.Arguments[0].String()
 		if engine.IsCoreEntityType(targetEntity) {
-			return &result{}
+			return targetEntity, nil, true
 		}
 
 		params, _ := call.Arguments[1].Export().(map[string]any)
@@ -328,16 +387,33 @@ func (r *Request) applyScript(h Hook, fnName string, entity map[string]any) erro
 			filters[field] = condMap
 		}
 
-		res, qkey, err := r.query(h, targetEntity, filters, h.ByPassACL, run)
+		return targetEntity, filters, false
+	}
+
+	depend := func(target string, filters map[string]map[string]string, qkey, version string) {
+		depsMu.Lock()
+		deps = append(deps, queryDep{target: target, filters: filters, owner: r.owner(h.ByPassACL), key: qkey, version: version, bypass: h.ByPassACL})
+		depsMu.Unlock()
+	}
+
+	load := func(target string, filters map[string]map[string]string) *result {
+		res, qkey, err := r.query(h, target, filters, h.ByPassACL, run)
 		if err != nil {
 			panic(vm.NewGoError(r.stopReason(err, reason)))
 		}
 
-		depsMu.Lock()
-		deps = append(deps, queryDep{target: targetEntity, owner: r.owner(h.ByPassACL), key: qkey, version: res.version, bypass: h.ByPassACL})
-		depsMu.Unlock()
+		depend(target, filters, qkey, res.version)
 
 		return res
+	}
+
+	fetch := func(name string, call goja.FunctionCall, args int) *result {
+		target, filters, core := parseArgs(name, call, args)
+		if core {
+			return &result{}
+		}
+
+		return load(target, filters)
 	}
 
 	ctx := map[string]any{
@@ -366,6 +442,76 @@ func (r *Request) applyScript(h Hook, fnName string, entity map[string]any) erro
 		return err
 	}
 
+	if plan != nil {
+		helper := map[string]any{
+			"view": func(call goja.FunctionCall) goja.Value {
+				target, filters, core := parseArgs("query(entity, params)", call, 2)
+				tok := &viewToken{target: target, filters: filters, core: core}
+				if core {
+					return vm.ToValue(tok)
+				}
+
+				prepared.observe(h.Script, target, filters)
+				tok.key = target + "\x00" + r.owner(h.ByPassACL) + "\x00" + filtersKey(filters)
+				depend(target, filters, tok.key, queryVersion(target, filters, h.ByPassACL))
+
+				return vm.ToValue(tok)
+			},
+			"rows": func(call goja.FunctionCall) goja.Value {
+				tok, ok := call.Argument(0).Export().(*viewToken)
+				if !ok {
+					return call.Argument(0)
+				}
+				if tok.core {
+					return newArrayView(vm, nil)
+				}
+
+				return newArrayView(vm, load(tok.target, tok.filters).rows)
+			},
+			"fold": func(call goja.FunctionCall) goja.Value {
+				tok, ok := call.Argument(1).Export().(*viewToken)
+				if !ok {
+					return goja.Null()
+				}
+
+				def := plan.folds[int(call.Argument(0).ToInteger())]
+				regs := call.Arguments[2 : 2+len(def.regs)]
+				free := call.Arguments[2+len(def.regs):]
+
+				resume := pause()
+				out, names, err := r.fold(h, def, tok, regs, free)
+				resume()
+				if err != nil {
+					panic(vm.NewGoError(r.stopReason(err, reason)))
+				}
+				if out == nil {
+					return goja.Null()
+				}
+
+				items := make([]any, len(out))
+				for i, v := range out {
+					switch v.k {
+					case vNum:
+						items[i] = vm.ToValue(v.n)
+					case vBool:
+						items[i] = vm.ToValue(v.n != 0)
+					case vStr, vTmp:
+						items[i] = vm.ToValue(names[i])
+					case vNull:
+						items[i] = goja.Null()
+					default:
+						items[i] = goja.Undefined()
+					}
+				}
+
+				return vm.NewArray(items...)
+			},
+		}
+		if err := vm.Set(foldGlobal, helper); err != nil {
+			return err
+		}
+	}
+
 	if _, err := vm.RunProgram(program); err != nil {
 		return err
 	}
@@ -392,6 +538,10 @@ func (r *Request) applyScript(h Hook, fnName string, entity map[string]any) erro
 	}
 
 	return nil
+}
+
+func observeFold(h Hook, rows int, hit bool, start time.Time) {
+	metrics.ObserveHookQuery(h.ID, h.Entity, h.Event, rows, hit, time.Since(start))
 }
 
 func boolByte(b bool) byte {
@@ -447,9 +597,13 @@ func (c *costTable) heavy(script string) bool {
 }
 
 func (c *costTable) observe(script string, d time.Duration) {
-	v, _ := c.m.LoadOrStore(script, &hookCost{ewma: d})
+	v, loaded := c.m.LoadOrStore(script, &hookCost{ewma: d})
 	hc := v.(*hookCost)
+	if !loaded {
+		return
+	}
+
 	hc.mu.Lock()
-	hc.ewma = (hc.ewma*7 + d) / 8
+	hc.ewma = (hc.ewma*7 + min(d, 8*hc.ewma+time.Millisecond)) / 8
 	hc.mu.Unlock()
 }

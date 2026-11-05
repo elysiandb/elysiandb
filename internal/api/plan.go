@@ -545,6 +545,45 @@ func opCandidates(view *datastore.IndexView, op, cmp string, ops map[string]stri
 	return candidates{set: set, exact: exact}
 }
 
+func EqKey(filters map[string]map[string]string) (string, [][]byte, bool) {
+	best := ""
+	for field, ops := range filters {
+		cmp, ok := ops["eq"]
+		if !ok || len(ops) != 1 || strings.Contains(field, ".") || strings.ContainsAny(cmp, "*\\") {
+			continue
+		}
+
+		if _, isDate, _ := docpath.ParseDate(cmp); isDate {
+			continue
+		}
+
+		if best == "" || field < best {
+			best = field
+		}
+	}
+
+	if best == "" {
+		return "", nil, false
+	}
+
+	cmp := filters[best]["eq"]
+	terms := [][]byte{
+		exactOf(datastore.KeyLower, strings.ToLower(cmp)),
+		exactOf(datastore.KeyElement, strings.Split(cmp, ",")[0]),
+	}
+
+	if f, err := strconv.ParseFloat(cmp, 64); err == nil {
+		terms = append(terms, datastore.AppendNumber([]byte{datastore.KeyNumber}, f))
+	}
+
+	b := byte(0)
+	if cmp == "true" || cmp == "1" {
+		b = 1
+	}
+
+	return best, append(terms, []byte{datastore.KeyBool, b}), true
+}
+
 const (
 	selectiveRatio   = 16
 	selectiveMinimum = 4096

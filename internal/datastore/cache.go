@@ -92,6 +92,18 @@ func (c *valueCache) get(lsn uint64) ([]byte, bool) {
 	return data, ok
 }
 
+func (c *valueCache) peek(lsn uint64) ([]byte, bool) {
+	s := c.shard(lsn)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if i, ok := s.index[lsn]; ok {
+		return s.entries[i].data, true
+	}
+
+	return nil, false
+}
+
 func (c *valueCache) put(lsn uint64, data []byte) {
 	s := c.shard(lsn)
 	s.mu.Lock()

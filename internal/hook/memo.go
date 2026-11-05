@@ -17,6 +17,7 @@ import (
 
 type queryDep struct {
 	target  string
+	filters map[string]map[string]string
 	owner   string
 	key     string
 	version string

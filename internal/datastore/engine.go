@@ -90,6 +90,7 @@ type Engine struct {
 	pressureSweeps int
 	stop           chan struct{}
 	wg             sync.WaitGroup
+	closeMu        sync.Mutex
 	closed         atomic.Bool
 	writers        sync.WaitGroup
 	migrated       *MigrationReport
@@ -300,10 +301,32 @@ func (e *Engine) startBackground() {
 	}
 }
 
+func (e *Engine) RunBackground(fn func(stop <-chan struct{})) {
+	if !e.opts.Background {
+		return
+	}
+
+	e.closeMu.Lock()
+	defer e.closeMu.Unlock()
+
+	if e.closed.Load() {
+		return
+	}
+
+	e.wg.Add(1)
+	go func() {
+		defer e.wg.Done()
+		fn(e.stop)
+	}()
+}
+
 func (e *Engine) Close() error {
+	e.closeMu.Lock()
 	if !e.closed.CompareAndSwap(false, true) {
+		e.closeMu.Unlock()
 		return nil
 	}
+	e.closeMu.Unlock()
 
 	close(e.stop)
 	e.wg.Wait()
@@ -328,9 +351,12 @@ func (e *Engine) Close() error {
 }
 
 func (e *Engine) Abandon() {
+	e.closeMu.Lock()
 	if !e.closed.CompareAndSwap(false, true) {
+		e.closeMu.Unlock()
 		return
 	}
+	e.closeMu.Unlock()
 
 	close(e.stop)
 	e.wg.Wait()
@@ -491,6 +517,10 @@ func (s *Snapshot) Len() int {
 	return s.r.slots.Len()
 }
 
+func (s *Snapshot) Instance() uint64 {
+	return s.e.instance
+}
+
 func (s *Snapshot) Version() uint64 {
 	return s.r.version
 }
@@ -588,6 +618,22 @@ func (s *Snapshot) At(i int) (Doc, bool) {
 func (s *Snapshot) Ascend(offset int, fn func(Doc) bool) {
 	s.r.slots.AscendAt(offset, func(k string, v []byte) bool {
 		return fn(Doc{s: s, slot: decodeSlotValue(keySeq(k), v, true)})
+	})
+}
+
+const scanWindowBytes = 4 << 20
+
+func (s *Snapshot) ScanValues(fn func(d Doc, raw []byte, err error) bool) {
+	window := journal.NewReadWindow(scanWindowBytes)
+	s.Ascend(0, func(d Doc) bool {
+		sl := d.slot
+		if b, ok := s.e.cache.peek(sl.lsn); ok {
+			return fn(d, b, nil)
+		}
+
+		raw, err := s.e.j.ReadThrough(sl.loc, window)
+
+		return fn(d, raw, err)
 	})
 }
 

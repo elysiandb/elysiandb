@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/taymour/elysiandb/internal/log"
 	"runtime"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"sync"
@@ -20,9 +21,12 @@ import (
 
 type result struct {
 	version  string
+	entity   string
 	rows     []row
 	bytes    int64
 	bySeq    bool
+	advanced bool
+	instance uint64
 	gen      uint64
 	lsn      uint64
 	frontier *atomic.Int64
@@ -44,9 +48,10 @@ func (r *result) reusable(seq uint32, lsn uint64) (row, bool) {
 }
 
 type cacheItem struct {
-	key string
-	res *result
-	el  *list.Element
+	key  string
+	res  *result
+	el   *list.Element
+	used int64
 }
 
 type flight struct {
@@ -61,6 +66,7 @@ type resultCache struct {
 	lru     *list.List
 	flights map[string]*flight
 	refused map[string]time.Time
+	swept   time.Time
 	hits    atomic.Int64
 	misses  atomic.Int64
 }
@@ -82,6 +88,7 @@ func (c *resultCache) lookup(key, version string) (*result, *result) {
 
 	if it.res.version == version {
 		c.lru.MoveToFront(it.el)
+		it.used = time.Now().Unix()
 		return it.res, nil
 	}
 
@@ -100,9 +107,10 @@ func (c *resultCache) store(key string, res *result) bool {
 	if it, ok := c.items[key]; ok {
 		memory.HookResults.Release(it.res.bytes)
 		it.res = res
+		it.used = time.Now().Unix()
 		c.lru.MoveToFront(it.el)
 	} else {
-		it := &cacheItem{key: key, res: res}
+		it := &cacheItem{key: key, res: res, used: time.Now().Unix()}
 		it.el = c.lru.PushFront(it)
 		c.items[key] = it
 	}
@@ -141,30 +149,58 @@ func (c *resultCache) reset() {
 	c.lru.Init()
 }
 
+func (c *resultCache) sweep(e *datastore.Engine) {
+	c.mu.Lock()
+	if time.Since(c.swept) < resultSweepEvery {
+		c.mu.Unlock()
+		return
+	}
+	c.swept = time.Now()
+
+	cutoff := time.Now().Add(-resultIdleAfter).Unix()
+	var freed int64
+	for key, it := range c.items {
+		stale := it.used < cutoff
+		if !stale && it.res.bySeq && it.res.entity != "" {
+			stale = it.res.instance != e.Instance() || e.Snapshot(it.res.entity).Generation() != it.res.gen
+		}
+		if stale {
+			c.lru.Remove(it.el)
+			delete(c.items, key)
+			memory.HookResults.Release(it.res.bytes)
+			freed += it.res.bytes
+		}
+	}
+	c.mu.Unlock()
+
+	if freed >= releaseAfterSweep {
+		debug.FreeOSMemory()
+	}
+}
+
+const (
+	resultSweepEvery  = 30 * time.Second
+	resultIdleAfter   = 10 * time.Minute
+	releaseAfterSweep = 64 << 20
+)
+
 func (c *resultCache) get(key, version string, guard *api_storage.Guard, build func(prev *result) (*result, error)) (*result, bool, error) {
 	if version == "" {
 		res, err := build(nil)
 		return res, false, err
 	}
 
-	missed := false
 	for {
 		if res, _ := c.lookup(key, version); res != nil {
-			if !missed {
-				c.hits.Add(1)
-			}
-			return res, !missed, nil
-		}
-
-		if !missed {
-			c.misses.Add(1)
-			missed = true
+			c.hits.Add(1)
+			return res, true, nil
 		}
 
 		c.mu.Lock()
 		if until, ok := c.refused[key]; ok {
 			if time.Now().Before(until) {
 				c.mu.Unlock()
+				c.misses.Add(1)
 				return nil, false, guard.Reject()
 			}
 			delete(c.refused, key)
@@ -179,7 +215,7 @@ func (c *resultCache) get(key, version string, guard *api_storage.Guard, build f
 			go c.fill(key, version, f, build)
 
 			res, _, err := waitFlight(f, guard)
-			return res, false, err
+			return res, c.counted(res), err
 		}
 		c.mu.Unlock()
 
@@ -189,9 +225,20 @@ func (c *resultCache) get(key, version string, guard *api_storage.Guard, build f
 		}
 
 		if res != nil && res.version == version {
-			return res, false, nil
+			return res, c.counted(res), nil
 		}
 	}
+}
+
+func (c *resultCache) counted(res *result) bool {
+	if res != nil && res.advanced {
+		c.hits.Add(1)
+		return true
+	}
+
+	c.misses.Add(1)
+
+	return false
 }
 
 func (c *resultCache) fill(key, version string, f *flight, build func(prev *result) (*result, error)) {
@@ -255,7 +302,7 @@ func buildResult(targetEntity string, filters map[string]map[string]string, owne
 		mode = acl.ReadModeFor(owner, targetEntity)
 	}
 
-	res := &result{bySeq: true}
+	res := &result{bySeq: true, entity: targetEntity}
 	if mode == acl.ReadNone {
 		return res, nil
 	}
@@ -284,6 +331,10 @@ func buildResult(targetEntity string, filters map[string]map[string]string, owne
 	}
 
 	snap := api_storage.Snapshot(targetEntity)
+	if prev != nil && prev.instance != snap.Instance() {
+		prev = nil
+	}
+
 	if next, ok := prev.advance(snap, filters, keep, b); ok {
 		return next, nil
 	}
@@ -292,7 +343,7 @@ func buildResult(targetEntity string, filters map[string]map[string]string, owne
 	if planned.Err != nil {
 		return nil, planned.Err
 	}
-	res.gen, res.lsn = snap.Generation(), snap.Version()
+	res.instance, res.gen, res.lsn = snap.Instance(), snap.Generation(), snap.Version()
 	res.frontier = new(atomic.Int64)
 
 	rows, built, err := buildRows(planned.Docs, prev, keep)
@@ -350,7 +401,7 @@ func (r *result) advance(snap *datastore.Snapshot, filters map[string]map[string
 		updates[seq] = &built
 	}
 
-	next := &result{bySeq: true, gen: snap.Generation(), lsn: snap.Version(), bytes: r.bytes + b.bytes}
+	next := &result{bySeq: true, advanced: true, entity: r.entity, instance: r.instance, gen: snap.Generation(), lsn: snap.Version(), bytes: r.bytes + b.bytes}
 	last := uint32(0)
 	if n := len(r.rows); n > 0 {
 		last = r.rows[n-1].seq
@@ -486,6 +537,7 @@ func buildRows(docs []datastore.Doc, prev *result, keep func(map[string]any) boo
 
 func ResetQueryCache() {
 	results.reset()
+	views.reset()
 }
 
 type QueryCacheStats struct {

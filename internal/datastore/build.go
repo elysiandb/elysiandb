@@ -194,9 +194,13 @@ func (e *Engine) buildPass(ent *entity) bool {
 
 	docs := 0
 	each := func(fn func(seq uint32, doc map[string]any)) {
-		snap.slots.AscendAt(0, func(k string, v []byte) bool {
-			s := decodeSlotValue(keySeq(k), v, true)
-			fn(s.seq, e.decodeSlot(s))
+		view := &Snapshot{e: e, ent: ent, r: snap, name: ent.name}
+		view.ScanValues(func(d Doc, raw []byte, err error) bool {
+			if err != nil {
+				fn(d.Seq(), nil)
+				return true
+			}
+			fn(d.Seq(), decodeDoc(raw))
 			return true
 		})
 	}
