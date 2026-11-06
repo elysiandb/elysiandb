@@ -72,6 +72,7 @@ func TestNothingDriftsAtConstantVolume(t *testing.T) {
 		return map[string]any{"id": fmt.Sprintf("doc-%05d", i), "tag": fmt.Sprintf("t%d", r.Intn(40)), "rank": r.Intn(100000), "round": round, "pad": fmt.Sprintf("%0300d", i)}
 	}
 
+	const coldDocuments = 50
 	writeAll := func(round int) {
 		for from := 0; from < documents; from += 200 {
 			if err := e.Update(func(tx *datastore.Tx) error {
@@ -79,6 +80,15 @@ func TestNothingDriftsAtConstantVolume(t *testing.T) {
 				for i := from; i < from+200; i++ {
 					if err := tx.Put("steady", fmt.Sprintf("doc-%05d", i), doc(i, round)); err != nil {
 						return err
+					}
+				}
+				if round == 0 {
+					tx.EnsureType("cold")
+					for i := from / 20; i < from/20+10; i++ {
+						id := fmt.Sprintf("cold-%05d", i)
+						if err := tx.Put("cold", id, map[string]any{"id": id, "pad": fmt.Sprintf("%0300d", i)}); err != nil {
+							return err
+						}
 					}
 				}
 				return nil
@@ -197,6 +207,23 @@ func TestNothingDriftsAtConstantVolume(t *testing.T) {
 	}
 
 	if st := e.Stats(); st.CompactedSegments == 0 {
-		t.Errorf("compaction never ran: %+v", st)
+		t.Errorf("segments that keep a little live data should be compacted: %+v", st)
+	}
+
+	cold := e.Snapshot("cold")
+	if cold.Len() != coldDocuments {
+		t.Fatalf("%d documents that were never rewritten, %d expected", cold.Len(), coldDocuments)
+	}
+	count := 0
+	cold.ScanValues(func(d datastore.Doc, _ []byte, err error) bool {
+		if err != nil {
+			t.Error(err)
+			return false
+		}
+		count++
+		return true
+	})
+	if count != coldDocuments {
+		t.Fatalf("%d of %d documents can be read after compaction", count, coldDocuments)
 	}
 }
