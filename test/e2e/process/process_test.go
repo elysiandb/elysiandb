@@ -41,6 +41,25 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+type serverLog struct {
+	mu  sync.Mutex
+	out bytes.Buffer
+}
+
+func (l *serverLog) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	return l.out.Write(p)
+}
+
+func (l *serverLog) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	return l.out.String()
+}
+
 type server struct {
 	t      *testing.T
 	cmd    *exec.Cmd
@@ -48,7 +67,7 @@ type server struct {
 	client *http.Client
 	folder string
 	config string
-	log    *bytes.Buffer
+	log    *serverLog
 }
 
 func freePort(t *testing.T) int {
@@ -99,7 +118,7 @@ func start(t *testing.T, folder, extra string) *server {
 
 	port := freePort(t)
 	config := writeConfig(t, folder, port, extra)
-	output := &bytes.Buffer{}
+	output := &serverLog{}
 
 	cmd := exec.Command(binary, "--config", config)
 	cmd.Stdout = output
