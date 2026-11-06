@@ -5,15 +5,52 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/metrics"
 )
 
 type cacheItem struct {
-	v   []byte
-	exp int64
+	v    []byte
+	exp  int64
+	deps []dependency
+}
+
+type dependency struct {
+	entity  string
+	version string
+}
+
+var VersionOf func(entity string) string
+
+func captureDeps(entities []string) []dependency {
+	if VersionOf == nil || len(entities) == 0 {
+		return nil
+	}
+
+	deps := make([]dependency, 0, len(entities))
+	for _, entity := range entities {
+		deps = append(deps, dependency{entity: entity, version: VersionOf(entity)})
+	}
+
+	return deps
+}
+
+func (it cacheItem) fresh(now int64) bool {
+	if now > it.exp {
+		return false
+	}
+
+	for _, d := range it.deps {
+		if VersionOf(d.entity) != d.version {
+			return false
+		}
+	}
+
+	return true
 }
 
 type cacheEntity struct {
@@ -26,15 +63,52 @@ type cacheStore struct {
 	mu       sync.RWMutex
 	entities map[string]*cacheEntity
 	ttl      time.Duration
+	maxBytes int64
+	maxEntry int64
+	bytes    atomic.Int64
 }
 
-var CacheStore *cacheStore
+const (
+	DefaultMaxMB      = 128
+	DefaultMaxEntryKB = 1024
+)
+
+var Limits = func() (int64, int64) {
+	maxMB, maxEntryKB := int64(DefaultMaxMB), int64(DefaultMaxEntryKB)
+	if cfg := globals.GetConfig(); cfg != nil {
+		if cfg.Api.Cache.MaxMB > 0 {
+			maxMB = int64(cfg.Api.Cache.MaxMB)
+		}
+
+		if cfg.Api.Cache.MaxEntryKB > 0 {
+			maxEntryKB = int64(cfg.Api.Cache.MaxEntryKB)
+		}
+	}
+
+	return maxMB << 20, maxEntryKB << 10
+}
+
+var (
+	CacheStore *cacheStore
+	currentMu  sync.RWMutex
+)
 
 func InitCache(ttl time.Duration) {
-	CacheStore = &cacheStore{
+	if ttl <= 0 {
+		ttl = time.Second
+	}
+
+	maxBytes, maxEntry := Limits()
+	store := &cacheStore{
 		entities: make(map[string]*cacheEntity),
 		ttl:      ttl,
+		maxBytes: maxBytes,
+		maxEntry: maxEntry,
 	}
+
+	currentMu.Lock()
+	CacheStore = store
+	currentMu.Unlock()
 
 	log.Debug("api cache initialized", "component", "cache", "ttl", ttl)
 }
@@ -77,7 +151,7 @@ func (s *cacheStore) Get(entity string, hash []byte) []byte {
 	it, ok := e.data[key]
 	e.mu.RUnlock()
 
-	if !ok {
+	if !ok || !it.fresh(time.Now().UnixNano()) {
 		metrics.CacheMiss()
 		return nil
 	}
@@ -87,7 +161,70 @@ func (s *cacheStore) Get(entity string, hash []byte) []byte {
 	return it.v
 }
 
+func (s *cacheStore) Accepts(size int) bool {
+	return s != nil && int64(size) <= s.maxEntry
+}
+
+func (s *cacheStore) admit(size int) bool {
+	if int64(size) > s.maxEntry {
+		return false
+	}
+
+	if s.bytes.Add(int64(size)) > s.maxBytes {
+		s.evict()
+	}
+
+	return true
+}
+
+func (s *cacheStore) evict() {
+	target := s.maxBytes * 9 / 10
+
+	s.mu.RLock()
+	entities := make([]*cacheEntity, 0, len(s.entities))
+	for _, e := range s.entities {
+		entities = append(entities, e)
+	}
+	s.mu.RUnlock()
+
+	for _, e := range entities {
+		if s.bytes.Load() <= target {
+			return
+		}
+
+		e.mu.Lock()
+		for k, it := range e.data {
+			delete(e.data, k)
+			s.bytes.Add(-int64(len(it.v)))
+			if s.bytes.Load() <= target {
+				break
+			}
+		}
+
+		for id, it := range e.ids {
+			if s.bytes.Load() <= target {
+				break
+			}
+			delete(e.ids, id)
+			s.bytes.Add(-int64(len(it.v)))
+		}
+		e.mu.Unlock()
+	}
+}
+
+func (s *cacheStore) Bytes() int64 {
+	if s == nil {
+		return 0
+	}
+
+	return s.bytes.Load()
+}
+
 func (s *cacheStore) Set(entity string, hash, value []byte) {
+	s.SetWithDeps(entity, hash, value, nil)
+}
+
+func (s *cacheStore) SetWithDeps(entity string, hash, value []byte, entities []string) {
 	if len(hash) != 32 {
 		return
 	}
@@ -103,9 +240,18 @@ func (s *cacheStore) Set(entity string, hash, value []byte) {
 	}
 
 	s.mu.Unlock()
+
+	if !s.admit(len(value)) {
+		return
+	}
+
 	exp := time.Now().Add(s.ttl).UnixNano()
+	deps := captureDeps(entities)
 	e.mu.Lock()
-	e.data[key] = cacheItem{v: value, exp: exp}
+	if old, ok := e.data[key]; ok {
+		s.bytes.Add(-int64(len(old.v)))
+	}
+	e.data[key] = cacheItem{v: value, exp: exp, deps: deps}
 	e.mu.Unlock()
 }
 
@@ -122,7 +268,7 @@ func (s *cacheStore) GetById(entity, id string) []byte {
 	it, ok := e.ids[id]
 	e.mu.RUnlock()
 
-	if !ok {
+	if !ok || !it.fresh(time.Now().UnixNano()) {
 		return nil
 	}
 
@@ -130,6 +276,10 @@ func (s *cacheStore) GetById(entity, id string) []byte {
 }
 
 func (s *cacheStore) SetById(entity, id string, value []byte) {
+	s.SetByIdWithDeps(entity, id, value, nil)
+}
+
+func (s *cacheStore) SetByIdWithDeps(entity, id string, value []byte, entities []string) {
 	s.mu.Lock()
 	e, exists := s.entities[entity]
 	if !exists {
@@ -138,21 +288,52 @@ func (s *cacheStore) SetById(entity, id string, value []byte) {
 	}
 
 	s.mu.Unlock()
+
+	if !s.admit(len(value)) {
+		return
+	}
+
 	exp := time.Now().Add(s.ttl).UnixNano()
+	deps := captureDeps(entities)
 	e.mu.Lock()
-	e.ids[id] = cacheItem{v: value, exp: exp}
+	if old, ok := e.ids[id]; ok {
+		s.bytes.Add(-int64(len(old.v)))
+	}
+	e.ids[id] = cacheItem{v: value, exp: exp, deps: deps}
 	e.mu.Unlock()
 }
 
 func (s *cacheStore) Purge(entity string) {
 	s.mu.Lock()
+	e := s.entities[entity]
 	delete(s.entities, entity)
 	s.mu.Unlock()
+
+	if e != nil {
+		s.bytes.Add(-e.size())
+	}
+}
+
+func (e *cacheEntity) size() int64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	total := int64(0)
+	for _, it := range e.data {
+		total += int64(len(it.v))
+	}
+
+	for _, it := range e.ids {
+		total += int64(len(it.v))
+	}
+
+	return total
 }
 
 func (s *cacheStore) PurgeAll() {
 	s.mu.Lock()
 	s.entities = make(map[string]*cacheEntity)
+	s.bytes.Store(0)
 	s.mu.Unlock()
 }
 
@@ -231,6 +412,16 @@ func HashQuery(
 	return sum[:]
 }
 
+func CleanExpiredEntries() {
+	currentMu.RLock()
+	store := CacheStore
+	currentMu.RUnlock()
+
+	if store != nil {
+		store.CleanExpired()
+	}
+}
+
 func (s *cacheStore) CleanExpired() {
 	s.mu.RLock()
 	entities := make(map[string]*cacheEntity, len(s.entities))
@@ -246,12 +437,14 @@ func (s *cacheStore) CleanExpired() {
 		for k, it := range e.data {
 			if now > it.exp {
 				delete(e.data, k)
+				s.bytes.Add(-int64(len(it.v)))
 			}
 		}
 
 		for id, it := range e.ids {
 			if now > it.exp {
 				delete(e.ids, id)
+				s.bytes.Add(-int64(len(it.v)))
 			}
 		}
 

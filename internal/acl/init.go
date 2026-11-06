@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/storage"
 )
 
 const UsernameField = globals.CoreFieldsPrefix + "username"
@@ -147,8 +149,29 @@ func InitACLStorage() {
 	}
 }
 
+var lastSignature atomic.Value
+
+func aclSignature() string {
+	e := storage.Engine()
+	if e == nil || !engine.IsEngineInternal() {
+		return ""
+	}
+
+	version := func(entity string) string {
+		snap := e.Snapshot(entity)
+		return fmt.Sprintf("%d.%d", snap.Generation(), snap.Version())
+	}
+
+	return e.Folder() + "|" + version(security.UserEntity) + "|" + version(ACLEntity) + "|" + version(schema.SchemaEntity) + "|" + strings.Join(e.Types(), "\x00")
+}
+
 func InitACL() error {
 	if !security.UserAuthenticationIsEnabled() {
+		return nil
+	}
+
+	sig := aclSignature()
+	if sig != "" && lastSignature.Load() == sig {
 		return nil
 	}
 
@@ -158,6 +181,8 @@ func InitACL() error {
 		log.Error("cannot create the default ACLs", "component", "acl", "err", err)
 		return err
 	}
+
+	lastSignature.Store(aclSignature())
 
 	return nil
 }

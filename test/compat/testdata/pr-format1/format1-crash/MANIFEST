@@ -1,0 +1,8 @@
+{
+  "format": 1,
+  "checkpoint": "checkpoint-0000000000000192.ckpt",
+  "lsn": 192,
+  "segment": 1,
+  "offset": 40330,
+  "created_at": "2026-11-04T13:07:25Z"
+}

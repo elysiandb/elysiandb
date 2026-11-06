@@ -3,6 +3,7 @@ package globals
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 )
 
 const CoreFieldsPrefix = "_elysiandb_core_"
@@ -69,4 +70,14 @@ func ApiEntityIndexPatternKey(entity string) string {
 
 func ApiEntityIndexFieldAllKey(entity, field string) string {
 	return fmt.Sprintf(ApiEntityIndexFieldAllPattern, entity, field)
+}
+
+var starting atomic.Bool
+
+func SetStarting(v bool) {
+	starting.Store(v)
+}
+
+func IsStarting() bool {
+	return starting.Load()
 }

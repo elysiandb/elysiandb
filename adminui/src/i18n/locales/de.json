@@ -279,7 +279,9 @@
             "runtime": "Laufzeitumgebung",
             "connections": "Verbindungen",
             "hooks": "Hooks",
-            "mongodb": "MongoDB"
+            "mongodb": "MongoDB",
+            "indexes": "Indizes",
+            "memory": "Speicherbudget"
         },
         "tabs": {
             "data": "Daten",
@@ -306,13 +308,14 @@
             "cacheHitRatio": "Trefferquote des API-Caches",
             "flushDuration": "Schreibdauer",
             "flushFailures": "Fehlgeschlagene und erzwungene Schreibvorgänge pro Minute",
-            "recoveryLogs": "Größe der Wiederherstellungsprotokolle",
+            "recoveryLogs": "Loggröße",
             "diskSize": "Größe des Datenordners",
             "memory": "Speicher",
             "goroutines": "Goroutinen",
             "gcPause": "GC-Pause (p99)",
             "gcCycles": "GC-Zyklen pro Minute",
-            "cpu": "Prozess-CPU",
+            "cpu": "Prozess-CPU (% aller Threads)",
+            "cpuCores": "Belegte CPU-Threads",
             "openFds": "Offene Dateideskriptoren",
             "connections": "Offene Verbindungen",
             "adminSessions": "Admin-Sitzungen",
@@ -322,7 +325,14 @@
             "hookDuration": "Hook-Dauer (p95)",
             "mongoPing": "MongoDB-Ping",
             "mongoErrors": "MongoDB-Fehler pro Minute",
-            "mongoPool": "Belegte Verbindungen im MongoDB-Pool"
+            "mongoPool": "Belegte Verbindungen im MongoDB-Pool",
+            "indexCount": "Indizes",
+            "indexBytes": "Indexgröße",
+            "memoryBudget": "Speicher im Verhältnis zum Budget",
+            "memoryShares": "Speicher nach Verwendung",
+            "memoryPressure": "Speicherdruck (0 normal, 1 hoch, 2 kritisch)",
+            "memoryRefused": "Wegen Speicher abgelehnte Anfragen pro Minute",
+            "hookReuse": "Wiederverwendete Hook-Abfragen und -Ergebnisse"
         },
         "series": {
             "http": "HTTP",
@@ -362,8 +372,6 @@
             "flush": "Dauer",
             "flushFailures": "Fehlgeschlagen",
             "forcedFlushes": "Durch die Größe des Wiederherstellungsprotokolls erzwungen",
-            "recoveryJson": "JSON-Wiederherstellungsprotokoll",
-            "recoveryStore": "Store-Wiederherstellungsprotokoll",
             "disk": "Größe",
             "heap": "Heap",
             "total": "Gesamt",
@@ -371,13 +379,32 @@
             "gcPause": "Pause",
             "gcCycles": "Zyklen",
             "cpu": "CPU",
+            "cpuCores": "Belegt",
+            "gomaxprocs": "Threads",
             "openFds": "Dateideskriptoren",
             "adminSessions": "Sitzungen",
             "openTransactions": "Transaktionen",
             "oldestTransaction": "Alter",
             "executions": "Ausführungen",
             "ping": "Ping",
-            "poolInUse": "Belegt"
+            "poolInUse": "Belegt",
+            "logSinceCheckpoint": "Seit dem letzten Checkpoint",
+            "logBytes": "Log auf der Platte",
+            "liveBytes": "Aktive Daten",
+            "indexCount": "Indizes",
+            "indexBytes": "Größe",
+            "budget": "Budget",
+            "heapLive": "Lebender Heap",
+            "valueCache": "Zwischengespeicherte Werte",
+            "pageCache": "Zwischengespeicherte Seiten",
+            "dirtyPages": "Seiten vor dem Checkpoint",
+            "hookResults": "Hook-Ergebnisse",
+            "indexBuilds": "Indexaufbau",
+            "requestMemory": "Anfragen",
+            "pressure": "Druck",
+            "refused": "Abgelehnt",
+            "queryReuse": "Abfragen",
+            "outputReuse": "Ergebnisse"
         },
         "routes": {
             "last15m": "Häufigste Routen, letzte 15 Minuten",
@@ -410,6 +437,37 @@
             "lastSuccess": "Letztes erfolgreiches Schreiben",
             "failures": "Fehlgeschlagene Schreibvorgänge seit dem Start",
             "lastError": "Letzter Schreibfehler"
+        },
+        "indexes": {
+            "title": "Indizes",
+            "entity": "Entität",
+            "index": "Index",
+            "kind": "Form",
+            "origin": "Herkunft",
+            "state": "Status",
+            "entries": "Einträge",
+            "size": "Größe",
+            "uses": "Nutzungen",
+            "lastUsed": "Zuletzt genutzt",
+            "pinned": "angeheftet",
+            "kinds": {
+                "ordered": "Geordnet",
+                "sort": "Sortierung",
+                "bitmap": "Bitmap",
+                "composite": "Zusammengesetzt",
+                "search": "Volltext",
+                "references": "Referenzen"
+            },
+            "origins": {
+                "query": "Abfrage",
+                "hook": "Hook",
+                "advisor": "Optimierer"
+            },
+            "states": {
+                "ready": "Bereit",
+                "building": "Im Aufbau",
+                "released": "Freigegeben"
+            }
         }
     },
     "logs": {

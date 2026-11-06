@@ -9,6 +9,10 @@ import (
 var auditLog = log.For("audit")
 
 func Audit(ctx *fasthttp.RequestCtx, msg string, args ...any) {
+	AuditContext(ctx)(msg, args...)
+}
+
+func AuditContext(ctx *fasthttp.RequestCtx) func(msg string, args ...any) {
 	base := []any{
 		"actor", security.Actor(ctx),
 		"source", "http",
@@ -19,5 +23,7 @@ func Audit(ctx *fasthttp.RequestCtx, msg string, args ...any) {
 		base = append(base, "request_id", id)
 	}
 
-	auditLog.Info(msg, append(base, args...)...)
+	return func(msg string, args ...any) {
+		auditLog.Info(msg, append(append([]any{}, base...), args...)...)
+	}
 }

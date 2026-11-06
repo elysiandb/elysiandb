@@ -9,12 +9,15 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/cache"
+	"github.com/taymour/elysiandb/internal/durable"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/hook"
@@ -49,7 +52,7 @@ func Restore(src io.ReadSeeker) (*Report, error) {
 		return nil, err
 	}
 
-	return apply(src, manifest)
+	return Apply(src, manifest)
 }
 
 func Verify(src io.Reader) (*Manifest, error) {
@@ -146,7 +149,7 @@ func verifyEntry(r io.Reader, path, expectedSum string, check func(io.Reader) er
 	return checkErr
 }
 
-func apply(src io.Reader, manifest *Manifest) (*Report, error) {
+func Apply(src io.Reader, manifest *Manifest) (*Report, error) {
 	archive, err := openArchive(src)
 	if err != nil {
 		return nil, err
@@ -166,6 +169,10 @@ func apply(src io.Reader, manifest *Manifest) (*Report, error) {
 		return nil, err
 	}
 
+	if err := markRestoring(); err != nil {
+		return nil, err
+	}
+
 	if err := security.WriteKey(key); err != nil {
 		return nil, err
 	}
@@ -175,6 +182,8 @@ func apply(src io.Reader, manifest *Manifest) (*Report, error) {
 		return nil, &IncompleteRestoreError{Err: err}
 	}
 
+	clearRestoring()
+
 	return report, nil
 }
 
@@ -182,6 +191,9 @@ func replaceData(archive *archiveReader, manifest *Manifest) (*Report, error) {
 	if err := engine.WipeAll(); err != nil {
 		return nil, err
 	}
+
+	storage.ReleaseIndexes()
+	defer storage.WakeIndexes()
 
 	report := &Report{Entities: map[string]int{}}
 
@@ -199,7 +211,7 @@ func replaceData(archive *archiveReader, manifest *Manifest) (*Report, error) {
 			return nil, err
 		}
 
-		count, err := engine.RestoreEntities(entity.Name, newDocumentReader(r, path).next)
+		count, err := restoreDocuments(entity.Name, newUncheckedDocumentReader(r, path))
 		if err != nil {
 			return nil, err
 		}
@@ -216,6 +228,14 @@ func replaceData(archive *archiveReader, manifest *Manifest) (*Report, error) {
 	}
 
 	return report, nil
+}
+
+func restoreDocuments(entity string, documents *documentReader) (int, error) {
+	if !engine.IsEngineInternal() {
+		return engine.RestoreEntities(entity, documents.next)
+	}
+
+	return api_storage.RestoreRawEntities(entity, documents.nextRaw)
 }
 
 func restoreSchemas(archive *archiveReader, manifest *Manifest) (int, error) {
@@ -278,6 +298,52 @@ func restoreKeys(archive *archiveReader, report *Report) error {
 	}
 }
 
+const (
+	restoringMarker = "RESTORING"
+	uploadPrefix    = ".restore-upload-"
+)
+
+func restoringPath() string {
+	return filepath.Join(globals.GetConfig().Store.Folder, restoringMarker)
+}
+
+func markRestoring() error {
+	if err := os.MkdirAll(globals.GetConfig().Store.Folder, 0o755); err != nil {
+		return err
+	}
+
+	return durable.WriteFileAtomic(nil, restoringPath(), func(w io.Writer) error {
+		_, err := io.WriteString(w, time.Now().UTC().Format(time.RFC3339)+"\n")
+		return err
+	})
+}
+
+func clearRestoring() {
+	_ = os.Remove(restoringPath())
+	_ = durable.OS.SyncDir(globals.GetConfig().Store.Folder)
+}
+
+func RestoreWasInterrupted() bool {
+	_, err := os.Stat(restoringPath())
+	return err == nil
+}
+
+func NewUpload() (*os.File, error) {
+	folder := globals.GetConfig().Store.Folder
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		return nil, err
+	}
+
+	return os.CreateTemp(folder, uploadPrefix+"*")
+}
+
+func RemoveAbandonedUploads() {
+	found, _ := filepath.Glob(filepath.Join(globals.GetConfig().Store.Folder, uploadPrefix+"*"))
+	for _, path := range found {
+		_ = os.Remove(path)
+	}
+}
+
 func finishRestore() error {
 	if err := security.DeleteAllSessions(); err != nil {
 		return err
@@ -296,10 +362,6 @@ func finishRestore() error {
 	}
 
 	hook.InitHooks()
-
-	if engine.IsEngineInternal() {
-		api_storage.RebuildAllIndexes()
-	}
 
 	storage.WriteToDB()
 
@@ -479,42 +541,73 @@ type documentReader struct {
 	decoder *json.Decoder
 	path    string
 	line    int
-	ids     map[string]bool
+	ids     map[[idHashSize]byte]struct{}
 }
+
+const idHashSize = 16
 
 func newDocumentReader(r io.Reader, path string) *documentReader {
-	return &documentReader{decoder: json.NewDecoder(r), path: path, ids: map[string]bool{}}
+	return &documentReader{decoder: json.NewDecoder(r), path: path, ids: map[[idHashSize]byte]struct{}{}}
 }
 
-func (d *documentReader) next() (map[string]any, error) {
-	var data map[string]any
-	if err := d.decoder.Decode(&data); err != nil {
+func newUncheckedDocumentReader(r io.Reader, path string) *documentReader {
+	return &documentReader{decoder: json.NewDecoder(r), path: path}
+}
+
+func (d *documentReader) nextRaw() (string, []byte, error) {
+	var raw json.RawMessage
+	if err := d.decoder.Decode(&raw); err != nil {
 		if err == io.EOF {
-			return nil, io.EOF
+			return "", nil, io.EOF
 		}
 
-		return nil, invalidArchive("%s, document %d: %v", d.path, d.line+1, err)
+		return "", nil, invalidArchive("%s, document %d: %v", d.path, d.line+1, err)
+	}
+
+	id, ok := simpleDocumentID(raw)
+	if !ok {
+		var data map[string]any
+		if err := json.Unmarshal(raw, &data); err != nil {
+			return "", nil, invalidArchive("%s, document %d: %v", d.path, d.line+1, err)
+		}
+		id, _ = data["id"].(string)
 	}
 
 	d.line++
 
-	id, _ := data["id"].(string)
-	if data == nil || id == "" {
-		return nil, invalidArchive("%s, document %d: a document must be an object with a string id", d.path, d.line)
+	if id == "" {
+		return "", nil, invalidArchive("%s, document %d: a document must be an object with a string id", d.path, d.line)
 	}
 
-	if d.ids[id] {
-		return nil, invalidArchive("%s, document %d: duplicate id %q", d.path, d.line, id)
+	if d.ids != nil {
+		sum := sha256.Sum256([]byte(id))
+		key := [idHashSize]byte(sum[:idHashSize])
+		if _, dup := d.ids[key]; dup {
+			return "", nil, invalidArchive("%s, document %d: duplicate id %q", d.path, d.line, id)
+		}
+		d.ids[key] = struct{}{}
 	}
 
-	d.ids[id] = true
+	return id, raw, nil
+}
+
+func (d *documentReader) next() (map[string]any, error) {
+	_, raw, err := d.nextRaw()
+	if err != nil {
+		return nil, err
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return nil, invalidArchive("%s, document %d: %v", d.path, d.line, err)
+	}
 
 	return data, nil
 }
 
 func (d *documentReader) count() (int, error) {
 	for {
-		if _, err := d.next(); err != nil {
+		if _, _, err := d.nextRaw(); err != nil {
 			if err == io.EOF {
 				return d.line, nil
 			}

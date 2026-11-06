@@ -241,6 +241,20 @@ type Details struct {
 	Routes      Routes        `json:"routes"`
 	Hooks       []HookSummary `json:"hooks"`
 	EntityTypes []EntityCount `json:"entity_types"`
+	Indexes     []IndexState  `json:"indexes"`
+}
+
+type IndexState struct {
+	Entity     string     `json:"entity"`
+	Index      string     `json:"index"`
+	State      string     `json:"state"`
+	Entries    int        `json:"entries"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+	Kind       string     `json:"kind,omitempty"`
+	Origin     string     `json:"origin,omitempty"`
+	Pinned     bool       `json:"pinned,omitempty"`
+	Bytes      int64      `json:"bytes,omitempty"`
+	Uses       int64      `json:"uses,omitempty"`
 }
 
 func CurrentDetails() Details {
@@ -252,6 +266,7 @@ func CurrentDetails() Details {
 		baseline = state.routeMarks[0]
 	}
 	counts := state.slow.entityCounts
+	indexes := state.sources.Indexes
 	state.mu.RUnlock()
 
 	details := Details{
@@ -261,6 +276,13 @@ func CurrentDetails() Details {
 		},
 		Hooks:       hookSummaries(),
 		EntityTypes: []EntityCount{},
+		Indexes:     []IndexState{},
+	}
+
+	if indexes != nil {
+		if list := indexes(); list != nil {
+			details.Indexes = list
+		}
 	}
 
 	for name, count := range counts {

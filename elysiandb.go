@@ -41,27 +41,48 @@ func main() {
 	globals.SetConfig(cfg)
 	boot.LogConfiguration(*configFilename)
 
-	boot.InitDB()
-	if err := security.InitAdminUserIfNotExists(); err != nil {
-		log.Error("default admin creation failed", "component", "security", "err", err)
-	}
-	security.ProtectSessionsFile()
-
 	args := flag.Args()
 
-	if len(args) == 0 {
+	if len(args) == 0 || args[0] == cmd.ServerCommand {
+		boot.ApplyMemoryLimit()
+		boot.InitDB()
+		initAdmin()
 		cmd.StartServer()
 		return
 	}
 
-	handlers := cmd.GetHandlers()
-
-	if handler, ok := handlers[args[0]]; ok {
-		handler()
-	} else {
+	handler, ok := cmd.GetHandlers()[args[0]]
+	if !ok {
 		fmt.Printf("%sUnknown command: %s%s\n", globals.Gold, args[0], globals.Reset)
 		printListOfCommands()
+		return
 	}
+
+	if args[0] == cmd.HelpCommand {
+		handler()
+		return
+	}
+
+	if cmd.RunsWithoutStorage(args) {
+		handler()
+		return
+	}
+
+	if args[0] == cmd.RestoreCommand {
+		boot.InitBulkTool()
+	} else {
+		boot.InitTool()
+	}
+	initAdmin()
+	defer cmd.CloseStorage()
+	handler()
+}
+
+func initAdmin() {
+	if err := security.InitAdminUserIfNotExists(); err != nil {
+		log.Error("default admin creation failed", "component", "security", "err", err)
+	}
+	security.ProtectSessionsFile()
 }
 
 func printListOfCommands() {

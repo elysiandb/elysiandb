@@ -10,7 +10,21 @@ COVERPKG := $(shell go list ./... | tr '\n' ',' | sed 's/,$$//')
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//')
 LDFLAGS := -X github.com/taymour/elysiandb/internal/globals.VERSION=$(VERSION)
 
-.PHONY: test test-e2e-http test-unit test-cover build
+.PHONY: test test-e2e-http test-unit test-cover build bench bench-compare
+
+BENCH_COUNT ?= 5
+BENCH_TIME ?= 2s
+BENCH_BASE ?= origin/main
+
+bench:
+	go test ./test/bench -run '^$$' -bench . -benchmem -benchtime $(BENCH_TIME) -count $(BENCH_COUNT) | tee bench.new.txt
+
+bench-compare: bench
+	@rm -rf .bench-base && git worktree add -q .bench-base $(BENCH_BASE)
+	@mkdir -p .bench-base/test/bench && cp test/bench/bench_test.go .bench-base/test/bench/
+	cd .bench-base && go test ./test/bench -run '^$$' -bench . -benchmem -benchtime $(BENCH_TIME) -count $(BENCH_COUNT) | tee ../bench.base.txt
+	@git worktree remove --force .bench-base
+	@if command -v benchstat >/dev/null; then benchstat bench.base.txt bench.new.txt; else echo "install benchstat (golang.org/x/perf/cmd/benchstat) to compare bench.base.txt and bench.new.txt"; fi
 
 test:
 	@pkgs=$$(go list -f '{{if or (len .TestGoFiles) (len .XTestGoFiles)}}{{.ImportPath}}{{end}}' ./... | grep -v '^$$'); \

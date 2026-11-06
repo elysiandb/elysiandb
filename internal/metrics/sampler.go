@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"github.com/taymour/elysiandb/internal/memory"
 	"math"
 	"os"
 	"path/filepath"
@@ -27,6 +28,55 @@ type Sources struct {
 	MongoPing            func() (time.Duration, error)
 	MongoPoolInUse       func() int
 	DefaultAdminPassword func() bool
+	Engine               func() EngineSample
+	HookCaches           func() HookCacheSample
+	HeavyWaiting         func() int
+	Indexes              func() []IndexState
+	Disk                 func() DiskSample
+	Backup               func() BackupSample
+}
+
+type DiskSample struct {
+	ReadBytes        int64
+	WriteBytes       int64
+	Syncs            int64
+	SyncNanos        int64
+	FreeBytes        int64
+	RefusedWrites    int64
+	IndexUpkeepBytes int64
+}
+
+type BackupSample struct {
+	Running   int64
+	Completed int64
+	Failed    int64
+	LastOK    bool
+	LastAt    time.Time
+	Duration  time.Duration
+	Bytes     int64
+}
+
+type EngineSample struct {
+	LogSinceCheckpoint int64
+	LogBytes           int64
+	LiveBytes          int64
+	ValueCacheHits     int64
+	ValueCacheMisses   int64
+	ResidentBytes      int64
+	ValueCacheBytes    int64
+	DirtyPageBytes     int64
+	IndexCount         int
+	IndexBytes         int64
+	CheckpointMs       float64
+}
+
+type HookCacheSample struct {
+	QueryHits    int64
+	QueryMisses  int64
+	OutputHits   int64
+	OutputMisses int64
+	FoldHits     int64
+	FoldPasses   int64
 }
 
 type resolution struct {
@@ -43,6 +93,8 @@ type snapshot struct {
 	counters    [numCounters]uint64
 	http        hist
 	tcp         hist
+	auth        hist
+	wait        hist
 	hook        hist
 	logWarnings uint64
 	logErrors   uint64
@@ -51,6 +103,15 @@ type snapshot struct {
 	cpuSeconds  float64
 	procs       int
 	gauges      map[int]float64
+
+	valueCacheHits   int64
+	valueCacheMisses int64
+	memoryRefused    int64
+	hookQuery        [2]int64
+	hookOutput       [2]int64
+	hookFold         [2]int64
+	disk             DiskSample
+	backup           BackupSample
 }
 
 type slowValues struct {
@@ -172,6 +233,8 @@ func Reset() {
 	}
 	httpLatency = Histogram{}
 	tcpLatency = Histogram{}
+	tcpAuth = Histogram{}
+	heavyWait = Histogram{}
 	hookLatency = Histogram{}
 	tcpOpen.Store(0)
 	routeStats = sync.Map{}
@@ -298,6 +361,7 @@ func (s *sampler) refreshSlow(src Sources, ticks int64) slowValues {
 var runtimeSamples = []metrics.Sample{
 	{Name: "/memory/classes/heap/objects:bytes"},
 	{Name: "/memory/classes/total:bytes"},
+	{Name: "/memory/classes/heap/released:bytes"},
 	{Name: "/sched/goroutines:goroutines"},
 	{Name: "/gc/cycles/total:gc-cycles"},
 	{Name: "/sched/pauses/total/gc:seconds"},
@@ -310,6 +374,8 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 		at:     now,
 		http:   httpLatency.snapshot(),
 		tcp:    tcpLatency.snapshot(),
+		auth:   tcpAuth.snapshot(),
+		wait:   heavyWait.snapshot(),
 		hook:   hookLatency.snapshot(),
 		procs:  runtime.GOMAXPROCS(0),
 		gauges: map[int]float64{},
@@ -330,6 +396,8 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 			s.gauges[sHeapBytes] = uintValue(sample.Value)
 		case "/memory/classes/total:bytes":
 			s.gauges[sTotalBytes] = uintValue(sample.Value)
+		case "/memory/classes/heap/released:bytes":
+			s.gauges[sHeldBytes] = -uintValue(sample.Value)
 		case "/sched/goroutines:goroutines":
 			s.gauges[sGoroutines] = uintValue(sample.Value)
 		case "/gc/cycles/total:gc-cycles":
@@ -376,6 +444,68 @@ func takeSnapshot(now time.Time, src Sources, slow slowValues) *snapshot {
 		s.gauges[sMongoPoolInUse] = float64(src.MongoPoolInUse())
 	}
 
+	if src.HeavyWaiting != nil {
+		s.gauges[sHeavyWaiting] = float64(src.HeavyWaiting())
+	}
+
+	if src.Engine != nil {
+		eng := src.Engine()
+		s.gauges[sLogSinceCheckpointBytes] = float64(eng.LogSinceCheckpoint)
+		s.gauges[sLogBytes] = float64(eng.LogBytes)
+		s.gauges[sLiveBytes] = float64(eng.LiveBytes)
+		s.gauges[sResidentBytes] = float64(eng.ResidentBytes)
+		s.gauges[sCheckpointMs] = eng.CheckpointMs
+		s.gauges[sValueCacheBytes] = float64(eng.ValueCacheBytes)
+		s.gauges[sPageCacheBytes] = float64(eng.ResidentBytes)
+		s.gauges[sDirtyPageBytes] = float64(eng.DirtyPageBytes)
+		s.gauges[sIndexCount] = float64(eng.IndexCount)
+		s.gauges[sIndexBytes] = float64(eng.IndexBytes)
+		s.valueCacheHits = eng.ValueCacheHits
+		s.valueCacheMisses = eng.ValueCacheMisses
+	}
+
+	if src.HookCaches != nil {
+		hc := src.HookCaches()
+		s.hookQuery = [2]int64{hc.QueryHits, hc.QueryMisses}
+		s.hookOutput = [2]int64{hc.OutputHits, hc.OutputMisses}
+		s.hookFold = [2]int64{hc.FoldHits, hc.FoldPasses}
+	}
+
+	if src.Disk != nil {
+		s.disk = src.Disk()
+		s.gauges[sDiskFreeBytes] = float64(s.disk.FreeBytes)
+		s.gauges[sIndexUpkeepBytes] = float64(s.disk.IndexUpkeepBytes)
+	}
+
+	if src.Backup != nil {
+		s.backup = src.Backup()
+		s.gauges[sBackupRunning] = float64(s.backup.Running)
+		if !s.backup.LastAt.IsZero() {
+			s.gauges[sBackupLastOK] = 0
+			if s.backup.LastOK {
+				s.gauges[sBackupLastOK] = 1
+			}
+			s.gauges[sBackupDurationMs] = float64(s.backup.Duration) / float64(time.Millisecond)
+			s.gauges[sBackupBytes] = float64(s.backup.Bytes)
+			s.gauges[sBackupAgeSeconds] = now.Sub(s.backup.LastAt).Seconds()
+		}
+	}
+
+	if took := Startup(); took > 0 {
+		s.gauges[sStartupMs] = float64(took) / float64(time.Millisecond)
+	}
+
+	s.gauges[sHeldBytes] += s.gauges[sTotalBytes]
+	s.gauges[sMemoryBudget] = float64(memory.Budget())
+	s.gauges[sHeapLiveBytes] = float64(memory.Live())
+	s.gauges[sMemoryPressure] = float64(memory.Current())
+	s.gauges[sHookResultsBytes] = float64(memory.HookResults.Used())
+	s.gauges[sIndexBuildBytes] = float64(memory.Builds.Used())
+	s.gauges[sRequestReservedBytes] = float64(memory.Requests.Used())
+	for _, p := range memory.Pools() {
+		s.memoryRefused += p.Refused()
+	}
+
 	s.gauges[sTCPConns] = float64(tcpOpen.Load())
 	s.gauges[sRecoveryJSONBytes] = slow.recoveryJSON
 	s.gauges[sRecoveryStoreBytes] = slow.recoveryStore
@@ -400,12 +530,13 @@ func uintValue(v metrics.Value) float64 {
 }
 
 func openFileDescriptors() float64 {
-	entries, err := os.ReadDir("/proc/self/fd")
-	if err != nil {
-		return math.NaN()
+	for _, folder := range []string{"/proc/self/fd", "/dev/fd"} {
+		if entries, err := os.ReadDir(folder); err == nil {
+			return float64(len(entries))
+		}
 	}
 
-	return float64(len(entries))
+	return math.NaN()
 }
 
 func folderSize(folder string) float64 {

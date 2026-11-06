@@ -10,6 +10,7 @@ import (
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/mongodb"
+	"github.com/taymour/elysiandb/internal/storage"
 )
 
 func ResetAll() {
@@ -41,6 +42,10 @@ func ResetAll() {
 
 	cfg := globals.GetConfig()
 	dir := cfg.Store.Folder
+
+	if err := storage.Close(); err != nil {
+		Printf("Cannot close the data folder cleanly: %v\n", err)
+	}
 
 	os.RemoveAll(dir)
 

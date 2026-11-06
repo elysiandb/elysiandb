@@ -46,14 +46,21 @@ type PrometheusConfig struct {
 
 type MonitoringConfig struct {
 	Prometheus PrometheusConfig `yaml:"prometheus"`
+	Pprof      PprofConfig      `yaml:"pprof"`
+}
+
+type PprofConfig struct {
+	Enabled bool `yaml:"enabled"`
 }
 
 type ServerConfig struct {
-	Enabled        bool       `yaml:"enabled"`
-	Host           string     `yaml:"host"`
-	Port           int        `yaml:"port"`
-	CORS           CORSConfig `yaml:"cors"`
-	TrustedProxies []string   `yaml:"trustedProxies"`
+	Enabled             bool       `yaml:"enabled"`
+	Host                string     `yaml:"host"`
+	Port                int        `yaml:"port"`
+	CORS                CORSConfig `yaml:"cors"`
+	TrustedProxies      []string   `yaml:"trustedProxies"`
+	ReadTimeoutSeconds  int        `yaml:"readTimeoutSeconds"`
+	WriteTimeoutSeconds int        `yaml:"writeTimeoutSeconds"`
 }
 
 type CORSConfig struct {
@@ -70,6 +77,20 @@ type StoreConfig struct {
 	Shards               int                 `yaml:"shards"`
 	FlushIntervalSeconds int                 `yaml:"flushIntervalSeconds"`
 	CrashRecovery        CrashRecoveryConfig `yaml:"crashRecovery"`
+	Durability           string              `yaml:"durability"`
+	Memory               StoreMemoryConfig   `yaml:"memory"`
+	MinFreeDiskMB        int64               `yaml:"minFreeDiskMB"`
+	Backup               StoreBackupConfig   `yaml:"backup"`
+}
+
+type StoreBackupConfig struct {
+	Folder       string `yaml:"folder"`
+	EveryMinutes int    `yaml:"everyMinutes"`
+	Keep         int    `yaml:"keep"`
+}
+
+type StoreMemoryConfig struct {
+	LimitMB int64 `yaml:"limitMB"`
 }
 
 type StatsConfig struct {
@@ -82,14 +103,34 @@ type ApiSchemaConfig struct {
 }
 
 type ApiConfig struct {
-	Index  ApiIndexConfig  `yaml:"index"`
-	Cache  ApiCacheConfig  `yaml:"cache"`
-	Schema ApiSchemaConfig `yaml:"schema"`
-	Hooks  HooksConfig     `yaml:"hooks"`
+	Index    ApiIndexConfig    `yaml:"index"`
+	Cache    ApiCacheConfig    `yaml:"cache"`
+	Schema   ApiSchemaConfig   `yaml:"schema"`
+	Hooks    HooksConfig       `yaml:"hooks"`
+	Query    ApiQueryConfig    `yaml:"query"`
+	Response ApiResponseConfig `yaml:"response"`
+}
+
+type ApiQueryConfig struct {
+	Workers            int   `yaml:"workers"`
+	TimeoutMs          int   `yaml:"timeoutMs"`
+	MaxQueued          int   `yaml:"maxQueued"`
+	QueueTimeoutMs     int   `yaml:"queueTimeoutMs"`
+	CancelOnDisconnect *bool `yaml:"cancelOnDisconnect"`
+}
+
+func (c ApiQueryConfig) CancelsAbandonedRequests() bool {
+	return c.CancelOnDisconnect == nil || *c.CancelOnDisconnect
+}
+
+type ApiResponseConfig struct {
+	SpoolMB int `yaml:"spoolMB"`
 }
 
 type HooksConfig struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled         bool `yaml:"enabled"`
+	TimeoutMs       int  `yaml:"timeoutMs"`
+	RequestBudgetMs int  `yaml:"requestBudgetMs"`
 }
 
 type ApiIndexConfig struct {
@@ -99,6 +140,8 @@ type ApiIndexConfig struct {
 type ApiCacheConfig struct {
 	Enabled                bool `yaml:"enabled"`
 	CleanupIntervalSeconds int  `yaml:"cleanupIntervalSeconds"`
+	MaxMB                  int  `yaml:"maxMB"`
+	MaxEntryKB             int  `yaml:"maxEntryKB"`
 }
 
 type EngineConfig struct {
@@ -226,6 +269,41 @@ func LoadConfig(path string) (*Config, error) {
 
 	if cfg.Log.BufferLines < 0 {
 		return nil, fmt.Errorf("log.bufferLines must be 0 or more")
+	}
+
+	switch strings.ToLower(strings.TrimSpace(cfg.Store.Durability)) {
+	case "", "default", "fsync":
+	default:
+		return nil, fmt.Errorf("unknown store.durability %q: use default or fsync", cfg.Store.Durability)
+	}
+
+	for name, v := range map[string]int{
+		"server.http.readTimeoutSeconds":  cfg.Server.HTTP.ReadTimeoutSeconds,
+		"server.http.writeTimeoutSeconds": cfg.Server.HTTP.WriteTimeoutSeconds,
+		"api.query.workers":               cfg.Api.Query.Workers,
+		"api.query.timeoutMs":             cfg.Api.Query.TimeoutMs,
+		"api.hooks.timeoutMs":             cfg.Api.Hooks.TimeoutMs,
+		"api.hooks.requestBudgetMs":       cfg.Api.Hooks.RequestBudgetMs,
+		"api.cache.maxMB":                 cfg.Api.Cache.MaxMB,
+		"api.cache.maxEntryKB":            cfg.Api.Cache.MaxEntryKB,
+		"api.response.spoolMB":            cfg.Api.Response.SpoolMB,
+	} {
+		if v < 0 {
+			return nil, fmt.Errorf("%s must be 0 or more", name)
+		}
+	}
+
+	if cfg.Store.Memory.LimitMB < 0 {
+		return nil, fmt.Errorf("store.memory.limitMB must be 0 or more")
+	}
+
+	for name, v := range map[string]int{
+		"api.query.maxQueued":      cfg.Api.Query.MaxQueued,
+		"api.query.queueTimeoutMs": cfg.Api.Query.QueueTimeoutMs,
+	} {
+		if v < -1 {
+			return nil, fmt.Errorf("%s must be -1 (no limit), 0 (default) or more", name)
+		}
 	}
 
 	if cfg.Security.Authentication.Enabled {

@@ -23,6 +23,7 @@ const (
 	RequestIDHeader = "X-Request-Id"
 	errorKey        = "elysiandb.error"
 	loggedKey       = "elysiandb.error_logged"
+	rejectedKey     = "elysiandb.rejected"
 	requestIDKey    = "elysiandb.request_id"
 	maxRequestIDLen = 64
 	unmatchedRoute  = "unmatched"
@@ -34,6 +35,7 @@ var (
 	unauthorizedThrottle = log.NewThrottle(time.Minute)
 	forbiddenThrottle    = log.NewThrottle(time.Minute)
 	slowThrottle         = log.NewThrottle(time.Minute)
+	rejectedThrottle     = log.NewThrottle(time.Minute)
 	idPrefix             = newIDPrefix()
 	idCounter            atomic.Uint64
 )
@@ -56,12 +58,17 @@ func ResetThrottles() {
 	unauthorizedThrottle = log.NewThrottle(time.Minute)
 	forbiddenThrottle = log.NewThrottle(time.Minute)
 	slowThrottle = log.NewThrottle(time.Minute)
+	rejectedThrottle = log.NewThrottle(time.Minute)
 }
 
 func SetError(ctx *fasthttp.RequestCtx, err error) {
 	if err != nil {
 		ctx.SetUserValue(errorKey, err)
 	}
+}
+
+func SetRejected(ctx *fasthttp.RequestCtx, reason string) {
+	ctx.SetUserValue(rejectedKey, reason)
 }
 
 func RequestID(ctx *fasthttp.RequestCtx) string {
@@ -128,6 +135,10 @@ func Kind(method, route string) string {
 	return ""
 }
 
+const GuardKey = "elysian.guard"
+
+const deferredKey = "observeDeferred"
+
 func Middleware(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
 		start := time.Now()
@@ -135,6 +146,10 @@ func Middleware(next fasthttp.RequestHandler) fasthttp.RequestHandler {
 		ctx.SetUserValue(requestIDKey, requestID)
 
 		next(ctx)
+
+		if g, ok := ctx.UserValue(GuardKey).(interface{ ReleaseMemory() }); ok {
+			g.ReleaseMemory()
+		}
 
 		ctx.Response.Header.Set(RequestIDHeader, requestID)
 		finish(ctx, start, requestID)
@@ -165,7 +180,20 @@ func validRequestID(id string) bool {
 	return true
 }
 
+func Defer(ctx *fasthttp.RequestCtx) {
+	ctx.SetUserValue(deferredKey, true)
+}
+
+func FinishDeferred(ctx *fasthttp.RequestCtx) {
+	ctx.SetUserValue(deferredKey, nil)
+	finish(ctx, ctx.Time(), RequestID(ctx))
+}
+
 func finish(ctx *fasthttp.RequestCtx, start time.Time, requestID string) {
+	if ctx.UserValue(deferredKey) != nil {
+		return
+	}
+
 	d := time.Since(start)
 	status := ctx.Response.StatusCode()
 	method := string(ctx.Method())
@@ -178,7 +206,17 @@ func finish(ctx *fasthttp.RequestCtx, start time.Time, requestID string) {
 		metrics.ObserveHTTP(method, route, status, d, Kind(method, route))
 	}
 
+	reason, rejected := ctx.UserValue(rejectedKey).(string)
+
 	switch {
+	case rejected:
+		if suppressed, ok := rejectedThrottle.Allow(method + " " + route + " " + reason); ok {
+			args := []any{"method", method, "route", route, "status", status, "reason", reason, "request_id", requestID}
+			if user != "" {
+				args = append(args, "user", user)
+			}
+			httpLog.Warn("request rejected", log.WithSuppressed(args, suppressed)...)
+		}
 	case status >= 500:
 		if ctx.UserValue(loggedKey) == nil {
 			args := []any{"method", method, "route", route, "status", status, "request_id", requestID, "duration_ms", durationMs}

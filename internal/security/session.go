@@ -117,10 +117,9 @@ func storedUser(username string) (*BasicHashedUser, bool) {
 }
 
 type sessionsCacheEntry struct {
-	path    string
-	modTime time.Time
-	size    int64
-	file    SessionsFile
+	path   string
+	file   SessionsFile
+	byHash map[string]int
 }
 
 var (
@@ -138,27 +137,40 @@ func copySessions(sf SessionsFile) *SessionsFile {
 	return &SessionsFile{Sessions: append([]Session(nil), sf.Sessions...)}
 }
 
-func loadSessions() (*SessionsFile, error) {
-	path := sessionsPath()
-
-	info, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			cacheSessions(nil)
-			return &SessionsFile{Sessions: []Session{}}, nil
+func newSessionsCacheEntry(path string, sf SessionsFile) *sessionsCacheEntry {
+	entry := &sessionsCacheEntry{path: path, file: *copySessions(sf), byHash: make(map[string]int, len(sf.Sessions))}
+	for i, s := range entry.file.Sessions {
+		if s.TokenHash != "" {
+			entry.byHash[s.TokenHash] = i
 		}
-
-		return nil, err
 	}
+
+	return entry
+}
+
+func cachedSessions() (*sessionsCacheEntry, error) {
+	path := sessionsPath()
 
 	sessionsCacheMu.Lock()
 	cached := sessionsCache
 	sessionsCacheMu.Unlock()
 
-	if cached != nil && cached.path == path && cached.modTime.Equal(info.ModTime()) && cached.size == info.Size() {
-		return copySessions(cached.file), nil
+	if cached != nil && cached.path == path {
+		return cached, nil
 	}
 
+	sf, err := readSessionsFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	entry := newSessionsCacheEntry(path, *sf)
+	cacheSessions(entry)
+
+	return entry, nil
+}
+
+func readSessionsFile(path string) (*SessionsFile, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -171,14 +183,20 @@ func loadSessions() (*SessionsFile, error) {
 	defer file.Close()
 
 	var sf SessionsFile
-	dec := json.NewDecoder(file)
-	if err := dec.Decode(&sf); err != nil {
+	if err := json.NewDecoder(file).Decode(&sf); err != nil {
 		return nil, err
 	}
 
-	cacheSessions(&sessionsCacheEntry{path: path, modTime: info.ModTime(), size: info.Size(), file: *copySessions(sf)})
-
 	return &sf, nil
+}
+
+func loadSessions() (*SessionsFile, error) {
+	entry, err := cachedSessions()
+	if err != nil {
+		return nil, err
+	}
+
+	return copySessions(entry.file), nil
 }
 
 func cacheSessions(entry *sessionsCacheEntry) {
@@ -188,14 +206,14 @@ func cacheSessions(entry *sessionsCacheEntry) {
 }
 
 func ActiveSessionCount() int {
-	sf, err := loadSessions()
+	entry, err := cachedSessions()
 	if err != nil {
 		return 0
 	}
 
 	now := time.Now().Unix()
 	count := 0
-	for _, s := range sf.Sessions {
+	for _, s := range entry.file.Sessions {
 		if s.ExpiresAt > now && s.TokenHash != "" {
 			count++
 		}
@@ -221,11 +239,7 @@ func saveSessions(sf *SessionsFile) error {
 		return err
 	}
 
-	if info, err := os.Stat(path); err == nil {
-		cacheSessions(&sessionsCacheEntry{path: path, modTime: info.ModTime(), size: info.Size(), file: *copySessions(*sf)})
-	} else {
-		cacheSessions(nil)
-	}
+	cacheSessions(newSessionsCacheEntry(path, *sf))
 
 	return nil
 }
@@ -282,36 +296,23 @@ func GetSession(id string) (*Session, error) {
 		return nil, nil
 	}
 
-	sf, err := loadSessions()
+	entry, err := cachedSessions()
 	if err != nil {
 		return nil, err
 	}
 
-	now := time.Now().Unix()
-	hash := []byte(hashSessionID(id))
-	var found *Session
-	hasExpired := false
-
-	for _, s := range sf.Sessions {
-		if s.ExpiresAt <= now || s.TokenHash == "" {
-			hasExpired = true
-			continue
-		}
-
-		if subtle.ConstantTimeCompare([]byte(s.TokenHash), hash) == 1 {
-			tmp := s
-			found = &tmp
-		}
-	}
-
-	if hasExpired {
-		removeExpiredSessions()
-	}
-
-	if found == nil {
+	hash := hashSessionID(id)
+	i, ok := entry.byHash[hash]
+	if !ok {
 		return nil, nil
 	}
 
+	s := entry.file.Sessions[i]
+	if s.ExpiresAt <= time.Now().Unix() || subtle.ConstantTimeCompare([]byte(s.TokenHash), []byte(hash)) != 1 {
+		return nil, nil
+	}
+
+	found := &s
 	user, ok := storedUser(found.Username)
 	if !ok || subtle.ConstantTimeCompare([]byte(found.Credentials), []byte(credentialsFingerprint(user.Password))) != 1 {
 		return nil, nil
@@ -371,9 +372,10 @@ func DeleteSession(id string) error {
 	}
 
 	hash := hashSessionID(id)
+	now := time.Now().Unix()
 	var updated []Session
 	for _, s := range sf.Sessions {
-		if s.TokenHash != hash {
+		if s.TokenHash != hash && s.ExpiresAt > now && s.TokenHash != "" {
 			updated = append(updated, s)
 		}
 	}

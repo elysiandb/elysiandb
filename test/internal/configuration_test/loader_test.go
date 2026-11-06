@@ -150,3 +150,35 @@ func TestLoadConfig_RejectsInvalidLogValues(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadConfig_QueryOverloadSettings(t *testing.T) {
+	write := func(content string) string {
+		path := filepath.Join(t.TempDir(), "elysian.yaml")
+		if err := os.WriteFile(path, []byte("store:\n  folder: /tmp/x\n"+content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+
+	cfg, err := cfgpkg.LoadConfig(write(""))
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Api.Query.MaxQueued != 0 || cfg.Api.Query.QueueTimeoutMs != 0 || !cfg.Api.Query.CancelsAbandonedRequests() {
+		t.Fatalf("unexpected defaults %+v", cfg.Api.Query)
+	}
+
+	cfg, err = cfgpkg.LoadConfig(write("api:\n  query:\n    maxQueued: -1\n    queueTimeoutMs: -1\n    cancelOnDisconnect: false\n"))
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Api.Query.MaxQueued != -1 || cfg.Api.Query.QueueTimeoutMs != -1 || cfg.Api.Query.CancelsAbandonedRequests() {
+		t.Fatalf("unexpected values %+v", cfg.Api.Query)
+	}
+
+	for _, content := range []string{"api:\n  query:\n    maxQueued: -2\n", "api:\n  query:\n    queueTimeoutMs: -5\n"} {
+		if _, err := cfgpkg.LoadConfig(write(content)); err == nil {
+			t.Fatalf("a value below -1 is rejected: %q", content)
+		}
+	}
+}

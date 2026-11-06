@@ -41,6 +41,23 @@ type Preflighter interface {
 	Preflight(ops []TxOperation) error
 }
 
+type BatchCommitter interface {
+	CommitBatch(ops []TxOperation) (bool, error)
+}
+
+func (realStorage) CommitBatch(ops []TxOperation) (bool, error) {
+	if !engine.IsEngineInternal() {
+		return false, nil
+	}
+
+	batch := make([]api_storage.BatchOperation, 0, len(ops))
+	for _, op := range ops {
+		batch = append(batch, api_storage.BatchOperation{Kind: op.Kind, Entity: op.Entity, ID: op.ID, Data: op.Data})
+	}
+
+	return true, api_storage.CommitBatch(batch)
+}
+
 type realStorage struct{}
 
 func (realStorage) Preflight(ops []TxOperation) error {
@@ -158,14 +175,20 @@ func CommitTransaction(txID string) error {
 	delete(TxManager.txs, txID)
 	TxManager.mu.Unlock()
 
-	commitMu.Lock()
-	defer commitMu.Unlock()
-
 	if preflighter, ok := storageImpl.(Preflighter); ok {
 		if err := preflighter.Preflight(tx.Ops); err != nil {
 			return err
 		}
 	}
+
+	if committer, ok := storageImpl.(BatchCommitter); ok {
+		if handled, err := committer.CommitBatch(tx.Ops); handled {
+			return err
+		}
+	}
+
+	commitMu.Lock()
+	defer commitMu.Unlock()
 
 	for _, op := range tx.Ops {
 		switch op.Kind {

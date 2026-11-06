@@ -51,6 +51,10 @@ func setup(t *testing.T, mutate func(cfg *configuration.Config)) fasthttp.Reques
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
 	})
 	r.GET("/panic", func(ctx *fasthttp.RequestCtx) { panic("kaboom") })
+	r.GET("/busy", func(ctx *fasthttp.RequestCtx) {
+		observe.SetRejected(ctx, "server busy")
+		ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
+	})
 	r.GET("/slow", func(ctx *fasthttp.RequestCtx) { time.Sleep(60 * time.Millisecond) })
 	r.GET("/denied", func(ctx *fasthttp.RequestCtx) { ctx.SetStatusCode(fasthttp.StatusUnauthorized) })
 	r.GET("/forbidden", func(ctx *fasthttp.RequestCtx) {
@@ -311,5 +315,24 @@ func TestAuditCarriesActorAndRequest(t *testing.T) {
 	got := entries(log.Query{Component: "audit"})
 	if len(got) != 1 || got[0].Message != "schema changed" || got[0].Attrs["actor"] != "alice" || got[0].Attrs["source"] != "http" || got[0].Attrs["entity"] != "books" {
 		t.Fatalf("unexpected audit entry %+v", got)
+	}
+}
+
+func TestRejectedRequestsAreGroupedWarnings(t *testing.T) {
+	h := setup(t, nil)
+
+	for i := 0; i < 3; i++ {
+		if ctx := call(h, "GET", "/busy", nil); ctx.Response.StatusCode() != fasthttp.StatusServiceUnavailable {
+			t.Fatalf("the status is kept, got %d", ctx.Response.StatusCode())
+		}
+	}
+
+	if errs := entries(log.Query{MinLevel: slog.LevelError}); len(errs) != 0 {
+		t.Fatalf("a rejected request is not an error, got %+v", errs)
+	}
+
+	got := entries(log.Query{MinLevel: slog.LevelWarn})
+	if len(got) != 1 || got[0].Message != "request rejected" || got[0].Attrs["reason"] != "server busy" || got[0].Attrs["route"] != "/busy" {
+		t.Fatalf("one grouped warning is expected, got %+v", got)
 	}
 }

@@ -279,7 +279,9 @@
             "runtime": "Exécution",
             "connections": "Connexions",
             "hooks": "Hooks",
-            "mongodb": "MongoDB"
+            "mongodb": "MongoDB",
+            "indexes": "Index",
+            "memory": "Budget mémoire"
         },
         "tabs": {
             "data": "Données",
@@ -306,13 +308,14 @@
             "cacheHitRatio": "Taux de succès du cache de l'API",
             "flushDuration": "Durée d'écriture",
             "flushFailures": "Écritures en échec et forcées par minute",
-            "recoveryLogs": "Taille des journaux de reprise",
+            "recoveryLogs": "Taille du log",
             "diskSize": "Taille du dossier des données",
             "memory": "Mémoire",
             "goroutines": "Goroutines",
             "gcPause": "Pause du GC (p99)",
             "gcCycles": "Cycles du GC par minute",
-            "cpu": "CPU du processus",
+            "cpu": "CPU du processus (% de tous les threads)",
+            "cpuCores": "Threads CPU occupés",
             "openFds": "Descripteurs de fichiers ouverts",
             "connections": "Connexions ouvertes",
             "adminSessions": "Sessions d'administration",
@@ -322,7 +325,14 @@
             "hookDuration": "Durée des hooks (p95)",
             "mongoPing": "Ping MongoDB",
             "mongoErrors": "Erreurs MongoDB par minute",
-            "mongoPool": "Connexions du pool MongoDB utilisées"
+            "mongoPool": "Connexions du pool MongoDB utilisées",
+            "indexCount": "Index",
+            "indexBytes": "Taille des index",
+            "memoryBudget": "Mémoire face au budget",
+            "memoryShares": "Mémoire par usage",
+            "memoryPressure": "Pression mémoire (0 normale, 1 haute, 2 critique)",
+            "memoryRefused": "Requêtes refusées faute de mémoire par minute",
+            "hookReuse": "Requêtes et résultats de hooks réutilisés"
         },
         "series": {
             "http": "HTTP",
@@ -362,8 +372,6 @@
             "flush": "Durée",
             "flushFailures": "En échec",
             "forcedFlushes": "Forcées par la taille du journal de reprise",
-            "recoveryJson": "Journal de reprise JSON",
-            "recoveryStore": "Journal de reprise du store",
             "disk": "Taille",
             "heap": "Tas",
             "total": "Total",
@@ -371,13 +379,32 @@
             "gcPause": "Pause",
             "gcCycles": "Cycles",
             "cpu": "CPU",
+            "cpuCores": "Occupés",
+            "gomaxprocs": "Threads",
             "openFds": "Descripteurs de fichiers",
             "adminSessions": "Sessions",
             "openTransactions": "Transactions",
             "oldestTransaction": "Ancienneté",
             "executions": "Exécutions",
             "ping": "Ping",
-            "poolInUse": "Utilisées"
+            "poolInUse": "Utilisées",
+            "logSinceCheckpoint": "Depuis le dernier checkpoint",
+            "logBytes": "Log sur disque",
+            "liveBytes": "Données vivantes",
+            "indexCount": "Index",
+            "indexBytes": "Taille",
+            "budget": "Budget",
+            "heapLive": "Tas vivant",
+            "valueCache": "Valeurs en cache",
+            "pageCache": "Pages en cache",
+            "dirtyPages": "Pages en attente de checkpoint",
+            "hookResults": "Résultats des hooks",
+            "indexBuilds": "Constructions d'index",
+            "requestMemory": "Requêtes",
+            "pressure": "Pression",
+            "refused": "Refusées",
+            "queryReuse": "Requêtes",
+            "outputReuse": "Résultats"
         },
         "routes": {
             "last15m": "Routes les plus appelées, 15 dernières minutes",
@@ -410,6 +437,37 @@
             "lastSuccess": "Dernière écriture réussie",
             "failures": "Écritures en échec depuis le démarrage",
             "lastError": "Dernière erreur d'écriture"
+        },
+        "indexes": {
+            "title": "Index",
+            "entity": "Entité",
+            "index": "Index",
+            "kind": "Forme",
+            "origin": "Origine",
+            "state": "État",
+            "entries": "Entrées",
+            "size": "Taille",
+            "uses": "Usages",
+            "lastUsed": "Dernier usage",
+            "pinned": "épinglé",
+            "kinds": {
+                "ordered": "Ordonné",
+                "sort": "Tri",
+                "bitmap": "Bitmap",
+                "composite": "Composé",
+                "search": "Texte intégral",
+                "references": "Références"
+            },
+            "origins": {
+                "query": "Requête",
+                "hook": "Hook",
+                "advisor": "Optimiseur"
+            },
+            "states": {
+                "ready": "Prêt",
+                "building": "En construction",
+                "released": "Libéré"
+            }
         }
     },
     "logs": {

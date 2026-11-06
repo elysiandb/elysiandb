@@ -279,7 +279,9 @@
             "runtime": "ランタイム",
             "connections": "接続",
             "hooks": "フック",
-            "mongodb": "MongoDB"
+            "mongodb": "MongoDB",
+            "indexes": "インデックス",
+            "memory": "メモリ予算"
         },
         "tabs": {
             "data": "データ",
@@ -306,13 +308,14 @@
             "cacheHitRatio": "API キャッシュのヒット率",
             "flushDuration": "書き込み時間",
             "flushFailures": "毎分の失敗・強制された書き込み",
-            "recoveryLogs": "リカバリーログのサイズ",
+            "recoveryLogs": "ログのサイズ",
             "diskSize": "データフォルダーのサイズ",
             "memory": "メモリ",
             "goroutines": "Goroutine",
             "gcPause": "GC 停止時間 (p99)",
             "gcCycles": "毎分の GC サイクル",
-            "cpu": "プロセスの CPU",
+            "cpu": "プロセスの CPU（全スレッドに対する %）",
+            "cpuCores": "使用中の CPU スレッド",
             "openFds": "開いているファイルディスクリプター",
             "connections": "開いている接続",
             "adminSessions": "管理セッション",
@@ -322,7 +325,14 @@
             "hookDuration": "フックの実行時間 (p95)",
             "mongoPing": "MongoDB の ping",
             "mongoErrors": "毎分の MongoDB エラー数",
-            "mongoPool": "使用中の MongoDB プール接続"
+            "mongoPool": "使用中の MongoDB プール接続",
+            "indexCount": "インデックス",
+            "indexBytes": "インデックスのサイズ",
+            "memoryBudget": "予算に対するメモリ",
+            "memoryShares": "用途別メモリ",
+            "memoryPressure": "メモリ圧迫 (0 通常、1 高、2 危険)",
+            "memoryRefused": "メモリ不足で拒否されたリクエスト (毎分)",
+            "hookReuse": "再利用されたフックのクエリと結果"
         },
         "series": {
             "http": "HTTP",
@@ -362,8 +372,6 @@
             "flush": "時間",
             "flushFailures": "失敗",
             "forcedFlushes": "リカバリーログのサイズによる強制",
-            "recoveryJson": "JSON リカバリーログ",
-            "recoveryStore": "ストアのリカバリーログ",
             "disk": "サイズ",
             "heap": "ヒープ",
             "total": "合計",
@@ -371,13 +379,32 @@
             "gcPause": "停止時間",
             "gcCycles": "サイクル",
             "cpu": "CPU",
+            "cpuCores": "使用中",
+            "gomaxprocs": "スレッド",
             "openFds": "ファイルディスクリプター",
             "adminSessions": "セッション",
             "openTransactions": "トランザクション",
             "oldestTransaction": "経過時間",
             "executions": "実行数",
             "ping": "Ping",
-            "poolInUse": "使用中"
+            "poolInUse": "使用中",
+            "logSinceCheckpoint": "前回のチェックポイント以降",
+            "logBytes": "ディスク上のログ",
+            "liveBytes": "有効なデータ",
+            "indexCount": "インデックス",
+            "indexBytes": "サイズ",
+            "budget": "予算",
+            "heapLive": "生存ヒープ",
+            "valueCache": "キャッシュされた値",
+            "pageCache": "キャッシュされたページ",
+            "dirtyPages": "チェックポイント待ちのページ",
+            "hookResults": "フックの結果",
+            "indexBuilds": "インデックス構築",
+            "requestMemory": "リクエスト",
+            "pressure": "圧迫",
+            "refused": "拒否",
+            "queryReuse": "クエリ",
+            "outputReuse": "結果"
         },
         "routes": {
             "last15m": "よく呼ばれるルート (直近 15 分)",
@@ -410,6 +437,37 @@
             "lastSuccess": "最後に成功した書き込み",
             "failures": "起動以降の書き込み失敗数",
             "lastError": "最新の書き込みエラー"
+        },
+        "indexes": {
+            "title": "インデックス",
+            "entity": "エンティティ",
+            "index": "インデックス",
+            "kind": "形式",
+            "origin": "作成元",
+            "state": "状態",
+            "entries": "エントリ",
+            "size": "サイズ",
+            "uses": "使用回数",
+            "lastUsed": "最終使用",
+            "pinned": "固定",
+            "kinds": {
+                "ordered": "順序付き",
+                "sort": "ソート",
+                "bitmap": "ビットマップ",
+                "composite": "複合",
+                "search": "全文",
+                "references": "参照"
+            },
+            "origins": {
+                "query": "クエリ",
+                "hook": "フック",
+                "advisor": "最適化"
+            },
+            "states": {
+                "ready": "準備完了",
+                "building": "構築中",
+                "released": "解放済み"
+            }
         }
     },
     "logs": {

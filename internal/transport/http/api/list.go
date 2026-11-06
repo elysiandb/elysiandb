@@ -1,8 +1,7 @@
 package api
 
 import (
-	"encoding/json"
-	"fmt"
+	"github.com/taymour/elysiandb/internal/datastore"
 	"strings"
 
 	"github.com/taymour/elysiandb/internal/acl"
@@ -58,51 +57,115 @@ func ListController(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
-	preReadHooks := globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPreReadHooks(entity)
-
-	var data []map[string]any
+	hooksEnabled := globals.GetConfig().Api.Hooks.Enabled
+	preReadHooks := hooksEnabled && hook.EntityHasPreReadHooks(entity)
+	postReadHooks := hooksEnabled && hook.EntityHasPostReadHooks(entity)
 	paginateAfterHooks := preReadHooks && len(filters) > 0
-	if paginateAfterHooks {
+	guard := requestGuard(ctx)
+	hooks := hook.NewRequest(currentUser).WithGuard(guard)
+
+	if engine.IsEngineInternal() && !paginateAfterHooks {
 		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
-		data = engine.ListEntities(entity, 0, 0, sortField, sortAscending, nil, search, includes)
-		data = api_storage.ApplyStoredFiltersToList(data, filters, 0, 0)
-	} else {
-		data = engine.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
+		fields := api_storage.ParseFieldsParam(fieldsParam)
+		mode := acl.ReadModeFor(currentUser, entity)
+
+		if countOnlyParam {
+			res := api_storage.Plan(api_storage.ListQuery{
+				Entity:    entity,
+				Limit:     limit,
+				Offset:    offset,
+				SortField: sortField,
+				SortAsc:   sortAscending,
+				Filters:   filters,
+				Search:    search,
+				Includes:  includes,
+				CountOnly: mode != acl.ReadOwned,
+				Guard:     guard,
+			})
+			if res.Err != nil {
+				sendGuardError(ctx, res.Err)
+				return
+			}
+			writeCount(ctx, countPlanned(res, limit > 0 || offset > 0 || sortField != "", mode, currentUser), entity, hash, cacheDeps(entity, includes))
+			return
+		}
+
+		if includes == "" && len(fields) == 0 && !preReadHooks && !postReadHooks && mode == acl.ReadAll {
+			res := api_storage.Plan(api_storage.ListQuery{
+				Entity:    entity,
+				Limit:     limit,
+				Offset:    offset,
+				SortField: sortField,
+				SortAsc:   sortAscending,
+				Filters:   filters,
+				Search:    search,
+				Guard:     guard,
+			})
+			if res.Err != nil {
+				sendGuardError(ctx, res.Err)
+				return
+			}
+
+			if err := writeDocuments(ctx, res.Docs, entity, hash, true, cacheDeps(entity, "")); err != nil {
+				observe.SetError(ctx, err)
+				ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+				ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
+				ctx.SetBodyString("Error processing request")
+			}
+
+			return
+		}
 	}
 
-	data = acl.FilterListOfEntities(currentUser, entity, data)
-
-	if paginateAfterHooks {
+	var data []map[string]any
+	if paginateAfterHooks && engine.IsEngineInternal() {
+		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
+		snap := api_storage.Snapshot(entity)
+		stored := func(item map[string]any) bool { return api_storage.StoredFiltersMatchEntity(item, filters) }
 		matches := func(item map[string]any) bool { return api_storage.FiltersMatchEntity(item, filters) }
-		data = applyPreReadHooksAndFilter(currentUser, entity, data, matches, offset, limit)
+		candidates := api_storage.StoredCandidates(snap, filters, nil, includes)
+		each := func(fn func(datastore.Doc) bool) {
+			api_storage.Plan(api_storage.ListQuery{Entity: entity, SortField: sortField, SortAsc: sortAscending, Search: search, Includes: includes, Guard: guard, Snapshot: snap, Each: fn})
+		}
+		data = lazyPreReadPage(hooks, entity, each, includes, stored, candidates, acl.ReadModeFor(currentUser, entity), currentUser, matches, offset, limit)
+	} else if paginateAfterHooks {
+		includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
+		data = listEntities(guard, entity, 0, 0, sortField, sortAscending, nil, search, includes)
+		data = api_storage.ApplyStoredFiltersToList(data, filters, 0, 0)
+	} else {
+		data = listEntities(guard, entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
+	}
+
+	if !paginateAfterHooks || !engine.IsEngineInternal() {
+		data = acl.FilterListOfEntities(currentUser, entity, data)
+	}
+
+	if paginateAfterHooks && !engine.IsEngineInternal() {
+		matches := func(item map[string]any) bool { return api_storage.FiltersMatchEntity(item, filters) }
+		data = applyPreReadHooksAndFilter(hooks, entity, data, matches, offset, limit)
 	} else if preReadHooks {
 		for i, item := range data {
-			data[i] = hook.ApplyPreReadHooksForEntity(currentUser, entity, item)
+			data[i] = hooks.PreRead(entity, item)
 		}
 
 		data = engine.ApplyFiltersToList(data, filters)
 	}
 
-	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(entity) {
-		for i, item := range data {
-			data[i] = hook.ApplyPostReadHooksForEntity(currentUser, entity, item)
-		}
+	if guardStopped(ctx, guard) {
+		return
 	}
 
+	includes := api_storage.MergeIncludes(includesParam, api_storage.ExtractAutoIncludes(filters))
 	if countOnlyParam {
-		countResult := int64(len(data))
-		response := []byte(`{"count":` + fmt.Sprintf("%d", countResult) + `}`)
-
-		ctx.Response.Header.Set("Content-Type", "application/json")
-		ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
-		ctx.SetStatusCode(fasthttp.StatusOK)
-		ctx.SetBody(response)
-
-		if globals.GetConfig().Api.Cache.Enabled {
-			cache.CacheStore.Set(entity, hash, response)
-		}
-
+		writeCount(ctx, len(data), entity, hash, cacheDeps(entity, includes))
 		return
+	}
+
+	if postReadHooks {
+		applyPostReadHooks(hooks, entity, data)
+		if guardStopped(ctx, guard) {
+			return
+		}
 	}
 
 	fields := api_storage.ParseFieldsParam(fieldsParam)
@@ -115,7 +178,7 @@ func ListController(ctx *fasthttp.RequestCtx) {
 		data = filteredData
 	}
 
-	response, err := json.Marshal(data)
+	encoded, err := encodeList(data)
 	if err != nil {
 		observe.SetError(ctx, err)
 		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
@@ -127,10 +190,21 @@ func ListController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 	ctx.Response.Header.Set("X-Elysian-Cache", "MISS")
 	ctx.SetStatusCode(fasthttp.StatusOK)
+
+	response, inMemory := encoded.inMemory()
+	if !inMemory {
+		if err := encoded.send(ctx); err != nil {
+			observe.SetError(ctx, err)
+			ctx.SetStatusCode(fasthttp.StatusInternalServerError)
+			ctx.SetBodyString("Error processing request")
+		}
+		return
+	}
+
 	ctx.SetBody(response)
 
-	if globals.GetConfig().Api.Cache.Enabled {
-		cache.CacheStore.Set(entity, hash, response)
+	if globals.GetConfig().Api.Cache.Enabled && hash != nil {
+		cache.CacheStore.SetWithDeps(entity, hash, response, cacheDeps(entity, includes))
 	}
 }
 

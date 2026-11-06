@@ -16,9 +16,9 @@ import (
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/legacy"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/metrics"
-	"github.com/taymour/elysiandb/internal/recovery"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/storage"
 	"github.com/valyala/fasthttp"
@@ -267,21 +267,32 @@ func TestStartHTTP(t *testing.T) {
 	}
 }
 
-func TestInitDBReplaysTheRecoveryLogAndRepairsTheIndexes(t *testing.T) {
-	folder := t.TempDir()
-	config(folder, nil)
+func TestInitDBMigratesA024FolderWithAPendingRecoveryLog(t *testing.T) {
+	seed := t.TempDir()
+	config(seed, nil)
 	storage.LoadDB()
-	storage.LoadJsonDB()
-
 	if err := security.InitAdminUserIfNotExists(); err != nil {
 		t.Fatal(err)
 	}
 	api_storage.WriteEntity("books", map[string]any{"id": "b1", "title": "Dune"})
-	storage.DeleteByWildcardKey(globals.ApiKeyPrefix + "*")
-	storage.WriteToDB()
+
+	folder := t.TempDir()
+	if _, err := storage.Engine().ExportLegacy(folder); err != nil {
+		t.Fatal(err)
+	}
+	key, err := os.ReadFile(filepath.Join(seed, security.KeyFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(folder, security.KeyFilename), key, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := storage.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	line := `{"op":"put","key":"api:entity:books:id:b2","value":{"id":"b2","title":"Emma"}}` + "\n"
-	if err := os.WriteFile(filepath.Join(folder, recovery.RecoveryFile), []byte(line), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(folder, legacy.JsonRecoveryFile), []byte(line), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -291,15 +302,11 @@ func TestInitDBReplaysTheRecoveryLogAndRepairsTheIndexes(t *testing.T) {
 	})
 
 	boot.InitDB()
+	t.Cleanup(func() { _ = storage.Close() })
 
-	replayed := entries(log.Query{Text: "unclean shutdown detected"})
-	if len(replayed) != 1 || replayed[0].Attrs["entries"] != int64(1) {
-		t.Fatalf("expected one replay warning, got %+v", replayed)
-	}
-
-	repaired := entries(log.Query{Text: "rest api indexes repaired"})
-	if len(repaired) != 1 {
-		t.Fatalf("expected one repair warning, got %+v", entries(log.Query{MinLevel: slog.LevelDebug}))
+	migrated := entries(log.Query{Text: "storage migrated"})
+	if len(migrated) != 1 || migrated[0].Attrs["recovery_entries_replayed"] != int64(1) {
+		t.Fatalf("expected one migration line, got %+v", entries(log.Query{MinLevel: slog.LevelDebug}))
 	}
 
 	if loaded := entries(log.Query{Text: "storage loaded"}); len(loaded) != 1 {
@@ -312,5 +319,25 @@ func TestInitDBReplaysTheRecoveryLogAndRepairsTheIndexes(t *testing.T) {
 
 	if acl.GetACLEntityForUsername("books", security.DefaultAdminUsername) == nil {
 		t.Fatalf("the admin ACL of books should be created at startup")
+	}
+}
+
+func TestAnExplicitBudgetStaysUnderTheContainerLimit(t *testing.T) {
+	setupLog(t)
+
+	gb := int64(1) << 30
+	cases := []struct {
+		budget, container, want int64
+	}{
+		{4 * gb, 8 * gb, 4 * gb},
+		{4 * gb, 0, 4 * gb},
+		{9 * gb, 8 * gb, int64(float64(8*gb) * 0.90)},
+		{8 * gb, 8 * gb, int64(float64(8*gb) * 0.90)},
+	}
+
+	for _, c := range cases {
+		if got := boot.BudgetWithinContainer(c.budget, c.container); got != c.want {
+			t.Fatalf("budget %d in a container of %d: %d, expected %d", c.budget, c.container, got, c.want)
+		}
 	}
 }

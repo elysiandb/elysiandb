@@ -4,13 +4,19 @@ import "strings"
 
 const maxIncludeDepth = 32
 
-var ReadEntityByIdFunc = ReadEntityById
+var ReadEntityByIdFunc func(entity, id string) map[string]any
+
+type entityReader func(entity, id string) map[string]any
 
 func ApplyIncludes(data []map[string]any, includesParam string) []map[string]any {
+	return applyIncludesWith(data, includesParam, includeReader())
+}
+
+func applyIncludesWith(data []map[string]any, includesParam string, read entityReader) []map[string]any {
 	allMode := strings.TrimSpace(includesParam) == "all"
 	includeTree := buildIncludeTree(includesParam, allMode)
 	for _, entityData := range data {
-		applyIncludesRecursive(entityData, includeTree, allMode, map[string]bool{}, 0)
+		applyIncludesRecursive(entityData, includeTree, allMode, map[string]bool{}, 0, read)
 	}
 
 	return data
@@ -35,7 +41,7 @@ func buildIncludeTree(includesParam string, allMode bool) map[string][]string {
 	return includeTree
 }
 
-func applyIncludesRecursive(entityData map[string]any, tree map[string][]string, forceAll bool, ancestors map[string]bool, depth int) {
+func applyIncludesRecursive(entityData map[string]any, tree map[string][]string, forceAll bool, ancestors map[string]bool, depth int, read entityReader) {
 	if depth >= maxIncludeDepth {
 		return
 	}
@@ -49,12 +55,12 @@ func applyIncludesRecursive(entityData map[string]any, tree map[string][]string,
 
 		switch v := val.(type) {
 		case map[string]any:
-			entityData[field] = includeAndDescend(v, tree[field], forceAll, ancestors, depth)
+			entityData[field] = includeAndDescend(v, tree[field], forceAll, ancestors, depth, read)
 		case []any:
 			newList := []map[string]any{}
 			for _, item := range v {
 				if m, ok := item.(map[string]any); ok {
-					newList = append(newList, includeAndDescend(m, tree[field], forceAll, ancestors, depth))
+					newList = append(newList, includeAndDescend(m, tree[field], forceAll, ancestors, depth, read))
 				}
 			}
 
@@ -63,19 +69,19 @@ func applyIncludesRecursive(entityData map[string]any, tree map[string][]string,
 	}
 }
 
-func includeAndDescend(m map[string]any, subs []string, forceAll bool, ancestors map[string]bool, depth int) map[string]any {
+func includeAndDescend(m map[string]any, subs []string, forceAll bool, ancestors map[string]bool, depth int, read entityReader) map[string]any {
 	ref := includeReference(m)
 	if ref != "" && ancestors[ref] {
 		return m
 	}
 
-	included := includeSingleEntity(m)
+	included := includeSingleEntity(m, read)
 	if ref != "" {
 		ancestors[ref] = true
 		defer delete(ancestors, ref)
 	}
 
-	applyIncludesRecursive(included, buildNextTree(subs, forceAll), forceAll, ancestors, depth+1)
+	applyIncludesRecursive(included, buildNextTree(subs, forceAll), forceAll, ancestors, depth+1, read)
 
 	return included
 }
@@ -119,10 +125,10 @@ func collectIncludeFields(entityData map[string]any, tree map[string][]string, f
 	return fields
 }
 
-func includeSingleEntity(m map[string]any) map[string]any {
+func includeSingleEntity(m map[string]any, reader entityReader) map[string]any {
 	if ent, ok := m["@entity"].(string); ok && !IsCoreEntityType(ent) {
 		if id, ok := m["id"].(string); ok && id != "" {
-			read := ReadEntityByIdFunc(ent, id)
+			read := reader(ent, id)
 			if read != nil {
 				read["@entity"] = ent
 				return read

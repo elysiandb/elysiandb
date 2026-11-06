@@ -73,6 +73,12 @@ func forwardedClientIP(ctx *fasthttp.RequestCtx, proxies []*net.IPNet) net.IP {
 		hops = append(hops, strings.Split(string(value), ",")...)
 	}
 
+	if len(hops) == 0 {
+		if ip := net.ParseIP(strings.TrimSpace(string(ctx.Request.Header.Peek("X-Real-Ip")))); ip != nil {
+			return ip
+		}
+	}
+
 	var leftmost net.IP
 	for i := len(hops) - 1; i >= 0; i-- {
 		ip := net.ParseIP(strings.TrimSpace(hops[i]))

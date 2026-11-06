@@ -870,9 +870,9 @@ func TestIncludesDoNotResolveCoreEntities(t *testing.T) {
 func TestPreReadHooksDoNotScanTheWholeEntityForAPage(t *testing.T) {
 	s := startAdminSession(t, withoutStrictSchema)
 
-	posts := make([]map[string]any, 0, 300)
-	authors := make([]map[string]any, 0, 300)
-	for i := 0; i < 300; i++ {
+	posts := make([]map[string]any, 0, 2000)
+	authors := make([]map[string]any, 0, 2000)
+	for i := 0; i < 2000; i++ {
 		posts = append(posts, map[string]any{"id": fmt.Sprintf("p%03d", i), "authorId": fmt.Sprintf("a%03d", i), "rank": i})
 		authors = append(authors, map[string]any{"id": fmt.Sprintf("a%03d", i), "name": fmt.Sprintf("Author %d", i)})
 	}
@@ -883,6 +883,7 @@ func TestPreReadHooksDoNotScanTheWholeEntityForAPage(t *testing.T) {
 	s.mustDo(fasthttp.StatusOK, "POST", "/api/hook/post", `{"name":"join","event":"pre_read","language":"javascript","enabled":true,"bypass_acl":true,"script":"function preRead(ctx){ var r = ctx.query(\"author\", {\"id\": {\"eq\": ctx.entity.authorId}}); ctx.entity.authorName = r.length ? r[0].name : null }"}`)
 
 	elapsed := func(method, path, body string) time.Duration {
+		s.mustDo(fasthttp.StatusOK, method, path, body)
 		start := time.Now()
 		s.mustDo(fasthttp.StatusOK, method, path, body)
 		return time.Since(start)

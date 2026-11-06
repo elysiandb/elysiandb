@@ -3,16 +3,11 @@ package handler
 import (
 	"fmt"
 
-	"github.com/taymour/elysiandb/internal/globals"
-	"github.com/taymour/elysiandb/internal/stat"
 	"github.com/taymour/elysiandb/internal/storage"
 	"github.com/taymour/elysiandb/internal/wildcard"
 )
 
 func HandleDelete(query []byte) []byte {
-	if globals.GetConfig().Stats.Enabled {
-		stat.Stats.IncrementTotalRequests()
-	}
 
 	key := string(query)
 

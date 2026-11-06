@@ -41,12 +41,13 @@ engine:
 
 **internal (default, recommended)**
 
-The `internal` engine is the original storage engine shipped with ElysianDB. It provides:
+The `internal` engine is the storage engine shipped with ElysianDB, designed together with its API. It provides:
 
-* Sharded in-memory storage
-* Periodic disk persistence
-* Crash recovery via write-ahead logs
-* Lazy index creation
+* An append-only log that holds the data, with group commit, paced checkpoints that stay out of the way of writes, and background compaction that gives the disk back within seconds, behind a durability layer tested against a power cut at every disk operation
+* Copy-on-write entity state: reads never wait for writes
+* Automatic indexes for sorts, filters, search and references (ordered, bitmap and composite forms), built in the background, chosen by selectivity and released when unused
+* A memory budget that holds the whole process, from caches to the working memory of requests and hooks, at millions of documents
+* Hooks that stay fast at scale: counting and summing loops computed on views that follow every write, `ctx.query` results kept per filter value and brought up to date from the changed documents, reused hook results and optional `count`, `sum` and `group` helpers
 * Very high throughput and low latency
 * Full compatibility with all ElysianDB features
 
@@ -137,13 +138,22 @@ Queries are deterministic, type-aware, and executed predictably, making them eas
 
 ElysianDB is designed for low latency and high throughput.
 
-With the internal engine, the system relies on sharded in-memory storage, minimal allocations, and cache-friendly data structures.
+With the internal engine, paged, filtered, sorted, counted and searched requests use indexes and cost about the same on 1,000 or 60,000 documents, and writes are grouped into a few disk writes.
 
 On a MacBook Pro M4, mixed workloads with CRUD, filtering, sorting, nested writes, and includes reach tens of thousands of requests per second with sub-millisecond latencies under moderate load.
 
 With the MongoDB engine, which is in beta, performance is bounded by MongoDB and network latency.
 
 These are real API scenarios, not synthetic microbenchmarks.
+
+## Running in Production
+
+* **Hot backup:** `GET /api/backup`, or `elysiandb backup --url <address> --user <name> --output <folder>` with the password in `ELYSIANDB_PASSWORD`. One consistent instant, in a stream, without stopping the server or holding writes. Archives keep format v1 and travel both ways between versions.
+* **Durability:** with `store.crashRecovery.enabled`, a `kill -9` at any moment loses no confirmed write; add `store.durability: fsync` and neither does a power cut. Torn writes are detected by checksums and never read as valid.
+* **Degraded cases:** a full or failing disk refuses writes with a clear error, keeps serving reads and recovers by itself. `GET /health` answers once the server can serve.
+* **Upgrades:** folders are read without action, and the previous binary reads them back.
+
+See [Backup and Restore](docs/index.md#backup-and-restore) and [Storage engine internals](docs/index.md#storage-engine-internals).
 
 ## When to Use ElysianDB
 

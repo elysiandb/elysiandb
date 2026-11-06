@@ -1,0 +1,211 @@
+{
+  "format": 2,
+  "kv": "kv-0000000000000192.ckpt",
+  "lsn": 192,
+  "segment": 1,
+  "offset": 40330,
+  "created_at": "2026-11-06T00:19:58Z",
+  "types": [
+    "_elysiandb_core_acl",
+    "_elysiandb_core_schema",
+    "_elysiandb_core_user",
+    "_elysiandb_core_hook",
+    "author",
+    "book",
+    "review",
+    "purchase",
+    "budget_month",
+    "program",
+    "step",
+    "note"
+  ],
+  "entities": [
+    {
+      "name": "_elysiandb_core_acl",
+      "gen": 0,
+      "next_seq": 16,
+      "version": 28,
+      "slots": {
+        "id": 4294967296,
+        "size": 416
+      },
+      "ids": {
+        "id": 4294967720,
+        "size": 320
+      }
+    },
+    {
+      "name": "_elysiandb_core_hook",
+      "gen": 0,
+      "next_seq": 3,
+      "version": 44,
+      "slots": {
+        "id": 4294968048,
+        "size": 146
+      },
+      "ids": {
+        "id": 4294968202,
+        "size": 128
+      }
+    },
+    {
+      "name": "_elysiandb_core_schema",
+      "gen": 0,
+      "next_seq": 11,
+      "version": 39,
+      "slots": {
+        "id": 4294968338,
+        "size": 243
+      },
+      "ids": {
+        "id": 4294968589,
+        "size": 178
+      }
+    },
+    {
+      "name": "_elysiandb_core_user",
+      "gen": 0,
+      "next_seq": 2,
+      "version": 41,
+      "slots": {
+        "id": 4294968775,
+        "size": 35
+      },
+      "ids": {
+        "id": 4294968818,
+        "size": 25
+      }
+    },
+    {
+      "name": "author",
+      "gen": 0,
+      "next_seq": 8,
+      "version": 52,
+      "slots": {
+        "id": 4294968851,
+        "size": 114
+      },
+      "ids": {
+        "id": 4294968973,
+        "size": 66
+      }
+    },
+    {
+      "name": "book",
+      "gen": 0,
+      "next_seq": 30,
+      "version": 82,
+      "refs": [
+        {
+          "Path": "author",
+          "Target": "author"
+        },
+        {
+          "Path": "coauthors",
+          "Target": "author"
+        }
+      ],
+      "slots": {
+        "id": 4294969047,
+        "size": 474
+      },
+      "ids": {
+        "id": 4294969529,
+        "size": 272
+      }
+    },
+    {
+      "name": "budget_month",
+      "gen": 0,
+      "next_seq": 12,
+      "version": 170,
+      "slots": {
+        "id": 4294969809,
+        "size": 194
+      },
+      "ids": {
+        "id": 4294970011,
+        "size": 110
+      }
+    },
+    {
+      "name": "note",
+      "gen": 0,
+      "next_seq": 1,
+      "version": 189,
+      "slots": {
+        "id": 4294970129,
+        "size": 17
+      },
+      "ids": {
+        "id": 4294970154,
+        "size": 10
+      }
+    },
+    {
+      "name": "program",
+      "gen": 0,
+      "next_seq": 3,
+      "version": 173,
+      "slots": {
+        "id": 4294970172,
+        "size": 50
+      },
+      "ids": {
+        "id": 4294970230,
+        "size": 29
+      }
+    },
+    {
+      "name": "purchase",
+      "gen": 0,
+      "next_seq": 36,
+      "version": 158,
+      "slots": {
+        "id": 4294970267,
+        "size": 573
+      },
+      "ids": {
+        "id": 4294970848,
+        "size": 326
+      }
+    },
+    {
+      "name": "review",
+      "gen": 0,
+      "next_seq": 40,
+      "version": 122,
+      "refs": [
+        {
+          "Path": "book",
+          "Target": "book"
+        }
+      ],
+      "slots": {
+        "id": 4294971182,
+        "size": 642
+      },
+      "ids": {
+        "id": 4294971832,
+        "size": 362
+      }
+    },
+    {
+      "name": "step",
+      "gen": 0,
+      "next_seq": 15,
+      "version": 188,
+      "slots": {
+        "id": 4294972202,
+        "size": 257
+      },
+      "ids": {
+        "id": 4294972467,
+        "size": 152
+      }
+    }
+  ],
+  "live": {
+    "1": 34617
+  }
+}

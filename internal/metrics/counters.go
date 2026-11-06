@@ -26,6 +26,10 @@ const (
 	cFailedLogins
 	cHookExecutions
 	cHookErrors
+	cHeavyQueries
+	cHeavyQueued
+	cHeavyRejected
+	cRequestsAbandoned
 	cKVGets
 	cKVSets
 	cKVDeletes
@@ -67,6 +71,8 @@ var (
 	counters      [numCounters]atomic.Uint64
 	httpLatency   Histogram
 	tcpLatency    Histogram
+	tcpAuth       Histogram
+	heavyWait     Histogram
 	hookLatency   Histogram
 	tcpOpen       atomic.Int64
 	startedAt     = time.Now()
@@ -147,6 +153,25 @@ func ObserveTCP(command string, d time.Duration) {
 	}
 
 	tcpLatency.Observe(d)
+	if command == "AUTH" {
+		tcpAuth.Observe(d)
+	}
+}
+
+func HeavyQuery(wait time.Duration) {
+	add(cHeavyQueries, 1)
+	if wait > time.Millisecond {
+		add(cHeavyQueued, 1)
+		heavyWait.Observe(wait)
+	}
+}
+
+func HeavyRejected() {
+	add(cHeavyRejected, 1)
+}
+
+func RequestAbandoned() {
+	add(cRequestsAbandoned, 1)
 }
 
 func SlowRequest() {
@@ -228,6 +253,18 @@ func ObserveHook(id, entity, phase string, d time.Duration, err error) {
 		hs.lastErrorAt = time.Now()
 		hs.mu.Unlock()
 		hookFailure.set(err.Error(), id)
+	}
+}
+
+func ObserveHookQuery(id, entity, phase string, rows int, cacheHit bool, d time.Duration) {
+	v, _ := hookStats.LoadOrStore(id, &hookStat{id: id, entity: entity, phase: phase})
+
+	hs := v.(*hookStat)
+	hs.queries.Add(1)
+	hs.rowsRead.Add(uint64(rows))
+	hs.queryNanos.Add(uint64(d))
+	if cacheHit {
+		hs.cacheHits.Add(1)
 	}
 }
 
@@ -448,8 +485,12 @@ type hookStat struct {
 	entity      string
 	phase       string
 	executions  atomic.Uint64
+	queries     atomic.Uint64
+	rowsRead    atomic.Uint64
+	cacheHits   atomic.Uint64
 	errors      atomic.Uint64
 	totalNanos  atomic.Uint64
+	queryNanos  atomic.Uint64
 	latency     Histogram
 	mu          sync.Mutex
 	lastError   string
@@ -461,8 +502,12 @@ type HookSummary struct {
 	Entity      string     `json:"entity"`
 	Phase       string     `json:"phase"`
 	Executions  uint64     `json:"executions"`
+	Queries     uint64     `json:"queries"`
+	RowsRead    uint64     `json:"rows_read"`
+	CacheHits   uint64     `json:"query_cache_hits"`
 	Errors      uint64     `json:"errors"`
 	AvgMs       *Number    `json:"avg_ms"`
+	AvgQueryMs  *Number    `json:"avg_query_ms,omitempty"`
 	P95Ms       *Number    `json:"p95_ms"`
 	LastError   string     `json:"last_error"`
 	LastErrorAt *time.Time `json:"last_error_at"`
@@ -478,12 +523,18 @@ func hookSummaries() []HookSummary {
 			Entity:     h.entity,
 			Phase:      h.phase,
 			Executions: executions,
+			Queries:    h.queries.Load(),
+			RowsRead:   h.rowsRead.Load(),
+			CacheHits:  h.cacheHits.Load(),
 			Errors:     h.errors.Load(),
 			P95Ms:      num(h.latency.snapshot().quantile(0.95)),
 		}
 
 		if executions > 0 {
 			summary.AvgMs = num(float64(h.totalNanos.Load()) / float64(executions) / float64(time.Millisecond))
+			if summary.Queries > 0 {
+				summary.AvgQueryMs = num(float64(h.queryNanos.Load()) / float64(executions) / float64(time.Millisecond))
+			}
 		}
 
 		h.mu.Lock()
@@ -562,4 +613,14 @@ func (a *addressCounter) worst() (string, int) {
 	}
 
 	return worstAddr, worstCount
+}
+
+var startupNanos atomic.Int64
+
+func SetStartup(d time.Duration) {
+	startupNanos.Store(int64(d))
+}
+
+func Startup() time.Duration {
+	return time.Duration(startupNanos.Load())
 }

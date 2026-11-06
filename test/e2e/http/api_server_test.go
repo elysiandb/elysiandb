@@ -117,6 +117,52 @@ func defaultAPIConfig(folder string) *configuration.Config {
 func startAPIServer(t *testing.T, configure func(cfg *configuration.Config)) *apiServer {
 	t.Helper()
 
+	srv := newAPIServer(t, configure)
+	ln := fasthttputil.NewInmemoryListener()
+	go func() { _ = srv.Serve(ln) }()
+
+	t.Cleanup(func() {
+		_ = ln.Close()
+		_ = srv.Shutdown()
+	})
+
+	return &apiServer{
+		t:       t,
+		ln:      ln,
+		client:  clientFrom(ln, "127.0.0.1"),
+		headers: map[string]string{},
+	}
+}
+
+func startTCPAdminSession(t *testing.T, configure func(cfg *configuration.Config)) (*apiServer, string) {
+	t.Helper()
+
+	srv := newAPIServer(t, configure)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() { _ = srv.Serve(ln) }()
+
+	t.Cleanup(func() {
+		_ = ln.Close()
+		_ = srv.Shutdown()
+	})
+
+	addr := ln.Addr().String()
+	s := &apiServer{
+		t:       t,
+		client:  &fasthttp.Client{Dial: func(string) (net.Conn, error) { return net.Dial("tcp", addr) }},
+		headers: map[string]string{},
+	}
+	s.login(security.DefaultAdminUsername, security.DefaultAdminPassword)
+
+	return s, addr
+}
+
+func newAPIServer(t *testing.T, configure func(cfg *configuration.Config)) *fasthttp.Server {
+	t.Helper()
+
 	cfg := defaultAPIConfig(t.TempDir())
 	if configure != nil {
 		configure(cfg)
@@ -137,22 +183,8 @@ func startAPIServer(t *testing.T, configure func(cfg *configuration.Config)) *ap
 
 	r := router.New()
 	routing.RegisterRoutes(r)
-	srv := &fasthttp.Server{Handler: security.Protect(r.Handler)}
 
-	ln := fasthttputil.NewInmemoryListener()
-	go func() { _ = srv.Serve(ln) }()
-
-	t.Cleanup(func() {
-		_ = ln.Close()
-		_ = srv.Shutdown()
-	})
-
-	return &apiServer{
-		t:       t,
-		ln:      ln,
-		client:  clientFrom(ln, "127.0.0.1"),
-		headers: map[string]string{},
-	}
+	return &fasthttp.Server{Handler: security.Protect(r.Handler)}
 }
 
 func clientFrom(ln *fasthttputil.InmemoryListener, ip string) *fasthttp.Client {
