@@ -24,7 +24,7 @@ func TestFoldersOfTheFormatTwoEngineAreRead(t *testing.T) {
 	}
 	want := golden["full"]
 
-	for _, variant := range []string{"format2", "format2-crash", "e68e64f", "e68e64f-crash", "c104f4a", "c104f4a-crash"} {
+	for _, variant := range []string{"format2", "format2-crash", "deb5d46", "deb5d46-crash", "e68e64f", "e68e64f-crash", "c104f4a", "c104f4a-crash"} {
 		folder := copyFolder(t, filepath.Join(format2FixturesDir, variant))
 
 		for round := 0; round < 2; round++ {
