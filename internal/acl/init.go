@@ -182,7 +182,7 @@ func InitACL() error {
 		return err
 	}
 
-	lastSignature.Store(aclSignature())
+	lastSignature.Store(sig)
 
 	return nil
 }

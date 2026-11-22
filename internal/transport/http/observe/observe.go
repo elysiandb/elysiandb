@@ -260,10 +260,19 @@ func finish(ctx *fasthttp.RequestCtx, start time.Time, requestID string) {
 			"route", route,
 			"status", status,
 			"duration_ms", durationMs,
-			"bytes", len(ctx.Response.Body()),
+		}
+		if ctx.Response.IsBodyStream() {
+			args = append(args, "streamed", true)
+			if n := ctx.Response.Header.ContentLength(); n >= 0 {
+				args = append(args, "bytes", n)
+			}
+		} else {
+			args = append(args, "bytes", len(ctx.Response.Body()))
+		}
+		args = append(args,
 			"remote_addr", security.LoginSourceFromRequest(ctx).String(),
 			"request_id", requestID,
-		}
+		)
 		if user != "" {
 			args = append(args, "user", user)
 		}

@@ -1,6 +1,9 @@
 package acl_test
 
 import (
+	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/taymour/elysiandb/internal/acl"
@@ -90,13 +93,54 @@ func TestCanCreateEntity_NewEntityTypeUsesRoleDefaults(t *testing.T) {
 	}
 }
 
-func TestCanCreateEntity_ExistingEntityTypeWithoutACL(t *testing.T) {
+func TestCanCreateEntity_ExistingEntityTypeWithoutACLGetsTheDefaultACLs(t *testing.T) {
 	setup(t, true)
 	writeUser("boss", security.RoleAdmin)
+	writeUser("u", security.RoleUser)
 	writeDoc("doc", "1", "x")
 
-	if acl.CanCreateEntity("boss", "doc") {
-		t.Fatalf("expected false")
+	if !acl.CanCreateEntity("boss", "doc") {
+		t.Fatalf("expected admin to create once the default ACLs are written")
+	}
+
+	if acl.CanCreateEntity("u", "doc") {
+		t.Fatalf("expected regular user to be denied")
+	}
+
+	if acl.GetACLEntityForUsername("doc", "boss") == nil || acl.GetACLEntityForUsername("doc", "u") == nil {
+		t.Fatalf("expected the default ACLs of the entity type to be written")
+	}
+}
+
+func TestCanCreateEntity_ConcurrentFirstWritesOfANewEntityType(t *testing.T) {
+	setup(t, true)
+	writeUser("boss", security.RoleAdmin)
+
+	for round := 0; round < 50; round++ {
+		entity := fmt.Sprintf("fresh_%d", round)
+		var wg sync.WaitGroup
+		var denied atomic.Int32
+
+		for i := 0; i < 20; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				if !acl.CanCreateEntity("boss", entity) {
+					denied.Add(1)
+					return
+				}
+				writeDoc(entity, fmt.Sprint(i), "boss")
+				if i%5 == 0 {
+					_ = acl.InitACL()
+				}
+			}(i)
+		}
+
+		wg.Wait()
+
+		if n := denied.Load(); n > 0 {
+			t.Fatalf("round %d: %d creations denied on a new entity type", round, n)
+		}
 	}
 }
 

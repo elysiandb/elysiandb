@@ -1,6 +1,7 @@
 package observe_test
 
 import (
+	"bufio"
 	"errors"
 	"log/slog"
 	"strings"
@@ -54,6 +55,11 @@ func setup(t *testing.T, mutate func(cfg *configuration.Config)) fasthttp.Reques
 	r.GET("/busy", func(ctx *fasthttp.RequestCtx) {
 		observe.SetRejected(ctx, "server busy")
 		ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
+	})
+	r.GET("/stream", func(ctx *fasthttp.RequestCtx) {
+		ctx.SetBodyStreamWriter(func(w *bufio.Writer) {
+			_, _ = w.WriteString("streamed")
+		})
 	})
 	r.GET("/slow", func(ctx *fasthttp.RequestCtx) { time.Sleep(60 * time.Millisecond) })
 	r.GET("/denied", func(ctx *fasthttp.RequestCtx) { ctx.SetStatusCode(fasthttp.StatusUnauthorized) })
@@ -231,6 +237,21 @@ func TestAccessLog(t *testing.T) {
 	got := entries(log.Query{MinLevel: slog.LevelInfo})
 	if len(got) != 1 || got[0].Message != "request" || got[0].Attrs["route"] != "/ok/{entity}" || got[0].Attrs["status"] != int64(200) {
 		t.Fatalf("expected one access line for the API request only, got %+v", got)
+	}
+}
+
+func TestAccessLogLeavesStreamedResponsesStreamed(t *testing.T) {
+	h := setup(t, func(cfg *configuration.Config) { cfg.Log.AccessLog = true })
+
+	ctx := call(h, "GET", "/stream", nil)
+
+	if !ctx.Response.IsBodyStream() {
+		t.Fatalf("the access log must not turn a streamed response into a buffered one")
+	}
+
+	got := entries(log.Query{MinLevel: slog.LevelInfo})
+	if len(got) != 1 || got[0].Attrs["streamed"] != true || got[0].Attrs["route"] != "/stream" {
+		t.Fatalf("expected one access line marked as streamed, got %+v", got)
 	}
 }
 
