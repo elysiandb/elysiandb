@@ -132,6 +132,19 @@ const TABS = [
                     ] },
                 ],
             },
+            {
+                id: "indexes",
+                title: "monitoring.sections.indexes",
+                extra: "indexes",
+                charts: [
+                    { title: "monitoring.charts.indexCount", unit: "count", series: [
+                        { name: "index_count", label: "monitoring.series.indexCount", color: "accent" },
+                    ] },
+                    { title: "monitoring.charts.indexBytes", unit: "bytes", series: [
+                        { name: "index_bytes", label: "monitoring.series.indexBytes", color: "purple" },
+                    ] },
+                ],
+            },
         ],
     },
     {
@@ -150,8 +163,9 @@ const TABS = [
                         { name: "forced_flushes_rps", label: "monitoring.series.forcedFlushes", color: "accent" },
                     ] },
                     { title: "monitoring.charts.recoveryLogs", unit: "bytes", series: [
-                        { name: "recovery_json_bytes", label: "monitoring.series.recoveryJson", color: "accent" },
-                        { name: "recovery_store_bytes", label: "monitoring.series.recoveryStore", color: "cyan" },
+                        { name: "log_since_checkpoint_bytes", label: "monitoring.series.logSinceCheckpoint", color: "accent" },
+                        { name: "log_bytes", label: "monitoring.series.logBytes", color: "cyan" },
+                        { name: "live_bytes", label: "monitoring.series.liveBytes", color: "green" },
                     ] },
                     { title: "monitoring.charts.diskSize", unit: "bytes", series: [
                         { name: "disk_bytes", label: "monitoring.series.disk", color: "purple" },
@@ -184,8 +198,37 @@ const TABS = [
                     { title: "monitoring.charts.cpu", unit: "percent", scale: 0.01, series: [
                         { name: "cpu_percent", label: "monitoring.series.cpu", color: "red" },
                     ] },
+                    { title: "monitoring.charts.cpuCores", unit: "count", series: [
+                        { name: "cpu_cores", label: "monitoring.series.cpuCores", color: "red" },
+                        { name: "gomaxprocs", label: "monitoring.series.gomaxprocs", color: "teal" },
+                    ] },
                     { title: "monitoring.charts.openFds", unit: "count", series: [
                         { name: "open_fds", label: "monitoring.series.openFds", color: "teal" },
+                    ] },
+                ],
+            },
+            {
+                id: "memory",
+                title: "monitoring.sections.memory",
+                charts: [
+                    { title: "monitoring.charts.memoryBudget", unit: "bytes", series: [
+                        { name: "memory_budget_bytes", label: "monitoring.series.budget", color: "red" },
+                        { name: "total_bytes", label: "monitoring.series.total", color: "cyan" },
+                        { name: "heap_live_bytes", label: "monitoring.series.heapLive", color: "accent" },
+                    ] },
+                    { title: "monitoring.charts.memoryShares", unit: "bytes", series: [
+                        { name: "value_cache_bytes", label: "monitoring.series.valueCache", color: "accent" },
+                        { name: "page_cache_bytes", label: "monitoring.series.pageCache", color: "cyan" },
+                        { name: "dirty_page_bytes", label: "monitoring.series.dirtyPages", color: "orange" },
+                        { name: "hook_results_bytes", label: "monitoring.series.hookResults", color: "purple" },
+                        { name: "index_build_bytes", label: "monitoring.series.indexBuilds", color: "teal" },
+                        { name: "request_reserved_bytes", label: "monitoring.series.requestMemory", color: "green" },
+                    ] },
+                    { title: "monitoring.charts.memoryPressure", unit: "count", series: [
+                        { name: "memory_pressure", label: "monitoring.series.pressure", color: "orange" },
+                    ] },
+                    { title: "monitoring.charts.memoryRefused", unit: "perMinute", scale: 60, series: [
+                        { name: "memory_refused_rps", label: "monitoring.series.refused", color: "red" },
                     ] },
                 ],
             },
@@ -223,6 +266,10 @@ const TABS = [
                     ] },
                     { title: "monitoring.charts.hookDuration", unit: "ms", series: [
                         { name: "hook_p95_ms", label: "monitoring.series.p95", color: "orange" },
+                    ] },
+                    { title: "monitoring.charts.hookReuse", unit: "percent", series: [
+                        { name: "hook_query_hit_ratio", label: "monitoring.series.queryReuse", color: "green" },
+                        { name: "hook_output_hit_ratio", label: "monitoring.series.outputReuse", color: "accent" },
                     ] },
                 ],
             },
@@ -412,6 +459,80 @@ function HooksTable({ hooks }) {
     );
 }
 
+const INDEX_KINDS = {
+    ordered: "monitoring.indexes.kinds.ordered",
+    sort: "monitoring.indexes.kinds.sort",
+    bitmap: "monitoring.indexes.kinds.bitmap",
+    composite: "monitoring.indexes.kinds.composite",
+    search: "monitoring.indexes.kinds.search",
+    references: "monitoring.indexes.kinds.references",
+};
+
+const INDEX_ORIGINS = {
+    query: "monitoring.indexes.origins.query",
+    hook: "monitoring.indexes.origins.hook",
+    advisor: "monitoring.indexes.origins.advisor",
+};
+
+const INDEX_STATES = {
+    ready: "monitoring.indexes.states.ready",
+    building: "monitoring.indexes.states.building",
+    released: "monitoring.indexes.states.released",
+};
+
+function IndexesTable({ indexes }) {
+    const { t } = useTranslation();
+    const format = useFormatters();
+    const label = (map, value) => (map[value] ? t(map[value]) : value || "–");
+
+    const empty = (indexes ?? []).length === 0;
+
+    return (
+        <Card className={empty ? "monitoring-card" : "monitoring-card monitoring-table-card"}>
+            <Card.Header>{t("monitoring.indexes.title")}</Card.Header>
+            {empty
+                ? <Card.Body className="text-secondary small">{t("monitoring.noData")}</Card.Body>
+                : (
+                    <div className="monitoring-table-scroll">
+                        <Table size="sm" responsive className="monitoring-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>{t("monitoring.indexes.entity")}</th>
+                                    <th>{t("monitoring.indexes.index")}</th>
+                                    <th>{t("monitoring.indexes.kind")}</th>
+                                    <th>{t("monitoring.indexes.origin")}</th>
+                                    <th>{t("monitoring.indexes.state")}</th>
+                                    <th className="text-end">{t("monitoring.indexes.entries")}</th>
+                                    <th className="text-end">{t("monitoring.indexes.size")}</th>
+                                    <th className="text-end">{t("monitoring.indexes.uses")}</th>
+                                    <th>{t("monitoring.indexes.lastUsed")}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {indexes.map((index) => (
+                                    <tr key={`${index.entity}/${index.index}`}>
+                                        <td className="text-break">{index.entity}</td>
+                                        <td className="text-break">{index.index}</td>
+                                        <td>{label(INDEX_KINDS, index.kind)}</td>
+                                        <td>
+                                            {label(INDEX_ORIGINS, index.origin)}
+                                            {index.pinned && <> · {t("monitoring.indexes.pinned")}</>}
+                                        </td>
+                                        <td>{label(INDEX_STATES, index.state)}</td>
+                                        <td className="text-end">{format.count(index.entries)}</td>
+                                        <td className="text-end">{format.bytes(index.bytes ?? 0)}</td>
+                                        <td className="text-end">{format.count(index.uses ?? 0)}</td>
+                                        <td>{index.last_used_at ? <RelativeTime value={index.last_used_at} /> : "–"}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    </div>
+                )}
+        </Card>
+    );
+}
+
 function PersistenceFacts({ persistence }) {
     const { t } = useTranslation();
     const format = useFormatters();
@@ -465,6 +586,11 @@ function MonitoringSection({ section, showTitle, data, chartCard }) {
                 {section.extra === "hooks" && (
                     <Col xs={12}>
                         <HooksTable hooks={data.details?.hooks} />
+                    </Col>
+                )}
+                {section.extra === "indexes" && (
+                    <Col xs={12}>
+                        <IndexesTable indexes={data.details?.indexes} />
                     </Col>
                 )}
             </Row>

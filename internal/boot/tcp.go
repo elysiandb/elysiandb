@@ -7,6 +7,8 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -44,6 +46,7 @@ func InitTCP() {
 		return
 	}
 	defer ln.Close()
+	tcpListener.Store(ln)
 
 	tcpLog.Info("tcp listening", "addr", addr)
 
@@ -71,7 +74,45 @@ func InitTCP() {
 		_ = tc.SetReadBuffer(256 << 10)
 		_ = tc.SetWriteBuffer(256 << 10)
 
-		go handleConnection(tc)
+		tcpConns.Add(1)
+		go func() {
+			defer tcpConns.Done()
+			handleConnection(tc)
+		}()
+	}
+}
+
+var (
+	tcpListener atomic.Pointer[net.TCPListener]
+	tcpConns    sync.WaitGroup
+	tcpOpen     sync.Map
+)
+
+func StopTCP(timeout time.Duration) {
+	if ln := tcpListener.Load(); ln != nil {
+		_ = ln.Close()
+	}
+
+	stopping.Store(true)
+	tcpOpen.Range(func(k, _ any) bool {
+		_ = k.(net.Conn).SetReadDeadline(time.Now())
+		return true
+	})
+
+	done := make(chan struct{})
+	go func() {
+		tcpConns.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		tcpOpen.Range(func(k, _ any) bool {
+			_ = k.(net.Conn).Close()
+			return true
+		})
+		<-done
 	}
 }
 
@@ -101,7 +142,9 @@ func handleConnection(c net.Conn) {
 		tcpLog.Debug("connection opened", "remote_addr", addr)
 	}
 
+	tcpOpen.Store(c, struct{}{})
 	defer func() {
+		tcpOpen.Delete(c)
 		_ = c.Close()
 		metrics.TCPConnectionClosed()
 		if debug {
@@ -116,6 +159,10 @@ func handleConnection(c net.Conn) {
 	session := tcprouting.NewSession()
 
 	for {
+		if stopping.Load() {
+			return
+		}
+
 		if session.IsAuthenticated() {
 			_ = c.SetReadDeadline(time.Time{})
 		} else {
@@ -124,7 +171,9 @@ func handleConnection(c net.Conn) {
 
 		line, err := r.ReadSlice('\n')
 		if err != nil {
-			connectionError("read", addr, err)
+			if !stopping.Load() {
+				connectionError("read", addr, err)
+			}
 			return
 		}
 

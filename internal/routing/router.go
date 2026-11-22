@@ -5,6 +5,7 @@ import (
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/security"
+	"github.com/taymour/elysiandb/internal/stat"
 	http_adminui "github.com/taymour/elysiandb/internal/transport/http/adminui"
 	"github.com/taymour/elysiandb/internal/transport/http/api"
 	http_acl "github.com/taymour/elysiandb/internal/transport/http/api/acl"
@@ -14,6 +15,7 @@ import (
 	"github.com/taymour/elysiandb/internal/transport/http/controller"
 	http_monitoring "github.com/taymour/elysiandb/internal/transport/http/monitoring"
 	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/pprofhandler"
 )
 
 func RegisterRoutes(r *router.Router) {
@@ -102,6 +104,10 @@ func RegisterRoutes(r *router.Router) {
 	r.GET("/monitoring/logs/level", Version(http_adminui.AdminAuth(http_monitoring.GetLogLevelController)))
 	r.PUT("/monitoring/logs/level", Version(http_adminui.AdminAuth(http_monitoring.PutLogLevelController)))
 
+	if globals.GetConfig().Monitoring.Pprof.Enabled {
+		r.GET("/debug/pprof/{profile:*}", Version(http_adminui.AdminAuth(pprofhandler.PprofHandler)))
+	}
+
 	if globals.GetConfig().Monitoring.Prometheus.Enabled {
 		r.GET("/metrics", Version(http_monitoring.PrometheusAuth(http_adminui.AdminAuth, http_monitoring.PrometheusController)))
 	}
@@ -118,6 +124,10 @@ func RegisterRoutes(r *router.Router) {
 
 var Version func(requestHandler fasthttp.RequestHandler) fasthttp.RequestHandler = func(requestHandler fasthttp.RequestHandler) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
+		if cfg := globals.GetConfig(); cfg != nil && cfg.Stats.Enabled {
+			stat.Stats.IncrementTotalRequests()
+		}
+
 		requestHandler(ctx)
 		ctx.Response.Header.Add("X-Elysian-Version", globals.VERSION)
 	}

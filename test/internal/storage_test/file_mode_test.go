@@ -1,6 +1,7 @@
 package storage_test
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,24 +14,30 @@ import (
 func expectOwnerOnly(t *testing.T, dir string) {
 	t.Helper()
 
-	entries, err := os.ReadDir(dir)
+	files := 0
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+
+		files++
+		if info.Mode().IsRegular() && info.Mode().Perm() != 0o600 {
+			t.Fatalf("%s: expected mode 0600, got %v", path, info.Mode().Perm())
+		}
+
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(entries) == 0 {
+	if files == 0 {
 		t.Fatalf("expected data files in %s", dir)
-	}
-
-	for _, entry := range entries {
-		info, err := entry.Info()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if info.Mode().IsRegular() && info.Mode().Perm() != 0o600 {
-			t.Fatalf("%s: expected mode 0600, got %v", entry.Name(), info.Mode().Perm())
-		}
 	}
 }
 
@@ -45,11 +52,11 @@ func TestDataFilesAreOwnerOnly(t *testing.T) {
 	})
 
 	storage.LoadDB()
-	storage.LoadJsonDB()
+	t.Cleanup(func() { _ = storage.Close() })
 	expectOwnerOnly(t, dir)
 
 	storage.PutKeyValue("k", []byte("v"))
-	if err := storage.PutJsonValue("doc", map[string]any{"id": "doc"}); err != nil {
+	if err := storage.PutJsonValue("api:entity:docs:id:doc", map[string]any{"id": "doc"}); err != nil {
 		t.Fatal(err)
 	}
 	storage.WriteToDB()
@@ -69,7 +76,7 @@ func TestExistingDataFilesBecomeOwnerOnlyAtStartup(t *testing.T) {
 
 	globals.SetConfig(&configuration.Config{Store: configuration.StoreConfig{Folder: dir, Shards: 4}})
 	storage.LoadDB()
-	storage.LoadJsonDB()
+	t.Cleanup(func() { _ = storage.Close() })
 
 	expectOwnerOnly(t, dir)
 }

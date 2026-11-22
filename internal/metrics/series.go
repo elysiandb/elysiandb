@@ -66,6 +66,50 @@ const (
 	sMongoPingMs
 	sMongoErrorsRps
 	sMongoPoolInUse
+	sCPUCores
+	sGOMAXPROCS
+	sLogSinceCheckpointBytes
+	sLogBytes
+	sLiveBytes
+	sValueCacheHitRatio
+	sResidentBytes
+	sCheckpointMs
+	sTCPAuthP95
+	sHeavyQueriesRps
+	sHeavyQueuedRps
+	sHeavyRejectedRps
+	sHeavyWaiting
+	sHeavyWaitP95
+	sAbandonedRps
+	sMemoryBudget
+	sHeapLiveBytes
+	sMemoryPressure
+	sMemoryRefusedRps
+	sValueCacheBytes
+	sPageCacheBytes
+	sDirtyPageBytes
+	sHookResultsBytes
+	sIndexBuildBytes
+	sRequestReservedBytes
+	sHookQueryHitRatio
+	sHookOutputHitRatio
+	sIndexCount
+	sIndexBytes
+	sHeldBytes
+	sHookFoldHitRatio
+	sDiskReadBytesRps
+	sDiskWriteBytesRps
+	sDiskSyncsRps
+	sDiskSyncMs
+	sDiskFreeBytes
+	sRefusedWritesRps
+	sIndexUpkeepBytes
+	sBackupRunning
+	sBackupLastOK
+	sBackupDurationMs
+	sBackupBytes
+	sBackupAgeSeconds
+	sStartupMs
 	numSeries
 )
 
@@ -130,6 +174,51 @@ var seriesNames = [numSeries]string{
 	sMongoPingMs:        "mongo_ping_ms",
 	sMongoErrorsRps:     "mongo_errors_rps",
 	sMongoPoolInUse:     "mongo_pool_in_use",
+	sCPUCores:           "cpu_cores",
+	sGOMAXPROCS:         "gomaxprocs",
+
+	sLogSinceCheckpointBytes: "log_since_checkpoint_bytes",
+	sLogBytes:                "log_bytes",
+	sLiveBytes:               "live_bytes",
+	sValueCacheHitRatio:      "value_cache_hit_ratio",
+	sResidentBytes:           "resident_bytes",
+	sCheckpointMs:            "checkpoint_ms",
+	sTCPAuthP95:              "tcp_auth_p95_ms",
+	sHeavyQueriesRps:         "heavy_queries_rps",
+	sHeavyQueuedRps:          "heavy_queued_rps",
+	sHeavyRejectedRps:        "heavy_rejected_rps",
+	sHeavyWaiting:            "heavy_waiting",
+	sHeavyWaitP95:            "heavy_wait_p95_ms",
+	sAbandonedRps:            "abandoned_rps",
+	sMemoryBudget:            "memory_budget_bytes",
+	sHeapLiveBytes:           "heap_live_bytes",
+	sMemoryPressure:          "memory_pressure",
+	sMemoryRefusedRps:        "memory_refused_rps",
+	sValueCacheBytes:         "value_cache_bytes",
+	sPageCacheBytes:          "page_cache_bytes",
+	sDirtyPageBytes:          "dirty_page_bytes",
+	sHookResultsBytes:        "hook_results_bytes",
+	sIndexBuildBytes:         "index_build_bytes",
+	sRequestReservedBytes:    "request_reserved_bytes",
+	sHookQueryHitRatio:       "hook_query_hit_ratio",
+	sHookOutputHitRatio:      "hook_output_hit_ratio",
+	sHeldBytes:               "held_bytes",
+	sHookFoldHitRatio:        "hook_fold_hit_ratio",
+	sIndexCount:              "index_count",
+	sIndexBytes:              "index_bytes",
+	sDiskReadBytesRps:        "disk_read_bytes_rps",
+	sDiskWriteBytesRps:       "disk_write_bytes_rps",
+	sDiskSyncsRps:            "disk_syncs_rps",
+	sDiskSyncMs:              "disk_sync_ms",
+	sDiskFreeBytes:           "disk_free_bytes",
+	sRefusedWritesRps:        "refused_writes_rps",
+	sIndexUpkeepBytes:        "index_upkeep_bytes",
+	sBackupRunning:           "backup_running",
+	sBackupLastOK:            "backup_last_ok",
+	sBackupDurationMs:        "backup_duration_ms",
+	sBackupBytes:             "backup_bytes",
+	sBackupAgeSeconds:        "backup_age_seconds",
+	sStartupMs:               "startup_ms",
 }
 
 func SeriesNames() []string {
@@ -157,6 +246,10 @@ var rateSeries = map[int]int{
 	sForbiddenRps:      cForbidden,
 	sFailedLoginsRps:   cFailedLogins,
 	sHookErrorsRps:     cHookErrors,
+	sHeavyQueriesRps:   cHeavyQueries,
+	sHeavyQueuedRps:    cHeavyQueued,
+	sHeavyRejectedRps:  cHeavyRejected,
+	sAbandonedRps:      cRequestsAbandoned,
 	sKVGetsRps:         cKVGets,
 	sKVSetsRps:         cKVSets,
 	sKVDeletesRps:      cKVDeletes,
@@ -210,6 +303,8 @@ func derive(prev, cur *snapshot) Point {
 	p.V[sTCPP99] = tcpHist.quantile(0.99)
 
 	p.V[sHookP95] = cur.hook.sub(prev.hook).quantile(0.95)
+	p.V[sTCPAuthP95] = cur.auth.sub(prev.auth).quantile(0.95)
+	p.V[sHeavyWaitP95] = cur.wait.sub(prev.wait).quantile(0.95)
 
 	if hits, misses := delta(cKVHits), delta(cKVMisses); hits+misses > 0 {
 		p.V[sKVHitRatio] = hits / (hits + misses)
@@ -238,14 +333,55 @@ func derive(prev, cur *snapshot) Point {
 	}
 
 	if cur.cpuSeconds >= 0 && prev.cpuSeconds >= 0 && cur.cpuSeconds >= prev.cpuSeconds && cur.procs > 0 {
-		p.V[sCPUPercent] = (cur.cpuSeconds - prev.cpuSeconds) / elapsed / float64(cur.procs) * 100
+		cores := (cur.cpuSeconds - prev.cpuSeconds) / elapsed
+		p.V[sCPUPercent] = cores / float64(cur.procs) * 100
+		p.V[sCPUCores] = cores
 	}
+
+	p.V[sGOMAXPROCS] = float64(cur.procs)
+
+	if hits, misses := cur.valueCacheHits-prev.valueCacheHits, cur.valueCacheMisses-prev.valueCacheMisses; cur.valueCacheHits >= prev.valueCacheHits && cur.valueCacheMisses >= prev.valueCacheMisses && hits+misses > 0 {
+		p.V[sValueCacheHitRatio] = float64(hits) / float64(hits+misses)
+	}
+
+	if cur.memoryRefused >= prev.memoryRefused {
+		p.V[sMemoryRefusedRps] = float64(cur.memoryRefused-prev.memoryRefused) / elapsed
+	}
+
+	if cur.disk.ReadBytes >= prev.disk.ReadBytes && cur.disk.WriteBytes >= prev.disk.WriteBytes {
+		p.V[sDiskReadBytesRps] = float64(cur.disk.ReadBytes-prev.disk.ReadBytes) / elapsed
+		p.V[sDiskWriteBytesRps] = float64(cur.disk.WriteBytes-prev.disk.WriteBytes) / elapsed
+	}
+
+	if done := cur.disk.Syncs - prev.disk.Syncs; done >= 0 {
+		p.V[sDiskSyncsRps] = float64(done) / elapsed
+		if done > 0 {
+			p.V[sDiskSyncMs] = float64(cur.disk.SyncNanos-prev.disk.SyncNanos) / float64(done) / 1e6
+		}
+	}
+
+	if cur.disk.RefusedWrites >= prev.disk.RefusedWrites {
+		p.V[sRefusedWritesRps] = float64(cur.disk.RefusedWrites-prev.disk.RefusedWrites) / elapsed
+	}
+
+	p.V[sHookQueryHitRatio] = ratio(cur.hookQuery, prev.hookQuery)
+	p.V[sHookOutputHitRatio] = ratio(cur.hookOutput, prev.hookOutput)
+	p.V[sHookFoldHitRatio] = ratio(cur.hookFold, prev.hookFold)
 
 	for s, v := range cur.gauges {
 		p.V[s] = v
 	}
 
 	return p
+}
+
+func ratio(cur, prev [2]int64) float64 {
+	hits, misses := cur[0]-prev[0], cur[1]-prev[1]
+	if hits < 0 || misses < 0 || hits+misses == 0 {
+		return math.NaN()
+	}
+
+	return float64(hits) / float64(hits+misses)
 }
 
 type Number float64

@@ -2,11 +2,13 @@ package boot
 
 import (
 	api_storage "github.com/taymour/elysiandb/internal/api"
+	"github.com/taymour/elysiandb/internal/backup"
 	"github.com/taymour/elysiandb/internal/cache"
+	"github.com/taymour/elysiandb/internal/durable"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/taymour/elysiandb/internal/metrics"
-	"github.com/taymour/elysiandb/internal/recovery"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/taymour/elysiandb/internal/storage"
 	"github.com/taymour/elysiandb/internal/transaction"
@@ -17,8 +19,12 @@ func MonitoringSources() metrics.Sources {
 		DataFolder:      func() string { return globals.GetConfig().Store.Folder },
 		KVKeys:          storage.CountKeys,
 		EntityCounts:    engine.CountEntitiesPerType,
-		IndexBacklog:    api_storage.DirtyFieldsCount,
-		RecoverySizes:   recovery.LogSizes,
+		IndexBacklog:    api_storage.IndexBacklog,
+		RecoverySizes:   storageLogSizes,
+		Engine:          engineSample,
+		HookCaches:      hookCaches,
+		HeavyWaiting:    api_storage.HeavyWaiting,
+		Indexes:         indexStates,
 		Transactions:    transaction.OpenTransactions,
 		HTTPConnections: HTTPConnections,
 		CacheEntries: func() int {
@@ -28,6 +34,12 @@ func MonitoringSources() metrics.Sources {
 			return cache.CacheStore.Entries()
 		},
 	}
+
+	if engine.IsEngineInternal() {
+		sources.Disk = diskSample
+	}
+
+	sources.Backup = backupSample
 
 	if security.UserAuthenticationIsEnabled() {
 		sources.AdminSessions = security.ActiveSessionCount
@@ -68,4 +80,83 @@ func WarnIfAuthenticationIsOffOnPublicAddress() {
 			"hint", "anyone who can reach these addresses can read and change all the data: enable security.authentication",
 		)
 	}
+}
+
+func storageLogSizes() (int64, int64) {
+	e := storage.Engine()
+	if e == nil {
+		return 0, 0
+	}
+
+	return 0, e.LogSinceCheckpoint()
+}
+
+func engineSample() metrics.EngineSample {
+	e := storage.Engine()
+	if e == nil {
+		return metrics.EngineSample{}
+	}
+
+	st := e.Stats()
+
+	return metrics.EngineSample{
+		LogSinceCheckpoint: st.LogSinceCheckpoint,
+		LogBytes:           st.LogBytes,
+		LiveBytes:          st.LiveBytes,
+		ValueCacheHits:     st.ValueCacheHits,
+		ValueCacheMisses:   st.ValueCacheMisses,
+		ResidentBytes:      st.ResidentStructBytes,
+		ValueCacheBytes:    st.ValueCacheBytes,
+		DirtyPageBytes:     st.DirtyPageBytes,
+		IndexCount:         st.IndexCount,
+		IndexBytes:         st.IndexBytes,
+		CheckpointMs:       st.LastCheckpointMs,
+	}
+}
+
+func diskSample() metrics.DiskSample {
+	io := durable.Stats()
+	sample := metrics.DiskSample{ReadBytes: io.ReadBytes, WriteBytes: io.WriteBytes, Syncs: io.Syncs, SyncNanos: io.SyncNanos, RefusedWrites: storage.RefusedWrites()}
+
+	if free, err := durable.FreeBytes(globals.GetConfig().Store.Folder); err == nil {
+		sample.FreeBytes = free
+	}
+
+	if e := storage.Engine(); e != nil {
+		sample.IndexUpkeepBytes = e.IndexBacklogBytes()
+	}
+
+	return sample
+}
+
+func backupSample() metrics.BackupSample {
+	st := backup.CurrentStatus()
+
+	return metrics.BackupSample{Running: st.Running, Completed: st.Completed, Failed: st.Failed, LastOK: st.LastOK, LastAt: st.LastAt, Duration: st.Duration, Bytes: st.Bytes}
+}
+
+func hookCaches() metrics.HookCacheSample {
+	q, o, f := hook.QueryCache(), hook.OutputMemo(), hook.Folds()
+
+	return metrics.HookCacheSample{QueryHits: q.Hits, QueryMisses: q.Misses, OutputHits: o.Hits, OutputMisses: o.Misses, FoldHits: f.Cached + f.Incremental, FoldPasses: f.FullPasses}
+}
+
+func indexStates() []metrics.IndexState {
+	e := storage.Engine()
+	if e == nil || !engine.IsEngineInternal() {
+		return nil
+	}
+
+	states := e.IndexStates()
+	out := make([]metrics.IndexState, 0, len(states))
+	for _, st := range states {
+		item := metrics.IndexState{Entity: st.Entity, Index: st.Index, State: st.State, Entries: st.Entries, Kind: st.Kind, Origin: st.Origin, Pinned: st.Pinned, Bytes: st.Bytes, Uses: st.Uses}
+		if !st.LastUsed.IsZero() {
+			used := st.LastUsed
+			item.LastUsedAt = &used
+		}
+		out = append(out, item)
+	}
+
+	return out
 }

@@ -85,10 +85,9 @@ func startTCPServer(t *testing.T, security configuration.SecurityConfig) string 
 	tcpServerOnce.Do(func() {
 		tcpServerPort = freeTCPPort(t)
 		globals.SetConfig(tcpConfig(security))
-		storage.LoadDB()
-		storage.LoadJsonDB()
-		boot.BootSaver()
-		boot.BootExpirationHandler()
+		if err := storage.Open(storage.ModeServer); err != nil {
+			t.Fatalf("cannot open the store: %v", err)
+		}
 
 		tcpServerAddr = fmt.Sprintf("127.0.0.1:%d", tcpServerPort)
 		go boot.InitTCP()

@@ -2,12 +2,19 @@ package api_test
 
 import (
 	"bytes"
+	"fmt"
+	"math/rand"
 	"reflect"
+	"sort"
+	"strings"
+	"sync"
 	"testing"
 
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/configuration"
+	"github.com/taymour/elysiandb/internal/datastore"
 	"github.com/taymour/elysiandb/internal/globals"
+	"github.com/taymour/elysiandb/internal/query"
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
@@ -25,6 +32,7 @@ func initIdxTestStore(t *testing.T) {
 	})
 	storage.LoadDB()
 	storage.LoadJsonDB()
+	t.Cleanup(func() { _ = storage.Close() })
 }
 
 func decodeIDs(b []byte) []string {
@@ -41,319 +49,532 @@ func decodeIDs(b []byte) []string {
 	return out
 }
 
-func TestAddIdToindexes_And_RemoveIdFromIndexes(t *testing.T) {
+func ids(list []map[string]any) []string {
+	out := make([]string, 0, len(list))
+	for _, item := range list {
+		out = append(out, item["id"].(string))
+	}
+
+	return out
+}
+
+func TestConcurrentWritesToOneEntityLoseNoID(t *testing.T) {
 	initIdxTestStore(t)
 
-	entity := "idx_users"
-	api_storage.AddIdToindexes(entity, "u1")
-	api_storage.AddIdToindexes(entity, "u2")
+	api_storage.WriteEntity("items", map[string]any{"id": "seed", "n": -1.0})
+	api_storage.EnsureSortIndex("items", "n")
 
-	key := globals.ApiEntityIndexIdKey(entity)
-	raw, err := storage.GetByKey(key)
-	if err != nil {
-		t.Fatalf("GetByKey: %v", err)
+	var wg sync.WaitGroup
+	for g := 0; g < 16; g++ {
+		wg.Add(1)
+		go func(g int) {
+			defer wg.Done()
+			for i := 0; i < 200; i++ {
+				api_storage.WriteEntity("items", map[string]any{"id": fmt.Sprintf("g%02d-%03d", g, i), "n": float64(g*1000 + i)})
+			}
+		}(g)
 	}
-	got := decodeIDs(raw)
-	if !reflect.DeepEqual(got, []string{"u1", "u2"}) {
-		t.Fatalf("ids=%v, want [u1 u2]", got)
+	wg.Wait()
+
+	want := 3201
+	if got := api_storage.CountEntities("items"); got != want {
+		t.Fatalf("count %d, want %d", got, want)
 	}
 
-	api_storage.RemoveIdFromIndexes(entity, "u1")
-
-	raw2, err := storage.GetByKey(key)
-	if err != nil {
-		t.Fatalf("GetByKey after remove: %v", err)
+	if got := len(api_storage.ListEntities("items", 0, 0, "", true, nil, "", "")); got != want {
+		t.Fatalf("list %d, want %d", got, want)
 	}
-	got2 := decodeIDs(raw2)
-	if !reflect.DeepEqual(got2, []string{"u2"}) {
-		t.Fatalf("ids=%v, want [u2]", got2)
+
+	if got := len(api_storage.ListEntities("items", 0, 0, "n", true, nil, "", "")); got != want {
+		t.Fatalf("sorted list %d, want %d", got, want)
+	}
+
+	raw, err := api_storage.GetListOfIds("items", "", true)
+	if err != nil || len(decodeIDs(raw)) != want {
+		t.Fatalf("id index %d, want %d (%v)", len(decodeIDs(raw)), want, err)
 	}
 }
 
-func TestAddFieldToIndexedFields_Dedup_And_GetList(t *testing.T) {
+func TestWriteDuringAnIndexBuildIsInTheIndex(t *testing.T) {
 	initIdxTestStore(t)
 
-	entity := "idx_articles"
-	api_storage.AddFieldToIndexedFields(entity, "title")
-	api_storage.AddFieldToIndexedFields(entity, "title")
-	api_storage.AddFieldToIndexedFields(entity, "created_at")
+	docs := make([]map[string]any, 0, 20000)
+	for i := 0; i < 20000; i++ {
+		docs = append(docs, map[string]any{"id": fmt.Sprintf("d%05d", i), "rank": float64(i)})
+	}
+	api_storage.WriteListOfEntities("big", docs)
 
-	list := api_storage.GetListForIndexedFields(entity)
-	if !reflect.DeepEqual(asSet(list), asSet([]string{"title", "created_at"})) {
-		t.Fatalf("fields=%v", list)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		api_storage.WriteEntity("big", map[string]any{"id": "late", "rank": -1.0})
+	}()
+
+	sorted := api_storage.ListEntities("big", 0, 0, "rank", true, nil, "", "")
+	<-done
+
+	sorted = api_storage.ListEntities("big", 0, 0, "rank", true, nil, "", "")
+	if len(sorted) != 20001 || sorted[0]["id"] != "late" {
+		t.Fatalf("expected 20001 sorted documents starting with the late write, got %d, first %v", len(sorted), sorted[0]["id"])
+	}
+
+	if got := api_storage.CountEntities("big"); got != 20001 {
+		t.Fatalf("count %d", got)
 	}
 }
 
-func TestEnsureFieldIndex_And_IndexExists(t *testing.T) {
+func TestSortTiesComeInInsertionOrderAndMissingValuesLast(t *testing.T) {
 	initIdxTestStore(t)
 
-	entity := "idx_scores"
-	api_storage.WriteEntity(entity, map[string]any{"id": "a", "score": 2})
-	api_storage.WriteEntity(entity, map[string]any{"id": "b", "score": 1})
-	api_storage.WriteEntity(entity, map[string]any{"id": "c", "score": 3})
-
-	if !api_storage.IndexExistsForField(entity, "score") {
-		t.Fatalf("index should exist")
+	for _, d := range []map[string]any{
+		{"id": "s1", "v": "b"},
+		{"id": "n2", "v": 2.0},
+		{"id": "m1"},
+		{"id": "s2", "v": "a"},
+		{"id": "n1", "v": 1.0},
+		{"id": "d1", "v": "2024-01-02"},
+		{"id": "b1", "v": true},
+		{"id": "s3", "v": "a"},
+		{"id": "m2", "v": nil},
+		{"id": "o1", "v": map[string]any{"x": 1.0}},
+		{"id": "d2", "v": "2023-05-01T10:00:00+02:00"},
+		{"id": "b2", "v": false},
+		{"id": "n3", "v": 1.0},
+	} {
+		api_storage.WriteEntity("mixed", d)
 	}
 
-	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, "score")
-	descKey := globals.ApiEntityIndexFieldSortDescKey(entity, "score")
-
-	ascRaw, err := storage.GetByKey(ascKey)
-	if err != nil {
-		t.Fatalf("asc GetByKey: %v", err)
-	}
-	descRaw, err := storage.GetByKey(descKey)
-	if err != nil {
-		t.Fatalf("desc GetByKey: %v", err)
+	asc := ids(api_storage.ListEntities("mixed", 0, 0, "v", true, nil, "", ""))
+	wantAsc := []string{"n1", "n3", "n2", "d2", "d1", "s2", "s3", "s1", "b2", "b1", "o1", "m1", "m2"}
+	if !reflect.DeepEqual(asc, wantAsc) {
+		t.Fatalf("asc %v, want %v", asc, wantAsc)
 	}
 
-	asc := decodeIDs(ascRaw)
-	desc := decodeIDs(descRaw)
-
-	if !reflect.DeepEqual(asc, []string{"b", "a", "c"}) {
-		t.Fatalf("asc=%v", asc)
-	}
-	if !reflect.DeepEqual(desc, []string{"c", "a", "b"}) {
-		t.Fatalf("desc=%v", desc)
+	desc := ids(api_storage.ListEntities("mixed", 0, 0, "v", false, nil, "", ""))
+	wantDesc := []string{"o1", "b1", "b2", "s1", "s2", "s3", "d1", "d2", "n2", "n1", "n3", "m1", "m2"}
+	if !reflect.DeepEqual(desc, wantDesc) {
+		t.Fatalf("desc %v, want %v", desc, wantDesc)
 	}
 
-	fields := api_storage.GetListForIndexedFields(entity)
-	if !reflect.DeepEqual(fields, []string{"score"}) {
-		t.Fatalf("fields=%v", fields)
+	for offset := 0; offset < len(wantDesc); offset++ {
+		page := ids(api_storage.ListEntities("mixed", 3, offset, "v", false, nil, "", ""))
+		end := min(offset+3, len(wantDesc))
+		if !reflect.DeepEqual(page, wantDesc[offset:end]) {
+			t.Fatalf("desc page at %d: %v, want %v", offset, page, wantDesc[offset:end])
+		}
+	}
+
+	data := api_storage.ListEntities("mixed", 0, 0, "", true, nil, "", "")
+	api_storage.SortEntities(data, []query.Sort{{Field: "v", Ascending: false}})
+	if got := ids(data); !reflect.DeepEqual(got, wantDesc) {
+		t.Fatalf("the Query API comparator gives %v, the index %v", got, wantDesc)
 	}
 }
 
-func TestEnsureFieldIndex_Nested(t *testing.T) {
+func TestIndexesFollowUpdatesDeletesAndResets(t *testing.T) {
 	initIdxTestStore(t)
 
-	entity := "idx_nested"
-	api_storage.WriteEntity(entity, map[string]any{
-		"id": "n1",
-		"obj": map[string]any{
-			"sub": map[string]any{
-				"val": 42,
-			},
-		},
+	for i := 0; i < 50; i++ {
+		api_storage.WriteEntity("users", map[string]any{"id": fmt.Sprintf("u%02d", i), "age": float64(50 - i), "team": fmt.Sprintf("t%d", i%5)})
+	}
+
+	filters := map[string]map[string]string{"team": {"eq": "t1"}}
+	if got := len(api_storage.ListEntities("users", 0, 0, "age", true, filters, "", "")); got != 10 {
+		t.Fatalf("expected 10 members of t1, got %d", got)
+	}
+
+	api_storage.UpdateEntityById("users", "u01", map[string]any{"team": "t2", "age": 1000.0})
+	api_storage.DeleteEntityById("users", "u06")
+
+	got := ids(api_storage.ListEntities("users", 0, 0, "age", true, filters, "", ""))
+	if len(got) != 8 || got[0] != "u46" {
+		t.Fatalf("unexpected t1 members after an update and a delete: %v", got)
+	}
+
+	sorted := ids(api_storage.ListEntities("users", 1, 0, "age", false, nil, "", ""))
+	if !reflect.DeepEqual(sorted, []string{"u01"}) {
+		t.Fatalf("the updated age leads the descending sort, got %v", sorted)
+	}
+
+	api_storage.DeleteAllEntities("users")
+	if got := api_storage.ListEntities("users", 0, 0, "age", true, filters, "", ""); len(got) != 0 {
+		t.Fatalf("a reset empties every index, got %v", got)
+	}
+
+	api_storage.WriteEntity("users", map[string]any{"id": "new", "age": 3.0, "team": "t1"})
+	if got := ids(api_storage.ListEntities("users", 0, 0, "age", true, filters, "", "")); !reflect.DeepEqual(got, []string{"new"}) {
+		t.Fatalf("indexes work after a reset, got %v", got)
+	}
+}
+
+func TestIndexKeysForTheDocumentedEntityKeys(t *testing.T) {
+	initIdxTestStore(t)
+
+	api_storage.WriteEntity("books", map[string]any{"id": "b2", "title": "Zed"})
+	api_storage.WriteEntity("books", map[string]any{"id": "b1", "title": "Ada"})
+	api_storage.ListEntities("books", 0, 0, "title", true, nil, "", "")
+
+	raw, err := storage.GetByKey(globals.ApiEntityIndexIdKey("books"))
+	if err != nil || strings.Join(decodeIDs(raw), ",") != "b2,b1" {
+		t.Fatalf("id index %q %v", raw, err)
+	}
+
+	raw, err = storage.GetByKey(globals.ApiEntityIndexFieldSortAscKey("books", "title"))
+	if err != nil || strings.Join(decodeIDs(raw), ",") != "b1,b2" {
+		t.Fatalf("sort index %q %v", raw, err)
+	}
+
+	raw, err = storage.GetByKey(globals.ApiAllEntityTypesListKey())
+	if err != nil || string(raw) != "books" {
+		t.Fatalf("types list %q %v", raw, err)
+	}
+
+	if !api_storage.IndexExistsForField("books", "title") || !reflect.DeepEqual(api_storage.GetListForIndexedFields("books"), []string{"title"}) {
+		t.Fatalf("the sort index of title should be listed")
+	}
+
+	if got := api_storage.GetSortedEntityIdsByField("books", "title", false); !reflect.DeepEqual(got, []string{"b2", "b1"}) {
+		t.Fatalf("descending ids %v", got)
+	}
+}
+
+var (
+	diffStrings = []string{"alpha", "Alpha", "beta", "BETA gamma", "2024-01-15", "2024-01-15T08:30:00Z", "2024-01-15T23:30:00-05:00", "2023-12-31", "", "a*b", "x\\y", "42", "true", "Ünïcode"}
+	diffOps     = []string{"eq", "neq", "lt", "lte", "gt", "gte", "contains", "not_contains", "all", "any", "none", "weird"}
+	diffCmps    = []string{"alpha", "ALPHA", "al*", "*ta", "*", "b*a", "2024-01-15", "2024-01-15T10:00:00Z", "2023-06-01", "42", "41.5", "true", "1", "0", "false", "beta,alpha", "1,2", "", "a\\*b", "ü*"}
+)
+
+func randomValue(r *rand.Rand, depth int) any {
+	switch r.Intn(9) {
+	case 0, 1:
+		return diffStrings[r.Intn(len(diffStrings))]
+	case 2:
+		return float64(r.Intn(100)) - 20 + []float64{0, 0.5}[r.Intn(2)]
+	case 3:
+		return r.Intn(2) == 0
+	case 4:
+		n := r.Intn(4)
+		arr := make([]any, 0, n)
+		for i := 0; i < n; i++ {
+			if r.Intn(3) == 0 {
+				arr = append(arr, float64(r.Intn(3)))
+			} else {
+				arr = append(arr, diffStrings[r.Intn(len(diffStrings))])
+			}
+		}
+		return arr
+	case 5:
+		if depth > 1 {
+			return nil
+		}
+		return map[string]any{"x": randomValue(r, depth+1), "y": randomValue(r, depth+1)}
+	case 6:
+		if depth > 1 {
+			return "leaf"
+		}
+		return []any{map[string]any{"x": randomValue(r, depth+1)}, map[string]any{"x": randomValue(r, depth+1)}}
+	case 7:
+		return nil
+	default:
+		return float64(r.Intn(5))
+	}
+}
+
+func randomLeaf(r *rand.Rand) map[string]map[string]string {
+	field := []string{"a", "b", "m.x", "m.y", "list.x"}[r.Intn(5)]
+	ops := map[string]string{diffOps[r.Intn(len(diffOps))]: diffCmps[r.Intn(len(diffCmps))]}
+	if r.Intn(4) == 0 {
+		ops[diffOps[r.Intn(len(diffOps))]] = diffCmps[r.Intn(len(diffCmps))]
+	}
+
+	filters := map[string]map[string]string{field: ops}
+	if r.Intn(3) == 0 {
+		other := []string{"a", "b", "m.x"}[r.Intn(3)]
+		if _, exists := filters[other]; !exists {
+			filters[other] = map[string]string{diffOps[r.Intn(4)]: diffCmps[r.Intn(len(diffCmps))]}
+		}
+	}
+
+	return filters
+}
+
+func TestPlannerMatchesTheScanOnRandomDocumentsAndFilters(t *testing.T) {
+	initIdxTestStore(t)
+
+	r := rand.New(rand.NewSource(42))
+	all := []map[string]any{}
+	for i := 0; i < 600; i++ {
+		doc := map[string]any{"id": fmt.Sprintf("r%03d", i)}
+		for _, f := range []string{"a", "b", "m", "list"} {
+			if r.Intn(6) == 0 {
+				continue
+			}
+
+			switch f {
+			case "m":
+				doc[f] = map[string]any{"x": randomValue(r, 1), "y": randomValue(r, 1)}
+			case "list":
+				doc[f] = []any{map[string]any{"x": randomValue(r, 1)}, map[string]any{"x": randomValue(r, 1)}}
+			default:
+				doc[f] = randomValue(r, 0)
+			}
+		}
+		all = append(all, doc)
+	}
+
+	api_storage.WriteListOfEntities("diff", all)
+	reference := api_storage.ListEntities("diff", 0, 0, "", true, nil, "", "")
+
+	scan := func(filters map[string]map[string]string) []string {
+		out := []string{}
+		for _, doc := range reference {
+			if api_storage.FiltersMatchEntity(doc, filters) {
+				out = append(out, doc["id"].(string))
+			}
+		}
+		return out
+	}
+
+	for i := 0; i < 1500; i++ {
+		filters := randomLeaf(r)
+		want := scan(filters)
+		got := ids(api_storage.ListEntities("diff", 0, 0, "", true, filters, "", ""))
+		if !reflect.DeepEqual(got, want) && !(len(got) == 0 && len(want) == 0) {
+			t.Fatalf("filters %v: planner %v, scan %v", filters, got, want)
+		}
+
+		res := api_storage.Plan(api_storage.ListQuery{Entity: "diff", Filters: filters, CountOnly: true})
+		if res.Total != len(want) {
+			t.Fatalf("filters %v: count %d, scan %d", filters, res.Total, len(want))
+		}
+	}
+
+	for i := 0; i < 300; i++ {
+		node := query.FilterNode{Or: []query.FilterNode{{Leaf: randomLeaf(r)}, {And: []query.FilterNode{{Leaf: randomLeaf(r)}, {Leaf: randomLeaf(r)}}}}}
+		want := []string{}
+		for _, doc := range reference {
+			if api_storage.QueryFilterMatchesEntity(node, doc) {
+				want = append(want, doc["id"].(string))
+			}
+		}
+
+		got := ids(api_storage.PlanQuery(query.Query{Entity: "diff", Filter: node}, false).Decode())
+		if !reflect.DeepEqual(got, want) && !(len(got) == 0 && len(want) == 0) {
+			t.Fatalf("node %+v: planner %v, scan %v", node, got, want)
+		}
+	}
+}
+
+func TestSearchIndexMatchesTheScan(t *testing.T) {
+	initIdxTestStore(t)
+
+	r := rand.New(rand.NewSource(3))
+	words := []string{"dragon", "Dune", "foundation", "kindred", "the", "abc", "Ünïcode", "a*b", "beginning"}
+	docs := []map[string]any{}
+	for i := 0; i < 300; i++ {
+		doc := map[string]any{"id": fmt.Sprintf("s%03d", i), "title": words[r.Intn(len(words))] + " " + words[r.Intn(len(words))]}
+		if r.Intn(2) == 0 {
+			doc["tags"] = []any{words[r.Intn(len(words))]}
+		}
+		if r.Intn(3) == 0 {
+			doc["meta"] = map[string]any{"note": words[r.Intn(len(words))], "_elysiandb_core_x": "dragon"}
+		}
+		docs = append(docs, doc)
+	}
+	api_storage.WriteListOfEntities("texts", docs)
+	api_storage.ListEntities("texts", 0, 0, "", true, nil, "warm", "")
+	storage.Engine().SearchCandidates("texts", "*warm*")
+
+	reference := api_storage.ListEntities("texts", 0, 0, "", true, nil, "", "")
+	for _, search := range []string{"dragon", "DUNE", "the", "ab", "*ing", "beg*ing", "zzz", "nïc", "a\\*b", "dune dragon", "on"} {
+		want := []string{}
+		for _, doc := range reference {
+			if api_storage.SearchMatchesEntity(doc, search) {
+				want = append(want, doc["id"].(string))
+			}
+		}
+
+		got := ids(api_storage.ListEntities("texts", 0, 0, "", true, nil, search, ""))
+		if !reflect.DeepEqual(got, want) && !(len(got) == 0 && len(want) == 0) {
+			t.Fatalf("search %q: index %v, scan %v", search, got, want)
+		}
+	}
+
+	api_storage.UpdateEntityById("texts", "s000", map[string]any{"title": "zebra crossing"})
+	got := ids(api_storage.ListEntities("texts", 0, 0, "", true, nil, "zebra", ""))
+	if !reflect.DeepEqual(got, []string{"s000"}) {
+		t.Fatalf("an update is searchable at once, got %v", got)
+	}
+}
+
+func TestUnfilteredPagesAndCountsUseTheLiveSet(t *testing.T) {
+	initIdxTestStore(t)
+
+	list := []map[string]any{}
+	for i := 0; i < 1000; i++ {
+		list = append(list, map[string]any{"id": fmt.Sprintf("p%04d", i)})
+	}
+	api_storage.WriteListOfEntities("pages", list)
+
+	for i := 0; i < 1000; i += 3 {
+		api_storage.DeleteEntityById("pages", fmt.Sprintf("p%04d", i))
+	}
+
+	remaining := []string{}
+	for i := 0; i < 1000; i++ {
+		if i%3 != 0 {
+			remaining = append(remaining, fmt.Sprintf("p%04d", i))
+		}
+	}
+
+	if got := api_storage.CountEntities("pages"); got != len(remaining) {
+		t.Fatalf("count %d, want %d", got, len(remaining))
+	}
+
+	for _, offset := range []int{0, 1, 333, 665, 666, 700} {
+		page := ids(api_storage.ListEntities("pages", 10, offset, "", true, nil, "", ""))
+		end := min(offset+10, len(remaining))
+		start := min(offset, len(remaining))
+		if !reflect.DeepEqual(page, remaining[start:end]) && !(len(page) == 0 && start == end) {
+			t.Fatalf("page at %d: %v, want %v", offset, page, remaining[start:end])
+		}
+	}
+
+	snap := storage.Engine().Snapshot("pages")
+	seqs := []int{}
+	snap.Ascend(0, func(d datastore.Doc) bool {
+		seqs = append(seqs, int(d.Seq()))
+		return true
 	})
-
-	if !api_storage.IndexExistsForField(entity, "obj.sub.val") {
-		t.Fatalf("expected nested index obj.sub.val to exist")
+	if !sort.IntsAreSorted(seqs) {
+		t.Fatalf("the live set iterates in insertion order")
 	}
 }
 
-func TestRemoveEntityIndexes(t *testing.T) {
+func TestFiltersThroughReferencesMatchTheScan(t *testing.T) {
 	initIdxTestStore(t)
 
-	entity := "idx_remove"
-	api_storage.AddIdToindexes(entity, "x1")
-	api_storage.AddFieldToIndexedFields(entity, "age")
-	api_storage.EnsureFieldIndex(entity, "age", "x1", 42)
-
-	api_storage.RemoveEntityIndexes(entity)
-
-	keys := []string{
-		globals.ApiEntityIndexIdKey(entity),
-		globals.ApiEntityIndexAllFieldsKey(entity),
-		globals.ApiEntityIndexFieldSortAscKey(entity, "age"),
-		globals.ApiEntityIndexFieldSortDescKey(entity, "age"),
+	r := rand.New(rand.NewSource(5))
+	names := []string{"Ada", "ada lovelace", "Bob", "Chiang", "Dune", "Émile"}
+	for i := 0; i < 40; i++ {
+		api_storage.WriteEntity("person", map[string]any{"id": fmt.Sprintf("p%02d", i), "name": names[r.Intn(len(names))], "age": float64(20 + r.Intn(50)), "city": map[string]any{"@entity": "city", "id": fmt.Sprintf("c%d", r.Intn(5))}})
 	}
-	for _, k := range keys {
-		if v, _ := storage.GetByKey(k); v != nil {
-			t.Fatalf("expected key %q to be deleted, got %q", k, string(v))
+	for i := 0; i < 5; i++ {
+		api_storage.WriteEntity("city", map[string]any{"id": fmt.Sprintf("c%d", i), "label": []string{"Paris", "Lyon", "paris", "Oslo", "Rome"}[i]})
+	}
+
+	docs := []map[string]any{}
+	for i := 0; i < 300; i++ {
+		doc := map[string]any{"id": fmt.Sprintf("b%03d", i), "title": names[r.Intn(len(names))]}
+		switch r.Intn(4) {
+		case 0:
+			doc["author"] = map[string]any{"@entity": "person", "id": fmt.Sprintf("p%02d", r.Intn(45))}
+		case 1:
+			doc["author"] = map[string]any{"name": names[r.Intn(len(names))], "age": float64(r.Intn(90))}
+		case 2:
+			doc["authors"] = []any{map[string]any{"@entity": "person", "id": fmt.Sprintf("p%02d", r.Intn(40))}, map[string]any{"@entity": "person", "id": fmt.Sprintf("p%02d", r.Intn(40))}}
+		}
+		docs = append(docs, doc)
+	}
+	api_storage.WriteListOfEntities("bk", docs)
+
+	filters := []map[string]map[string]string{
+		{"author.name": {"eq": "ada*"}},
+		{"author.name": {"contains": "chi"}},
+		{"author.age": {"gt": "40"}},
+		{"authors.name": {"eq": "Bob"}},
+		{"authors.age": {"lte": "30"}, "title": {"eq": "dune"}},
+		{"author.city.label": {"eq": "paris"}},
+		{"authors.city.id": {"eq": "c2"}},
+		{"author.name": {"neq": "Bob"}},
+		{"author.id": {"eq": "p03"}},
+	}
+
+	for _, f := range filters {
+		includes := api_storage.ExtractAutoIncludes(f)
+		all := api_storage.ListEntities("bk", 0, 0, "", true, nil, "", includes)
+		want := []string{}
+		for _, doc := range all {
+			if api_storage.FiltersMatchEntity(doc, f) {
+				want = append(want, doc["id"].(string))
+			}
+		}
+
+		got := ids(api_storage.ListEntities("bk", 0, 0, "", true, f, "", ""))
+		if !reflect.DeepEqual(got, want) && !(len(got) == 0 && len(want) == 0) {
+			t.Fatalf("filters %v: planner %v, scan %v", f, got, want)
+		}
+
+		if res := api_storage.Plan(api_storage.ListQuery{Entity: "bk", Filters: f, Includes: includes, CountOnly: true}); res.Total != len(want) {
+			t.Fatalf("filters %v: count %d, scan %d", f, res.Total, len(want))
+		}
+	}
+
+	api_storage.UpdateEntityById("person", "p03", map[string]any{"name": "Zed"})
+	f := map[string]map[string]string{"author.name": {"eq": "zed"}}
+	got := api_storage.ListEntities("bk", 0, 0, "", true, f, "", "")
+	for _, doc := range got {
+		if doc["author"].(map[string]any)["id"] != "p03" {
+			t.Fatalf("an update of the target is seen through the reference, got %v", doc)
 		}
 	}
 }
 
-func TestIndexesCreatedOnWriteEntity(t *testing.T) {
+func TestSortedPagesMatchTheQueryAPIComparator(t *testing.T) {
 	initIdxTestStore(t)
 
-	entity := "idx_update"
-	api_storage.WriteEntity(entity, map[string]any{"id": "p1", "rank": 10})
-	api_storage.WriteEntity(entity, map[string]any{"id": "p2", "rank": 5})
-
-	if !api_storage.IndexExistsForField(entity, "rank") {
-		t.Fatalf("expected index after WriteEntity")
-	}
-
-	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, "rank")
-	ascRaw, err := storage.GetByKey(ascKey)
-	if err != nil {
-		t.Fatalf("asc GetByKey: %v", err)
-	}
-	asc := decodeIDs(ascRaw)
-	if !reflect.DeepEqual(asc, []string{"p2", "p1"}) {
-		t.Fatalf("asc=%v", asc)
-	}
-}
-
-func TestDeleteIndexesForField(t *testing.T) {
-	initIdxTestStore(t)
-
-	entity := "idx_delete_field"
-	api_storage.WriteEntity(entity, map[string]any{"id": "u1", "score": 10, "age": 30})
-	api_storage.WriteEntity(entity, map[string]any{"id": "u2", "score": 5, "age": 25})
-
-	if !api_storage.IndexExistsForField(entity, "score") || !api_storage.IndexExistsForField(entity, "age") {
-		t.Fatalf("expected indexes for score and age to exist before deletion")
-	}
-
-	api_storage.DeleteIndexesForField(entity, "score")
-
-	if _, dirty := api_storage.DirtyFields.Load(entity + "|score"); !dirty {
-		t.Fatalf("expected 'score' index to be marked dirty or removed")
-	}
-	if !api_storage.IndexExistsForField(entity, "age") {
-		t.Fatalf("index for 'age' should still exist")
-	}
-}
-
-func asSet(xs []string) map[string]struct{} {
-	m := make(map[string]struct{}, len(xs))
-	for _, x := range xs {
-		m[x] = struct{}{}
-	}
-	return m
-}
-
-func TestUpdateIndexesForEntity_SimpleChange(t *testing.T) {
-	initIdxTestStore(t)
-	entity := "idx_update_simple"
-	oldData := map[string]interface{}{"id": "1", "name": "Alice", "age": 30}
-	newData := map[string]interface{}{"id": "1", "name": "Bob", "age": 30}
-	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
-	if !api_storage.IndexExistsForField(entity, "name") {
-		t.Fatalf("expected index for 'name'")
-	}
-}
-
-func TestUpdateIndexesForEntity_AddField(t *testing.T) {
-	initIdxTestStore(t)
-	entity := "idx_update_add"
-	oldData := map[string]interface{}{"id": "1", "name": "Alice"}
-	newData := map[string]interface{}{"id": "1", "name": "Alice", "city": "Paris"}
-	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
-	if !api_storage.IndexExistsForField(entity, "city") {
-		t.Fatalf("expected index for 'city'")
-	}
-}
-
-func TestUpdateIndexesForEntity_RemoveField(t *testing.T) {
-	initIdxTestStore(t)
-	entity := "idx_update_remove"
-	oldData := map[string]interface{}{"id": "1", "country": "FR", "age": 40}
-	newData := map[string]interface{}{"id": "1", "age": 40}
-	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
-
-	if _, dirty := api_storage.DirtyFields.Load(entity + "|country"); !dirty {
-		t.Fatalf("expected index for 'country' to be marked dirty or removed")
-	}
-}
-
-func TestUpdateIndexesForEntity_ArrayChange(t *testing.T) {
-	initIdxTestStore(t)
-	entity := "idx_update_array"
-	oldData := map[string]interface{}{"id": "1", "tags": []interface{}{"a", "b"}}
-	newData := map[string]interface{}{"id": "1", "tags": []interface{}{"a", "b", "c"}}
-	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
-	if !api_storage.IndexExistsForField(entity, "tags") {
-		t.Fatalf("expected index for 'tags'")
-	}
-}
-
-func TestUpdateIndexesForEntity_MapChange(t *testing.T) {
-	initIdxTestStore(t)
-	entity := "idx_update_map"
-	oldData := map[string]interface{}{"id": "1", "info": map[string]interface{}{"a": 1, "b": 2}}
-	newData := map[string]interface{}{"id": "1", "info": map[string]interface{}{"a": 1, "b": 3}}
-	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
-	if !api_storage.IndexExistsForField(entity, "info") {
-		t.Fatalf("expected index for 'info'")
-	}
-}
-
-func TestUpdateIndexesForEntity_NoChange(t *testing.T) {
-	initIdxTestStore(t)
-	entity := "idx_update_nochange"
-	oldData := map[string]interface{}{"id": "1", "x": 10}
-	newData := map[string]interface{}{"id": "1", "x": 10}
-	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
-	if !api_storage.IndexExistsForField(entity, "x") {
-		t.Fatalf("expected index for 'x'")
-	}
-}
-
-func TestUpdateIndexesForEntity_ComplexNestedChange(t *testing.T) {
-	initIdxTestStore(t)
-	entity := "idx_update_nested"
-	oldData := map[string]interface{}{
-		"id": "1",
-		"obj": map[string]interface{}{
-			"a": []interface{}{"x", "y"},
-			"b": 10,
-		},
-	}
-	newData := map[string]interface{}{
-		"id": "1",
-		"obj": map[string]interface{}{
-			"a": []interface{}{"x", "z"},
-			"b": 11,
-		},
-	}
-	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
-	if !api_storage.IndexExistsForField(entity, "obj.a") {
-		t.Fatalf("expected index for 'obj.a'")
-	}
-	if !api_storage.IndexExistsForField(entity, "obj.b") {
-		t.Fatalf("expected index for 'obj.b'")
-	}
-}
-
-func TestUpdateIndexesForEntity_MultipleChanges(t *testing.T) {
-	initIdxTestStore(t)
-	entity := "idx_update_multi"
-	oldData := map[string]interface{}{"id": "1", "name": "A", "age": 20, "tags": []interface{}{"t1"}}
-	newData := map[string]interface{}{"id": "1", "name": "B", "age": 25, "tags": []interface{}{"t2", "t3"}}
-	api_storage.UpdateIndexesForEntity(entity, "1", oldData, newData)
-	for _, f := range []string{"name", "age", "tags"} {
-		if !api_storage.IndexExistsForField(entity, f) {
-			t.Fatalf("expected index for '%s'", f)
+	r := rand.New(rand.NewSource(9))
+	values := []any{1.0, 2.0, 2.0, "a", "b", "B", true, false, "2024-01-01", "2023-06-01T10:00:00+02:00", map[string]any{"x": 1.0}, nil}
+	docs := []map[string]any{}
+	for i := 0; i < 400; i++ {
+		doc := map[string]any{"id": fmt.Sprintf("s%03d", i), "g": float64(r.Intn(4))}
+		if v := values[r.Intn(len(values))]; v != nil || r.Intn(2) == 0 {
+			doc["v"] = v
 		}
+		if r.Intn(5) > 0 {
+			doc["w"] = float64(r.Intn(10))
+		}
+		docs = append(docs, doc)
 	}
-}
+	api_storage.WriteListOfEntities("sorts", docs)
+	all := api_storage.ListEntities("sorts", 0, 0, "", true, nil, "", "")
 
-func TestMarkFieldDirtyAndEnsureFresh(t *testing.T) {
-	initIdxTestStore(t)
-	entity := "idx_lazy_refresh"
-	field := "price"
-	api_storage.MarkFieldDirty(entity, field)
+	for _, sorts := range [][]query.Sort{
+		{{Field: "v", Ascending: true}},
+		{{Field: "v", Ascending: false}},
+		{{Field: "g", Ascending: true}, {Field: "w", Ascending: false}},
+		{{Field: "g", Ascending: false}, {Field: "v", Ascending: true}, {Field: "w", Ascending: true}},
+		{{Field: "w", Ascending: true}, {Field: "g", Ascending: true}},
+	} {
+		want := append([]map[string]any(nil), all...)
+		api_storage.SortEntities(want, sorts)
+		wantIDs := ids(want)
 
-	if _, dirty := api_storage.DirtyFields.Load(entity + "|" + field); !dirty {
-		t.Fatalf("expected field to be marked dirty")
-	}
+		for _, page := range [][2]int{{0, 0}, {0, 10}, {37, 25}, {390, 50}, {500, 10}} {
+			res := api_storage.Plan(api_storage.ListQuery{Entity: "sorts", Sorts: sorts, Offset: page[0], Limit: page[1]})
+			start := min(page[0], len(wantIDs))
+			end := len(wantIDs)
+			if page[1] > 0 {
+				end = min(start+page[1], len(wantIDs))
+			}
 
-	api_storage.EnsureFieldIndex(entity, field, "1", 100)
-	_ = api_storage.IndexExistsForField(entity, field)
-	if _, dirty := api_storage.DirtyFields.Load(entity + "|" + field); dirty {
-		t.Fatalf("expected dirty flag cleared after ensureFieldIndex")
-	}
-}
+			if got := res.IDs(); !reflect.DeepEqual(got, wantIDs[start:end]) && !(len(got) == 0 && start == end) {
+				t.Fatalf("sorts %+v page %v: got %v, want %v", sorts, page, got, wantIDs[start:end])
+			}
+		}
 
-func TestProcessNextDirtyField(t *testing.T) {
-	initIdxTestStore(t)
-	entity := "idx_process_dirty"
-	api_storage.WriteEntity(entity, map[string]any{"id": "x1", "qty": 10})
-	api_storage.MarkFieldDirty(entity, "qty")
+		filters := map[string]map[string]string{"g": {"lt": "3"}}
+		filtered := []string{}
+		for _, doc := range want {
+			if api_storage.FiltersMatchEntity(doc, filters) {
+				filtered = append(filtered, doc["id"].(string))
+			}
+		}
 
-	api_storage.ProcessNextDirtyField()
-
-	api_storage.ProcessNextDirtyField()
-	_ = api_storage.IndexExistsForField(entity, "qty")
-	if _, dirty := api_storage.DirtyFields.Load(entity + "|" + "qty"); dirty {
-		t.Fatalf("expected dirty flag cleared after processing")
-	}
-
-	if !api_storage.IndexExistsForField(entity, "qty") {
-		t.Fatalf("expected index rebuilt for qty")
+		node := query.FilterNode{Leaf: filters}
+		res := api_storage.Plan(api_storage.ListQuery{Entity: "sorts", Sorts: sorts, Node: &node, Offset: 5, Limit: 30})
+		if got := res.IDs(); !reflect.DeepEqual(got, filtered[5:min(35, len(filtered))]) {
+			t.Fatalf("filtered sorts %+v: got %v, want %v", sorts, got, filtered[5:min(35, len(filtered))])
+		}
 	}
 }

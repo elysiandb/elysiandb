@@ -591,3 +591,67 @@ func TestStartAndStop(t *testing.T) {
 		t.Fatalf("the first tick only records a baseline, got %d points", len(s.Points))
 	}
 }
+
+func TestDiskAndBackupSeriesFollowTheirSources(t *testing.T) {
+	disk := metrics.DiskSample{ReadBytes: 1000, WriteBytes: 2000, Syncs: 10, SyncNanos: 1e7, FreeBytes: 1 << 30, RefusedWrites: 1, IndexUpkeepBytes: 77}
+	last := time.Now().Add(-time.Minute)
+	setup(t, metrics.Sources{
+		Disk: func() metrics.DiskSample { return disk },
+		Backup: func() metrics.BackupSample {
+			return metrics.BackupSample{Running: 1, Completed: 3, Failed: 2, LastOK: true, LastAt: last, Duration: 2 * time.Second, Bytes: 4096}
+		},
+	})
+	metrics.SetStartup(1500 * time.Millisecond)
+
+	t0 := time.Now()
+	metrics.Tick(t0)
+	disk.ReadBytes += 10000
+	disk.WriteBytes += 40000
+	disk.Syncs += 5
+	disk.SyncNanos += 50e6
+	disk.RefusedWrites += 20
+	metrics.Tick(t0.Add(10 * time.Second))
+
+	hour := series(t, "1h", 0)
+	want := map[string]float64{
+		"disk_read_bytes_rps":  1000,
+		"disk_write_bytes_rps": 4000,
+		"disk_syncs_rps":       0.5,
+		"disk_sync_ms":         10,
+		"disk_free_bytes":      1 << 30,
+		"refused_writes_rps":   2,
+		"index_upkeep_bytes":   77,
+		"backup_running":       1,
+		"backup_last_ok":       1,
+		"backup_duration_ms":   2000,
+		"backup_bytes":         4096,
+		"startup_ms":           1500,
+	}
+	for name, v := range want {
+		values := hour.Series[name]
+		if len(values) == 0 || values[len(values)-1] == nil || *values[len(values)-1] != v {
+			t.Fatalf("series %s: %v, expected %v", name, values, v)
+		}
+	}
+
+	if ages := hour.Series["backup_age_seconds"]; len(ages) == 0 || *ages[len(ages)-1] < 60 {
+		t.Fatalf("backup age: %v", ages)
+	}
+
+	text := string(metrics.Prometheus())
+	for _, line := range []string{
+		"elysiandb_disk_read_bytes_total 11000",
+		"elysiandb_disk_write_bytes_total 42000",
+		"elysiandb_disk_syncs_total 15",
+		"elysiandb_refused_writes_total 21",
+		"elysiandb_disk_free_bytes 1.073741824e+09",
+		`elysiandb_backups_total{result="ok"} 3`,
+		`elysiandb_backups_total{result="failed"} 2`,
+		"elysiandb_backup_last_duration_seconds 2",
+		"elysiandb_startup_seconds 1.5",
+	} {
+		if !strings.Contains(text, line) {
+			t.Fatalf("%q is missing:\n%s", line, text)
+		}
+	}
+}

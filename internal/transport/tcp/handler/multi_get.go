@@ -13,11 +13,6 @@ import (
 )
 
 func HandleMultiGet(query []byte) []byte {
-	cfg := globals.GetConfig()
-	if cfg.Stats.Enabled {
-		stat.Stats.IncrementTotalRequests()
-	}
-
 	keys := strings.Split(string(query), " ")
 	if len(keys) == 0 {
 		return []byte("ERR")

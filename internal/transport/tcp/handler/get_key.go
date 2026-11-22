@@ -11,11 +11,6 @@ import (
 )
 
 func HandleGet(query []byte) []byte {
-	cfg := globals.GetConfig()
-	if cfg.Stats.Enabled {
-		stat.Stats.IncrementTotalRequests()
-	}
-
 	if wildcard.KeyContainsWildcard(string(query)) {
 		return handleWildcardKey(query)
 	}

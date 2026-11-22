@@ -61,7 +61,11 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if globals.GetConfig().Api.Hooks.Enabled && hook.EntityHasPostReadHooks(entity) {
-		data = hook.ApplyPostReadHooksForEntity(username, entity, data)
+		guard := requestGuard(ctx)
+		data = hook.NewRequest(username).WithGuard(guard).PostRead(entity, data)
+		if guardStopped(ctx, guard) {
+			return
+		}
 	}
 
 	response, err := json.Marshal(data)
@@ -74,7 +78,7 @@ func GetByIdController(ctx *fasthttp.RequestCtx) {
 	}
 
 	if cacheable {
-		cache.CacheStore.SetById(entity, id, response)
+		cache.CacheStore.SetByIdWithDeps(entity, id, response, []string{entity})
 	}
 
 	ctx.Response.Header.Set("Content-Type", "application/json")

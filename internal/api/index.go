@@ -1,386 +1,162 @@
 package api_storage
 
 import (
-	"bytes"
-	"fmt"
-	"runtime"
+	"strconv"
 	"strings"
-	"sync"
 
-	"github.com/cespare/xxhash/v2"
+	"github.com/taymour/elysiandb/internal/cache"
+	"github.com/taymour/elysiandb/internal/datastore"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
-var (
-	DirtyFields sync.Map // key: entity+"|"+field -> struct{}
-	fieldLocks  sync.Map // key: entity+"|"+field -> *sync.Mutex
-)
-
-func ProcessNextDirtyField() {
-	var key string
-	var _ any
-	DirtyFields.Range(func(k, v any) bool {
-		key = k.(string)
-		_ = v
-		return false
-	})
-
-	if key == "" {
-		return
-	}
-
-	parts := strings.SplitN(key, "|", 2)
-	if len(parts) != 2 {
-		DirtyFields.Delete(key)
-		return
-	}
-
-	entity, field := parts[0], parts[1]
-	if fieldUsed(entity, field) {
-		ensureFieldIndexFresh(entity, field)
-	} else {
-		DirtyFields.Delete(key)
-	}
+func init() {
+	storage.ApiKeyResolver = resolveApiKey
+	cache.VersionOf = entityVersion
 }
 
-func fieldUsed(entity, field string) bool {
-	fields := GetListForIndexedFields(entity)
-	for _, f := range fields {
-		if f == field {
-			return true
-		}
+func entityVersion(entity string) string {
+	e := db()
+	if e == nil {
+		return ""
 	}
 
-	return false
+	snap := e.Snapshot(entity)
+
+	return strconv.FormatUint(e.Instance(), 36) + "." + strconv.FormatUint(snap.Generation(), 36) + "." + strconv.FormatUint(snap.Version(), 36)
 }
 
-func fieldKey(entity, field string) string {
-	return entity + "|" + field
-}
-
-func getFieldLock(entity, field string) *sync.Mutex {
-	key := fieldKey(entity, field)
-	if v, ok := fieldLocks.Load(key); ok {
-		return v.(*sync.Mutex)
+func CacheDependencies(entity, includes string, withACL bool) []string {
+	deps := []string{entity}
+	if withACL {
+		deps = append(deps, aclEntity)
 	}
 
-	m := &sync.Mutex{}
-	if actual, loaded := fieldLocks.LoadOrStore(key, m); loaded {
-		return actual.(*sync.Mutex)
+	if includes == "" {
+		return deps
 	}
 
-	return m
-}
-
-func MarkFieldDirty(entity, field string) {
-	DirtyFields.Store(fieldKey(entity, field), struct{}{})
-}
-
-func markFieldAndNestedDirty(entity, field string, value interface{}) {
-	MarkFieldDirty(entity, field)
-	if m, ok := value.(map[string]interface{}); ok {
-		for k, v := range m {
-			markFieldAndNestedDirty(entity, field+"."+k, v)
-		}
-	}
-}
-
-func ensureFieldIndexFresh(entity, field string) {
-	key := fieldKey(entity, field)
-	_, isDirty := DirtyFields.Load(key)
-	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, field)
-	descKey := globals.ApiEntityIndexFieldSortDescKey(entity, field)
-	ascData, _ := storage.GetByKey(ascKey)
-	descData, _ := storage.GetByKey(descKey)
-
-	if !isDirty && ascData != nil && descData != nil {
-		return
+	e := db()
+	if e == nil {
+		return deps
 	}
 
-	mtx := getFieldLock(entity, field)
-	mtx.Lock()
-
-	defer mtx.Unlock()
-
-	_, isDirty = DirtyFields.Load(key)
-	ascData, _ = storage.GetByKey(ascKey)
-	descData, _ = storage.GetByKey(descKey)
-
-	if !isDirty && ascData != nil && descData != nil {
-		return
-	}
-
-	rebuildIndexForField(entity, field)
-	DirtyFields.Delete(key)
-}
-
-func RebuildAllIndexes() {
-	entities := ListEntityTypes()
-	for _, entity := range entities {
-		fields := GetListForIndexedFields(entity)
-		for _, field := range fields {
-			rebuildIndexForField(entity, field)
-			DirtyFields.Delete(fieldKey(entity, field))
-		}
-	}
-}
-
-func rebuildIndexForField(entity, field string) {
-	type indexJob struct {
-		key string
-		asc bool
-	}
-
-	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, field)
-	descKey := globals.ApiEntityIndexFieldSortDescKey(entity, field)
-	jobs := []indexJob{
-		{key: ascKey, asc: true},
-		{key: descKey, asc: false},
-	}
-
-	sem := make(chan struct{}, runtime.NumCPU()*2)
-	wg := sync.WaitGroup{}
-
-	for _, job := range jobs {
-		wg.Add(1)
-		sem <- struct{}{}
-		go func(j indexJob) {
-			defer wg.Done()
-			defer func() { <-sem }()
-			ids := GetSortedEntityIdsByField(entity, field, j.asc)
-			storage.PutKeyValue(j.key, encodeIDs(ids))
-		}(job)
-	}
-
-	wg.Wait()
-	AddFieldToIndexedFields(entity, field)
-}
-
-func RemoveIdFromIndexes(entity, id string) {
-	idIndexKey := globals.ApiEntityIndexIdKey(entity)
-	raw, _ := storage.GetByKey(idIndexKey)
-	ids := decodeIDs(raw)
-	changed := false
-	newIds := newIdsWithout(ids, id, &changed)
-	if changed {
-		storage.PutKeyValue(idIndexKey, encodeIDs(newIds))
-	}
-
-	fields := GetListForIndexedFields(entity)
-	for _, f := range fields {
-		MarkFieldDirty(entity, f)
-	}
-}
-
-func RemoveIdFromNonMasterIndexes(entity, id string) {
-	fields := GetListForIndexedFields(entity)
-	for _, field := range fields {
-		for _, sortKey := range []string{
-			globals.ApiEntityIndexFieldSortAscKey(entity, field),
-			globals.ApiEntityIndexFieldSortDescKey(entity, field),
-		} {
-			raw, _ := storage.GetByKey(sortKey)
-			if len(raw) == 0 {
-				continue
-			}
-
-			ids := decodeIDs(raw)
-			changed := false
-			newIds := newIdsWithout(ids, id, &changed)
-			if changed {
-				storage.PutKeyValue(sortKey, encodeIDs(newIds))
+	seen := map[string]bool{entity: true}
+	queue := []string{entity}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		for _, ref := range e.Snapshot(current).Refs() {
+			if !seen[ref.Target] && !IsCoreEntityType(ref.Target) {
+				seen[ref.Target] = true
+				deps = append(deps, ref.Target)
+				queue = append(queue, ref.Target)
 			}
 		}
 	}
+
+	return deps
 }
 
-func decodeIDs(b []byte) []string {
-	if len(b) == 0 {
-		return nil
-	}
+const aclEntity = "_elysiandb_core_acl"
 
-	parts := bytes.Split(b, []byte{'\n'})
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if len(p) > 0 {
-			out = append(out, string(p))
-		}
-	}
-
-	return out
-}
-
-func encodeIDs(ids []string) []byte {
-	if len(ids) == 0 {
-		return nil
-	}
-
-	parts := make([][]byte, 0, len(ids))
-	for _, id := range ids {
-		parts = append(parts, []byte(id))
-	}
-
-	return bytes.Join(parts, []byte{'\n'})
-}
-
-func AddIdToindexes(entity, id string) {
-	k := globals.ApiEntityIndexIdKey(entity)
-	raw, _ := storage.GetByKey(k)
-	ids := decodeIDs(raw)
-	for _, v := range ids {
-		if v == id {
-			return
-		}
-	}
-
-	ids = append(ids, id)
-	_ = storage.PutKeyValue(k, encodeIDs(ids))
-}
-
-func RemoveEntityIndexes(entity string) {
-	storage.DeleteByWildcardKey(
-		globals.ApiEntityIndexPatternKey(entity),
-	)
-}
-
-func EnsureFieldIndex(entity, field, id string, value any) {
-	AddFieldToIndexedFields(entity, field)
-	rebuildIndexForField(entity, field)
-	if m, ok := value.(map[string]any); ok {
-		wg := sync.WaitGroup{}
-		sem := make(chan struct{}, runtime.NumCPU()*2)
-		for k, v := range m {
-			wg.Add(1)
-			sem <- struct{}{}
-			go func(subField string, subVal any) {
-				defer wg.Done()
-				defer func() { <-sem }()
-				nestedField := field + "." + subField
-				AddFieldToIndexedFields(entity, nestedField)
-				rebuildIndexForField(entity, nestedField)
-				if mm, ok := subVal.(map[string]any); ok {
-					for kk, vv := range mm {
-						markFieldAndNestedDirty(entity, nestedField+"."+kk, vv)
-					}
-				}
-			}(k, v)
-		}
-
-		wg.Wait()
-	}
+func sortSpec(field string) datastore.IndexSpec {
+	return datastore.IndexSpec{Kind: datastore.IndexSort, Field: field}
 }
 
 func IndexExistsForField(entity, field string) bool {
-	ensureFieldIndexFresh(entity, field)
-	ascKey := globals.ApiEntityIndexFieldSortAscKey(entity, field)
-	descKey := globals.ApiEntityIndexFieldSortDescKey(entity, field)
-	ascData, _ := storage.GetByKey(ascKey)
-	descData, _ := storage.GetByKey(descKey)
+	e := db()
+	if e == nil {
+		return false
+	}
 
-	return ascData != nil && descData != nil
+	e.EnsureIndex(entity, sortSpec(field))
+
+	return e.Snapshot(entity).HasIndex(sortSpec(field))
+}
+
+func EnsureSortIndex(entity, field string) bool {
+	e := db()
+	if e == nil {
+		return false
+	}
+
+	return e.EnsureIndex(entity, sortSpec(field))
 }
 
 func GetListForIndexedFields(entity string) []string {
-	raw, _ := storage.GetByKey(globals.ApiEntityIndexAllFieldsKey(entity))
-	return decodeIDs(raw)
+	e := db()
+	if e == nil {
+		return nil
+	}
+
+	fields := []string{}
+	for _, name := range e.IndexNames(entity) {
+		if spec, ok := datastore.ParseIndexName(name); ok && spec.Kind == datastore.IndexSort {
+			fields = append(fields, spec.Field)
+		}
+	}
+
+	return fields
 }
 
-func AddFieldToIndexedFields(entity, field string) {
-	fields, _ := storage.GetByKey(
-		globals.ApiEntityIndexAllFieldsKey(entity),
-	)
-
-	listOfFields := decodeIDs(fields)
-	for _, existingField := range listOfFields {
-		if existingField == field {
-			return
-		}
-	}
-
-	listOfFields = append(listOfFields, field)
-	storage.PutKeyValue(
-		globals.ApiEntityIndexAllFieldsKey(entity),
-		encodeIDs(listOfFields),
-	)
+func GetSortedEntityIdsByField(entity, field string, ascending bool) []string {
+	return Plan(ListQuery{Entity: entity, SortField: field, SortAsc: ascending}).IDs()
 }
 
-func UpdateIndexesForEntity(entity, id string, oldData, newData map[string]any) {
-	safeKey := func(v any) string {
-		switch val := v.(type) {
-		case []any:
-			h := xxhash.Sum64String(fmt.Sprint(val))
-			return fmt.Sprintf("%x", h)
-		case map[string]any:
-			h := xxhash.Sum64String(fmt.Sprint(val))
-			return fmt.Sprintf("%x", h)
-		default:
-			return fmt.Sprintf("%v", val)
-		}
+func IndexBacklog() int {
+	e := db()
+	if e == nil {
+		return 0
 	}
 
-	for k, v := range newData {
-		if k == "id" {
-			continue
-		}
-
-		markFieldAndNestedDirty(entity, k, v)
-	}
-
-	for k, newVal := range newData {
-		if k == "id" {
-			continue
-		}
-
-		oldVal, exists := oldData[k]
-		if !exists || safeKey(oldVal) != safeKey(newVal) {
-			markFieldAndNestedDirty(entity, k, newVal)
-		}
-	}
-
-	for k := range oldData {
-		if k == "id" {
-			continue
-		}
-
-		if _, exists := newData[k]; !exists {
-			MarkFieldDirty(entity, k)
-		}
-	}
+	return e.IndexBacklog()
 }
 
-func DeleteIndexesForField(entity, field string) {
-	storage.DeleteByWildcardKey(
-		globals.ApiEntityIndexFieldAllKey(entity, field),
-	)
-
-	MarkFieldDirty(entity, field)
-}
-
-func newIdsWithout(ids []string, id string, changed *bool) []string {
-	if len(ids) == 0 {
-		return ids
-	}
-
-	out := ids[:0]
-	for _, existing := range ids {
-		if existing == id {
-			*changed = true
-			continue
+func resolveApiKey(e *datastore.Engine, key string) ([]byte, bool) {
+	if key == globals.ApiAllEntityTypesListKey() {
+		types := e.Types()
+		if len(types) == 0 {
+			return nil, false
 		}
 
-		out = append(out, existing)
+		return []byte(strings.Join(types, "\n")), true
 	}
 
-	return out
-}
+	rest, ok := strings.CutPrefix(key, globals.ApiKeyPrefix)
+	if !ok {
+		return nil, false
+	}
 
-func DirtyFieldsCount() int {
-	count := 0
-	DirtyFields.Range(func(_, _ any) bool {
-		count++
-		return true
-	})
+	entity, index, ok := strings.Cut(rest, ":internal:index:")
+	if !ok || entity == "" || !e.TypeExists(entity) {
+		return nil, false
+	}
 
-	return count
+	switch {
+	case index == "id":
+		ids := Plan(ListQuery{Entity: entity}).IDs()
+		if len(ids) == 0 {
+			return nil, false
+		}
+
+		return []byte(strings.Join(ids, "\n")), true
+	case index == "fields:all":
+		fields := GetListForIndexedFields(entity)
+		if len(fields) == 0 {
+			return nil, false
+		}
+
+		return []byte(strings.Join(fields, "\n")), true
+	case strings.HasPrefix(index, "field:") && (strings.HasSuffix(index, ":sort:asc") || strings.HasSuffix(index, ":sort:desc")):
+		ascending := strings.HasSuffix(index, ":sort:asc")
+		field := strings.TrimSuffix(strings.TrimSuffix(strings.TrimPrefix(index, "field:"), ":sort:asc"), ":sort:desc")
+		if !e.Snapshot(entity).HasIndex(sortSpec(field)) {
+			return nil, false
+		}
+
+		return []byte(strings.Join(GetSortedEntityIdsByField(entity, field, ascending), "\n")), true
+	}
+
+	return nil, false
 }

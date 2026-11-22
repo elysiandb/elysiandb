@@ -27,6 +27,24 @@ func Backup() {
 }
 
 func RunBackup(args []string) (string, error) {
+	if RunsWithoutStorage(append([]string{BackupCommand}, args...)) {
+		remote, err := parseRemoteArgs(args)
+		if err != nil {
+			return "", err
+		}
+
+		info, err := os.Stat(remote.output)
+		if err != nil {
+			return "", err
+		}
+
+		if !info.IsDir() {
+			return "", fmt.Errorf("%s is not a folder", remote.output)
+		}
+
+		return remote.run()
+	}
+
 	output := "."
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
@@ -41,7 +59,7 @@ func RunBackup(args []string) (string, error) {
 		case strings.HasPrefix(arg, "--output="):
 			output = strings.TrimPrefix(arg, "--output=")
 		default:
-			return "", fmt.Errorf("unknown argument %q, usage: elysiandb backup [--output <folder>]", arg)
+			return "", fmt.Errorf("unknown argument %q, usage: elysiandb backup [--output <folder>] [--url <address>]", arg)
 		}
 	}
 

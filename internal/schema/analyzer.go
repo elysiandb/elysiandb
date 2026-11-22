@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/storage"
@@ -321,6 +322,10 @@ func validateFieldsRecursive(fields map[string]Field, data map[string]interface{
 
 func IsManualSchema(entity string, schemaData map[string]any) bool {
 	if schemaData == nil {
+		if p, ok := storedSchema(entity); ok {
+			return p.manual
+		}
+
 		key := globals.ApiSingleEntityKey(SchemaEntity, entity)
 		schemaData, _ = storage.GetJsonByKey(key)
 	}
@@ -395,8 +400,46 @@ func MapToFields(m map[string]any) map[string]Field {
 	return fields
 }
 
+type parsedSchema struct {
+	version string
+	entity  *Entity
+	manual  bool
+}
+
+var parsedSchemas sync.Map
+
+func storedSchema(entity string) (*parsedSchema, bool) {
+	key := globals.ApiSingleEntityKey(SchemaEntity, entity)
+	version, ok := storage.DocumentVersion(key)
+	if !ok {
+		return nil, false
+	}
+
+	if v, ok := parsedSchemas.Load(entity); ok {
+		if p := v.(*parsedSchema); p.version == version {
+			return p, true
+		}
+	}
+
+	raw, _ := storage.GetJsonByKey(key)
+	if raw == nil {
+		return nil, false
+	}
+
+	data := normalizeAnyMap(raw)
+	p := &parsedSchema{version: version, entity: parseSchema(entity, data)}
+	_, p.manual = data["_manual"]
+	parsedSchemas.Store(entity, p)
+
+	return p, true
+}
+
 func loadSchemaForEntity(entity string, schemaData map[string]any) *Entity {
 	if schemaData == nil {
+		if p, ok := storedSchema(entity); ok {
+			return p.entity
+		}
+
 		key := globals.ApiSingleEntityKey(SchemaEntity, entity)
 		raw, _ := storage.GetJsonByKey(key)
 		if raw == nil {
@@ -405,6 +448,10 @@ func loadSchemaForEntity(entity string, schemaData map[string]any) *Entity {
 		schemaData = normalizeAnyMap(raw)
 	}
 
+	return parseSchema(entity, schemaData)
+}
+
+func parseSchema(entity string, schemaData map[string]any) *Entity {
 	schema := &Entity{ID: entity}
 
 	if fields, ok := schemaData["fields"].(map[string]any); ok {

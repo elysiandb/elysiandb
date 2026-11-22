@@ -3,8 +3,6 @@ package e2e
 import (
 	"testing"
 
-	"github.com/taymour/elysiandb/internal/acl"
-	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/configuration"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/storage"
@@ -39,27 +37,19 @@ func TestResetDeletesKVKeysAndKeepsTheRESTAPIWorking(t *testing.T) {
 	s.mustDo(fasthttp.StatusOK, "GET", "/api/acl/admin/authors", "")
 }
 
-func TestRepairAtStartupFixesAStoreBrokenByAnEarlierReset(t *testing.T) {
+func TestDeletingInternalKeysCannotBreakTheRESTAPI(t *testing.T) {
 	s := startAdminSession(t, func(cfg *configuration.Config) { cfg.Api.Schema.Strict = false })
 
 	s.mustDo(fasthttp.StatusOK, "POST", "/api/books", `{"title":"Dune"}`)
 
 	storage.DeleteByWildcardKey(globals.ApiKeyPrefix + "*")
+	storage.DeleteByKey(globals.ApiEntityIndexIdKey("books"))
 
 	s.mustDo(fasthttp.StatusOK, "POST", "/api/authors", `{"name":"Herbert"}`)
-	s.mustDo(fasthttp.StatusForbidden, "POST", "/api/authors", `{"name":"Asimov"}`)
-
-	if repair := api_storage.RepairIndexes(); !repair.Changed() {
-		t.Fatalf("the broken indexes should be repaired")
-	}
-	if err := acl.InitACL(); err != nil {
-		t.Fatal(err)
-	}
-
 	s.mustDo(fasthttp.StatusOK, "POST", "/api/authors", `{"name":"Asimov"}`)
 
 	if books := s.mustDo(fasthttp.StatusOK, "GET", "/api/books", "").list(t); len(books) != 1 {
-		t.Fatalf("books should be listed again, got %v", books)
+		t.Fatalf("books are still listed, got %v", books)
 	}
 	if authors := s.mustDo(fasthttp.StatusOK, "GET", "/api/authors", "").list(t); len(authors) != 2 {
 		t.Fatalf("expected 2 authors, got %v", authors)

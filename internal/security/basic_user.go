@@ -7,11 +7,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync"
 	"unicode"
 
+	"github.com/taymour/elysiandb/internal/durable"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/valyala/fasthttp"
@@ -421,6 +423,12 @@ func CreateKeyFileOrGetKey() (string, error) {
 			return "", err
 		}
 
+		if err := file.Sync(); err != nil {
+			return "", err
+		}
+
+		_ = durable.OS.SyncDir(cfg.Store.Folder)
+
 		return key, nil
 	}
 
@@ -440,17 +448,15 @@ func CreateKeyFileOrGetKey() (string, error) {
 func WriteKey(key string) error {
 	cfg := globals.GetConfig()
 	path := fmt.Sprintf("%s/%s", cfg.Store.Folder, KeyFilename)
-	tmpPath := path + ".tmp"
 
 	if err := os.MkdirAll(cfg.Store.Folder, 0o755); err != nil {
 		return err
 	}
 
-	if err := os.WriteFile(tmpPath, []byte(key), 0o600); err != nil {
+	return durable.WriteFileAtomic(nil, path, func(w io.Writer) error {
+		_, err := io.WriteString(w, key)
 		return err
-	}
-
-	return os.Rename(tmpPath, path)
+	})
 }
 
 var (

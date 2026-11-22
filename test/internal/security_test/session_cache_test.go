@@ -13,7 +13,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func TestSessionsFileChangedOutsideIsReloaded(t *testing.T) {
+func TestSessionsAreKeptInMemoryAndWrittenOnChange(t *testing.T) {
 	dir := setupTempStore(t)
 	seedUser(t, "user", security.RoleAdmin)
 
@@ -22,20 +22,34 @@ func TestSessionsFileChangedOutsideIsReloaded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if found, err := security.GetSession(s.ID); err != nil || found == nil {
-		t.Fatalf("expected the session, got %v %v", found, err)
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	for i := 0; i < 3; i++ {
+		if found, err := security.GetSession(s.ID); err != nil || found == nil {
+			t.Fatalf("reading a session needs no file access, got %v %v", found, err)
+		}
 	}
 
-	time.Sleep(10 * time.Millisecond)
-	writeSessions(t, dir, security.SessionsFile{Sessions: []security.Session{}})
+	_ = os.Chmod(dir, 0o700)
+	if err := security.DeleteSession(s.ID); err != nil {
+		t.Fatal(err)
+	}
 
 	if found, _ := security.GetSession(s.ID); found != nil {
-		t.Fatalf("a session removed from the file by another process must be gone")
+		t.Fatalf("a deleted session must be gone")
+	}
+
+	raw, err := os.ReadFile(filepath.Join(dir, security.SessionsFilename))
+	if err != nil || len(raw) == 0 {
+		t.Fatalf("the change is written to the file: %q %v", raw, err)
 	}
 }
 
-func TestSessionsFileRemovedOutsideIsReloaded(t *testing.T) {
-	dir := setupTempStore(t)
+func TestDeleteAllSessionsEndsEverySession(t *testing.T) {
+	setupTempStore(t)
 	seedUser(t, "user", security.RoleAdmin)
 
 	s, err := security.CreateSession("user", security.RoleAdmin, time.Hour)
@@ -43,12 +57,12 @@ func TestSessionsFileRemovedOutsideIsReloaded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.Remove(filepath.Join(dir, security.SessionsFilename)); err != nil {
+	if err := security.DeleteAllSessions(); err != nil {
 		t.Fatal(err)
 	}
 
 	if found, _ := security.GetSession(s.ID); found != nil {
-		t.Fatalf("a deleted sessions file ends every session")
+		t.Fatalf("deleting every session ends every session")
 	}
 }
 
@@ -72,10 +86,14 @@ func TestActiveSessionCount(t *testing.T) {
 		t.Fatalf("expected 2 sessions, got %d", n)
 	}
 
-	writeSessions(t, dir, security.SessionsFile{Sessions: []security.Session{{TokenHash: "x", Username: "a", ExpiresAt: time.Now().Add(-time.Minute).Unix()}}})
-	if n := security.ActiveSessionCount(); n != 0 {
+	if _, err := security.CreateSession("a", security.RoleAdmin, time.Second); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(1100 * time.Millisecond)
+	if n := security.ActiveSessionCount(); n != 2 {
 		t.Fatalf("expired sessions are not counted, got %d", n)
 	}
+	_ = dir
 }
 
 func TestActorNamesTheCaller(t *testing.T) {

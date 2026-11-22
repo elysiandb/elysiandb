@@ -13,19 +13,30 @@ func CanCreateEntity(username, entity string) bool {
 		return true
 	}
 
-	acl := GetACLEntityForUsername(entity, username)
-	if acl == nil {
-		return canCreateNewEntityType(username, entity)
+	if acl := GetACLEntityForUsername(entity, username); acl != nil {
+		return acl.Can(PermissionCreate)
 	}
 
-	return acl.Can(PermissionCreate)
-}
-
-func canCreateNewEntityType(username, entity string) bool {
-	if strings.HasPrefix(entity, globals.CoreFieldsPrefix) || engine.EntityTypeExists(entity) {
+	if strings.HasPrefix(entity, globals.CoreFieldsPrefix) {
 		return false
 	}
 
+	if !engine.EntityTypeExists(entity) {
+		return roleCanCreate(username)
+	}
+
+	if err := InitACL(); err != nil {
+		return false
+	}
+
+	if acl := GetACLEntityForUsername(entity, username); acl != nil {
+		return acl.Can(PermissionCreate)
+	}
+
+	return false
+}
+
+func roleCanCreate(username string) bool {
 	user, err := security.GetBasicUserByUsername(username)
 	if err != nil {
 		return false
@@ -195,4 +206,38 @@ func FilterListOfEntities(username, entity string, data []map[string]any) []map[
 	}
 
 	return filteredData
+}
+
+type ReadMode int
+
+const (
+	ReadAll ReadMode = iota
+	ReadNone
+	ReadOwned
+)
+
+func ReadModeFor(username, entity string) ReadMode {
+	if !security.UserAuthenticationIsEnabled() {
+		return ReadAll
+	}
+
+	acl := GetACLEntityForUsername(entity, username)
+	if acl == nil {
+		return ReadNone
+	}
+
+	if acl.Can(PermissionRead) {
+		return ReadAll
+	}
+
+	if acl.Can(PermissionOwningRead) {
+		return ReadOwned
+	}
+
+	return ReadNone
+}
+
+func OwnedBy(data map[string]any, username string) bool {
+	owner, ok := data[UsernameField].(string)
+	return ok && owner != "" && owner == username
 }

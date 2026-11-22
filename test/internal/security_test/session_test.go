@@ -154,11 +154,16 @@ func TestGetSessionExpired(t *testing.T) {
 		t.Fatalf("expired session should be nil")
 	}
 
+	seedUser(t, "other", security.RoleUser)
+	if _, err := security.CreateSession("other", security.RoleUser, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+
 	data, _ := os.ReadFile(filepath.Join(dir, security.SessionsFilename))
 	var sf security.SessionsFile
 	_ = json.Unmarshal(data, &sf)
-	if len(sf.Sessions) != 0 {
-		t.Fatalf("expired session not cleaned")
+	if len(sf.Sessions) != 1 || sf.Sessions[0].Username != "other" {
+		t.Fatalf("expired sessions are removed at the next session change, got %+v", sf.Sessions)
 	}
 }
 

@@ -6,8 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/taymour/elysiandb/internal/globals"
-	"github.com/taymour/elysiandb/internal/storage"
+	"github.com/taymour/elysiandb/internal/docpath"
 )
 
 func SearchPattern(search string) string {
@@ -45,7 +44,7 @@ func SearchMatchesEntity(entityData map[string]any, search string) bool {
 				stack = append(stack, item)
 			}
 		case string:
-			if storage.MatchGlob(pattern, v) {
+			if docpath.MatchGlob(pattern, v) {
 				return true
 			}
 		}
@@ -55,7 +54,7 @@ func SearchMatchesEntity(entityData map[string]any, search string) bool {
 }
 
 func isSearchableKey(key string) bool {
-	return key != "id" && key != "@entity" && !strings.HasPrefix(key, globals.CoreFieldsPrefix)
+	return docpath.IsSearchableKey(key)
 }
 
 func FiltersMatchEntity(
@@ -266,11 +265,11 @@ func matchString(value string, ops map[string]string) bool {
 	for op, cmp := range ops {
 		switch op {
 		case "eq":
-			if !storage.MatchGlob(cmp, value) {
+			if !docpath.MatchGlob(cmp, value) {
 				return false
 			}
 		case "neq":
-			if storage.MatchGlob(cmp, value) {
+			if docpath.MatchGlob(cmp, value) {
 				return false
 			}
 		case "lt":
@@ -354,13 +353,5 @@ func matchNumber(value float64, ops map[string]string) bool {
 }
 
 func parseDate(s string) (time.Time, bool, bool) {
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t, true, false
-	}
-
-	if t, err := time.Parse("2006-01-02", s); err == nil {
-		return t, true, true
-	}
-
-	return time.Time{}, false, false
+	return docpath.ParseDate(s)
 }

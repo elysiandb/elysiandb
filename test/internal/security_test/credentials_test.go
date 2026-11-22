@@ -235,18 +235,20 @@ func TestGetSessionRemovesOnlyExpiredSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var stored security.SessionsFile
-	raw, _ := os.ReadFile(filepath.Join(dir, security.SessionsFilename))
-	_ = json.Unmarshal(raw, &stored)
-	stored.Sessions = append(stored.Sessions, security.Session{TokenHash: "old", Username: "a", Role: security.RoleAdmin, ExpiresAt: time.Now().Unix() - 10})
-	writeSessions(t, dir, stored)
+	if _, err := security.CreateSession("b", security.RoleAdmin, time.Second); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(1100 * time.Millisecond)
 
-	s, err := security.GetSession(live.ID)
-	if err != nil || s == nil || s.Username != "b" {
+	if s, err := security.GetSession(live.ID); err != nil || s == nil || s.Username != "b" {
 		t.Fatalf("expected the live session, got %v %v", s, err)
 	}
 
-	raw, err = os.ReadFile(filepath.Join(dir, security.SessionsFilename))
+	if err := security.DeleteSession("no-such-session"); err != nil {
+		t.Fatal(err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(dir, security.SessionsFilename))
 	if err != nil {
 		t.Fatal(err)
 	}

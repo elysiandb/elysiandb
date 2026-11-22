@@ -1,11 +1,13 @@
 package hook
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
 	"time"
 
+	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
@@ -185,6 +187,7 @@ func InitHooks() {
 	}
 
 	if engine.EntityTypeExists(HookEntity) {
+		PrepareIndexes()
 		return
 	}
 
@@ -206,53 +209,48 @@ func CreateHookEntity() error {
 }
 
 func ApplyPostReadHooksForEntity(username, entity string, data map[string]any) map[string]any {
-	if !globals.GetConfig().Api.Hooks.Enabled {
-		return data
-	}
-
-	enriched := data
-
-	hooks := GetPostReadHooksForEntity(entity)
-
-	sort.Slice(hooks, func(i, j int) bool {
-		return hooks[i].Priority > hooks[j].Priority
-	})
-
-	for _, hook := range hooks {
-		if !hook.Enabled {
-			continue
-		}
-
-		start := time.Now()
-		err := ApplyPostReadScript(username, hook.Script, enriched, hook.ByPassACL)
-		observeHook(hook, entity, PhasePostRead, start, err)
-	}
-
-	return enriched
+	return NewRequest(username).PostRead(entity, data)
 }
 
 func ApplyPreReadHooksForEntity(username, entity string, data map[string]any) map[string]any {
+	return NewRequest(username).PreRead(entity, data)
+}
+
+func (r *Request) PostRead(entity string, data map[string]any) map[string]any {
+	return r.apply(entity, data, HookEventPostRead, PhasePostRead, "postRead")
+}
+
+func (r *Request) PreRead(entity string, data map[string]any) map[string]any {
+	return r.apply(entity, data, HookEventPreRead, PhasePreRead, "preRead")
+}
+
+func (r *Request) apply(entity string, data map[string]any, event, phase, fnName string) map[string]any {
 	if !globals.GetConfig().Api.Hooks.Enabled {
 		return data
 	}
 
-	enriched := data
-
-	hooks := GetPreReadHooksForEntity(entity)
-
-	sort.Slice(hooks, func(i, j int) bool {
-		return hooks[i].Priority > hooks[j].Priority
+	list := append([]Hook(nil), hooksForEvent(entity, event)...)
+	sort.SliceStable(list, func(i, j int) bool {
+		return list[i].Priority > list[j].Priority
 	})
 
-	for _, hook := range hooks {
-		if !hook.Enabled {
+	for _, h := range list {
+		if !h.Enabled {
 			continue
 		}
 
+		if r.overBudget() || r.guard.Stopped() {
+			break
+		}
+
 		start := time.Now()
-		err := ApplyPreReadScript(username, hook.Script, enriched, hook.ByPassACL)
-		observeHook(hook, entity, PhasePreRead, start, err)
+		err := r.applyScript(h, fnName, data)
+		r.spent.Add(int64(time.Since(start)))
+		if errors.Is(err, api_storage.ErrBusy) || errors.Is(err, api_storage.ErrAbandoned) {
+			break
+		}
+		observeHook(h, entity, phase, start, err)
 	}
 
-	return enriched
+	return data
 }
