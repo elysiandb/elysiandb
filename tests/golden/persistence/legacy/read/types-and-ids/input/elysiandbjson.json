@@ -1,0 +1,1 @@
+{"api:entity:book:id:1":{"t":1},"api:entity:book:id:2":{"t":2},"api:entity:book:id:3":{"t":3},"api:entity:zeta:id:z":{"t":"z"},"api:entity:alpha:id:a":{"t":"a"},"api:entity::id:x":{"t":"bad"},"api:entity:book:id:":{"t":"bad"},"other:key":{"t":"other"}}

@@ -1,0 +1,5 @@
+{"OP":"put","KEY":"api:entity:book:id:2","VALUE":{"title":"two"}}
+not json
+{"op":"del","key":"api:entity:book:id:1"}
+{"op":"noop","key":"x"}
+{"op":"put","key":"api:entity:book:id:3","value":{"title":"three"}}

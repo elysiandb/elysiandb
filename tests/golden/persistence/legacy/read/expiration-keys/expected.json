@@ -1,0 +1,30 @@
+{
+  "data": {
+    "entities": [],
+    "expirations": [
+      {
+        "at": "1800000000",
+        "key_hex": "65"
+      },
+      {
+        "at": "1800000001",
+        "key_hex": "6d697373696e67"
+      }
+    ],
+    "kv": [
+      {
+        "key_hex": "63",
+        "value_hex": "33"
+      },
+      {
+        "key_hex": "65",
+        "value_hex": "35"
+      }
+    ],
+    "replayed": 0,
+    "types_hex": []
+  },
+  "now": 1800000000,
+  "present": true,
+  "replay": true
+}

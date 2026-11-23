@@ -1,0 +1,1209 @@
+{
+  "format": 2,
+  "kv": "kv-0000000000000192.ckpt",
+  "lsn": 192,
+  "segment": 1,
+  "offset": 40330,
+  "created_at": "2000-01-01T00:00:00Z",
+  "types": [
+    "_elysiandb_core_acl",
+    "_elysiandb_core_schema",
+    "_elysiandb_core_user",
+    "_elysiandb_core_hook",
+    "author",
+    "book",
+    "review",
+    "purchase",
+    "budget_month",
+    "program",
+    "step",
+    "note"
+  ],
+  "entities": [
+    {
+      "name": "_elysiandb_core_acl",
+      "gen": 0,
+      "next_seq": 16,
+      "version": 28,
+      "slots": {
+        "id": 4294967296,
+        "size": 416
+      },
+      "ids": {
+        "id": 4294967720,
+        "size": 320
+      },
+      "indexes": [
+        {
+          "name": "f:entity",
+          "root": {
+            "id": 4294968048,
+            "size": 606
+          }
+        },
+        {
+          "name": "f:id",
+          "root": {
+            "id": 4294968662,
+            "size": 846
+          }
+        },
+        {
+          "name": "f:permissions",
+          "root": {
+            "id": 4294969516,
+            "size": 114
+          }
+        },
+        {
+          "name": "f:username",
+          "root": {
+            "id": 4294969638,
+            "size": 578
+          }
+        },
+        {
+          "name": "s:entity",
+          "root": {
+            "id": 4294970224,
+            "size": 248
+          }
+        },
+        {
+          "name": "s:id",
+          "root": {
+            "id": 4294970480,
+            "size": 368
+          }
+        },
+        {
+          "name": "s:permissions",
+          "root": {
+            "id": 4294970856,
+            "size": 114
+          }
+        },
+        {
+          "name": "s:username",
+          "root": {
+            "id": 4294970978,
+            "size": 234
+          }
+        }
+      ]
+    },
+    {
+      "name": "_elysiandb_core_hook",
+      "gen": 0,
+      "next_seq": 3,
+      "version": 44,
+      "slots": {
+        "id": 4294971220,
+        "size": 146
+      },
+      "ids": {
+        "id": 4294971374,
+        "size": 128
+      },
+      "indexes": [
+        {
+          "name": "f:bypass_acl",
+          "root": {
+            "id": 4294971510,
+            "size": 47
+          }
+        },
+        {
+          "name": "f:enabled",
+          "root": {
+            "id": 4294971565,
+            "size": 47
+          }
+        },
+        {
+          "name": "f:entity",
+          "root": {
+            "id": 4294971620,
+            "size": 129
+          }
+        },
+        {
+          "name": "f:event",
+          "root": {
+            "id": 4294971757,
+            "size": 129
+          }
+        },
+        {
+          "name": "f:id",
+          "root": {
+            "id": 4294971894,
+            "size": 293
+          }
+        },
+        {
+          "name": "f:language",
+          "root": {
+            "id": 4294972195,
+            "size": 137
+          }
+        },
+        {
+          "name": "f:name",
+          "root": {
+            "id": 4294972340,
+            "size": 115
+          }
+        },
+        {
+          "name": "f:priority",
+          "root": {
+            "id": 4294972463,
+            "size": 68
+          }
+        },
+        {
+          "name": "f:script",
+          "root": {
+            "id": 4294972539,
+            "size": 1361
+          }
+        },
+        {
+          "name": "s:bypass_acl",
+          "root": {
+            "id": 4294973908,
+            "size": 26
+          }
+        },
+        {
+          "name": "s:enabled",
+          "root": {
+            "id": 4294973942,
+            "size": 26
+          }
+        },
+        {
+          "name": "s:entity",
+          "root": {
+            "id": 4294973976,
+            "size": 55
+          }
+        },
+        {
+          "name": "s:event",
+          "root": {
+            "id": 4294974039,
+            "size": 55
+          }
+        },
+        {
+          "name": "s:id",
+          "root": {
+            "id": 4294974102,
+            "size": 137
+          }
+        },
+        {
+          "name": "s:language",
+          "root": {
+            "id": 4294974247,
+            "size": 59
+          }
+        },
+        {
+          "name": "s:name",
+          "root": {
+            "id": 4294974314,
+            "size": 48
+          }
+        },
+        {
+          "name": "s:priority",
+          "root": {
+            "id": 4294974370,
+            "size": 47
+          }
+        },
+        {
+          "name": "s:script",
+          "root": {
+            "id": 4294974425,
+            "size": 671
+          }
+        }
+      ]
+    },
+    {
+      "name": "_elysiandb_core_schema",
+      "gen": 0,
+      "next_seq": 11,
+      "version": 39,
+      "slots": {
+        "id": 4294975104,
+        "size": 243
+      },
+      "ids": {
+        "id": 4294975355,
+        "size": 178
+      },
+      "indexes": [
+        {
+          "name": "f:_manual",
+          "root": {
+            "id": 4294975541,
+            "size": 47
+          }
+        },
+        {
+          "name": "f:fields",
+          "root": {
+            "id": 4294975596,
+            "size": 79
+          }
+        },
+        {
+          "name": "f:id",
+          "root": {
+            "id": 4294975683,
+            "size": 497
+          }
+        },
+        {
+          "name": "s:_manual",
+          "root": {
+            "id": 4294976188,
+            "size": 82
+          }
+        },
+        {
+          "name": "s:fields",
+          "root": {
+            "id": 4294976278,
+            "size": 79
+          }
+        },
+        {
+          "name": "s:id",
+          "root": {
+            "id": 4294976365,
+            "size": 211
+          }
+        }
+      ]
+    },
+    {
+      "name": "_elysiandb_core_user",
+      "gen": 0,
+      "next_seq": 2,
+      "version": 41,
+      "slots": {
+        "id": 4294976584,
+        "size": 35
+      },
+      "ids": {
+        "id": 4294976627,
+        "size": 25
+      },
+      "indexes": [
+        {
+          "name": "f:id",
+          "root": {
+            "id": 4294976660,
+            "size": 74
+          }
+        },
+        {
+          "name": "f:password",
+          "root": {
+            "id": 4294976742,
+            "size": 292
+          }
+        },
+        {
+          "name": "f:role",
+          "root": {
+            "id": 4294977042,
+            "size": 70
+          }
+        },
+        {
+          "name": "f:username",
+          "root": {
+            "id": 4294977120,
+            "size": 74
+          }
+        },
+        {
+          "name": "s:id",
+          "root": {
+            "id": 4294977202,
+            "size": 31
+          }
+        },
+        {
+          "name": "s:password",
+          "root": {
+            "id": 4294977241,
+            "size": 140
+          }
+        },
+        {
+          "name": "s:role",
+          "root": {
+            "id": 4294977389,
+            "size": 29
+          }
+        },
+        {
+          "name": "s:username",
+          "root": {
+            "id": 4294977426,
+            "size": 31
+          }
+        }
+      ]
+    },
+    {
+      "name": "author",
+      "gen": 0,
+      "next_seq": 8,
+      "version": 52,
+      "slots": {
+        "id": 4294977465,
+        "size": 114
+      },
+      "ids": {
+        "id": 4294977587,
+        "size": 66
+      },
+      "indexes": [
+        {
+          "name": "f:_elysiandb_core_username",
+          "root": {
+            "id": 4294977661,
+            "size": 282
+          }
+        },
+        {
+          "name": "f:active",
+          "root": {
+            "id": 4294977951,
+            "size": 122
+          }
+        },
+        {
+          "name": "f:born",
+          "root": {
+            "id": 4294978081,
+            "size": 514
+          }
+        },
+        {
+          "name": "f:country",
+          "root": {
+            "id": 4294978603,
+            "size": 234
+          }
+        },
+        {
+          "name": "f:id",
+          "root": {
+            "id": 4294978845,
+            "size": 234
+          }
+        },
+        {
+          "name": "f:meta",
+          "root": {
+            "id": 4294979087,
+            "size": 58
+          }
+        },
+        {
+          "name": "f:name",
+          "root": {
+            "id": 4294979153,
+            "size": 396
+          }
+        },
+        {
+          "name": "f:rating",
+          "root": {
+            "id": 4294979557,
+            "size": 178
+          }
+        },
+        {
+          "name": "f:tags",
+          "root": {
+            "id": 4294979743,
+            "size": 297
+          }
+        },
+        {
+          "name": "s:_elysiandb_core_username",
+          "root": {
+            "id": 4294980048,
+            "size": 114
+          }
+        },
+        {
+          "name": "s:active",
+          "root": {
+            "id": 4294980170,
+            "size": 66
+          }
+        },
+        {
+          "name": "s:born",
+          "root": {
+            "id": 4294980244,
+            "size": 154
+          }
+        },
+        {
+          "name": "s:country",
+          "root": {
+            "id": 4294980406,
+            "size": 90
+          }
+        },
+        {
+          "name": "s:id",
+          "root": {
+            "id": 4294980504,
+            "size": 90
+          }
+        },
+        {
+          "name": "s:meta",
+          "root": {
+            "id": 4294980602,
+            "size": 58
+          }
+        },
+        {
+          "name": "s:name",
+          "root": {
+            "id": 4294980668,
+            "size": 171
+          }
+        },
+        {
+          "name": "s:rating",
+          "root": {
+            "id": 4294980847,
+            "size": 122
+          }
+        },
+        {
+          "name": "s:tags",
+          "root": {
+            "id": 4294980977,
+            "size": 58
+          }
+        }
+      ]
+    },
+    {
+      "name": "book",
+      "gen": 0,
+      "next_seq": 30,
+      "version": 82,
+      "refs": [
+        {
+          "Path": "author",
+          "Target": "author"
+        },
+        {
+          "Path": "coauthors",
+          "Target": "author"
+        }
+      ],
+      "slots": {
+        "id": 4294981043,
+        "size": 474
+      },
+      "ids": {
+        "id": 4294981525,
+        "size": 272
+      },
+      "indexes": [
+        {
+          "name": "f:_elysiandb_core_username",
+          "root": {
+            "id": 4294982875,
+            "size": 43
+          }
+        },
+        {
+          "name": "f:author",
+          "root": {
+            "id": 4294982926,
+            "size": 212
+          }
+        },
+        {
+          "name": "f:awards",
+          "root": {
+            "id": 4294983146,
+            "size": 212
+          }
+        },
+        {
+          "name": "f:coauthors",
+          "root": {
+            "id": 8589934592,
+            "size": 752
+          }
+        },
+        {
+          "name": "f:edition",
+          "root": {
+            "id": 8589935352,
+            "size": 326
+          }
+        },
+        {
+          "name": "f:genres",
+          "root": {
+            "id": 8589936806,
+            "size": 52
+          }
+        },
+        {
+          "name": "f:id",
+          "root": {
+            "id": 8589937816,
+            "size": 41
+          }
+        },
+        {
+          "name": "f:inStock",
+          "root": {
+            "id": 8589938335,
+            "size": 36
+          }
+        },
+        {
+          "name": "f:isbn",
+          "root": {
+            "id": 8589939749,
+            "size": 48
+          }
+        },
+        {
+          "name": "f:price",
+          "root": {
+            "id": 8589940485,
+            "size": 43
+          }
+        },
+        {
+          "name": "f:published",
+          "root": {
+            "id": 8589943286,
+            "size": 109
+          }
+        },
+        {
+          "name": "f:status",
+          "root": {
+            "id": 8589944689,
+            "size": 46
+          }
+        },
+        {
+          "name": "f:stock",
+          "root": {
+            "id": 8589944743,
+            "size": 212
+          }
+        },
+        {
+          "name": "f:summary",
+          "root": {
+            "id": 8589949057,
+            "size": 89
+          }
+        },
+        {
+          "name": "f:title",
+          "root": {
+            "id": 12884901888,
+            "size": 58
+          }
+        },
+        {
+          "name": "f:year",
+          "root": {
+            "id": 12884902634,
+            "size": 43
+          }
+        },
+        {
+          "name": "s:_elysiandb_core_username",
+          "root": {
+            "id": 12884902685,
+            "size": 422
+          }
+        },
+        {
+          "name": "s:awards",
+          "root": {
+            "id": 12884903115,
+            "size": 212
+          }
+        },
+        {
+          "name": "s:edition",
+          "root": {
+            "id": 12884903335,
+            "size": 248
+          }
+        },
+        {
+          "name": "s:genres",
+          "root": {
+            "id": 12884903591,
+            "size": 212
+          }
+        },
+        {
+          "name": "s:id",
+          "root": {
+            "id": 12884903811,
+            "size": 362
+          }
+        },
+        {
+          "name": "s:inStock",
+          "root": {
+            "id": 12884904181,
+            "size": 242
+          }
+        },
+        {
+          "name": "s:isbn",
+          "root": {
+            "id": 12884904431,
+            "size": 572
+          }
+        },
+        {
+          "name": "s:price",
+          "root": {
+            "id": 12884905011,
+            "size": 452
+          }
+        },
+        {
+          "name": "s:published",
+          "root": {
+            "id": 12884905471,
+            "size": 572
+          }
+        },
+        {
+          "name": "s:status",
+          "root": {
+            "id": 12884906051,
+            "size": 530
+          }
+        },
+        {
+          "name": "s:stock",
+          "root": {
+            "id": 12884906589,
+            "size": 212
+          }
+        },
+        {
+          "name": "s:summary",
+          "root": {
+            "id": 12884906809,
+            "size": 1934
+          }
+        },
+        {
+          "name": "s:title",
+          "root": {
+            "id": 12884908751,
+            "size": 781
+          }
+        },
+        {
+          "name": "s:year",
+          "root": {
+            "id": 12884909540,
+            "size": 452
+          }
+        }
+      ]
+    },
+    {
+      "name": "budget_month",
+      "gen": 0,
+      "next_seq": 12,
+      "version": 170,
+      "slots": {
+        "id": 12884910000,
+        "size": 194
+      },
+      "ids": {
+        "id": 12884910202,
+        "size": 110
+      },
+      "indexes": [
+        {
+          "name": "f:_elysiandb_core_username",
+          "root": {
+            "id": 12884910320,
+            "size": 422
+          }
+        },
+        {
+          "name": "f:id",
+          "root": {
+            "id": 12884910750,
+            "size": 374
+          }
+        },
+        {
+          "name": "f:limit",
+          "root": {
+            "id": 12884911132,
+            "size": 266
+          }
+        },
+        {
+          "name": "f:month",
+          "root": {
+            "id": 12884911406,
+            "size": 470
+          }
+        },
+        {
+          "name": "s:_elysiandb_core_username",
+          "root": {
+            "id": 12884911884,
+            "size": 170
+          }
+        },
+        {
+          "name": "s:id",
+          "root": {
+            "id": 12884912062,
+            "size": 146
+          }
+        },
+        {
+          "name": "s:limit",
+          "root": {
+            "id": 12884912216,
+            "size": 182
+          }
+        },
+        {
+          "name": "s:month",
+          "root": {
+            "id": 12884912406,
+            "size": 194
+          }
+        }
+      ]
+    },
+    {
+      "name": "note",
+      "gen": 0,
+      "next_seq": 1,
+      "version": 189,
+      "slots": {
+        "id": 12884912608,
+        "size": 17
+      },
+      "ids": {
+        "id": 12884912633,
+        "size": 10
+      },
+      "indexes": [
+        {
+          "name": "f:_elysiandb_core_username",
+          "root": {
+            "id": 12884912651,
+            "size": 37
+          }
+        },
+        {
+          "name": "f:id",
+          "root": {
+            "id": 12884912696,
+            "size": 31
+          }
+        },
+        {
+          "name": "f:text",
+          "root": {
+            "id": 12884912735,
+            "size": 47
+          }
+        },
+        {
+          "name": "s:_elysiandb_core_username",
+          "root": {
+            "id": 12884912790,
+            "size": 16
+          }
+        },
+        {
+          "name": "s:id",
+          "root": {
+            "id": 12884912814,
+            "size": 13
+          }
+        },
+        {
+          "name": "s:text",
+          "root": {
+            "id": 12884912835,
+            "size": 21
+          }
+        }
+      ]
+    },
+    {
+      "name": "program",
+      "gen": 0,
+      "next_seq": 3,
+      "version": 173,
+      "slots": {
+        "id": 12884912864,
+        "size": 50
+      },
+      "ids": {
+        "id": 12884912922,
+        "size": 29
+      },
+      "indexes": [
+        {
+          "name": "f:_elysiandb_core_username",
+          "root": {
+            "id": 12884912959,
+            "size": 107
+          }
+        },
+        {
+          "name": "f:id",
+          "root": {
+            "id": 12884913074,
+            "size": 95
+          }
+        },
+        {
+          "name": "f:name",
+          "root": {
+            "id": 12884913177,
+            "size": 105
+          }
+        },
+        {
+          "name": "f:status",
+          "root": {
+            "id": 12884913290,
+            "size": 105
+          }
+        },
+        {
+          "name": "s:_elysiandb_core_username",
+          "root": {
+            "id": 12884913403,
+            "size": 44
+          }
+        },
+        {
+          "name": "s:id",
+          "root": {
+            "id": 12884913455,
+            "size": 38
+          }
+        },
+        {
+          "name": "s:name",
+          "root": {
+            "id": 12884913501,
+            "size": 43
+          }
+        },
+        {
+          "name": "s:status",
+          "root": {
+            "id": 12884913552,
+            "size": 43
+          }
+        }
+      ]
+    },
+    {
+      "name": "purchase",
+      "gen": 0,
+      "next_seq": 36,
+      "version": 158,
+      "slots": {
+        "id": 12884913603,
+        "size": 573
+      },
+      "ids": {
+        "id": 12884914184,
+        "size": 326
+      },
+      "indexes": [
+        {
+          "name": "f:_elysiandb_core_username",
+          "root": {
+            "id": 12884915808,
+            "size": 67
+          }
+        },
+        {
+          "name": "f:amount",
+          "root": {
+            "id": 12884916695,
+            "size": 44
+          }
+        },
+        {
+          "name": "f:id",
+          "root": {
+            "id": 12884917893,
+            "size": 63
+          }
+        },
+        {
+          "name": "f:month",
+          "root": {
+            "id": 17179870618,
+            "size": 71
+          }
+        },
+        {
+          "name": "s:_elysiandb_core_username",
+          "root": {
+            "id": 17179870697,
+            "size": 506
+          }
+        },
+        {
+          "name": "s:amount",
+          "root": {
+            "id": 17179871211,
+            "size": 542
+          }
+        },
+        {
+          "name": "s:id",
+          "root": {
+            "id": 17179871761,
+            "size": 434
+          }
+        },
+        {
+          "name": "s:month",
+          "root": {
+            "id": 17179872203,
+            "size": 578
+          }
+        }
+      ]
+    },
+    {
+      "name": "review",
+      "gen": 0,
+      "next_seq": 40,
+      "version": 122,
+      "refs": [
+        {
+          "Path": "book",
+          "Target": "book"
+        }
+      ],
+      "slots": {
+        "id": 17179872789,
+        "size": 642
+      },
+      "ids": {
+        "id": 17179873439,
+        "size": 362
+      },
+      "indexes": [
+        {
+          "name": "f:_elysiandb_core_username",
+          "root": {
+            "id": 17179875239,
+            "size": 67
+          }
+        },
+        {
+          "name": "f:book",
+          "root": {
+            "id": 17179875314,
+            "size": 282
+          }
+        },
+        {
+          "name": "f:created",
+          "root": {
+            "id": 17179878204,
+            "size": 106
+          }
+        },
+        {
+          "name": "f:id",
+          "root": {
+            "id": 17179879588,
+            "size": 63
+          }
+        },
+        {
+          "name": "f:stars",
+          "root": {
+            "id": 17179880559,
+            "size": 44
+          }
+        },
+        {
+          "name": "f:text",
+          "root": {
+            "id": 17179883561,
+            "size": 106
+          }
+        },
+        {
+          "name": "s:_elysiandb_core_username",
+          "root": {
+            "id": 17179883675,
+            "size": 562
+          }
+        },
+        {
+          "name": "s:created",
+          "root": {
+            "id": 17179884245,
+            "size": 762
+          }
+        },
+        {
+          "name": "s:id",
+          "root": {
+            "id": 17179885015,
+            "size": 482
+          }
+        },
+        {
+          "name": "s:stars",
+          "root": {
+            "id": 21474836480,
+            "size": 602
+          }
+        },
+        {
+          "name": "s:text",
+          "root": {
+            "id": 21474837090,
+            "size": 1322
+          }
+        }
+      ]
+    },
+    {
+      "name": "step",
+      "gen": 0,
+      "next_seq": 15,
+      "version": 188,
+      "slots": {
+        "id": 21474838420,
+        "size": 257
+      },
+      "ids": {
+        "id": 21474838685,
+        "size": 152
+      },
+      "indexes": [
+        {
+          "name": "f:_elysiandb_core_username",
+          "root": {
+            "id": 21474838845,
+            "size": 527
+          }
+        },
+        {
+          "name": "f:done",
+          "root": {
+            "id": 21474839380,
+            "size": 227
+          }
+        },
+        {
+          "name": "f:id",
+          "root": {
+            "id": 21474839615,
+            "size": 497
+          }
+        },
+        {
+          "name": "f:order",
+          "root": {
+            "id": 21474840120,
+            "size": 332
+          }
+        },
+        {
+          "name": "f:program_id",
+          "root": {
+            "id": 21474840460,
+            "size": 467
+          }
+        },
+        {
+          "name": "s:_elysiandb_core_username",
+          "root": {
+            "id": 21474840935,
+            "size": 212
+          }
+        },
+        {
+          "name": "s:done",
+          "root": {
+            "id": 21474841155,
+            "size": 122
+          }
+        },
+        {
+          "name": "s:id",
+          "root": {
+            "id": 21474841285,
+            "size": 197
+          }
+        },
+        {
+          "name": "s:order",
+          "root": {
+            "id": 21474841490,
+            "size": 227
+          }
+        },
+        {
+          "name": "s:program_id",
+          "root": {
+            "id": 21474841725,
+            "size": 182
+          }
+        }
+      ]
+    }
+  ],
+  "live": {
+    "1": 34617
+  },
+  "previous_lsn": 192
+}

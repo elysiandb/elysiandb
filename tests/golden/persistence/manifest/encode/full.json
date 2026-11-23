@@ -1,0 +1,77 @@
+{
+  "format": 2,
+  "checkpoint": "checkpoint-0000000000000192.ckpt",
+  "kv": "kv-0000000000000200.ckpt",
+  "lsn": 200,
+  "segment": 3,
+  "offset": 4096,
+  "created_at": "\u003ccreated_at\u003e",
+  "elysiandb_version": "0.3.0",
+  "types": [
+    "book",
+    "c\u003c\u0026\u003e",
+    "a\u2028b\u2029"
+  ],
+  "entities": [
+    {
+      "name": "book",
+      "gen": 1099511627776,
+      "next_seq": 301,
+      "version": 77,
+      "refs": [
+        {
+          "Path": "author",
+          "Target": "person"
+        },
+        {
+          "Path": "tags.*",
+          "Target": "tag"
+        }
+      ],
+      "slots": {
+        "id": 4294967312,
+        "size": 4000
+      },
+      "ids": {
+        "id": 8589934624,
+        "size": 3000
+      },
+      "indexes": [
+        {
+          "name": "f:title",
+          "root": {
+            "id": 12884901904,
+            "size": 100
+          }
+        },
+        {
+          "name": "s:year",
+          "root": {
+            "id": 0,
+            "size": 0
+          },
+          "dormant": true
+        }
+      ],
+      "derived_indexes": [
+        {
+          "name": "c:status,year",
+          "root": {
+            "id": 17179869200,
+            "size": 80
+          }
+        }
+      ],
+      "index_origins": {
+        "f:title": "hook",
+        "s:year": "query"
+      }
+    }
+  ],
+  "live": {
+    "1": 100,
+    "10": 5,
+    "2": 2000
+  },
+  "previous_lsn": 150
+}

@@ -1,0 +1,71 @@
+{
+  "entities": [
+    {
+      "docs": [
+        {
+          "id_hex": "626967",
+          "lsn": "2",
+          "raw_b64": "eyJ2IjoxZSsyMX0=",
+          "seq": 0
+        },
+        {
+          "id_hex": "736d616c6c",
+          "lsn": "3",
+          "raw_b64": "eyJ2IjoxZS03fQ==",
+          "seq": 1
+        },
+        {
+          "id_hex": "706f77",
+          "lsn": "4",
+          "raw_b64": "eyJ2IjoxMTUyOTIxNTA0NjA2ODQ3MDAwfQ==",
+          "seq": 2
+        },
+        {
+          "id_hex": "6e65677a65726f",
+          "lsn": "5",
+          "raw_b64": "eyJ2IjotMH0=",
+          "seq": 3
+        },
+        {
+          "id_hex": "74656e7468",
+          "lsn": "6",
+          "raw_b64": "eyJ2IjowLjF9",
+          "seq": 4
+        },
+        {
+          "id_hex": "696e74",
+          "lsn": "7",
+          "raw_b64": "eyJ2IjoxMjM0NTY3ODl9",
+          "seq": 5
+        },
+        {
+          "id_hex": "6e6573746564",
+          "lsn": "8",
+          "raw_b64": "eyJhcnIiOltbXSxbe31dXSwibyI6eyJhIjpbMSwyLjUseyJiIjpudWxsfV0sInMiOiJcdTAwM2N4XHUwMDNlIn19",
+          "seq": 6
+        }
+      ],
+      "gen": "0",
+      "indexes": [],
+      "len": 7,
+      "name_hex": "6e756d",
+      "next_seq": 7,
+      "refs": [],
+      "version": "8"
+    }
+  ],
+  "index_states": [],
+  "kv": [
+    {
+      "expires_at": "0",
+      "found": true,
+      "key_hex": "6b",
+      "lsn": "9",
+      "value_hex": "76"
+    }
+  ],
+  "replayed_records": 0,
+  "types_hex": [
+    "6e756d"
+  ]
+}

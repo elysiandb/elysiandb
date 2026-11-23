@@ -1,0 +1,27 @@
+{
+  "applied": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6"
+  ],
+  "batches": 2,
+  "damaged": [
+    1
+  ],
+  "last_lsn": "6",
+  "next_lsn": "7",
+  "position": {
+    "offset": 219,
+    "segment": 1
+  },
+  "records": 6,
+  "set_aside": [
+    2,
+    3,
+    4
+  ],
+  "truncated": 435
+}

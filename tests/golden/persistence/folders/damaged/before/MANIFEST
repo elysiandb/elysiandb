@@ -1,0 +1,198 @@
+{
+  "format": 2,
+  "kv": "kv-0000000000000407.ckpt",
+  "lsn": 407,
+  "segment": 15,
+  "offset": 1786,
+  "created_at": "2000-01-01T00:00:00Z",
+  "types": [
+    "a",
+    "b",
+    "c\u003c\u0026\u003e"
+  ],
+  "entities": [
+    {
+      "name": "a",
+      "gen": 0,
+      "next_seq": 128,
+      "version": 390,
+      "refs": [
+        {
+          "Path": "author",
+          "Target": "a"
+        },
+        {
+          "Path": "notes",
+          "Target": "b"
+        }
+      ],
+      "slots": {
+        "id": 12884917217,
+        "size": 50
+      },
+      "ids": {
+        "id": 12884917662,
+        "size": 59
+      },
+      "indexes": [
+        {
+          "name": "f:title",
+          "root": {
+            "id": 12884918040,
+            "size": 174
+          }
+        },
+        {
+          "name": "g:title",
+          "root": {
+            "id": 12884915221,
+            "size": 59
+          }
+        },
+        {
+          "name": "r:author",
+          "root": {
+            "id": 12884915288,
+            "size": 464
+          }
+        },
+        {
+          "name": "s:n",
+          "root": {
+            "id": 0,
+            "size": 0
+          },
+          "dormant": true
+        }
+      ],
+      "derived_indexes": [
+        {
+          "name": "b:status",
+          "root": {
+            "id": 8589949157,
+            "size": 811
+          }
+        },
+        {
+          "name": "c:status,n",
+          "root": {
+            "id": 12884904544,
+            "size": 68
+          }
+        }
+      ],
+      "index_origins": {
+        "b:status": "advisor",
+        "c:status,n": "advisor"
+      }
+    },
+    {
+      "name": "b",
+      "gen": 1,
+      "next_seq": 10,
+      "version": 349,
+      "refs": [
+        {
+          "Path": "author",
+          "Target": "a"
+        },
+        {
+          "Path": "notes",
+          "Target": "b"
+        }
+      ],
+      "slots": {
+        "id": 12884915760,
+        "size": 204
+      },
+      "ids": {
+        "id": 12884915972,
+        "size": 142
+      },
+      "indexes": [
+        {
+          "name": "f:title",
+          "root": {
+            "id": 12884916122,
+            "size": 332
+          }
+        },
+        {
+          "name": "s:date",
+          "root": {
+            "id": 12884916462,
+            "size": 192
+          }
+        }
+      ],
+      "index_origins": {
+        "f:title": "hook"
+      }
+    },
+    {
+      "name": "c\u003c\u0026\u003e",
+      "gen": 0,
+      "next_seq": 117,
+      "version": 407,
+      "refs": [
+        {
+          "Path": "author",
+          "Target": "a"
+        },
+        {
+          "Path": "notes",
+          "Target": "b"
+        }
+      ],
+      "slots": {
+        "id": 17179870165,
+        "size": 50
+      },
+      "ids": {
+        "id": 17179870848,
+        "size": 60
+      },
+      "indexes": [
+        {
+          "name": "f:tags",
+          "root": {
+            "id": 17179872872,
+            "size": 116
+          }
+        }
+      ]
+    },
+    {
+      "name": "d",
+      "gen": 0,
+      "next_seq": 1,
+      "version": 305,
+      "slots": {
+        "id": 8589946103,
+        "size": 18
+      },
+      "ids": {
+        "id": 8589946129,
+        "size": 12
+      }
+    }
+  ],
+  "live": {
+    "1": 628,
+    "10": 1356,
+    "11": 1425,
+    "12": 1389,
+    "13": 2305,
+    "14": 2798,
+    "15": 1223,
+    "2": 902,
+    "3": 1490,
+    "4": 1353,
+    "5": 1417,
+    "6": 1337,
+    "7": 1456,
+    "8": 1297,
+    "9": 1502
+  },
+  "previous_lsn": 390
+}

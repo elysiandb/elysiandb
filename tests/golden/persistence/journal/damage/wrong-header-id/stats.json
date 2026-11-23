@@ -1,0 +1,30 @@
+{
+  "applied": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12"
+  ],
+  "batches": 4,
+  "damaged": [],
+  "last_lsn": "12",
+  "next_lsn": "13",
+  "position": {
+    "offset": 16,
+    "segment": 2
+  },
+  "records": 12,
+  "set_aside": [
+    3,
+    4
+  ],
+  "truncated": 3776
+}

@@ -1,0 +1,7 @@
+{"op":"put","key":"t1","value":"djE=","ttl":1900000000}
+{"op":"put","key":"t2","value":"djI=","ttl":1700000000}
+{"op":"put","key":"t3","value":"djM=","ttl":1.5}
+{"op":"del","key":"keep"}
+
+   
+{"op":"put","key":"t4","value":"djQ="}

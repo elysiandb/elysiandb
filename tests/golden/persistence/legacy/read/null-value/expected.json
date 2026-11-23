@@ -1,0 +1,21 @@
+{
+  "data": {
+    "entities": [],
+    "expirations": [],
+    "kv": [
+      {
+        "key_hex": "6a",
+        "value_hex": "76"
+      },
+      {
+        "key_hex": "6b",
+        "value_hex": ""
+      }
+    ],
+    "replayed": 0,
+    "types_hex": []
+  },
+  "now": 1800000000,
+  "present": true,
+  "replay": true
+}

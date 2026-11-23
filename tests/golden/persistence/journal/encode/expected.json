@@ -1,0 +1,699 @@
+{
+  "next_lsn": "85",
+  "position": {
+    "offset": 631,
+    "segment": 4
+  },
+  "records": [
+    {
+      "batch": 0,
+      "length": 40,
+      "lsn": "1",
+      "offset": 52,
+      "record": 0,
+      "segment": 1
+    },
+    {
+      "batch": 1,
+      "length": 0,
+      "lsn": "2",
+      "offset": 128,
+      "record": 0,
+      "segment": 1
+    },
+    {
+      "batch": 1,
+      "length": 12,
+      "lsn": "3",
+      "offset": 148,
+      "record": 1,
+      "segment": 1
+    },
+    {
+      "batch": 1,
+      "length": 0,
+      "lsn": "4",
+      "offset": 183,
+      "record": 2,
+      "segment": 1
+    },
+    {
+      "batch": 1,
+      "length": 0,
+      "lsn": "5",
+      "offset": 202,
+      "record": 3,
+      "segment": 1
+    },
+    {
+      "batch": 1,
+      "length": 0,
+      "lsn": "6",
+      "offset": 219,
+      "record": 4,
+      "segment": 1
+    },
+    {
+      "batch": 2,
+      "length": 300,
+      "lsn": "7",
+      "offset": 256,
+      "record": 0,
+      "segment": 1
+    },
+    {
+      "batch": 2,
+      "length": 0,
+      "lsn": "8",
+      "offset": 572,
+      "record": 1,
+      "segment": 1
+    },
+    {
+      "batch": 2,
+      "length": 0,
+      "lsn": "9",
+      "offset": 587,
+      "record": 2,
+      "segment": 1
+    },
+    {
+      "batch": 2,
+      "length": 7,
+      "lsn": "10",
+      "offset": 603,
+      "record": 3,
+      "segment": 1
+    },
+    {
+      "batch": 2,
+      "length": 0,
+      "lsn": "11",
+      "offset": 624,
+      "record": 4,
+      "segment": 1
+    },
+    {
+      "batch": 3,
+      "length": 0,
+      "lsn": "12",
+      "offset": 654,
+      "record": 0,
+      "segment": 1
+    },
+    {
+      "batch": 4,
+      "length": 0,
+      "lsn": "13",
+      "offset": 59,
+      "record": 0,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 1,
+      "lsn": "14",
+      "offset": 86,
+      "record": 1,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 2,
+      "lsn": "15",
+      "offset": 114,
+      "record": 2,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 3,
+      "lsn": "16",
+      "offset": 143,
+      "record": 3,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 4,
+      "lsn": "17",
+      "offset": 173,
+      "record": 4,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 5,
+      "lsn": "18",
+      "offset": 204,
+      "record": 5,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 6,
+      "lsn": "19",
+      "offset": 236,
+      "record": 6,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 7,
+      "lsn": "20",
+      "offset": 269,
+      "record": 7,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 8,
+      "lsn": "21",
+      "offset": 303,
+      "record": 8,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 9,
+      "lsn": "22",
+      "offset": 338,
+      "record": 9,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 10,
+      "lsn": "23",
+      "offset": 374,
+      "record": 10,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 11,
+      "lsn": "24",
+      "offset": 411,
+      "record": 11,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 12,
+      "lsn": "25",
+      "offset": 449,
+      "record": 12,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 13,
+      "lsn": "26",
+      "offset": 488,
+      "record": 13,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 14,
+      "lsn": "27",
+      "offset": 528,
+      "record": 14,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 15,
+      "lsn": "28",
+      "offset": 569,
+      "record": 15,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 16,
+      "lsn": "29",
+      "offset": 611,
+      "record": 16,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 17,
+      "lsn": "30",
+      "offset": 654,
+      "record": 17,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 18,
+      "lsn": "31",
+      "offset": 698,
+      "record": 18,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 19,
+      "lsn": "32",
+      "offset": 743,
+      "record": 19,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 20,
+      "lsn": "33",
+      "offset": 789,
+      "record": 20,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 21,
+      "lsn": "34",
+      "offset": 836,
+      "record": 21,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 22,
+      "lsn": "35",
+      "offset": 884,
+      "record": 22,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 23,
+      "lsn": "36",
+      "offset": 933,
+      "record": 23,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 24,
+      "lsn": "37",
+      "offset": 983,
+      "record": 24,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 25,
+      "lsn": "38",
+      "offset": 1034,
+      "record": 25,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 26,
+      "lsn": "39",
+      "offset": 1086,
+      "record": 26,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 27,
+      "lsn": "40",
+      "offset": 1139,
+      "record": 27,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 28,
+      "lsn": "41",
+      "offset": 1193,
+      "record": 28,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 29,
+      "lsn": "42",
+      "offset": 1248,
+      "record": 29,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 30,
+      "lsn": "43",
+      "offset": 1304,
+      "record": 30,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 31,
+      "lsn": "44",
+      "offset": 1361,
+      "record": 31,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 32,
+      "lsn": "45",
+      "offset": 1419,
+      "record": 32,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 33,
+      "lsn": "46",
+      "offset": 1478,
+      "record": 33,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 34,
+      "lsn": "47",
+      "offset": 1538,
+      "record": 34,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 35,
+      "lsn": "48",
+      "offset": 1599,
+      "record": 35,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 36,
+      "lsn": "49",
+      "offset": 1661,
+      "record": 36,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 37,
+      "lsn": "50",
+      "offset": 1724,
+      "record": 37,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 38,
+      "lsn": "51",
+      "offset": 1788,
+      "record": 38,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 39,
+      "lsn": "52",
+      "offset": 1853,
+      "record": 39,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 40,
+      "lsn": "53",
+      "offset": 1919,
+      "record": 40,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 41,
+      "lsn": "54",
+      "offset": 1986,
+      "record": 41,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 42,
+      "lsn": "55",
+      "offset": 2054,
+      "record": 42,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 43,
+      "lsn": "56",
+      "offset": 2123,
+      "record": 43,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 44,
+      "lsn": "57",
+      "offset": 2193,
+      "record": 44,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 45,
+      "lsn": "58",
+      "offset": 2264,
+      "record": 45,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 46,
+      "lsn": "59",
+      "offset": 2336,
+      "record": 46,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 47,
+      "lsn": "60",
+      "offset": 2409,
+      "record": 47,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 48,
+      "lsn": "61",
+      "offset": 2483,
+      "record": 48,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 49,
+      "lsn": "62",
+      "offset": 2558,
+      "record": 49,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 50,
+      "lsn": "63",
+      "offset": 2634,
+      "record": 50,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 51,
+      "lsn": "64",
+      "offset": 2711,
+      "record": 51,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 52,
+      "lsn": "65",
+      "offset": 2789,
+      "record": 52,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 53,
+      "lsn": "66",
+      "offset": 2868,
+      "record": 53,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 54,
+      "lsn": "67",
+      "offset": 2948,
+      "record": 54,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 55,
+      "lsn": "68",
+      "offset": 3029,
+      "record": 55,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 56,
+      "lsn": "69",
+      "offset": 3111,
+      "record": 56,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 57,
+      "lsn": "70",
+      "offset": 3194,
+      "record": 57,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 58,
+      "lsn": "71",
+      "offset": 3278,
+      "record": 58,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 59,
+      "lsn": "72",
+      "offset": 3363,
+      "record": 59,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 60,
+      "lsn": "73",
+      "offset": 3449,
+      "record": 60,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 61,
+      "lsn": "74",
+      "offset": 3536,
+      "record": 61,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 62,
+      "lsn": "75",
+      "offset": 3624,
+      "record": 62,
+      "segment": 2
+    },
+    {
+      "batch": 4,
+      "length": 63,
+      "lsn": "76",
+      "offset": 3713,
+      "record": 63,
+      "segment": 2
+    },
+    {
+      "batch": 5,
+      "length": 10240,
+      "lsn": "77",
+      "offset": 51,
+      "record": 0,
+      "segment": 3
+    },
+    {
+      "batch": 6,
+      "length": 0,
+      "lsn": "78",
+      "offset": 46,
+      "record": 0,
+      "segment": 4
+    },
+    {
+      "batch": 7,
+      "length": 20,
+      "lsn": "79",
+      "offset": 88,
+      "record": 0,
+      "segment": 4
+    },
+    {
+      "batch": 7,
+      "length": 20,
+      "lsn": "80",
+      "offset": 134,
+      "record": 1,
+      "segment": 4
+    },
+    {
+      "batch": 7,
+      "length": 20,
+      "lsn": "81",
+      "offset": 180,
+      "record": 2,
+      "segment": 4
+    },
+    {
+      "batch": 7,
+      "length": 20,
+      "lsn": "82",
+      "offset": 226,
+      "record": 3,
+      "segment": 4
+    },
+    {
+      "batch": 7,
+      "length": 20,
+      "lsn": "83",
+      "offset": 272,
+      "record": 4,
+      "segment": 4
+    },
+    {
+      "batch": 8,
+      "length": 300,
+      "lsn": "84",
+      "offset": 331,
+      "record": 0,
+      "segment": 4
+    }
+  ],
+  "segments": [
+    {
+      "id": 1,
+      "size": 654
+    },
+    {
+      "id": 2,
+      "size": 3776
+    },
+    {
+      "id": 3,
+      "size": 10291
+    },
+    {
+      "id": 4,
+      "size": 631
+    }
+  ]
+}
