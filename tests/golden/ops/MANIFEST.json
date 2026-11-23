@@ -1,0 +1,219 @@
+{
+  "part": "ops",
+  "baseline": "1a11e5e",
+  "go_version": "go1.24.7",
+  "goos": "darwin",
+  "goarch": "arm64",
+  "files": [
+    {
+      "path": "config/01.json",
+      "size": 1194,
+      "sha256": "e04f81662d22a4447a565071eeb4ffe246ef6699e4efeadf86c1a896d6e8c147"
+    },
+    {
+      "path": "config/01.yaml",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "config/02.json",
+      "size": 1194,
+      "sha256": "e04f81662d22a4447a565071eeb4ffe246ef6699e4efeadf86c1a896d6e8c147"
+    },
+    {
+      "path": "config/02.yaml",
+      "size": 10,
+      "sha256": "5e49ea838dc30f3eeacf6ca7815f6e3adcf77f467a970d978676790fd90377e1"
+    },
+    {
+      "path": "config/03.json",
+      "size": 1199,
+      "sha256": "5c4a8e64fc27eda53bd960a0ec7f872dd15012b68c00d8e620304a384656068a"
+    },
+    {
+      "path": "config/03.yaml",
+      "size": 23,
+      "sha256": "c50f7644505d8a8147a8f4301fa8ea3e0c7288832db3deec8ba4c86cd8456728"
+    },
+    {
+      "path": "config/04.json",
+      "size": 1193,
+      "sha256": "384ec11b4fe682f2998abb0ec1bb14fb8f12ef2621251248c6296950d9a6bb3f"
+    },
+    {
+      "path": "config/04.yaml",
+      "size": 20,
+      "sha256": "f0aeab6b1a229bf1305294af1a9456d35a23e211071b559c49ecba6911e81213"
+    },
+    {
+      "path": "config/05.json",
+      "size": 1193,
+      "sha256": "384ec11b4fe682f2998abb0ec1bb14fb8f12ef2621251248c6296950d9a6bb3f"
+    },
+    {
+      "path": "config/05.yaml",
+      "size": 20,
+      "sha256": "af1cde9dd5ebc46145ab8a4b1de49d73feef9feba8294a74e0cb1d36b7dd59d6"
+    },
+    {
+      "path": "config/06.json",
+      "size": 1193,
+      "sha256": "384ec11b4fe682f2998abb0ec1bb14fb8f12ef2621251248c6296950d9a6bb3f"
+    },
+    {
+      "path": "config/06.yaml",
+      "size": 22,
+      "sha256": "f6f6a98873526546401282f727bfd6eb852040d6db832713a0650c0c7142ae48"
+    },
+    {
+      "path": "config/07.json",
+      "size": 1193,
+      "sha256": "384ec11b4fe682f2998abb0ec1bb14fb8f12ef2621251248c6296950d9a6bb3f"
+    },
+    {
+      "path": "config/07.yaml",
+      "size": 22,
+      "sha256": "ed792dcfc1e26bb0b472c408900ee958da105655676af49d2c9f1125a540b9d1"
+    },
+    {
+      "path": "config/08.json",
+      "size": 1193,
+      "sha256": "384ec11b4fe682f2998abb0ec1bb14fb8f12ef2621251248c6296950d9a6bb3f"
+    },
+    {
+      "path": "config/08.yaml",
+      "size": 22,
+      "sha256": "83a79f508f20683492b856bd4b74d5fcbb4228f2da54e26a8762e11d6eb2d86a"
+    },
+    {
+      "path": "config/09.json",
+      "size": 1193,
+      "sha256": "384ec11b4fe682f2998abb0ec1bb14fb8f12ef2621251248c6296950d9a6bb3f"
+    },
+    {
+      "path": "config/09.yaml",
+      "size": 23,
+      "sha256": "351ca4ddae8f4a0b1e2b964e87451678d433f319a306cec43b22e5b0c31c1121"
+    },
+    {
+      "path": "config/10.json",
+      "size": 1193,
+      "sha256": "384ec11b4fe682f2998abb0ec1bb14fb8f12ef2621251248c6296950d9a6bb3f"
+    },
+    {
+      "path": "config/10.yaml",
+      "size": 23,
+      "sha256": "f19e23ba869d42c67804fe6bf900f33894be7d755573f1da4448c50e7a406f46"
+    },
+    {
+      "path": "config/11.json",
+      "size": 1193,
+      "sha256": "384ec11b4fe682f2998abb0ec1bb14fb8f12ef2621251248c6296950d9a6bb3f"
+    },
+    {
+      "path": "config/11.yaml",
+      "size": 23,
+      "sha256": "aae00808240530bddb70b92cbeaa6bc9acad4df5d235e342fcfd73237df20970"
+    },
+    {
+      "path": "config/12.json",
+      "size": 1193,
+      "sha256": "384ec11b4fe682f2998abb0ec1bb14fb8f12ef2621251248c6296950d9a6bb3f"
+    },
+    {
+      "path": "config/12.yaml",
+      "size": 21,
+      "sha256": "37858ac27795cba13a4b9248a0ed6bd95fdf190457d403061da969dbf0c6c334"
+    },
+    {
+      "path": "config/13.json",
+      "size": 1193,
+      "sha256": "384ec11b4fe682f2998abb0ec1bb14fb8f12ef2621251248c6296950d9a6bb3f"
+    },
+    {
+      "path": "config/13.yaml",
+      "size": 21,
+      "sha256": "0a90473cc147e00aee3a7e0479d98504aab9efa20b45cfe2ced191bc97c28ff8"
+    },
+    {
+      "path": "config/14.json",
+      "size": 1193,
+      "sha256": "384ec11b4fe682f2998abb0ec1bb14fb8f12ef2621251248c6296950d9a6bb3f"
+    },
+    {
+      "path": "config/14.yaml",
+      "size": 21,
+      "sha256": "70bb7f15717b045ab57e2e057ba33773f6255327cf8503659abe2e246bf32975"
+    },
+    {
+      "path": "config/15.json",
+      "size": 1194,
+      "sha256": "e04f81662d22a4447a565071eeb4ffe246ef6699e4efeadf86c1a896d6e8c147"
+    },
+    {
+      "path": "config/15.yaml",
+      "size": 20,
+      "sha256": "affd92724d9cd97d8f76adb6efe69f65f765a59b217e28672d1ac065c492e778"
+    },
+    {
+      "path": "config/16.json",
+      "size": 1194,
+      "sha256": "e04f81662d22a4447a565071eeb4ffe246ef6699e4efeadf86c1a896d6e8c147"
+    },
+    {
+      "path": "config/16.yaml",
+      "size": 20,
+      "sha256": "4df5633b7ef7b3eac4b277889f647dc29a4b048b4a9f3ffa0d162d2c290e066c"
+    },
+    {
+      "path": "config/17.json",
+      "size": 1194,
+      "sha256": "e04f81662d22a4447a565071eeb4ffe246ef6699e4efeadf86c1a896d6e8c147"
+    },
+    {
+      "path": "config/17.yaml",
+      "size": 21,
+      "sha256": "e8cbb95f6e976b885e7273d8be75fb501f5873980ec6aecbf3c18b270b9fea8b"
+    },
+    {
+      "path": "config/18.json",
+      "size": 1194,
+      "sha256": "e04f81662d22a4447a565071eeb4ffe246ef6699e4efeadf86c1a896d6e8c147"
+    },
+    {
+      "path": "config/18.yaml",
+      "size": 21,
+      "sha256": "f850913aad6297966e7828a5d86e34ad34d470cb94e6579c2563f884ffff0241"
+    },
+    {
+      "path": "config/19.json",
+      "size": 1194,
+      "sha256": "e04f81662d22a4447a565071eeb4ffe246ef6699e4efeadf86c1a896d6e8c147"
+    },
+    {
+      "path": "config/19.yaml",
+      "size": 21,
+      "sha256": "cca514476f94b82a5ff83cd268ef2165a60870b7357f2de07d639140eb54ceb5"
+    },
+    {
+      "path": "config/20.json",
+      "size": 1194,
+      "sha256": "e04f81662d22a4447a565071eeb4ffe246ef6699e4efeadf86c1a896d6e8c147"
+    },
+    {
+      "path": "config/20.yaml",
+      "size": 24,
+      "sha256": "916d2082231fa5b381cf05ea301f876a52c47b5cb5dec33c57f02db9ac9c3642"
+    },
+    {
+      "path": "config/default.json",
+      "size": 1188,
+      "sha256": "c44dd987dc4d86cfc08fed8c5c221694965d71c2e306869fe58666ea860fd48b"
+    },
+    {
+      "path": "yaml/cases.jsonl",
+      "size": 140514,
+      "sha256": "51cc73158145d29bab88b7214264cfb445fcf103137ed60edce5f27eec47db38"
+    }
+  ]
+}
