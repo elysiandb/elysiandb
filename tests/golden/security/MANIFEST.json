@@ -1,0 +1,94 @@
+{
+  "part": "security",
+  "baseline": "1a11e5e",
+  "go_version": "go1.24.7",
+  "goos": "darwin",
+  "goarch": "amd64",
+  "files": [
+    {
+      "path": "acl.jsonl",
+      "size": 724,
+      "sha256": "cd9f88f5e0dbc4dfdf4daba0f2a23b8d925b8fbe550cba2fb32e2cc3c2a04b04"
+    },
+    {
+      "path": "basic_header.jsonl",
+      "size": 1249,
+      "sha256": "bc6da9902c83c738c40d6062a8c6373c40ae30b08242b50dca1f4eeecbfc6c2d"
+    },
+    {
+      "path": "bcrypt.jsonl",
+      "size": 29094,
+      "sha256": "367828f8e13e29b5f59373e9ae3db116213c814561cbbcc30cc9f49f800abd5f"
+    },
+    {
+      "path": "bcrypt_parse.jsonl",
+      "size": 2907,
+      "sha256": "380fb1dcfbdf3b539331861d18ba370872b24321add820ee36c3ac3542dfe424"
+    },
+    {
+      "path": "cli.jsonl",
+      "size": 4811,
+      "sha256": "9d5832a117bdf0a0d4450c9a975ae9caa0e2f3344cf0584520ae335f76b4c8ae"
+    },
+    {
+      "path": "cookies.jsonl",
+      "size": 1610,
+      "sha256": "9c115ec721d2209510dcb500c6913d66cf2d66deef46c55ca0fb7c883b015919"
+    },
+    {
+      "path": "dto_decode.jsonl",
+      "size": 8455,
+      "sha256": "37c07362678b8a417cc7a7c77d2d415fb652840f9c11c8ae34c891fbba9257b3"
+    },
+    {
+      "path": "guard.jsonl",
+      "size": 14052,
+      "sha256": "d3cd9087150981072a83e79e645c2596bba251b19c35b91a7d990334dd4e3d1d"
+    },
+    {
+      "path": "http.jsonl",
+      "size": 26773,
+      "sha256": "0cd669555e8076598eef24fc2af85626e27c57ecc4df2c4d46a3e1d372ee9656"
+    },
+    {
+      "path": "ip.jsonl",
+      "size": 3534,
+      "sha256": "7cc9b745912b972b3946328451225c4054ea8a10b44f9b1d771740c9dd7d7300"
+    },
+    {
+      "path": "keyfile.jsonl",
+      "size": 413,
+      "sha256": "6f0b061277975108008490d53a492a5fc77aa8f825d0cae333fd80b579df59dd"
+    },
+    {
+      "path": "origin.jsonl",
+      "size": 27781,
+      "sha256": "c4d097dacb320dd0c067e7184be610915c65c26c18e3eaf73ade4e5c1d5fa865"
+    },
+    {
+      "path": "scan.jsonl",
+      "size": 1178,
+      "sha256": "c9f0100c6e7ddef124010aee68cf3af613178b79827d7bd892d20f06a17a8fde"
+    },
+    {
+      "path": "session.jsonl",
+      "size": 1468,
+      "sha256": "29ccb27022423f830febd473b25db34486f110af24b0026c6c8736ce16cf6cf6"
+    },
+    {
+      "path": "sessions_decode.jsonl",
+      "size": 1804,
+      "sha256": "a663beba24e628051642c07dbff1d78180554228e94ee966b2253037d209cf4c"
+    },
+    {
+      "path": "sha256.jsonl",
+      "size": 3489,
+      "sha256": "3081aba5da5f87f645b3017e78856379d49014733101219e736118943ea2eaf3"
+    },
+    {
+      "path": "validation.jsonl",
+      "size": 3452,
+      "sha256": "5a14ece6d05554c2c8551f6a010ad8d5e81b9bdf731c0e840df046161ab1c09d"
+    }
+  ]
+}

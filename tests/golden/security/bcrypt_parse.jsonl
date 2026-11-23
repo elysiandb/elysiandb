@@ -1,0 +1,16 @@
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"$2a$10$7AsfOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSosr2","name":"orig","result":"match"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"$2$10$7AsfOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSosr2","name":"2","result":"match"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"$2b$10$7AsfOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSosr2","name":"2b","result":"match"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"$2x$10$7AsfOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSosr2","name":"2x","result":"match"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"$2y$10$7AsfOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSosr2","name":"2y","result":"match"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"$3a$10$7AsfOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSosr2","name":"3a","result":"no match"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"$2a$03$7AsfOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSosr2","name":"cost03","result":"no match"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"$2a$04$7AsfOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSosr2","name":"cost04","result":"no match"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"$2a$31$7AsfOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSosr2","name":"cost31","parse_error":false,"parsed_cost":31,"result":"not computed"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"$2a$32$7AsfOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSosr2","name":"cost32","result":"no match"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"$2a$10$7AsfOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSos","name":"trunc58","result":"no match"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"$2a$10$7AsfOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSosr","name":"trunc59","result":"no match"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"$2a$10$7AsAOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSosr2","name":"alter-salt","result":"no match"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"$2a$10$7AsfOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSosre","name":"alter-hash","result":"no match"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"","name":"empty","result":"no match"}
+{"digest_hex":"320a81aa8f4c969bf8881f086fb39028c5236d5dce67dbde6b10b0d99d5bdebd","hash":"not a hash","name":"garbage","result":"no match"}

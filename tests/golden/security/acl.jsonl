@@ -1,0 +1,5 @@
+{"acl_json":"{\"username\":\"u\",\"entity\":\"book\",\"permissions\":{\"0\":true,\"1\":true,\"2\":true,\"3\":true,\"4\":true,\"5\":true,\"6\":true,\"7\":true}}","fn":"default","role":"admin"}
+{"acl_json":"{\"username\":\"u\",\"entity\":\"book\",\"permissions\":{\"0\":false,\"1\":false,\"2\":false,\"3\":false,\"4\":true,\"5\":true,\"6\":true,\"7\":true}}","fn":"default","role":"user"}
+{"acl_json":"{\"username\":\"u\",\"entity\":\"book\",\"permissions\":{\"0\":false,\"1\":false,\"2\":false,\"3\":false,\"4\":true,\"5\":true,\"6\":true,\"7\":true}}","fn":"default","role":"auditor"}
+{"fn":"GenerateACLFoAllrEntities","zero_types":"null"}
+{"acl_json":"null","entity":"book","fn":"GetACLEntityForUsername","username":"ann"}

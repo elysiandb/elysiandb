@@ -1,0 +1,12 @@
+{"clear":false,"request":"plain","set_cookie":"edb_session=0123456789abcdef; path=/; HttpOnly; SameSite=Strict"}
+{"clear":true,"request":"plain","set_cookie":"edb_session=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; HttpOnly; SameSite=Strict"}
+{"clear":false,"request":"peer-loopback","set_cookie":"edb_session=0123456789abcdef; path=/; HttpOnly; SameSite=Strict"}
+{"clear":true,"request":"peer-loopback","set_cookie":"edb_session=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; HttpOnly; SameSite=Strict"}
+{"clear":false,"request":"proto-https","set_cookie":"edb_session=0123456789abcdef; path=/; HttpOnly; secure; SameSite=Strict"}
+{"clear":true,"request":"proto-https","set_cookie":"edb_session=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; HttpOnly; secure; SameSite=Strict"}
+{"clear":false,"request":"proto-list","set_cookie":"edb_session=0123456789abcdef; path=/; HttpOnly; secure; SameSite=Strict"}
+{"clear":true,"request":"proto-list","set_cookie":"edb_session=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; HttpOnly; secure; SameSite=Strict"}
+{"clear":false,"request":"proto-spaces","set_cookie":"edb_session=0123456789abcdef; path=/; HttpOnly; secure; SameSite=Strict"}
+{"clear":true,"request":"proto-spaces","set_cookie":"edb_session=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; HttpOnly; secure; SameSite=Strict"}
+{"clear":false,"request":"proto-http-first","set_cookie":"edb_session=0123456789abcdef; path=/; HttpOnly; SameSite=Strict"}
+{"clear":true,"request":"proto-http-first","set_cookie":"edb_session=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; HttpOnly; SameSite=Strict"}
