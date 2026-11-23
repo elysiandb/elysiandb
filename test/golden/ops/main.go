@@ -29,7 +29,7 @@ func main() {
 	steps := []struct {
 		name string
 		fn   func(string) error
-	}{{"yaml", genYAML}, {"config", genConfig}}
+	}{{"yaml", genYAML}, {"config", genConfig}, {"logs", genLogs}}
 	for _, s := range steps {
 		if *only != "" && !strings.Contains(","+*only+",", ","+s.name+",") {
 			continue
