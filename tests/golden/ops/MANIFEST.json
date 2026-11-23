@@ -221,6 +221,36 @@
       "sha256": "fed52641df6c4f310b429f95d8dc4b6645697478025589ce5f59dca18861da12"
     },
     {
+      "path": "metrics/details.json",
+      "size": 930,
+      "sha256": "c2645736a2a2c1ebc0a6bb51d289e7f998828ff7676938577870f094d1ddd647"
+    },
+    {
+      "path": "metrics/instance.json",
+      "size": 417,
+      "sha256": "a5ee3de4084a2dad23104957dbcc6b91dea8c41c959d0e6747018626739511d4"
+    },
+    {
+      "path": "metrics/overview.json",
+      "size": 1484,
+      "sha256": "d9033d3d94facccb121a1bf2be6bea7a96ca58bf96c9214347f2bfdfa8911eaa"
+    },
+    {
+      "path": "metrics/prometheus.prom",
+      "size": 13055,
+      "sha256": "e428aa50647046dfd95c01a3d8cb08e5ed98df438e66742593437103f0f97aa6"
+    },
+    {
+      "path": "metrics/series.jsonl",
+      "size": 96285,
+      "sha256": "d47c384e49605cd3281b65df1478be3b6a60be231d35b31b1ab822830df7f546"
+    },
+    {
+      "path": "metrics/status.json",
+      "size": 188,
+      "sha256": "9dadc50a632f9f7d5bf9117504b20197c8371faa5af13adad331a65c669eb117"
+    },
+    {
       "path": "yaml/cases.jsonl",
       "size": 140514,
       "sha256": "51cc73158145d29bab88b7214264cfb445fcf103137ed60edce5f27eec47db38"
