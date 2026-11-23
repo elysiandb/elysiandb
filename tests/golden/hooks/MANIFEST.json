@@ -1,0 +1,29 @@
+{
+  "part": "hooks",
+  "baseline": "1a11e5e",
+  "go_version": "go1.24.7",
+  "goos": "darwin",
+  "goarch": "arm64",
+  "files": [
+    {
+      "path": "arch-amd64-europe-paris.jsonl",
+      "size": 299,
+      "sha256": "102e7e12ac687b33452934463531e201451bacac3aaaa1474d3543bce8e0ec34"
+    },
+    {
+      "path": "arch-amd64-utc.jsonl",
+      "size": 299,
+      "sha256": "102e7e12ac687b33452934463531e201451bacac3aaaa1474d3543bce8e0ec34"
+    },
+    {
+      "path": "corpus-europe-paris.jsonl",
+      "size": 150988,
+      "sha256": "6b7340a69f27a3534b3469aedee937215a7fdee4d326df805c0a7315b662ceeb"
+    },
+    {
+      "path": "corpus-utc.jsonl",
+      "size": 150962,
+      "sha256": "b82b0f202ed29c209496f06d6fa177845441b2fb16a503d7ab7a5ffa91a7f412"
+    }
+  ]
+}
