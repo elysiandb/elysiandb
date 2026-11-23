@@ -1,0 +1,6 @@
+POST /api/security/logout HTTP/1.1
+Host: h
+Connection: close
+Cookie: edb_session={{sid}}
+Content-Length: 0
+

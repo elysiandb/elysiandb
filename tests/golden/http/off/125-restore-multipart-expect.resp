@@ -1,0 +1,17 @@
+HTTP/1.1 100 Continue
+
+HTTP/1.1 200 OK
+Server: ElysianDB
+Date: <DATE>
+Content-Type: application/json
+Content-Length: 259
+X-Elysian-Version: <VER>
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Cache-Control: no-store
+X-Request-Id: <RID>
+Connection: close
+
+{"entities":{"_elysiandb_core_acl":16,"_elysiandb_core_hook":3,"_elysiandb_core_user":2,"author":8,"book":30,"budget_month":12,"note":1,"program":3,"purchase":36,"review":40,"step":15},"kv_keys":3,"kv_keys_expired":0,"schemas":11,"status":"restore completed"}

@@ -1,0 +1,13 @@
+HTTP/1.1 204 No Content
+Server: ElysianDB
+Date: <DATE>
+X-Elysian-Version: <VER>
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Cache-Control: no-store
+X-Request-Id: <RID>
+Set-Cookie: edb_session=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; HttpOnly; SameSite=Strict
+Connection: close
+

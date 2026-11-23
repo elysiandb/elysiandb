@@ -1,0 +1,41 @@
+[
+  {
+    "closed": false,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "001-hold-connection",
+    "logged": false,
+    "read": {
+      "until": "quiet",
+      "quiet_ms": 500,
+      "max_ms": 15000
+    },
+    "server": "limited",
+    "steps": [
+      {
+        "file": "001-hold-connection.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "d27",
+    "conn": "new",
+    "half_close": false,
+    "id": "002-concurrency-503",
+    "logged": true,
+    "read": {
+      "until": "close",
+      "max_ms": 5000
+    },
+    "server": "limited",
+    "steps": [
+      {
+        "file": "002-concurrency-503.req",
+        "pause_before_ms": 0
+      }
+    ]
+  }
+]

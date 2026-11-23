@@ -1,0 +1,4 @@
+GET /api/hook/id/nope HTTP/1.1
+Host: h
+Connection: close
+

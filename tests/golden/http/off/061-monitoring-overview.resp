@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+Server: ElysianDB
+Date: <DATE>
+Content-Type: application/json
+Content-Length: <LEN>
+X-Elysian-Version: <VER>
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Cache-Control: no-store
+X-Request-Id: <RID>
+Connection: close
+
+{"connections":{"admin_sessions":"\u003cnull\u003e","http":"\u003cnumber\u003e","oldest_transaction_seconds":"\u003cnumber\u003e","open_transactions":"\u003cnumber\u003e","tcp":"\u003cnumber\u003e"},"data":{"disk_bytes":"\u003cnumber\u003e","entities":"\u003cnumber\u003e","entity_types":"\u003cnumber\u003e","kv_keys":"\u003cnumber\u003e","kv_keys_with_ttl":"\u003cnumber\u003e","top_entity_types":[]},"generated_at":"\u003cstring\u003e","instance":{"auth_mode":"\u003cstring\u003e","data_folder":"\u003cstring\u003e","engine":"\u003cstring\u003e","features":{"access_log":"\u003cbool\u003e","admin_ui":"\u003cbool\u003e","cache":"\u003cbool\u003e","crash_recovery":"\u003cbool\u003e","hooks":"\u003cbool\u003e","prometheus":"\u003cbool\u003e","schema":"\u003cbool\u003e","stats":"\u003cbool\u003e"},"go_version":"\u003cstring\u003e","http":{"address":"\u003cstring\u003e","enabled":"\u003cbool\u003e"},"started_at":"\u003cstring\u003e","tcp":{"address":"\u003cstring\u003e","enabled":"\u003cbool\u003e"},"uptime_seconds":"\u003cnumber\u003e","version":"\u003cstring\u003e"},"logs":{"errors_1h":"\u003cnumber\u003e","errors_24h":"\u003cnumber\u003e","level":"\u003cstring\u003e","warnings_1h":"\u003cnumber\u003e","warnings_24h":"\u003cnumber\u003e"},"persistence":{"flush_failures":"\u003cnumber\u003e","last_flush_at":"\u003cstring\u003e","last_flush_error":"\u003cstring\u003e","last_flush_ms":"\u003cnumber\u003e","last_flush_ok":"\u003cbool\u003e","last_success_at":"\u003cstring\u003e"},"runtime":{"cpu_percent":"\u003cnumber\u003e","goroutines":"\u003cnumber\u003e","heap_bytes":"\u003cnumber\u003e","total_bytes":"\u003cnumber\u003e"},"status":{"level":"\u003cstring\u003e","problems":[]},"traffic":{"error_rate":"\u003cnumber\u003e","http_requests_per_second":"\u003cnumber\u003e","p95_ms":"\u003cnumber\u003e","requests_per_second":"\u003cnumber\u003e","slow_requests_per_minute":"\u003cnumber\u003e","tcp_commands_per_second":"\u003cnumber\u003e"}}

@@ -1,0 +1,8 @@
+POST /api/hook/book HTTP/1.1
+Host: h
+Connection: close
+Content-Type: application/json
+Authorization: Basic YWRtaW46YWRtaW4=
+Content-Length: 184
+
+{"name":"upper","event":"post_read","language":"javascript","script":"function postRead(ctx){ ctx.entity.upper = (ctx.entity.title || '').toUpperCase(); }","priority":1,"enabled":true}

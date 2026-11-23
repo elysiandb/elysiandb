@@ -1,0 +1,7 @@
+POST /api/restore HTTP/1.1
+Host: h
+Connection: close
+Content-Type: application/gzip
+Content-Length: 17
+
+not a gzip stream

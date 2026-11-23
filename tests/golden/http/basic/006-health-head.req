@@ -1,0 +1,5 @@
+HEAD /health HTTP/1.1
+Host: h
+Connection: close
+Authorization: Basic YWRtaW46YWRtaW4=
+

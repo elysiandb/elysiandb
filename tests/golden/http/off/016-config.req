@@ -1,0 +1,4 @@
+GET /config HTTP/1.1
+Host: h
+Connection: close
+

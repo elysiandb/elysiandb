@@ -1,0 +1,34 @@
+store:
+  folder: <DATA>
+  shards: 8
+  flushIntervalSeconds: 0
+  crashRecovery: { enabled: true, maxLogMB: 100 }
+server:
+  http: { enabled: true, host: 127.0.0.1, port: 8089 }
+  tcp:  { enabled: false, host: 127.0.0.1, port: 8088 }
+log:
+  level: info
+  format: text
+  accessLog: true
+  bufferLines: 500
+stats:
+  enabled: true
+security:
+  authentication:
+    enabled: false
+api:
+  index:
+    workers: 1
+  schema:
+    enabled: true
+    strict: true
+  cache:
+    enabled: true
+    cleanupIntervalSeconds: 10
+  hooks:
+    enabled: true
+adminui:
+  enabled: true
+monitoring:
+  prometheus:
+    enabled: true

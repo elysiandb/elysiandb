@@ -1,0 +1,10 @@
+HTTP/1.1 507 Insufficient Storage
+Server: ElysianDB
+Date: <DATE>
+Content-Type: application/json
+Content-Length: 21
+Retry-After: 30
+X-Request-Id: <RID>
+Connection: close
+
+{"error":"disk full"}

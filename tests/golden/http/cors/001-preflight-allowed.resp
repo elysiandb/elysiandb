@@ -1,0 +1,11 @@
+HTTP/1.1 204 No Content
+Server: ElysianDB
+Date: <DATE>
+Access-Control-Allow-Origin: http://allowed.test
+Vary: Origin
+Access-Control-Allow-Credentials: true
+Access-Control-Allow-Headers: Content-Type, Authorization
+Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+X-Request-Id: <RID>
+Connection: close
+

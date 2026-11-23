@@ -1,0 +1,6 @@
+OPTIONS /api/book HTTP/1.1
+Host: h
+Connection: close
+Origin: http://elsewhere.test
+Access-Control-Request-Method: GET
+

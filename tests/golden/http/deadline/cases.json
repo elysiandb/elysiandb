@@ -1,0 +1,56 @@
+[
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "001-query-deadline",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "001-query-deadline.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "002-list-deadline",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "002-list-deadline.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "003-health",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "003-health.req",
+        "pause_before_ms": 0
+      }
+    ]
+  }
+]

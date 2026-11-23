@@ -1,0 +1,4 @@
+GET /monitoring/details HTTP/1.1
+Host: h
+Connection: close
+

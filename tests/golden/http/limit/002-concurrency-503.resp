@@ -1,0 +1,8 @@
+HTTP/1.1 503 Service Unavailable
+Connection: close
+Server: ElysianDB
+Date: <DATE>
+Content-Type: text/plain
+Content-Length: <LEN>
+
+<D27>

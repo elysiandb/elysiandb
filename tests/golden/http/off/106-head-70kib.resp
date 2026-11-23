@@ -1,0 +1,8 @@
+HTTP/1.1 431 Request Header Fields Too Large
+Server: ElysianDB
+Date: <DATE>
+Content-Type: text/plain; charset=utf-8
+Content-Length: <LEN>
+Connection: close
+
+<D27>

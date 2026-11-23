@@ -1,0 +1,13 @@
+HTTP/1.1 308 Permanent Redirect
+Server: ElysianDB
+Date: <DATE>
+Content-Length: 0
+Location: http://h/save
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Cache-Control: no-store
+X-Request-Id: <RID>
+Connection: close
+

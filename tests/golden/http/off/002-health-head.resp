@@ -1,0 +1,14 @@
+HTTP/1.1 405 Method Not Allowed
+Server: ElysianDB
+Date: <DATE>
+Content-Type: text/plain; charset=utf-8
+Content-Length: 18
+Allow: GET, OPTIONS
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Cache-Control: no-store
+X-Request-Id: <RID>
+Connection: close
+

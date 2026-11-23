@@ -1,0 +1,4 @@
+GET /kv/a%2Fb%20c HTTP/1.1
+Host: h
+Connection: close
+

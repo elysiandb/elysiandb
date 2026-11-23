@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+Server: ElysianDB
+Date: <DATE>
+Content-Type: application/json
+Content-Length: <LEN>
+X-Elysian-Version: <VER>
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Cache-Control: no-store
+X-Request-Id: <RID>
+Connection: close
+
+{"entities_count":"\u003cstring\u003e","expiration_keys_count":"\u003cstring\u003e","hits":"\u003cstring\u003e","keys_count":"\u003cstring\u003e","misses":"\u003cstring\u003e","total_requests":"\u003cstring\u003e","uptime_seconds":"\u003cstring\u003e","version":"\u003cstring\u003e"}

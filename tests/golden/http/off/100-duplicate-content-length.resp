@@ -1,0 +1,8 @@
+HTTP/1.1 400 Bad Request
+Server: ElysianDB
+Date: <DATE>
+Content-Type: text/plain; charset=utf-8
+Content-Length: <LEN>
+Connection: close
+
+<D27>

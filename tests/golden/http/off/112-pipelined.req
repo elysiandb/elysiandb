@@ -1,0 +1,7 @@
+GET /health HTTP/1.1
+Host: h
+
+GET /api/book/count HTTP/1.1
+Host: h
+Connection: close
+
