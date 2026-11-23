@@ -130,7 +130,7 @@ func filtersKey(filters map[string]map[string]string) string {
 
 func entityVersion(entity string) string {
 	e := storage.Engine()
-	if e == nil || !engine.IsEngineInternal() {
+	if e == nil {
 		return ""
 	}
 
@@ -141,7 +141,7 @@ func entityVersion(entity string) string {
 
 func keyVersion(entity string, filters map[string]map[string]string) string {
 	e := storage.Engine()
-	if e == nil || !engine.IsEngineInternal() {
+	if e == nil {
 		return ""
 	}
 
@@ -159,10 +159,6 @@ func keyVersion(entity string, filters map[string]map[string]string) string {
 }
 
 func listForHook(targetEntity string, filters map[string]map[string]string, guard *api_storage.Guard) ([]map[string]any, error) {
-	if !engine.IsEngineInternal() {
-		return engine.ListEntities(targetEntity, 0, 0, "", true, filters, "", ""), nil
-	}
-
 	return api_storage.ListEntitiesGuarded(targetEntity, 0, 0, "", true, filters, "", "", guard)
 }
 

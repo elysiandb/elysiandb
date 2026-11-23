@@ -110,11 +110,11 @@ func TestConfigToJsonRedactsSecrets(t *testing.T) {
 	cfg.Security.Authentication.Enabled = true
 	cfg.Security.Authentication.Mode = "token"
 	cfg.Security.Authentication.Token = "test-token"
-	cfg.Engine.Name = "mongodb"
-	cfg.Engine.URI = "mongodb://elysian:s3cret@localhost:27017/elysiandb"
+	cfg.Monitoring.Prometheus.Token = "prom-token"
+	cfg.Engine.Name = "internal"
 
 	out := cfg.ToJson()
-	if strings.Contains(out, "test-token") || strings.Contains(out, "s3cret") {
+	if strings.Contains(out, "test-token") || strings.Contains(out, "prom-token") {
 		t.Fatalf("expected secrets to be redacted, got %s", out)
 	}
 
@@ -127,47 +127,68 @@ func TestConfigToJsonRedactsSecrets(t *testing.T) {
 		t.Fatalf("unexpected authentication block %+v", decoded.Security.Authentication)
 	}
 
-	if decoded.Engine.URI != "mongodb://elysian:xxxxx@localhost:27017/elysiandb" {
-		t.Fatalf("unexpected engine URI %q", decoded.Engine.URI)
+	if decoded.Monitoring.Prometheus.Token != cfgpkg.RedactedValue || decoded.Engine.Name != "internal" {
+		t.Fatalf("unexpected decoded configuration %+v", decoded)
 	}
 
-	if cfg.Security.Authentication.Token != "test-token" || !strings.Contains(cfg.Engine.URI, "s3cret") {
+	if cfg.Security.Authentication.Token != "test-token" || cfg.Monitoring.Prometheus.Token != "prom-token" {
 		t.Fatalf("ToJson must not change the configuration")
 	}
 
 	empty := (&cfgpkg.Config{}).ToJson()
 	var decodedEmpty cfgpkg.Config
 	_ = json.Unmarshal([]byte(empty), &decodedEmpty)
-	if decodedEmpty.Security.Authentication.Token != "" || decodedEmpty.Engine.URI != "" {
+	if decodedEmpty.Security.Authentication.Token != "" || decodedEmpty.Monitoring.Prometheus.Token != "" {
 		t.Fatalf("expected empty values to stay empty, got %s", empty)
-	}
-
-	invalid := &cfgpkg.Config{}
-	invalid.Engine.URI = "mongodb://user:pa%zzss@localhost:27017/elysiandb"
-	if out := invalid.ToJson(); strings.Contains(out, "pa%zzss") || !strings.Contains(out, `"URI":"***"`) {
-		t.Fatalf("expected an unparsable URI to be fully redacted, got %s", out)
-	}
-
-	noPassword := &cfgpkg.Config{}
-	noPassword.Engine.URI = "mongodb://localhost:27017/elysiandb"
-	if !strings.Contains(noPassword.ToJson(), "mongodb://localhost:27017/elysiandb") {
-		t.Fatalf("expected a URI without password to be kept, got %s", noPassword.ToJson())
 	}
 }
 
-func TestConfigToJsonRedactsSecretQueryParameters(t *testing.T) {
-	cfg := &cfgpkg.Config{}
-	cfg.Engine.URI = "mongodb://elysian:s3cret@localhost:27017/elysiandb?authMechanismProperties=AWS_SESSION_TOKEN:abc123&tlsCertificateKeyFilePassword=k3y&replicaSet=rs0"
-
-	out := cfg.ToJson()
-	for _, secret := range []string{"s3cret", "abc123", "k3y"} {
-		if strings.Contains(out, secret) {
-			t.Fatalf("expected %q to be redacted, got %s", secret, out)
-		}
+func TestLoadConfigChecksTheEngine(t *testing.T) {
+	cases := map[string]struct {
+		block   string
+		wantErr bool
+		warns   bool
+	}{
+		"no engine block":  {block: ""},
+		"empty name":       {block: "engine:\n  name: \"\"\n"},
+		"internal":         {block: "engine:\n  name: internal\n"},
+		"former uri key":   {block: "engine:\n  name: internal\n  uri: \"db://user:secret@localhost:1/x\"\n", warns: true},
+		"other engine":     {block: "engine:\n  name: other\n", wantErr: true},
+		"wrong case":       {block: "engine:\n  name: Internal\n", wantErr: true},
+		"surrounding text": {block: "engine:\n  name: \" internal\"\n", wantErr: true},
 	}
 
-	if !strings.Contains(out, "replicaSet=rs0") {
-		t.Fatalf("expected other parameters to be kept, got %s", out)
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "elysian.yaml")
+			content := "store:\n  folder: /tmp/x\n" + tc.block
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			var cfg *cfgpkg.Config
+			var err error
+			out := captureStdout(t, func() { cfg, err = cfgpkg.LoadConfig(path) })
+
+			if tc.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "engine.name") {
+					t.Fatalf("expected an engine.name error, got %v", err)
+				}
+				return
+			}
+
+			if err != nil || cfg == nil {
+				t.Fatalf("unexpected error %v", err)
+			}
+
+			if strings.Contains(out, "WARN") != tc.warns {
+				t.Fatalf("unexpected warning output %q", out)
+			}
+
+			if strings.Contains(out, "secret") || strings.Contains(cfg.ToJson(), "secret") {
+				t.Fatalf("the former uri key must not be kept, got %q and %s", out, cfg.ToJson())
+			}
+		})
 	}
 }
 

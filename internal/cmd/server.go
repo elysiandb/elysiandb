@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/taymour/elysiandb/internal/backup"
 	"github.com/taymour/elysiandb/internal/boot"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/hook"
 	"github.com/taymour/elysiandb/internal/log"
@@ -22,11 +20,10 @@ import (
 var serverLog = log.For("boot")
 
 const (
-	mongoDisconnectTimeout = 5 * time.Second
-	shutdownDrainTimeout   = 5 * time.Second
-	shutdownCloseTimeout   = 3 * time.Second
-	readyWithin            = 5 * time.Minute
-	readyPoll              = 100 * time.Millisecond
+	shutdownDrainTimeout = 5 * time.Second
+	shutdownCloseTimeout = 3 * time.Second
+	readyWithin          = 5 * time.Minute
+	readyPoll            = 100 * time.Millisecond
 )
 
 func announceReady() {
@@ -44,7 +41,7 @@ func announceReady() {
 func StartServer() {
 	cfg := globals.GetConfig()
 
-	if cfg.Stats.Enabled && engine.IsEngineInternal() {
+	if cfg.Stats.Enabled {
 		boot.BootStats()
 	}
 
@@ -88,14 +85,6 @@ func StartServer() {
 		serverLog.Error("cannot close the data folder cleanly", "err", err)
 	} else {
 		serverLog.Info("data flushed on shutdown", "duration_ms", log.Since(start))
-	}
-
-	if globals.MongoClient != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), mongoDisconnectTimeout)
-		if err := globals.MongoClient.Disconnect(ctx); err != nil {
-			log.Warn("mongodb disconnect failed", "component", "mongodb", "err", err)
-		}
-		cancel()
 	}
 
 	metrics.Stop()

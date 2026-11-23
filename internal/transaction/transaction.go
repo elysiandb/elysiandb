@@ -46,10 +46,6 @@ type BatchCommitter interface {
 }
 
 func (realStorage) CommitBatch(ops []TxOperation) (bool, error) {
-	if !engine.IsEngineInternal() {
-		return false, nil
-	}
-
 	batch := make([]api_storage.BatchOperation, 0, len(ops))
 	for _, op := range ops {
 		batch = append(batch, api_storage.BatchOperation{Kind: op.Kind, Entity: op.Entity, ID: op.ID, Data: op.Data})

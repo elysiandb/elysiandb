@@ -77,7 +77,7 @@ func Prepare(now time.Time) (*Source, error) {
 	}})
 
 	e := storage.Engine()
-	if !engine.IsEngineInternal() || e == nil {
+	if e == nil {
 		if err := s.spool(now); err != nil {
 			s.Close()
 			return nil, err

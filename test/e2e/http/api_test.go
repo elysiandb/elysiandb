@@ -712,12 +712,11 @@ func TestCoreEntitiesAreNotExposedByGenericRoutes(t *testing.T) {
 func TestConfigRedactsSecrets(t *testing.T) {
 	s := startAPIServer(t, func(cfg *configuration.Config) {
 		cfg.Security.Authentication.Mode = "token"
-		cfg.Engine.URI = "mongodb://elysian:s3cret@localhost:27017/elysiandb"
 	})
 	s.headers["Authorization"] = "Bearer test-token"
 
 	resp := s.mustDo(fasthttp.StatusOK, "GET", "/config", "")
-	if strings.Contains(string(resp.body), "test-token") || strings.Contains(string(resp.body), "s3cret") {
+	if strings.Contains(string(resp.body), "test-token") {
 		t.Fatalf("expected secrets to be redacted, got %s", resp.body)
 	}
 
@@ -726,8 +725,8 @@ func TestConfigRedactsSecrets(t *testing.T) {
 		t.Fatalf("unexpected authentication block %v", authentication)
 	}
 
-	if uri := resp.object(t)["Engine"].(map[string]any)["URI"]; uri != "mongodb://elysian:xxxxx@localhost:27017/elysiandb" {
-		t.Fatalf("expected the engine URI password to be redacted, got %v", uri)
+	if engineBlock := resp.object(t)["Engine"].(map[string]any); len(engineBlock) != 1 {
+		t.Fatalf("expected the engine block to hold only its name, got %v", engineBlock)
 	}
 
 	if globals.GetConfig().Security.Authentication.Token != "test-token" {

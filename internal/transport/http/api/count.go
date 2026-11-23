@@ -5,7 +5,6 @@ import (
 
 	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/security"
 	"github.com/valyala/fasthttp"
 )
@@ -17,17 +16,12 @@ func CountController(ctx *fasthttp.RequestCtx) {
 	username := security.GetCurrentUsername(ctx)
 
 	var count int64
-	if engine.IsEngineInternal() {
-		switch mode := acl.ReadModeFor(username, entity); mode {
-		case acl.ReadAll:
-			count = int64(api_storage.CountEntities(entity))
-		default:
-			res := api_storage.Plan(api_storage.ListQuery{Entity: entity})
-			count = int64(countPlanned(res, true, mode, username))
-		}
-	} else {
-		data := engine.ListEntities(entity, 0, 0, "", true, nil, "", "")
-		count = int64(len(acl.FilterListOfEntities(username, entity, data)))
+	switch mode := acl.ReadModeFor(username, entity); mode {
+	case acl.ReadAll:
+		count = int64(api_storage.CountEntities(entity))
+	default:
+		res := api_storage.Plan(api_storage.ListQuery{Entity: entity})
+		count = int64(countPlanned(res, true, mode, username))
 	}
 
 	ctx.SetStatusCode(fasthttp.StatusOK)

@@ -3,7 +3,6 @@ package hook
 import (
 	"container/list"
 	"errors"
-	"github.com/taymour/elysiandb/internal/log"
 	"runtime"
 	"runtime/debug"
 	"sort"
@@ -12,10 +11,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/taymour/elysiandb/internal/log"
+
 	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
 	"github.com/taymour/elysiandb/internal/datastore"
-	engine "github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/memory"
 )
 
@@ -314,7 +314,7 @@ func buildResult(targetEntity string, filters map[string]map[string]string, owne
 	}
 
 	includes := api_storage.MergeIncludes("", api_storage.ExtractAutoIncludes(filters))
-	if !engine.IsEngineInternal() || includes != "" {
+	if includes != "" {
 		docs, err := listForHook(targetEntity, filters, guard)
 		if err != nil {
 			return nil, err

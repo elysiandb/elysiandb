@@ -153,7 +153,7 @@ var lastSignature atomic.Value
 
 func aclSignature() string {
 	e := storage.Engine()
-	if e == nil || !engine.IsEngineInternal() {
+	if e == nil {
 		return ""
 	}
 

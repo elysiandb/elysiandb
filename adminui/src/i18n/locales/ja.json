@@ -190,7 +190,6 @@
         "problems": {
             "flush_failing": "直近のディスクへの書き込みに失敗しました",
             "recovery_write_failing": "直近 5 分間にリカバリーログへの書き込みに失敗しました",
-            "mongodb_unreachable": "MongoDB に接続できません",
             "error_rate_high": "直近 5 分間でリクエストの 1% 以上が失敗しました",
             "latency_high": "p95 レイテンシーが 5 分間、低速リクエストのしきい値を超えています",
             "hook_failing": "フック {hook_id} が直近 5 分間に失敗しました",
@@ -246,8 +245,7 @@
             "dataFolder": "データフォルダー"
         },
         "engines": {
-            "internal": "内部",
-            "mongodb": "MongoDB (ベータ)"
+            "internal": "内部"
         },
         "features": {
             "cache": "API キャッシュ",
@@ -279,7 +277,6 @@
             "runtime": "ランタイム",
             "connections": "接続",
             "hooks": "フック",
-            "mongodb": "MongoDB",
             "indexes": "インデックス",
             "memory": "メモリ予算"
         },
@@ -323,9 +320,6 @@
             "oldestTransaction": "最も古い未完了トランザクション",
             "hookExecutions": "毎秒のフック実行数",
             "hookDuration": "フックの実行時間 (p95)",
-            "mongoPing": "MongoDB の ping",
-            "mongoErrors": "毎分の MongoDB エラー数",
-            "mongoPool": "使用中の MongoDB プール接続",
             "indexCount": "インデックス",
             "indexBytes": "インデックスのサイズ",
             "memoryBudget": "予算に対するメモリ",
@@ -386,8 +380,6 @@
             "openTransactions": "トランザクション",
             "oldestTransaction": "経過時間",
             "executions": "実行数",
-            "ping": "Ping",
-            "poolInUse": "使用中",
             "logSinceCheckpoint": "前回のチェックポイント以降",
             "logBytes": "ディスク上のログ",
             "liveBytes": "有効なデータ",

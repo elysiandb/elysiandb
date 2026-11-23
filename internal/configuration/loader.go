@@ -3,7 +3,6 @@ package configuration
 import (
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 
@@ -146,7 +145,6 @@ type ApiCacheConfig struct {
 
 type EngineConfig struct {
 	Name string `yaml:"name"`
-	URI  string `yaml:"uri"`
 }
 
 type Config struct {
@@ -189,53 +187,12 @@ func (c *Config) ToJson() string {
 		copyConfig.Monitoring.Prometheus.Token = RedactedValue
 	}
 
-	copyConfig.Engine.URI = redactURIPassword(copyConfig.Engine.URI)
-
 	data, err := json.Marshal(copyConfig)
 	if err != nil {
 		return "{}"
 	}
 
 	return string(data)
-}
-
-func redactURIPassword(uri string) string {
-	if uri == "" {
-		return uri
-	}
-
-	parsed, err := url.Parse(uri)
-	if err != nil {
-		return RedactedValue
-	}
-
-	query := parsed.Query()
-	redacted := false
-	for key := range query {
-		if isSecretParameter(key) {
-			query.Set(key, "xxxxx")
-			redacted = true
-		}
-	}
-
-	if redacted {
-		parsed.RawQuery = query.Encode()
-	}
-
-	return parsed.Redacted()
-}
-
-var secretParameterHints = []string{"password", "secret", "token", "key", "credential", "authmechanismproperties"}
-
-func isSecretParameter(name string) bool {
-	lower := strings.ToLower(name)
-	for _, hint := range secretParameterHints {
-		if strings.Contains(lower, hint) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -269,6 +226,12 @@ func LoadConfig(path string) (*Config, error) {
 
 	if cfg.Log.BufferLines < 0 {
 		return nil, fmt.Errorf("log.bufferLines must be 0 or more")
+	}
+
+	switch cfg.Engine.Name {
+	case "", "internal":
+	default:
+		return nil, fmt.Errorf("unknown engine.name %q: use internal", cfg.Engine.Name)
 	}
 
 	switch strings.ToLower(strings.TrimSpace(cfg.Store.Durability)) {

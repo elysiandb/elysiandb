@@ -7,7 +7,6 @@ import (
 	"github.com/taymour/elysiandb/internal/backup"
 	"github.com/taymour/elysiandb/internal/cache"
 	"github.com/taymour/elysiandb/internal/configuration"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/metrics"
@@ -73,14 +72,6 @@ func InitDB() {
 
 	logStorageLoaded(cfg, start)
 
-	switch {
-	case engine.IsEngineMongoDB():
-		InitMongoDBConnection()
-	case engine.IsEngineInternal():
-	default:
-		log.Fatal("unsupported storage engine", "component", "boot", "engine", cfg.Engine.Name, "hint", "use internal or mongodb")
-	}
-
 	BootACL()
 	BootHooks()
 	BootApiCacheCleaner()
@@ -105,10 +96,6 @@ func openTool(mode storage.OpenMode) {
 	}
 
 	logStorageLoaded(cfg, start)
-
-	if engine.IsEngineMongoDB() {
-		InitMongoDBConnection()
-	}
 }
 
 func logStorageLoaded(cfg *configuration.Config, start time.Time) {

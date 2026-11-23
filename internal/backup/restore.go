@@ -231,10 +231,6 @@ func replaceData(archive *archiveReader, manifest *Manifest) (*Report, error) {
 }
 
 func restoreDocuments(entity string, documents *documentReader) (int, error) {
-	if !engine.IsEngineInternal() {
-		return engine.RestoreEntities(entity, documents.next)
-	}
-
 	return api_storage.RestoreRawEntities(entity, documents.nextRaw)
 }
 
@@ -589,20 +585,6 @@ func (d *documentReader) nextRaw() (string, []byte, error) {
 	}
 
 	return id, raw, nil
-}
-
-func (d *documentReader) next() (map[string]any, error) {
-	_, raw, err := d.nextRaw()
-	if err != nil {
-		return nil, err
-	}
-
-	var data map[string]any
-	if err := json.Unmarshal(raw, &data); err != nil {
-		return nil, invalidArchive("%s, document %d: %v", d.path, d.line, err)
-	}
-
-	return data, nil
 }
 
 func (d *documentReader) count() (int, error) {

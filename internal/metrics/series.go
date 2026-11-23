@@ -63,9 +63,6 @@ const (
 	sOldestTransaction
 	sHookExecutionsRps
 	sHookP95
-	sMongoPingMs
-	sMongoErrorsRps
-	sMongoPoolInUse
 	sCPUCores
 	sGOMAXPROCS
 	sLogSinceCheckpointBytes
@@ -171,9 +168,6 @@ var seriesNames = [numSeries]string{
 	sOldestTransaction:  "oldest_transaction_seconds",
 	sHookExecutionsRps:  "hook_executions_rps",
 	sHookP95:            "hook_p95_ms",
-	sMongoPingMs:        "mongo_ping_ms",
-	sMongoErrorsRps:     "mongo_errors_rps",
-	sMongoPoolInUse:     "mongo_pool_in_use",
 	sCPUCores:           "cpu_cores",
 	sGOMAXPROCS:         "gomaxprocs",
 
@@ -260,7 +254,6 @@ var rateSeries = map[int]int{
 	sFlushFailuresRps:  cFlushFailures,
 	sForcedFlushesRps:  cForcedFlushes,
 	sHookExecutionsRps: cHookExecutions,
-	sMongoErrorsRps:    cMongoErrors,
 }
 
 func derive(prev, cur *snapshot) Point {

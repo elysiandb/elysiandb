@@ -13,7 +13,6 @@ import (
 	"github.com/fasthttp/router"
 
 	"github.com/taymour/elysiandb/internal/datastore"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/globals"
 	"github.com/taymour/elysiandb/internal/log"
 	"github.com/taymour/elysiandb/internal/routing"
@@ -51,7 +50,7 @@ func changesData(ctx *fasthttp.RequestCtx) bool {
 	switch {
 	case bytes.HasPrefix(path, []byte("/kv/")):
 		return true
-	case !bytes.HasPrefix(path, []byte("/api/")) || !engine.IsEngineInternal():
+	case !bytes.HasPrefix(path, []byte("/api/")):
 		return false
 	case bytes.Equal(path, []byte("/api/query")), bytes.HasPrefix(path, []byte("/api/security/log")):
 		return false
