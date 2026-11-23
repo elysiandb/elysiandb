@@ -53,6 +53,35 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
 
+  rust:
+    name: Rust tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        run: rustup toolchain install
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Ensure adminui dist exists
+        run: mkdir -p adminui/dist
+
+      - name: Verify Cargo.lock
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Lint
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: Run tests
+        run: cargo test --locked --release -- --test-threads=1
+
   adminui:
     name: Admin UI tests
     runs-on: ubuntu-latest
