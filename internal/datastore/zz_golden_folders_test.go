@@ -18,6 +18,7 @@ import (
 	"github.com/taymour/elysiandb/internal/durable"
 	"github.com/taymour/elysiandb/internal/journal"
 	"github.com/taymour/elysiandb/internal/legacy"
+	"github.com/taymour/elysiandb/internal/pagetree"
 )
 
 const fixedCreatedAt = "2000-01-01T00:00:00Z"
@@ -581,12 +582,12 @@ func TestGenerateGoldenMessages(t *testing.T) {
 	path := goldenFile(t, "messages.json")
 	root := t.TempDir()
 	var rows []map[string]any
-	add := func(site string, err error, dir string) {
+	add := func(site string, err error, dir string, inner ...error) {
 		row := map[string]any{"site": site}
 		if err == nil {
 			row["error"] = nil
 		} else {
-			row["error"] = splitMessage(err, dir)
+			row["error"] = describeMessage(err, dir, inner)
 		}
 		rows = append(rows, row)
 	}
@@ -613,7 +614,8 @@ func TestGenerateGoldenMessages(t *testing.T) {
 		}
 	}
 	_, err = Open(folderOptions(corruptBoth))
-	add("MANIFEST and MANIFEST.prev both unreadable", err, corruptBoth)
+	_, parseErr := parseManifest([]byte(`{"format":`))
+	add("MANIFEST and MANIFEST.prev both unreadable", err, corruptBoth, parseErr)
 
 	badLive := filepath.Join(root, "bad-live")
 	copyTree(t, base, badLive)
@@ -657,7 +659,7 @@ func TestGenerateGoldenMessages(t *testing.T) {
 		_ = os.Truncate(p, 20)
 	}
 	_, err = Open(folderOptions(shortPages))
-	add("short page read", err, shortPages)
+	add("short page read", err, shortPages, rootPageErrors(t, shortPages)...)
 
 	badKV := filepath.Join(root, "bad-kv")
 	copyTree(t, base, badKV)
@@ -674,19 +676,18 @@ func TestGenerateGoldenMessages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := e.Close(); err != nil {
-		t.Fatal(err)
-	}
+	e.Abandon()
 	unreadable := filepath.Join(root, "format1-prev-unreadable")
 	copyTree(t, upgraded, unreadable)
 	_ = os.Remove(filepath.Join(upgraded, durable.ManifestFile))
 	_, err = Open(folderOptions(upgraded))
-	add("format-1 MANIFEST.prev after upgrade, MANIFEST removed", err, upgraded)
+	add("format-1 MANIFEST.prev after upgrade, MANIFEST removed", err, upgraded, checkpointOpenError(upgraded))
 	if err := os.WriteFile(filepath.Join(unreadable, durable.ManifestFile), []byte("garbage"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	_, err = Open(folderOptions(unreadable))
-	add("format-1 MANIFEST.prev after upgrade, MANIFEST unreadable", err, unreadable)
+	_, garbageErr := parseManifest([]byte("garbage"))
+	add("format-1 MANIFEST.prev after upgrade, MANIFEST unreadable", err, unreadable, garbageErr, checkpointOpenError(unreadable))
 
 	jdir := filepath.Join(root, "journal")
 	j, err := journal.Open(jdir, journal.Options{Mode: journal.ModeSync, SegmentSize: 4096})
@@ -776,55 +777,92 @@ func flipRootPage(t *testing.T, dir string) {
 	}
 }
 
-func goParts(msg string) string {
-	for _, part := range []struct{ text, marker string }{
-		{"unexpected end of JSON input", "<go:json>"},
-		{"invalid character 'g' looking for beginning of value", "<go:json>"},
-	} {
-		msg = strings.ReplaceAll(msg, part.text, part.marker)
+func goPart(err error) (string, string, bool) {
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		switch e.(type) {
+		case *json.SyntaxError, *json.UnmarshalTypeError:
+			return e.Error(), "json", true
+		case *fs.PathError, *os.LinkError, *os.SyscallError:
+			return e.Error(), "file_system", true
+		}
+		if e == io.EOF {
+			return e.Error(), "end_of_file", true
+		}
+		if e == io.ErrUnexpectedEOF {
+			return e.Error(), "end_of_file", true
+		}
 	}
-	if strings.HasSuffix(msg, ": EOF") {
-		msg = strings.TrimSuffix(msg, "EOF") + "<go:eof>"
-	}
-	if msg == "EOF" {
-		msg = "<go:eof>"
-	}
-	return msg
+	return "", "", false
 }
 
-func splitMessage(err error, dir string) map[string]any {
+func describeMessage(err error, dir string, inner []error) map[string]any {
 	msg := strings.ReplaceAll(err.Error(), dir, "<dir>")
-	var inner error
-	kind := ""
-	var se *json.SyntaxError
-	var te *json.UnmarshalTypeError
-	var pe *fs.PathError
-	var le *os.LinkError
-	switch {
-	case errors.As(err, &se):
-		inner, kind = se, "json"
-	case errors.As(err, &te):
-		inner, kind = te, "json"
-	case errors.As(err, &pe):
-		inner, kind = pe, "file_system"
-	case errors.As(err, &le):
-		inner, kind = le, "file_system"
-	case errors.Is(err, io.ErrUnexpectedEOF):
-		inner, kind = io.ErrUnexpectedEOF, "end_of_file"
-	case errors.Is(err, io.EOF):
-		inner, kind = io.EOF, "end_of_file"
-	}
-	if inner == nil {
-		masked := goParts(msg)
-		if masked != msg {
-			return map[string]any{"text": masked}
+	var kinds []string
+	sources := append([]error{err}, inner...)
+	for _, src := range sources {
+		if src == nil {
+			continue
 		}
+		text, kind, ok := goPart(src)
+		if !ok {
+			continue
+		}
+		text = strings.ReplaceAll(text, dir, "<dir>")
+		if !strings.Contains(msg, text) {
+			continue
+		}
+		if kind == "end_of_file" {
+			if !strings.HasSuffix(msg, ": "+text) && msg != text {
+				continue
+			}
+			msg = strings.TrimSuffix(msg, text) + "<go:" + kind + ">"
+		} else {
+			msg = strings.ReplaceAll(msg, text, "<go:"+kind+">")
+		}
+		kinds = append(kinds, kind)
+	}
+	if len(kinds) == 0 {
 		return map[string]any{"message": msg}
 	}
-	innerText := strings.ReplaceAll(inner.Error(), dir, "<dir>")
-	prefix, found := strings.CutSuffix(msg, innerText)
-	if !found {
-		return map[string]any{"wrapped": kind, "literal_unknown": true}
+	return map[string]any{"text": msg, "wrapped": kinds}
+}
+
+func rootPageErrors(t *testing.T, dir string) []error {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(dir, durable.ManifestFile))
+	if err != nil {
+		t.Fatal(err)
 	}
-	return map[string]any{"literal": prefix, "wrapped": kind}
+	m, err := parseManifest(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := durable.OpenPageStore(nil, filepath.Join(dir, durable.PagesFolder), 1<<30, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	var out []error
+	for _, r := range m.roots() {
+		if r.ID == 0 {
+			continue
+		}
+		if _, err := store.Load(pagetree.StoredRef(r.ID, r.Size)); err != nil {
+			out = append(out, err)
+		}
+	}
+	return out
+}
+
+func checkpointOpenError(dir string) error {
+	data, err := os.ReadFile(filepath.Join(dir, durable.PreviousManifest))
+	if err != nil {
+		return err
+	}
+	m, err := parseManifest(data)
+	if err != nil || m.Checkpoint == "" {
+		return err
+	}
+	_, err = readCheckpoint(filepath.Join(dir, m.Checkpoint))
+	return err
 }

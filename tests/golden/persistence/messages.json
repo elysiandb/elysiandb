@@ -7,7 +7,10 @@
   },
   {
     "error": {
-      "text": "no readable checkpoint: MANIFEST: cannot read MANIFEST: \u003cgo:json\u003e; MANIFEST.prev: cannot read MANIFEST: \u003cgo:json\u003e"
+      "text": "no readable checkpoint: MANIFEST: cannot read MANIFEST: \u003cgo:json\u003e; MANIFEST.prev: cannot read MANIFEST: \u003cgo:json\u003e",
+      "wrapped": [
+        "json"
+      ]
     },
     "site": "MANIFEST and MANIFEST.prev both unreadable"
   },
@@ -37,7 +40,10 @@
   },
   {
     "error": {
-      "text": "no readable checkpoint: MANIFEST: page 300003be1: \u003cgo:eof\u003e"
+      "text": "no readable checkpoint: MANIFEST: page 300003be1: \u003cgo:end_of_file\u003e",
+      "wrapped": [
+        "end_of_file"
+      ]
     },
     "site": "short page read"
   },
@@ -48,17 +54,29 @@
     "site": "corrupt kv file"
   },
   {
-    "error": null,
+    "error": {
+      "text": "cannot read the checkpoint checkpoint-0000000000000192.ckpt: \u003cgo:file_system\u003e",
+      "wrapped": [
+        "file_system"
+      ]
+    },
     "site": "format-1 MANIFEST.prev after upgrade, MANIFEST removed"
   },
   {
-    "error": null,
+    "error": {
+      "text": "cannot read the checkpoint checkpoint-0000000000000192.ckpt: \u003cgo:file_system\u003e",
+      "wrapped": [
+        "file_system"
+      ]
+    },
     "site": "format-1 MANIFEST.prev after upgrade, MANIFEST unreadable"
   },
   {
     "error": {
-      "literal": "",
-      "wrapped": "end_of_file"
+      "text": "\u003cgo:end_of_file\u003e",
+      "wrapped": [
+        "end_of_file"
+      ]
     },
     "site": "ReadValue short read"
   },

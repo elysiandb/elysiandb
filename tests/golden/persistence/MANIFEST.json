@@ -1372,8 +1372,8 @@
     },
     {
       "path": "messages.json",
-      "size": 1842,
-      "sha256": "35443cb83b1a00039ea295a403c22b61659b1c0ff05fa900fd249eba96a5ce4b"
+      "size": 2298,
+      "sha256": "04643efb2930da02f3b0567008fc7a73db894ff32662689f6850e534e6647270"
     },
     {
       "path": "migration/numbers/expected.json",
