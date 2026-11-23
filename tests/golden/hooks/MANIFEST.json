@@ -16,6 +16,26 @@
       "sha256": "102e7e12ac687b33452934463531e201451bacac3aaaa1474d3543bce8e0ec34"
     },
     {
+      "path": "bench-baseline.json",
+      "size": 35484,
+      "sha256": "ff1a45b415e7c009f182be7260cabbfdd62cc41b34afc9f40430ed357a4603b2"
+    },
+    {
+      "path": "bench-runs/run1.json",
+      "size": 35477,
+      "sha256": "bfe0b20d3db50b88c600f3f7d59318d1c33ce3934d069d2d0afad3522e763dae"
+    },
+    {
+      "path": "bench-runs/run2.json",
+      "size": 35477,
+      "sha256": "39226912e57217b8061ba4a802f3c8dd6ccfa302be44fe9adaeabefb4c11b145"
+    },
+    {
+      "path": "bench-runs/run3.json",
+      "size": 35464,
+      "sha256": "0b35155525cbc23fc5a3f191c4c982acb6035194aa488d37b29e8e292261ff7e"
+    },
+    {
       "path": "bytecode/alias.code",
       "size": 747,
       "sha256": "322e83c9e174c9bc30abfd81e2bf2773685416ae4b73344b269af8952d31a876"
