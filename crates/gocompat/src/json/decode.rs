@@ -1,5 +1,5 @@
 use super::scanner::{SyntaxError, check_valid, is_space};
-use crate::gocompat::{utf8, utf16};
+use crate::{utf8, utf16};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Number(String);

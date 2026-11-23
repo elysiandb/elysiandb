@@ -129,8 +129,8 @@ fn display_char(rest: &[u8]) -> Option<String> {
     if c < 0x80 {
         return Some((c as char).to_string());
     }
-    let (r, size) = crate::gocompat::utf8::decode_rune(rest);
-    if r == crate::gocompat::utf8::RUNE_ERROR && size == 1 {
+    let (r, size) = crate::utf8::decode_rune(rest);
+    if r == crate::utf8::RUNE_ERROR && size == 1 {
         return None;
     }
     std::str::from_utf8(&rest[..size]).ok().map(str::to_string)

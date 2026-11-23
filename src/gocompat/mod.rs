@@ -1,13 +1,1 @@
-pub mod base64;
-pub mod errors;
-pub mod flag;
-pub mod fmt;
-pub mod json;
-pub mod rand;
-pub mod sort;
-pub mod strconv;
-pub mod strings;
-pub mod time;
-pub mod unicode;
-pub mod utf16;
-pub mod utf8;
+pub use gocompat::*;

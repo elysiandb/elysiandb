@@ -6,7 +6,7 @@ pub use self::tables::{
     ND as DIGIT, P as PUNCT, S as SYMBOL, SENTENCE_TERMINAL as STERM, Z as SPACE,
 };
 
-use crate::gocompat::utf8::Rune;
+use crate::utf8::Rune;
 
 pub const MAX_RUNE: Rune = 0x10FFFF;
 pub const REPLACEMENT_CHAR: Rune = 0xFFFD;

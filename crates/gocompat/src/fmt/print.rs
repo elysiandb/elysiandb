@@ -1,6 +1,6 @@
 use super::Arg;
 use super::format::{Fmt, LDIGITS, SIGNED, UDIGITS, UNSIGNED};
-use crate::gocompat::utf8::{RUNE_SELF, decode_rune};
+use crate::utf8::{RUNE_SELF, decode_rune};
 use std::cmp::Ordering;
 
 const COMMA_SPACE_STRING: &[u8] = b", ";

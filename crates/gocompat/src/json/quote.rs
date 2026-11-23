@@ -1,4 +1,4 @@
-use crate::gocompat::utf8::{RUNE_ERROR, RUNE_SELF, decode_rune};
+use crate::utf8::{RUNE_ERROR, RUNE_SELF, decode_rune};
 
 const HEX: &[u8; 16] = b"0123456789abcdef";
 

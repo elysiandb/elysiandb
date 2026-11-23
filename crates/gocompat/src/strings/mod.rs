@@ -1,5 +1,5 @@
-use crate::gocompat::unicode;
-use crate::gocompat::utf8::{self, RUNE_ERROR, RUNE_SELF, Rune, UTF_MAX};
+use crate::unicode;
+use crate::utf8::{self, RUNE_ERROR, RUNE_SELF, Rune, UTF_MAX};
 
 static ASCII_SPACE: [bool; 256] = {
     let mut t = [false; 256];

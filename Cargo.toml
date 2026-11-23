@@ -7,6 +7,12 @@ license = "MIT"
 publish = false
 build = "build.rs"
 
+[workspace]
+members = ["crates/gocompat"]
+
+[dependencies]
+gocompat = { path = "crates/gocompat" }
+
 [lib]
 path = "src/lib.rs"
 

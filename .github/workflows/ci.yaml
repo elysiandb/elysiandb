@@ -77,10 +77,10 @@ jobs:
         run: cargo fmt --all --check
 
       - name: Lint
-        run: cargo clippy --all-targets --locked -- -D warnings
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: Run tests
-        run: cargo test --locked --release -- --test-threads=1
+        run: cargo test --workspace --locked --release -- --test-threads=1
 
   adminui:
     name: Admin UI tests

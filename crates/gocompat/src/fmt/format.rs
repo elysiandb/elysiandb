@@ -1,8 +1,8 @@
-use crate::gocompat::strconv::{
+use crate::strconv::{
     append_float, append_quote, append_quote_rune, append_quote_rune_to_ascii,
     append_quote_to_ascii, can_backquote, is_print,
 };
-use crate::gocompat::utf8::{RUNE_ERROR, RUNE_SELF, Rune, UTF_MAX, append_rune, decode_rune};
+use crate::utf8::{RUNE_ERROR, RUNE_SELF, Rune, UTF_MAX, append_rune, decode_rune};
 
 pub(super) const LDIGITS: &[u8; 17] = b"0123456789abcdefx";
 pub(super) const UDIGITS: &[u8; 17] = b"0123456789ABCDEFX";

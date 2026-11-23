@@ -1,5 +1,5 @@
 use super::isprint::{IS_GRAPHIC, IS_NOT_PRINT16, IS_NOT_PRINT32, IS_PRINT16, IS_PRINT32};
-use crate::gocompat::utf8::{RUNE_ERROR, RUNE_SELF, Rune, append_rune, decode_rune};
+use crate::utf8::{RUNE_ERROR, RUNE_SELF, Rune, append_rune, decode_rune};
 
 pub(super) static LOWERHEX: &[u8; 16] = b"0123456789abcdef";
 pub(super) static UPPERHEX: &[u8; 16] = b"0123456789ABCDEF";

@@ -4,7 +4,7 @@ use super::time::{
 };
 use super::zoneinfo_read::{load_location_sources, load_tzinfo_from_dir_or_zip, parse_tzdata};
 use super::zoneinfo_unix::{PLATFORM_ZONE_SOURCES, local_data};
-use crate::gocompat::json::quote_text;
+use crate::json::quote_text;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::io;

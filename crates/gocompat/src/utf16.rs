@@ -1,4 +1,4 @@
-use crate::gocompat::utf8::Rune;
+use crate::utf8::Rune;
 
 const REPLACEMENT_CHAR: Rune = 0xFFFD;
 const MAX_RUNE: Rune = 0x10FFFF;

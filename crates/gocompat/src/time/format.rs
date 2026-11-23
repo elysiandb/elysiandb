@@ -4,7 +4,7 @@ use super::time::{
     days_in, is_leap,
 };
 use super::zoneinfo::Location;
-use crate::gocompat::json::quote_text;
+use crate::json::quote_text;
 use std::fmt;
 
 pub const LAYOUT: &str = "01/02 03:04:05PM '06 -0700";

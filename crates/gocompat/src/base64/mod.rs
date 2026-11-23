@@ -1,4 +1,4 @@
-use crate::gocompat::utf8::Rune;
+use crate::utf8::Rune;
 use std::fmt;
 
 pub const STD_PADDING: Rune = '=' as Rune;

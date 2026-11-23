@@ -1,9 +1,9 @@
 use std::fmt;
 use std::io::{self, Write};
 
-use crate::gocompat::json::quote_text;
-use crate::gocompat::strconv::{parse_bool, parse_float, parse_int};
-use crate::gocompat::time::{Duration, parse_duration};
+use crate::json::quote_text;
+use crate::strconv::{parse_bool, parse_float, parse_int};
+use crate::time::{Duration, parse_duration};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {

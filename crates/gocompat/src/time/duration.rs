@@ -1,5 +1,5 @@
 use super::format::leading_int;
-use crate::gocompat::json::quote_text;
+use crate::json::quote_text;
 use std::fmt;
 use std::ops::{Add, Mul, Neg, Sub};
 

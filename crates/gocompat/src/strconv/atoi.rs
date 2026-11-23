@@ -1,4 +1,4 @@
-use crate::gocompat::json::quote_text;
+use crate::json::quote_text;
 use std::fmt;
 
 pub(super) fn lower(c: u8) -> u8 {
