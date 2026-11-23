@@ -1,0 +1,69 @@
+{
+  "part": "engine",
+  "baseline": "1a11e5e",
+  "go_version": "go1.24.7",
+  "goos": "darwin",
+  "goarch": "amd64",
+  "files": [
+    {
+      "path": "corpus.jsonl",
+      "size": 400478,
+      "sha256": "7753014a9ae4a63734f66d97da74fde5462d27ae3bf6be418c48719ad112295d"
+    },
+    {
+      "path": "dates.jsonl",
+      "size": 24837,
+      "sha256": "50a06f21055947086eab866ca186a1547334c3128eaae711ba1b8db1d458c54b"
+    },
+    {
+      "path": "index_keys.jsonl",
+      "size": 5977819,
+      "sha256": "371597d1bd1ca7c20f8a1de62053682108d76e0d290cfb4f74e8b8bfddbf8359"
+    },
+    {
+      "path": "memory.jsonl",
+      "size": 25186,
+      "sha256": "98a229bb0ca2d10860322a8abceb1b731a10ae3b337364ba05ec5ac5cb3ab74f"
+    },
+    {
+      "path": "memory_container.jsonl",
+      "size": 3989,
+      "sha256": "d311c86e82905fc405834aceb1cef034eaf9b764f89914268c9264015cd5aeb2"
+    },
+    {
+      "path": "pages.jsonl",
+      "size": 4529836,
+      "sha256": "fbd5857c6927c08f5b12711ffb0adccfb422a3cdd7835eb950ac724cd7ae6468"
+    },
+    {
+      "path": "postings.jsonl",
+      "size": 721065,
+      "sha256": "b638f79b67f8d4985e1da675eae83c130d701c0285bb465acc3f887e9c2bbd60"
+    },
+    {
+      "path": "primitives.jsonl",
+      "size": 8403,
+      "sha256": "9ebc8d43eba7e672d6f1eaf5277901358fbfdc5cb5a6645cd1f90dd26303b9b5"
+    },
+    {
+      "path": "put_bytes.jsonl",
+      "size": 27694,
+      "sha256": "afabecb66052d33cd6973f34ffe1200ee13fb54fa736e3533db8b583cc651bfc"
+    },
+    {
+      "path": "scenario.jsonl",
+      "size": 319443,
+      "sha256": "88fdff9f936f540f0146b8d1ad4ecbdf5c8702c4dd702fac7c45a85f152d6c14"
+    },
+    {
+      "path": "scenario_ops.jsonl",
+      "size": 23835,
+      "sha256": "d886ab648196de3b88632322ad7a918e9359cac1f15f823ae45d9a6370cb818c"
+    },
+    {
+      "path": "strings.jsonl",
+      "size": 35991,
+      "sha256": "f8aeaa74338774979ad803b4c373996220e60c171e09f0da83d349b31d035185"
+    }
+  ]
+}
