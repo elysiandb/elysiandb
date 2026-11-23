@@ -1,0 +1,85 @@
+{"date_only":true,"day_unix":1768435200,"fn":"ParseDate","in":"2026-01-15","nanos":0,"ok":true,"sort_ok":true,"sort_unix":1768435200,"unix":1768435200}
+{"date_only":false,"day_unix":1768435200,"fn":"ParseDate","in":"2026-01-15T10:00:00Z","nanos":0,"ok":true,"sort_ok":true,"sort_unix":1768471200,"unix":1768471200}
+{"date_only":false,"day_unix":1768435200,"fn":"ParseDate","in":"2026-01-15T10:00:00+02:00","nanos":0,"ok":true,"sort_ok":true,"sort_unix":1768464000,"unix":1768464000}
+{"date_only":false,"fn":"ParseDate","in":"2026-1-15","ok":false,"sort_ok":false}
+{"date_only":false,"fn":"ParseDate","in":"2026-01-15 10:00:00","ok":false,"sort_ok":false}
+{"date_only":false,"day_unix":1768435200,"fn":"ParseDate","in":"2026-01-15T10:00:00,5Z","nanos":500000000,"ok":true,"sort_ok":true,"sort_unix":1768471200,"unix":1768471200}
+{"date_only":false,"fn":"ParseDate","in":"2026-01-15T24:00:00Z","ok":false,"sort_ok":false}
+{"date_only":false,"fn":"ParseDate","in":"x","ok":false,"sort_ok":false}
+{"date_only":false,"fn":"ParseDate","in":"2026-13-01","ok":false,"sort_ok":false}
+{"date_only":false,"day_unix":1768435200,"fn":"ParseDate","in":"2026-01-15T10:00:00.123456789123Z","nanos":123456789,"ok":true,"sort_ok":true,"sort_unix":1768471200,"unix":1768471200}
+{"fn":"MatchGlob","out":true,"pattern":"dune*","subject":"Dune Messiah"}
+{"fn":"MatchGlob","out":true,"pattern":"*UNE","subject":"dune"}
+{"fn":"MatchGlob","out":false,"pattern":"d?ne","subject":"dune"}
+{"fn":"MatchGlob","out":true,"pattern":"a\\*","subject":"a*"}
+{"fn":"MatchGlob","out":true,"pattern":"","subject":""}
+{"fn":"MatchGlob","out":true,"pattern":"*","subject":"\ufffd"}
+{"fn":"MatchGlob","out":true,"pattern":"É*","subject":"été"}
+{"bits":"3ff0000000000000","fn":"ParseFloat","in":"1"}
+{"bits":"3ff8000000000000","fn":"ParseFloat","in":"1.5"}
+{"bits":"8000000000000000","fn":"ParseFloat","in":"-0"}
+{"bits":"444b1ae4d6e2ef50","fn":"ParseFloat","in":"1e21"}
+{"bits":"3e7ad7f29abcaf48","fn":"ParseFloat","in":"1e-7"}
+{"bits":"0000000000000000","error":"syntax","fn":"ParseFloat","in":"0x10"}
+{"bits":"3fd0000000000000","fn":"ParseFloat","in":"0x1p-2"}
+{"bits":"408f400000000000","fn":"ParseFloat","in":"1_000"}
+{"bits":"7ff0000000000000","fn":"ParseFloat","in":"inf"}
+{"bits":"fff0000000000000","fn":"ParseFloat","in":"-Inf"}
+{"bits":"7ff8000000000001","fn":"ParseFloat","in":"nan"}
+{"bits":"7ff8000000000001","fn":"ParseFloat","in":"NaN"}
+{"bits":"7ff0000000000000","error":"range","fn":"ParseFloat","in":"1e400"}
+{"bits":"fff0000000000000","error":"range","fn":"ParseFloat","in":"-1e400"}
+{"bits":"0000000000000000","fn":"ParseFloat","in":"1e-400"}
+{"bits":"0000000000000000","error":"syntax","fn":"ParseFloat","in":" 1"}
+{"bits":"0000000000000000","error":"syntax","fn":"ParseFloat","in":"1 "}
+{"bits":"0000000000000000","error":"syntax","fn":"ParseFloat","in":""}
+{"bits":"3fe0000000000000","fn":"ParseFloat","in":".5"}
+{"bits":"4014000000000000","fn":"ParseFloat","in":"5."}
+{"bits":"4014000000000000","fn":"ParseFloat","in":"+5"}
+{"bits":"4415af1d78b58c40","fn":"ParseFloat","in":"99999999999999999999"}
+{"bits":"0000000000000000","error":"syntax","fn":"ParseFloat","in":"1,5"}
+{"bits":"0000000000000000","f":"0","fn":"FormatFloat","g":"0"}
+{"bits":"8000000000000000","f":"-0","fn":"FormatFloat","g":"-0"}
+{"bits":"3ff0000000000000","f":"1","fn":"FormatFloat","g":"1"}
+{"bits":"3ff8000000000000","f":"1.5","fn":"FormatFloat","g":"1.5"}
+{"bits":"4415af1d78b58c40","f":"100000000000000000000","fn":"FormatFloat","g":"1e+20"}
+{"bits":"444b1ae4d6e2ef50","f":"1000000000000000000000","fn":"FormatFloat","g":"1e+21"}
+{"bits":"3eb0c6f7a0b5ed8d","f":"0.000001","fn":"FormatFloat","g":"1e-06"}
+{"bits":"3e7ad7f29abcaf48","f":"0.0000001","fn":"FormatFloat","g":"1e-07"}
+{"bits":"419d6f3454000000","f":"123456789","fn":"FormatFloat","g":"1.23456789e+08"}
+{"bits":"3fb999999999999a","f":"0.1","fn":"FormatFloat","g":"0.1"}
+{"bits":"4340000000000000","f":"9007199254740992","fn":"FormatFloat","g":"9.007199254740992e+15"}
+{"bits":"7fefffffffffffff","f":"179769313486231570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","fn":"FormatFloat","g":"1.7976931348623157e+308"}
+{"bits":"0000000000000001","f":"0.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005","fn":"FormatFloat","g":"5e-324"}
+{"fn":"Sprintf_v","in":"[1,\"a\",null,true,[2,[3]],{\"b\":1,\"a\":[1]}]","out":"[1 a \u003cnil\u003e true [2 [3]] map[a:[1] b:1]]"}
+{"fn":"Sprintf_v","in":"{\"z\":1,\"a\":{\"c\":[],\"b\":null}}","out":"map[a:map[b:\u003cnil\u003e c:[]] z:1]"}
+{"fn":"Sprintf_v","in":"[]","out":"[]"}
+{"fn":"Sprintf_v","in":"{}","out":"map[]"}
+{"fn":"Sprintf_v","in":"[1e21,1e-7,-0]","out":"[1e+21 1e-07 -0]"}
+{"fn":"ToLower+TrimSpace","in":"414243","lower":"616263","trim":"414243"}
+{"fn":"ToLower+TrimSpace","in":"c4b07374616e62756c","lower":"697374616e62756c","trim":"c4b07374616e62756c"}
+{"fn":"ToLower+TrimSpace","in":"cea3cf83cf82","lower":"cf83cf83cf82","trim":"cea3cf83cf82"}
+{"fn":"ToLower+TrimSpace","in":"e1ba9e","lower":"c39f","trim":"e1ba9e"}
+{"fn":"ToLower+TrimSpace","in":"c785","lower":"c786","trim":"c785"}
+{"fn":"ToLower+TrimSpace","in":"e284aa","lower":"6b","trim":"e284aa"}
+{"fn":"ToLower+TrimSpace","in":"ff41","lower":"efbfbd61","trim":"ff41"}
+{"fn":"ToLower+TrimSpace","in":"2020782020","lower":"2020782020","trim":"78"}
+{"fn":"ToLower+TrimSpace","in":"c2a078c2a0","lower":"c2a078c2a0","trim":"78"}
+{"fn":"ToLower+TrimSpace","in":"c28578","lower":"c28578","trim":"78"}
+{"fn":"ToLower+TrimSpace","in":"e280a878e280a9","lower":"e280a878e280a9","trim":"78"}
+{"fn":"ToLower+TrimSpace","in":"e3808078","lower":"e3808078","trim":"78"}
+{"fn":"ToLower+TrimSpace","in":"efbbbf78","lower":"efbbbf78","trim":"efbbbf78"}
+{"fn":"ToLower+TrimSpace","in":"e1a08e78","lower":"e1a08e78","trim":"e1a08e78"}
+{"fn":"ToLower+TrimSpace","in":"e2808b78","lower":"e2808b78","trim":"e2808b78"}
+{"fn":"ToLower+TrimSpace","in":"09780a","lower":"09780a","trim":"78"}
+{"fn":"SearchPattern","in":"64756e65","lowered":"2a64756e652a","pattern":"2a64756e652a"}
+{"fn":"SearchPattern","in":"2a64756e652a","lowered":"2a64756e652a","pattern":"2a64756e652a"}
+{"fn":"SearchPattern","in":"44554e45","lowered":"2a64756e652a","pattern":"2a44554e452a"}
+{"fn":"SearchPattern","in":"2a","lowered":"2a","pattern":"2a"}
+{"fn":"SearchPattern","in":"","lowered":"2a2a","pattern":"2a2a"}
+{"fn":"SearchPattern","in":"612a62","lowered":"612a62","pattern":"612a62"}
+{"fn":"SearchPattern","in":"c38974c3a9","lowered":"2ac3a974c3a92a","pattern":"2ac38974c3a92a"}
+{"fn":"SearchPattern","in":"20207820","lowered":"2a202078202a","pattern":"2a202078202a"}
+{"fn":"SearchPattern","in":"ff","lowered":"2aefbfbd2a","pattern":"2aff2a"}
+{"fn":"SearchPattern","in":"2a2a","lowered":"2a2a","pattern":"2a2a"}
+{"fn":"SearchPattern","in":"615c2a","lowered":"615c2a","pattern":"615c2a"}

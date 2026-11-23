@@ -1,0 +1,59 @@
+{
+  "part": "api",
+  "baseline": "1a11e5e",
+  "go_version": "go1.24.7",
+  "goos": "darwin",
+  "goarch": "amd64",
+  "files": [
+    {
+      "path": "cache_keys.jsonl",
+      "size": 4980,
+      "sha256": "0268c7599939f1297e0a11178102dc33d7ff90da66ca15b578179f79d78d9299"
+    },
+    {
+      "path": "include_corpus.jsonl",
+      "size": 13028,
+      "sha256": "5d49265f4862cbf33d6489f94039e4d46858e0a7b6f0cbe9983f35a28b24d885"
+    },
+    {
+      "path": "matcher_corpus.jsonl",
+      "size": 751616,
+      "sha256": "35799cf96029d0bf1cbba83b8de1735d1a3156842b464ac1e399a8a11d08b114"
+    },
+    {
+      "path": "planner_corpus.jsonl",
+      "size": 1498940,
+      "sha256": "b7212102d359e86dbd38152ef149a34c70db025d9f4d2f46535302c58f503c8f"
+    },
+    {
+      "path": "query_payload_errors.jsonl",
+      "size": 36636,
+      "sha256": "42a0ee465c7858b53e728db3d0a60ff4c20bdd1e3a589bafc04fd2ea69a02325"
+    },
+    {
+      "path": "rest_corpus.jsonl",
+      "size": 90720,
+      "sha256": "7e23a2b05680daf5338e3f7149569d271561c83eabe2aecd5912cf63c0810475"
+    },
+    {
+      "path": "scalar_vectors.jsonl",
+      "size": 7295,
+      "sha256": "6531f3d8cb7d952801013fa98c995a1be01516046490bc315293a29884e50822"
+    },
+    {
+      "path": "schema_corpus.jsonl",
+      "size": 23086,
+      "sha256": "122b05621415c9192182c8a4f1ab99dcf663e14e07be6af82d52140c21834627"
+    },
+    {
+      "path": "sort_corpus.jsonl",
+      "size": 20052,
+      "sha256": "aac7928c7178614f3b65cd714df01d4179f9dd96205f8a8f4dc38292a09c4f74"
+    },
+    {
+      "path": "write_corpus.jsonl",
+      "size": 24231,
+      "sha256": "d4bf54e91f40591470cc61f654478560dcfb96591ac2b96deb77dafb73df02ca"
+    }
+  ]
+}
