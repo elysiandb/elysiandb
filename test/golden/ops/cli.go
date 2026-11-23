@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -224,10 +225,81 @@ func genCLI(out string) error {
 		}
 		l.Add(row)
 	}
+	if err := invalidRestoreCases(bin, base, out, &l); err != nil {
+		return err
+	}
 	if err := remoteBackupCases(bin, base, &l); err != nil {
 		return err
 	}
 	return l.Write(out, "cli/cases.jsonl")
+}
+
+func invalidRestoreCases(bin, base, out string, l *goldenio.Lines) error {
+	folder := filepath.Join(out, "archives", "invalid")
+	archives, err := filepath.Glob(filepath.Join(folder, "*.tar.gz"))
+	if err != nil {
+		return err
+	}
+	if len(archives) == 0 {
+		return fmt.Errorf("no invalid archive in %s: run the archives step first", folder)
+	}
+	sort.Strings(archives)
+	ordered := map[string]string{}
+	expected, err := os.ReadFile(filepath.Join(out, "archives", "expected.jsonl"))
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(expected)), "\n") {
+		var row struct {
+			File   string  `json:"file"`
+			Reason *string `json:"reason"`
+			Order  string  `json:"order"`
+		}
+		if err := json.Unmarshal([]byte(line), &row); err != nil {
+			return err
+		}
+		if row.Order != "" && row.Reason != nil {
+			ordered["archives/"+row.File] = *row.Reason
+		}
+	}
+	for i, p := range archives {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		dir := filepath.Join(base, fmt.Sprintf("invalid%02d", i))
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+		os.WriteFile(filepath.Join(dir, "c.yaml"), []byte(cliConfig("", 1)), 0o644)
+		os.WriteFile(filepath.Join(dir, "archive.tar.gz"), data, 0o644)
+		texts, _ := archReplay(data)
+		extra := map[string]string{}
+		for k, v := range texts {
+			extra[k] = archMarker(v)
+		}
+		slug := strings.TrimSuffix(filepath.Base(p), ".tar.gz")
+		archive := "archives/invalid/" + slug + ".tar.gz"
+		c := cliCase{name: "restore invalid " + slug, args: []string{"-config", "c.yaml", "restore", "archive.tar.gz", "--force"}, extra: extra}
+		row, err := runCLI(bin, dir, c)
+		if err != nil {
+			return err
+		}
+		if want, ok := ordered[archive]; ok {
+			for try := 0; !strings.Contains(row["stdout"].(string), want) && try < 500; try++ {
+				if row, err = runCLI(bin, dir, c); err != nil {
+					return err
+				}
+			}
+			if !strings.Contains(row["stdout"].(string), want) {
+				return fmt.Errorf("%s: no sorted pick", archive)
+			}
+			row["order"] = "first unknown path in sorted order (D20)"
+		}
+		row["archive"] = archive
+		l.Add(row)
+	}
+	return nil
 }
 
 func runCLI(bin, dir string, c cliCase) (map[string]any, error) {

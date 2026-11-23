@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -187,6 +189,7 @@ func authTCPCases(mode string) []tcpCase {
 			{name: "auth one arg", steps: []tcpStep{{send: "AUTH admin\r\n"}, {send: "AUTH\r\n"}}},
 			{name: "auth admin", steps: []tcpStep{{send: "AUTH admin " + password + "\r\n"}, {send: "SET k v\r\n"}, {send: "GET k\r\n"}, {send: "RESET\r\n"}, {send: "GET k\r\n"}}},
 			{name: "auth trimmed", steps: []tcpStep{{send: "AUTH  admin " + password + "  \r\n"}, {send: "PING\r\n"}}},
+			{name: "auth non-admin user", steps: []tcpStep{{send: "AUTH ann secret-1\r\n"}, {send: "GET k\r\n"}, {send: "AUTH ann wrong\r\n"}}},
 		}
 	}
 	if mode == "dual" {
@@ -225,6 +228,30 @@ func sortWildcardAnswer(recv string) (string, error) {
 		return ki < kj
 	})
 	return strings.Join(lines, "\n") + "\n", nil
+}
+
+func tcpCreateUser(httpPort int) error {
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{Jar: jar}
+	base := "http://127.0.0.1:" + strconv.Itoa(httpPort)
+	for _, step := range []struct{ path, body string }{
+		{"/api/security/login", `{"username":"admin","password":"admin"}`},
+		{"/api/security/user", `{"username":"ann","password":"secret-1","role":"user"}`},
+	} {
+		resp, err := client.Post(base+step.path, "application/json", strings.NewReader(step.body))
+		if err != nil {
+			return err
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode/100 != 2 {
+			return fmt.Errorf("%s: status %d: %s", step.path, resp.StatusCode, body)
+		}
+	}
+	return nil
 }
 
 func readQuiet(conn net.Conn, quiet time.Duration, max time.Duration) (string, string) {
@@ -275,7 +302,8 @@ func genTCP(out string) error {
 		for tcpPort == 8088 {
 			tcpPort = freePort()
 		}
-		os.WriteFile(filepath.Join(dir, "s.yaml"), []byte(tcpConfig(mode, freePort(), tcpPort)), 0o644)
+		httpPort := freePort()
+		os.WriteFile(filepath.Join(dir, "s.yaml"), []byte(tcpConfig(mode, httpPort, tcpPort)), 0o644)
 		logs := &lockedBuffer{}
 		server := exec.Command(bin, "-config", "s.yaml")
 		server.Dir = dir
@@ -297,6 +325,12 @@ func genTCP(out string) error {
 			time.Sleep(50 * time.Millisecond)
 		}
 		time.Sleep(300 * time.Millisecond)
+		if mode == "user" {
+			if err := tcpCreateUser(httpPort); err != nil {
+				server.Process.Kill()
+				return err
+			}
+		}
 		logs.take()
 		cases := append(commonTCPCases(), authTCPCases(mode)...)
 		if mode != "off" {
