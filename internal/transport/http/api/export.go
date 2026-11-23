@@ -11,9 +11,7 @@ import (
 	"github.com/taymour/elysiandb/internal/storage"
 
 	"github.com/taymour/elysiandb/internal/acl"
-	"github.com/taymour/elysiandb/internal/engine"
 	"github.com/taymour/elysiandb/internal/security"
-	"github.com/taymour/elysiandb/internal/transport/http/observe"
 	"github.com/valyala/fasthttp"
 )
 
@@ -25,25 +23,7 @@ func ExportController(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.Set("Content-Type", "application/json")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 
-	if engine.IsEngineInternal() {
-		streamExport(ctx)
-		return
-	}
-
-	dump := engine.DumpAll()
-	for _, entity := range accountEntities {
-		delete(dump, entity)
-	}
-
-	response, err := json.Marshal(dump)
-	if err != nil {
-		observe.SetError(ctx, err)
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-		ctx.SetBody([]byte(`{"error":"failed to marshal response"}`))
-		return
-	}
-
-	ctx.SetBody(response)
+	streamExport(ctx)
 }
 
 func streamExport(ctx *fasthttp.RequestCtx) {

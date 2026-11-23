@@ -29,10 +29,6 @@ type registry struct {
 var hooks = &registry{}
 
 func (r *registry) forEntity(entity string) ([]Hook, bool) {
-	if !engine.IsEngineInternal() {
-		return nil, false
-	}
-
 	e := storage.Engine()
 	if e == nil {
 		return nil, false

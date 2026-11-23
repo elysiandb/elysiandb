@@ -5,9 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/taymour/elysiandb/internal/datastore"
 	"sort"
 	"strconv"
+
+	"github.com/taymour/elysiandb/internal/datastore"
 
 	"github.com/taymour/elysiandb/internal/acl"
 	api_storage "github.com/taymour/elysiandb/internal/api"
@@ -212,7 +213,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 	filterAfterHooks := preReadHooks && !api_storage.QueryFilterIsEmpty(filter)
 	fields := api_storage.ParseFieldsParam(payload.Fields)
 
-	if engine.IsEngineInternal() && !filterAfterHooks {
+	if !filterAfterHooks {
 		mode := acl.ReadModeFor(currentUser, payload.Entity)
 		if payload.CountOnly {
 			res := api_storage.PlanQueryGuarded(q, mode != acl.ReadOwned, guard)
@@ -240,7 +241,7 @@ func QueryController(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
-	if filterAfterHooks && engine.IsEngineInternal() {
+	if filterAfterHooks {
 		all := q
 		all.Offset, all.Limit = 0, 0
 		all.Filter = query.FilterNode{Leaf: map[string]map[string]string{}}

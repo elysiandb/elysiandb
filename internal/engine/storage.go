@@ -2,184 +2,52 @@ package engine
 
 import (
 	api_storage "github.com/taymour/elysiandb/internal/api"
-	"github.com/taymour/elysiandb/internal/globals"
-	"github.com/taymour/elysiandb/internal/mongodb"
-	"github.com/taymour/elysiandb/internal/query"
 	"github.com/taymour/elysiandb/internal/schema"
 	"github.com/taymour/elysiandb/internal/storage"
 )
 
-const (
-	EngineInternal = "internal"
-	EngineMongoDB  = "mongodb"
-)
-
-func ExecuteQuery(q query.Query) ([]map[string]any, error) {
-	if IsEngineInternal() {
-		return api_storage.ExecuteQuery(q)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.ExecuteQuery(q)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil, nil
-}
-
 func FilterFields(data map[string]any, fields []string) map[string]any {
-	if IsEngineInternal() {
-		return api_storage.FilterFields(data, fields)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.FilterFields(data, fields)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.FilterFields(data, fields)
 }
 
 func ApplyIncludes(data []map[string]interface{}, includesParam string) []map[string]interface{} {
-	if IsEngineInternal() {
-		return api_storage.ApplyIncludes(data, includesParam)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.ApplyIncludes(data, includesParam)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.ApplyIncludes(data, includesParam)
 }
 
 func WriteEntity(entity string, data map[string]interface{}) []schema.ValidationError {
-	if IsEngineInternal() {
-		return api_storage.WriteEntity(entity, data)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.WriteEntity(entity, data)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.WriteEntity(entity, data)
 }
 
 func UpdateEntitySchema(entity string, fieldsRaw map[string]interface{}) map[string]interface{} {
-	if IsEngineInternal() {
-		return api_storage.UpdateEntitySchema(entity, fieldsRaw)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.UpdateEntitySchema(entity, fieldsRaw)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.UpdateEntitySchema(entity, fieldsRaw)
 }
 
 func CreateEntityType(entity string) error {
-	if IsEngineInternal() {
-		return api_storage.CreateEntityType(entity)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.CreateEntityType(entity)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.CreateEntityType(entity)
 }
 
 func DeleteEntityType(entity string) error {
-	if IsEngineInternal() {
-		return api_storage.DeleteEntityType(entity)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.DeleteEntityType(entity)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.DeleteEntityType(entity)
 }
 
 func WriteListOfEntities(entity string, list []map[string]interface{}) [][]schema.ValidationError {
-	if IsEngineInternal() {
-		return api_storage.WriteListOfEntities(entity, list)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.WriteListOfEntities(entity, list)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.WriteListOfEntities(entity, list)
 }
 
 func AddEntityType(entity string) {
-	if IsEngineInternal() {
-		api_storage.AddEntityType(entity)
-		return
-	}
-
-	if IsEngineMongoDB() {
-		mongodb.AddEntityType(entity)
-		return
-	}
-
-	ThrowErrorIfNotValidEngine()
+	api_storage.AddEntityType(entity)
 }
 
 func GetEntitySchema(entity string) map[string]interface{} {
-	if IsEngineInternal() {
-		return api_storage.GetEntitySchema(entity)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.GetEntitySchema(entity)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.GetEntitySchema(entity)
 }
 
 func EntityTypeExists(entity string) bool {
-	if IsEngineInternal() {
-		return api_storage.EntityTypeExists(entity)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.EntityTypeExists(entity)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return false
+	return api_storage.EntityTypeExists(entity)
 }
 
 func ListEntityTypes() []string {
-	if IsEngineInternal() {
-		return api_storage.ListEntityTypes()
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.ListEntityTypes()
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.ListEntityTypes()
 }
 
 func IsCoreEntityType(entity string) bool {
@@ -187,31 +55,11 @@ func IsCoreEntityType(entity string) bool {
 }
 
 func ListPublicEntityTypes() []string {
-	if IsEngineInternal() {
-		return api_storage.ListPublicEntityTypes()
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.ListPublicEntityTypes()
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.ListPublicEntityTypes()
 }
 
 func ReadEntityById(entity, id string) map[string]interface{} {
-	if IsEngineInternal() {
-		return api_storage.ReadEntityById(entity, id)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.ReadEntityById(entity, id)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.ReadEntityById(entity, id)
 }
 
 func ListEntities(
@@ -224,172 +72,50 @@ func ListEntities(
 	search string,
 	includesParam string,
 ) []map[string]any {
-	if IsEngineInternal() {
-		return api_storage.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.ListEntities(entity, limit, offset, sortField, sortAscending, filters, search, includesParam)
 }
 
 func ApplyFiltersToList(
 	entities []map[string]any,
 	filters map[string]map[string]string,
 ) []map[string]any {
-	if IsEngineInternal() {
-		return api_storage.ApplyFiltersToList(entities, filters)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.ApplyFiltersToList(entities, filters)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.ApplyFiltersToList(entities, filters)
 }
 
 func GetListOfIds(entity, sortField string, sortAscending bool) ([]byte, error) {
-	if IsEngineInternal() {
-		return api_storage.GetListOfIds(entity, sortField, sortAscending)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.GetListOfIds(entity, sortField, sortAscending)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil, nil
+	return api_storage.GetListOfIds(entity, sortField, sortAscending)
 }
 
 func DeleteEntityById(entity, id string) {
-	if IsEngineInternal() {
-		api_storage.DeleteEntityById(entity, id)
-		return
-	}
-
-	if IsEngineMongoDB() {
-		mongodb.DeleteEntityById(entity, id)
-		return
-	}
-
-	ThrowErrorIfNotValidEngine()
+	api_storage.DeleteEntityById(entity, id)
 }
 
 func DeleteAllEntities(entity string) {
-	if IsEngineInternal() {
-		api_storage.DeleteAllEntities(entity)
-		return
-	}
-
-	if IsEngineMongoDB() {
-		mongodb.DeleteAllEntities(entity)
-		return
-	}
-
-	ThrowErrorIfNotValidEngine()
+	api_storage.DeleteAllEntities(entity)
 }
 
 func DeleteAll() {
-	if IsEngineInternal() {
-		api_storage.DeleteAll()
-		return
-	}
-
-	if IsEngineMongoDB() {
-		mongodb.DeleteAll()
-		return
-	}
-
-	ThrowErrorIfNotValidEngine()
+	api_storage.DeleteAll()
 }
 
 func UpdateEntityById(entity, id string, updated map[string]interface{}) map[string]interface{} {
-	if IsEngineInternal() {
-		return api_storage.UpdateEntityById(entity, id, updated)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.UpdateEntityById(entity, id, updated)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.UpdateEntityById(entity, id, updated)
 }
 
 func UpdateListOfEntities(entity string, updates []map[string]interface{}) []map[string]interface{} {
-	if IsEngineInternal() {
-		return api_storage.UpdateListOfEntities(entity, updates)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.UpdateListOfEntities(entity, updates)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
-}
-
-func DumpAll() map[string]interface{} {
-	if IsEngineInternal() {
-		return api_storage.DumpAll()
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.DumpAll()
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.UpdateListOfEntities(entity, updates)
 }
 
 func EntityExists(entity, id string) bool {
-	if IsEngineInternal() {
-		return api_storage.EntityExists(entity, id)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.EntityExists(entity, id)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return false
+	return api_storage.EntityExists(entity, id)
 }
 
 func CountAllEntities() int {
-	if IsEngineInternal() {
-		return api_storage.CountAllEntities()
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.CountAllEntities()
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return 0
+	return api_storage.CountAllEntities()
 }
 
 func CountEntitiesPerType() map[string]int {
-	if IsEngineInternal() {
-		return api_storage.CountEntitiesPerType()
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.CountEntitiesPerType()
-	}
-
-	return map[string]int{}
+	return api_storage.CountEntitiesPerType()
 }
 
 func ValidateImport(data map[string][]map[string]interface{}) []api_storage.ImportRejection {
@@ -397,70 +123,19 @@ func ValidateImport(data map[string][]map[string]interface{}) []api_storage.Impo
 }
 
 func ImportAll(data map[string][]map[string]interface{}) []api_storage.ImportRejection {
-	if IsEngineInternal() {
-		return api_storage.ImportAll(data)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.ImportAll(data)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.ImportAll(data)
 }
 
 func IterateEntities(entity string, fn func(data map[string]any) error) error {
-	if IsEngineInternal() {
-		return api_storage.IterateEntities(entity, fn)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.IterateEntities(entity, fn)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return nil
+	return api_storage.IterateEntities(entity, fn)
 }
 
 func RestoreEntities(entity string, next func() (map[string]any, error)) (int, error) {
-	if IsEngineInternal() {
-		return api_storage.RestoreEntities(entity, next)
-	}
-
-	if IsEngineMongoDB() {
-		return mongodb.RestoreEntities(entity, next)
-	}
-
-	ThrowErrorIfNotValidEngine()
-
-	return 0, nil
+	return api_storage.RestoreEntities(entity, next)
 }
 
 func WipeAll() error {
-	if IsEngineMongoDB() {
-		if err := mongodb.DropAllCollections(); err != nil {
-			return err
-		}
-	} else if !IsEngineInternal() {
-		ThrowErrorIfNotValidEngine()
-	}
-
 	storage.ClearAll()
 
 	return nil
-}
-
-func IsEngineInternal() bool {
-	return globals.GetEngine() == EngineInternal
-}
-
-func IsEngineMongoDB() bool {
-	return globals.GetEngine() == EngineMongoDB
-}
-
-func ThrowErrorIfNotValidEngine() {
-	engine := globals.GetConfig().Engine.Name
-	panic("Invalid storage engine: " + engine + ". Only '" + EngineInternal + "' is supported.")
 }

@@ -1253,7 +1253,7 @@ func (r *Request) fold(h Hook, def *foldDef, tok *viewToken, regs, free []goja.V
 }
 
 func (r *Request) foldOnView(h Hook, def *foldDef, tok *viewToken, regs, free []goja.Value) ([]val, []string, error) {
-	if foldsDisabled.Load() || tok.core || !engine.IsEngineInternal() {
+	if foldsDisabled.Load() || tok.core {
 		return nil, nil, nil
 	}
 

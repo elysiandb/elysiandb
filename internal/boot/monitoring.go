@@ -35,9 +35,7 @@ func MonitoringSources() metrics.Sources {
 		},
 	}
 
-	if engine.IsEngineInternal() {
-		sources.Disk = diskSample
-	}
+	sources.Disk = diskSample
 
 	sources.Backup = backupSample
 
@@ -47,11 +45,6 @@ func MonitoringSources() metrics.Sources {
 
 	if security.BasicAuthenticationIsEnabled() || security.UserAuthenticationIsEnabled() {
 		sources.DefaultAdminPassword = security.DefaultAdminPasswordIsInUse
-	}
-
-	if engine.IsEngineMongoDB() {
-		sources.MongoPing = MongoPing
-		sources.MongoPoolInUse = func() int { return int(mongoPoolInUse.Load()) }
 	}
 
 	return sources
@@ -143,7 +136,7 @@ func hookCaches() metrics.HookCacheSample {
 
 func indexStates() []metrics.IndexState {
 	e := storage.Engine()
-	if e == nil || !engine.IsEngineInternal() {
+	if e == nil {
 		return nil
 	}
 

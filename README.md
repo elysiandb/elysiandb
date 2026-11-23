@@ -8,7 +8,7 @@
 
 ElysianDB is a self-contained backend engine that turns raw JSON into a usable, queryable API in seconds.
 
-It combines automatic REST API generation, advanced querying and indexing, authentication, ACLs, hooks, and optional KV and TCP interfaces into a single fast Go binary, while supporting multiple storage backends through a pluggable engine system.
+It combines automatic REST API generation, advanced querying and indexing, authentication, ACLs, hooks, and optional KV and TCP interfaces into a single fast Go binary, on top of its own storage engine designed together with the API.
 
 The goal is simple: remove backend boilerplate so you can focus on shipping features instead of infrastructure.
 
@@ -26,22 +26,14 @@ Here is a related and explicative article https://dev.to/taymour/why-i-built-ely
 
 ## Storage Engine
 
-ElysianDB uses a **pluggable storage engine abstraction** that cleanly separates API logic from the underlying persistence layer.
-
-Its goal is for the REST API, Query API, ACLs, hooks, transactions, and Admin UI to work identically regardless of the selected engine. The `internal` engine is the default and recommended one. The `mongodb` engine is in beta and does not reach that goal yet.
-
-The storage engine is selected at startup via configuration:
+ElysianDB runs on its own storage engine, `internal`, designed together with its API. It is the only engine and the default one; the configuration can name it:
 
 ```yaml
 engine:
   name: internal
 ```
 
-### Available Engines
-
-**internal (default, recommended)**
-
-The `internal` engine is the storage engine shipped with ElysianDB, designed together with its API. It provides:
+It provides:
 
 * An append-only log that holds the data, with group commit, paced checkpoints that stay out of the way of writes, and background compaction that gives the disk back within seconds, behind a durability layer tested against a power cut at every disk operation
 * Copy-on-write entity state: reads never wait for writes
@@ -51,39 +43,7 @@ The `internal` engine is the storage engine shipped with ElysianDB, designed tog
 * Very high throughput and low latency
 * Full compatibility with all ElysianDB features
 
-This engine is production-ready and optimized for speed, prototyping, and controlled workloads. It is the recommended engine.
-
-**mongodb (beta)**
-
-> **Beta.** The `mongodb` engine is not yet fully functional and is not interchangeable with the `internal` engine: switching engines can change behavior. The remaining work is tracked in [#167](https://github.com/elysiandb/elysiandb/issues/167) and [#164](https://github.com/elysiandb/elysiandb/issues/164). Use the `internal` engine unless you are testing MongoDB support.
-
-The `mongodb` engine allows ElysianDB to run on top of MongoDB. It aims to offer the same API surface and behavior as the `internal` engine.
-
-It provides:
-
-* Persistence backed by MongoDB
-* Durability and scalability handled by MongoDB deployments
-
-Example configuration:
-
-```yaml
-engine:
-  name: mongodb
-  uri: mongodb://elysian:elysian@localhost:27017/elysiandb
-```
-
-The MongoDB engine is designed for users who want ElysianDB’s API and query model while relying on an external database for storage, replication, or operational constraints.
-
-### Future Engines
-
-The engine abstraction is designed to support additional backends in the future, such as:
-
-* Alternative persistence models
-* Embedded databases
-* Specialized engines optimized for specific workloads
-* Experimental or in-memory–only backends
-
-All engines are selected using the same configuration mechanism.
+This engine is production-ready and optimized for speed, prototyping, and controlled workloads.
 
 ## What You Get Out of the Box
 
@@ -138,11 +98,9 @@ Queries are deterministic, type-aware, and executed predictably, making them eas
 
 ElysianDB is designed for low latency and high throughput.
 
-With the internal engine, paged, filtered, sorted, counted and searched requests use indexes and cost about the same on 1,000 or 60,000 documents, and writes are grouped into a few disk writes.
+Paged, filtered, sorted, counted and searched requests use indexes and cost about the same on 1,000 or 60,000 documents, and writes are grouped into a few disk writes.
 
 On a MacBook Pro M4, mixed workloads with CRUD, filtering, sorting, nested writes, and includes reach tens of thousands of requests per second with sub-millisecond latencies under moderate load.
-
-With the MongoDB engine, which is in beta, performance is bounded by MongoDB and network latency.
 
 These are real API scenarios, not synthetic microbenchmarks.
 
@@ -234,7 +192,5 @@ What you send is what you get.
 ## Status
 
 ElysianDB is actively developed and evolving.
-
-The internal engine is the recommended one. The MongoDB engine is in beta: it is not yet fully functional, and the work to make it interchangeable with the internal engine is tracked in [#167](https://github.com/elysiandb/elysiandb/issues/167) and [#164](https://github.com/elysiandb/elysiandb/issues/164).
 
 Feedback, issues, and contributions are welcome.

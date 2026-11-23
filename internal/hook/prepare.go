@@ -212,7 +212,7 @@ func (p *preparedIndexes) observe(script, entity string, filters map[string]map[
 	}
 
 	e := storage.Engine()
-	if e == nil || !engine.IsEngineInternal() {
+	if e == nil {
 		return
 	}
 

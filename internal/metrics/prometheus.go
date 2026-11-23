@@ -54,7 +54,6 @@ var promCounters = []promCounter{
 	{"elysiandb_flush_failures_total", "Failed flushes to disk.", cFlushFailures, ""},
 	{"elysiandb_forced_flushes_total", "Flushes forced by the recovery log size limit.", cForcedFlushes, ""},
 	{"elysiandb_recovery_write_failures_total", "Failed recovery log writes.", cRecoveryFailures, ""},
-	{"elysiandb_mongodb_errors_total", "Failed MongoDB operations.", cMongoErrors, ""},
 }
 
 var promGauges = []struct {
@@ -79,8 +78,6 @@ var promGauges = []struct {
 	{"elysiandb_admin_sessions", "Active Admin UI sessions.", sAdminSessions},
 	{"elysiandb_open_transactions", "Open transactions.", sOpenTransactions},
 	{"elysiandb_oldest_transaction_seconds", "Age of the oldest open transaction.", sOldestTransaction},
-	{"elysiandb_mongodb_ping_seconds", "MongoDB ping latency.", sMongoPingMs},
-	{"elysiandb_mongodb_pool_in_use", "MongoDB pool connections in use.", sMongoPoolInUse},
 	{"elysiandb_disk_free_bytes", "Free space on the disk of the data folder.", sDiskFreeBytes},
 	{"elysiandb_index_upkeep_bytes", "Index changes of large batches waiting to be applied.", sIndexUpkeepBytes},
 	{"elysiandb_backup_running", "Backups running now.", sBackupRunning},
@@ -119,9 +116,6 @@ func Prometheus() []byte {
 			v, ok := latest.gauges[g.series]
 			if !ok || math.IsNaN(v) {
 				continue
-			}
-			if g.series == sMongoPingMs {
-				v /= 1000
 			}
 			writeHeader(&b, g.name, g.help, "gauge")
 			writeSample(&b, g.name, "", v)

@@ -45,7 +45,6 @@ const (
 	cFlushNanos
 	cFlushFailures
 	cForcedFlushes
-	cMongoErrors
 	cRecoveryFailures
 	numCounters
 )
@@ -220,10 +219,6 @@ func CacheMiss() {
 
 func ForcedFlush() {
 	add(cForcedFlushes, 1)
-}
-
-func MongoError() {
-	add(cMongoErrors, 1)
 }
 
 func RecoveryWriteFailed(err error) {

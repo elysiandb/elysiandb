@@ -2,9 +2,9 @@
 
 ElysianDB turns raw JSON into a complete backend instantly.
 
-It combines a pluggable storage engine, an auto-generated REST API, advanced querying, and optional KV/TCP interfaces into a single, high-performance Go binary. It runs on its built-in internal engine, the default and recommended one. A MongoDB engine is also available in beta: it is not yet fully functional, and switching to it can change behavior (see Storage Engine Selection below).
+It combines its own storage engine, designed together with the API, an auto-generated REST API, advanced querying, and optional KV/TCP interfaces into a single, high-performance Go binary.
 
-This document explains how to use ElysianDB, its features, configuration, storage engines, and runtime behavior.
+This document explains how to use ElysianDB, its features, configuration, storage engine, and runtime behavior.
 
 
 ---
@@ -142,8 +142,7 @@ Every key added after 0.2.4 is optional. Their defaults keep the 0.2.4 answers, 
 | **security.authentication.enabled**  | Enables authentication layer for all endpoints except `/health`                       |
 | **security.authentication.mode**     | Authentication mode: `basic`, `token` or `user`. Any other value, or no value, stops ElysianDB at startup |
 | **security.authentication.token**    | Instance token used in `token` mode                                                   |
-| **engine.name**                      | Storage engine: `internal` (default, recommended) or `mongodb` (beta)                 |
-| **engine.uri**                       | Connection URI for the `mongodb` engine                                               |
+| **engine.name**                      | Storage engine: `internal`, the only one and the default. Any other value stops ElysianDB at startup |
 | **adminui.enabled**                  | Enables the admin web interface                                                       |
 | **monitoring.prometheus.enabled**    | Serves `GET /metrics` in the Prometheus text format (see Monitoring below). Off by default |
 | **monitoring.prometheus.token**      | Bearer token for `GET /metrics`. Without it, `/metrics` takes the same credentials as the admin endpoints |
@@ -182,7 +181,7 @@ When the configuration file cannot be read or is invalid, ElysianDB logs the rea
 
 ## Logging
 
-ElysianDB writes its logs to the standard output, one line per event, as soon as they happen. Each line has a time, a level, a fixed message and attributes. `component` tells which part of ElysianDB wrote it: `boot`, `storage`, `recovery`, `http`, `tcp`, `security`, `audit`, `hook`, `mongodb`, `cache`, `acl` or `api`.
+ElysianDB writes its logs to the standard output, one line per event, as soon as they happen. Each line has a time, a level, a fixed message and attributes. `component` tells which part of ElysianDB wrote it: `boot`, `storage`, `recovery`, `http`, `tcp`, `security`, `audit`, `hook`, `cache`, `acl` or `api`.
 
 ```text
 time=2026-11-01T12:00:00.123+01:00 level=INFO msg="storage loaded" component=storage folder=/data kv_keys=120394 kv_keys_with_ttl=812 documents=48211 duration_ms=412
@@ -195,18 +194,18 @@ At the default `info` level, the number of lines does not depend on the traffic:
 
 | Level   | Meaning | Examples |
 | ------- | ------- | -------- |
-| `error` | ElysianDB failed to do its job | `500` answers, handler panics, failed flushes and recovery log writes, failed MongoDB operations |
+| `error` | ElysianDB failed to do its job | `500` answers, handler panics, failed flushes and recovery log writes |
 | `warn`  | Handled, but abnormal or risky | recovery log replayed after an unclean shutdown, default admin password, authentication off on a public address, failed logins, `401` and `403` answers, slow requests, hook script errors |
 | `info`  | Lifecycle and admin actions | configuration and storage loaded, listening addresses, shutdown, admin actions (component `audit`) |
 | `debug` | Investigation | other `4xx` answers, TCP connections, flushes, cache, hook timings |
 
-Errors that can repeat (failed flushes, recovery log writes, failed logins and `401` per address, hook script errors per hook, MongoDB errors, slow requests per route) are logged once per minute at most; the next line carries a `suppressed` attribute with the number of lines left out.
+Errors that can repeat (failed flushes, recovery log writes, failed logins and `401` per address, hook script errors per hook, slow requests per route) are logged once per minute at most; the next line carries a `suppressed` attribute with the number of lines left out.
 
 Admin actions are logged at `info` with `component=audit`, the `actor`, the `source` (`http` or `tcp`) and the remote address: user, ACL, hook and schema changes, entity type creation and destruction, store reset, manual flush, import, migration, backup, restore and log level changes. The `elysiandb` commands print their own result and do not add log lines.
 
 Every HTTP answer carries an `X-Request-Id` header. ElysianDB keeps the value sent by the client when it is 1 to 64 letters, digits, `-`, `_` or `.`, and generates one otherwise. Log lines about a request carry it as `request_id`.
 
-Logs never contain passwords, tokens, session IDs, the `Authorization` header, the credentials of the MongoDB URI, document bodies or KV values.
+Logs never contain passwords, tokens, session IDs, the `Authorization` header, document bodies or KV values.
 
 ## Monitoring
 
@@ -233,7 +232,6 @@ The status is `healthy`, `warning` or `critical`, with these problems:
 | ---- | -------- | --------- |
 | `flush_failing` | critical | The last checkpoint failed |
 | `recovery_write_failing` | critical | A log write failed in the last 5 minutes, for example on a full disk. The writers wait, unanswered, until the write succeeds: no change is acknowledged before it is in the log |
-| `mongodb_unreachable` | critical | The MongoDB ping fails |
 | `error_rate_high` | warning | More than 1 % of at least 20 HTTP requests answered `5xx` over 5 minutes |
 | `latency_high` | warning | p95 above `log.slowRequestMs` over 5 minutes |
 | `hook_failing` | warning | A hook script failed in the last 5 minutes |
@@ -463,7 +461,7 @@ Two backups of the same data hold the same files; only `created_at` in the manif
 ### Restore rules
 
 * The manifest and the SHA-256 of every file are checked, and every file is read, before anything is touched. An archive with a newer format version, a bad checksum, a missing or unexpected file, or an invalid line is refused with `400`, and the data is left as it was.
-* A restore replaces everything, without merging: documents, entity types, schemas and KV keys that are not in the archive no longer exist afterwards. With MongoDB, every collection of the `elysiandb` database is dropped.
+* A restore replaces everything, without merging: documents, entity types, schemas and KV keys that are not in the archive no longer exist afterwards.
 * The order is: `users.key`, then schemas, then documents, then KV keys. Keys that have already expired are skipped; the others keep their expiration date.
 * Documents are written as they are stored in the archive, without schema validation: the checksums guarantee that they are the documents of the backup.
 * Every session ends, the session that ran the restore included. Log in again with the accounts and passwords of the backup: the previous `admin` is replaced by the one in the archive.
@@ -473,7 +471,7 @@ Two backups of the same data hold the same files; only `created_at` in the manif
 { "status": "restore completed", "entities": { "book": 2, "empty": 0 }, "schemas": 3, "kv_keys": 12, "kv_keys_expired": 0 }
 ```
 
-If the data cannot be written once the restore has started (a MongoDB error, a full disk), the answer is `500` and the instance is left partly restored: run the restore again. A restore stopped by a crash leaves a mark in the data folder: the next start logs an `ERROR` that the data is partial, until a restore completes.
+If the data cannot be written once the restore has started (a full disk), the answer is `500` and the instance is left partly restored: run the restore again. A restore stopped by a crash leaves a mark in the data folder: the next start logs an `ERROR` that the data is partial, until a restore completes.
 
 Stop the clients that write to ElysianDB during a restore: their writes would be lost or mixed with the restored data.
 
@@ -481,15 +479,15 @@ Stop the clients that write to ElysianDB during a restore: their writes would be
 
 The archive holds `users.key` and the password hashes: it gives the same access as the data folder. Store it like the data folder, and do not send it to someone who should not administer the instance. Archives written by `elysiandb backup` are only readable by their owner (`0600`).
 
-### Engines and versions
+### Versions
 
-The manifest records the engine and the ElysianDB version, but the archive does not depend on the engine: a backup of the internal engine can be restored on MongoDB, and the other way around. The format version lets a newer ElysianDB read older archives; an ElysianDB refuses archives whose format is newer than its own.
+The manifest records the engine and the ElysianDB version. The format version lets a newer ElysianDB read older archives; an ElysianDB refuses archives whose format is newer than its own.
 
 ### Limits
 
 `GET /api/backup` and `POST /api/restore` have no size limit and do not follow the 4 MB and 3-second limits of the other routes. `POST /api/restore` stops when the client sends nothing for 5 minutes. It writes the archive received to a temporary file in the data folder, checks it, and only then replaces the data, so a bad archive leaves the data as it was; such files left by a crash are removed at the next start.
 
-Other routes keep their limits. On a stopped instance, `elysiandb backup` reads the data folder directly, and needs no temporary folder with the internal engine; with MongoDB, the backup is staged in the system temporary folder (`TMPDIR`), which needs as much free space as the uncompressed data.
+Other routes keep their limits. On a stopped instance, `elysiandb backup` reads the data folder directly, and needs no temporary folder.
 
 `GET /api/backup` and `POST /api/restore` take precedence over the generic routes: an entity named `backup` cannot be listed, and documents cannot be created in an entity named `restore`, as with `export`, `import` and `query`.
 
@@ -574,34 +572,18 @@ From this version on, take a backup with `elysiandb backup` before each upgrade,
 
 ---
 
-## Storage Engine Selection
+## Storage Engine
 
-ElysianDB exposes a **pluggable storage engine abstraction** that allows the core database logic to run independently of the underlying storage implementation.
+ElysianDB runs on its own storage engine, `internal`, designed together with the API: it knows entities, insertion order, references, schemas, the filter language and hooks. It is the only engine, and it requires no external dependencies.
 
-Its goal is to switch storage backends **without changing the API, query language, ACL rules, hooks, transactions, or Admin UI**, with the same requests, payloads, and behaviors regardless of the engine in use. This goal is not reached yet: the `mongodb` engine is in beta, and switching from `internal` to `mongodb` can change behavior.
-
-Use the `internal` engine, the default and recommended one.
-
----
-
-### Engine Configuration
-
-The storage engine is selected in `elysian.yaml`:
+It is used by default, and `elysian.yaml` can name it:
 
 ```yaml
 engine:
   name: internal
 ```
 
-Some engines may require additional configuration fields.
-
----
-
-### Available Engines
-
-#### `internal` (default, recommended)
-
-The `internal` engine is the built-in storage engine provided by ElysianDB, and the recommended one. It is designed together with the API: it knows entities, insertion order, references, schemas, the filter language and hooks.
+Any other `engine.name` stops ElysianDB at startup.
 
 It offers:
 
@@ -613,62 +595,7 @@ It offers:
 
 See Storage engine internals below.
 
-This engine is **production-ready** and requires no external dependencies. It is well suited for prototyping, embedded deployments, internal tools, and high-performance read-heavy workloads.
-
----
-
-#### `mongodb` (beta)
-
-> **Beta.** The `mongodb` engine is not yet fully functional and is not interchangeable with the `internal` engine: some features are missing or behave differently, and part of the data still lives in the internal storage. Switching engines can change the behavior of your application. The remaining work is tracked in [#167](https://github.com/elysiandb/elysiandb/issues/167) and [#164](https://github.com/elysiandb/elysiandb/issues/164). Use the `internal` engine unless you are testing MongoDB support.
-
-The `mongodb` engine allows ElysianDB to use **MongoDB as its persistence layer**. It aims to offer the same API surface and developer experience as the `internal` engine.
-
-It provides:
-
-* External persistence backed by MongoDB
-* Native BSON support and document storage
-
-Once complete, it is meant for:
-
-* An external, battle-tested database
-* Backups and replication handled by MongoDB
-* Shared storage across multiple instances
-
-##### Configuration Example
-
-```yaml
-engine:
-  name: mongodb
-  uri: mongodb://elysian:elysian@localhost:27017/elysiandb
-```
-
-Switching between `internal` and `mongodb` keeps the same API and payloads, but the `mongodb` engine does not behave like the `internal` engine in every case yet: requests can return different results.
-
----
-
-### Design Goals
-
-The storage engine abstraction follows these principles:
-
-* Clear separation between **API logic** and **storage implementation**
-* Identical API behavior across engines
-* No feature loss when switching engines
-* Deterministic results regardless of backend
-* Minimal overhead for the default engine
-
-The `internal` engine meets these goals. The `mongodb` engine does not meet them yet: identical API behavior and no feature loss when switching engines are the remaining work of [#167](https://github.com/elysiandb/elysiandb/issues/167) and [#164](https://github.com/elysiandb/elysiandb/issues/164).
-
-Once they are met, this design allows ElysianDB to scale from an embedded, single-binary backend to an externally backed system without rewriting application logic.
-
----
-
-### Notes
-
-* If no engine is specified, `internal` is used by default, and it is the recommended engine
-* Engine selection is evaluated at startup
-* Switching engines may require data migration
-* All engines are meant to share the same query model, schema rules, ACLs, and hooks; the `mongodb` engine, in beta, does not fully share them yet
-
+This engine is **production-ready**. It is well suited for prototyping, embedded deployments, internal tools, and high-performance read-heavy workloads.
 
 ---
 
@@ -1638,7 +1565,7 @@ After repeated failed logins, the server answers `429 Too Many Requests` with a 
 * A backup archive holds `users.key` and the password hashes: store it like the data folder (see Backup and Restore)
 * In `token` mode, anyone with the token can fully access the API
 * The token is compared in constant time
-* `GET /config` never returns secrets: the token is replaced with `***`, and the password of `engine.uri`, as well as its query parameters that hold secrets (passwords, keys, tokens, credentials), with `xxxxx`
+* `GET /config` never returns secrets: the token is replaced with `***`
 * Passwords set through the API, the Admin UI or the command line must be at least 8 characters long
 * Usernames have 1 to 128 characters, without spaces, control characters or `/`
 * `users.key`, `sessions.json`, the data files and the recovery logs are readable by their owner only (`0600`). Files of an existing store folder are switched to `0600` when ElysianDB starts
@@ -2662,14 +2589,6 @@ Run tests:
 make test
 ```
 
-The MongoDB engine tests run only when `ELYSIAN_TEST_MONGODB_URI` points to a MongoDB server, for example with `docker compose -f docker/mongodb/docker-compose.yaml up -d`:
-
-```bash
-ELYSIAN_TEST_MONGODB_URI="mongodb://root:root@127.0.0.1:27017" make test
-```
-
-The CI starts a MongoDB service for them.
-
 Run performance benchmarks:
 
 ```bash
@@ -2774,7 +2693,7 @@ Run it while ElysianDB is stopped.
 
 ### 7. `reset`
 
-Deletes the data folder, schemas and users included. With MongoDB, it also drops the entity collections.
+Deletes the data folder, schemas and users included.
 
 ```bash
 elysiandb reset --force

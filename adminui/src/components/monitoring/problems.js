@@ -1,7 +1,6 @@
 export const PROBLEMS = {
     flush_failing: { message: "status.problems.flush_failing", link: "/admin/logs?component=storage&level=error", linkLabel: "nav.logs" },
     recovery_write_failing: { message: "status.problems.recovery_write_failing", link: "/admin/logs?component=recovery&level=error", linkLabel: "nav.logs" },
-    mongodb_unreachable: { message: "status.problems.mongodb_unreachable", link: "/admin/logs?component=mongodb", linkLabel: "nav.logs" },
     error_rate_high: { message: "status.problems.error_rate_high", link: "/admin/logs?component=http&level=error", linkLabel: "nav.logs" },
     latency_high: { message: "status.problems.latency_high", link: "/admin/monitoring", linkLabel: "nav.monitoring" },
     hook_failing: { message: "status.problems.hook_failing", link: "/admin/hooks", linkLabel: "nav.hooks" },
