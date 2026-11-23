@@ -26,6 +26,16 @@
       "sha256": "b82b0f202ed29c209496f06d6fa177845441b2fb16a503d7ab7a5ffa91a7f412"
     },
     {
+      "path": "surface-walker.js",
+      "size": 3512,
+      "sha256": "b85c50e3da9c26b9d3a0d1c813c7d05cc749712c17aeb4afe67c3e06f8c1cdcd"
+    },
+    {
+      "path": "surface.json",
+      "size": 380069,
+      "sha256": "be5cbf1da70ad1b6c67f4ebbdf156ee18249628d96e8216c3aeec72978e84424"
+    },
+    {
       "path": "test262-pass.tsv",
       "size": 2170406,
       "sha256": "49104c58544c4dd328c82db82e05f1e82cfc73a795118b8f94014e6bef95299c"
