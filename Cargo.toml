@@ -8,7 +8,7 @@ publish = false
 build = "build.rs"
 
 [workspace]
-members = ["crates/gocompat"]
+members = ["crates/gocompat", "crates/goja"]
 
 [dependencies]
 gocompat = { path = "crates/gocompat" }

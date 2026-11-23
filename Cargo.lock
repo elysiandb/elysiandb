@@ -12,3 +12,10 @@ dependencies = [
 [[package]]
 name = "gocompat"
 version = "0.0.0"
+
+[[package]]
+name = "goja"
+version = "0.0.0"
+dependencies = [
+ "gocompat",
+]
