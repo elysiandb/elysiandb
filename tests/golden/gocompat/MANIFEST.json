@@ -1,0 +1,234 @@
+{
+  "part": "gocompat",
+  "baseline": "1a11e5e",
+  "go_version": "go1.24.7",
+  "goos": "darwin",
+  "goarch": "amd64",
+  "files": [
+    {
+      "path": "base64/cases.jsonl",
+      "size": 7484,
+      "sha256": "4362e555e35af2d0ba36f37c255b9dff510a1e7f05290da612a20d0a92db46ba"
+    },
+    {
+      "path": "fmt/cases.jsonl",
+      "size": 902312,
+      "sha256": "53fdcc5812fbd2fda17493e0372a2e9a0cf04bebd7125409155ac2dc309e961f"
+    },
+    {
+      "path": "json/decode.jsonl",
+      "size": 1350959,
+      "sha256": "b2b7433d76236b251c132cb14741187ac9c1153884bd5ce571b058d1b2c37141"
+    },
+    {
+      "path": "json/encode.jsonl",
+      "size": 1406437,
+      "sha256": "b2c30d83ae8954b2bf289f95a201ec665dae050ddea35f867e486379e1d91e67"
+    },
+    {
+      "path": "json/stream.jsonl",
+      "size": 31737,
+      "sha256": "105a056c11b2af0754a0eae3f6e754416e141a5fa44891dfc42a0d88e9ea12fb"
+    },
+    {
+      "path": "rand/sources.jsonl",
+      "size": 671594,
+      "sha256": "051fe8ce3c0ee06bbc0a10768eb91e8ff354f1b861dcaa79ae6e45faeddab0f3"
+    },
+    {
+      "path": "sort/slice.jsonl",
+      "size": 780249,
+      "sha256": "2b006b75854dac7e7a34311a81cc39bad9124a30429d4861685c20e38a4d607c"
+    },
+    {
+      "path": "strconv/format_float.jsonl",
+      "size": 4376963,
+      "sha256": "a27e0b9ce594049934bb5ae4e3d3468d67c2fafc08c5af084d5ea9a9f522607b"
+    },
+    {
+      "path": "strconv/format_int.jsonl",
+      "size": 3080,
+      "sha256": "8713abcc531287a43ea8e2d602bce22695306cfb722286916b0e8efccc6af2e6"
+    },
+    {
+      "path": "strconv/parse_float.jsonl",
+      "size": 1821514,
+      "sha256": "16a10c056ab2b4965c1feedf9e4962bc2d09d81c9050a596d37b5f550771ec30"
+    },
+    {
+      "path": "strconv/parse_int.jsonl",
+      "size": 9178,
+      "sha256": "a4a1ae31b06c23b18e362b71d7ff9ae70b1655e311456b09f31bbb35e62ce979"
+    },
+    {
+      "path": "strconv/quote.jsonl",
+      "size": 168975,
+      "sha256": "7528b6b2b0e04f0f0d8ad3effa448c5a6e2e202d1daed05bf285862254c47537"
+    },
+    {
+      "path": "strings/cases.jsonl",
+      "size": 34323,
+      "sha256": "708f36820071351fc73616c0d8265ba403aab767c7094c8cacb1346d570f807f"
+    },
+    {
+      "path": "time/civil.jsonl",
+      "size": 27261,
+      "sha256": "d275f76bbb853e335fe726d034da0a93543ca00d3a553291cd44bc1164c1aebd"
+    },
+    {
+      "path": "time/duration.jsonl",
+      "size": 9663,
+      "sha256": "6fce00df18c57f325e9c4e4c3552effafb1f9e710c612f8f7ea092f180230e22"
+    },
+    {
+      "path": "time/format.jsonl",
+      "size": 219149,
+      "sha256": "b9b6b2cf03645d2a837dd8ed672b46f23784247784f7f5e67c78d0418cb0c1e4"
+    },
+    {
+      "path": "time/format_zones.json",
+      "size": 526,
+      "sha256": "dd581a7dae504f81fefa595a5d541281d20ec56115ef585a0ecf06395f4ef778"
+    },
+    {
+      "path": "time/parse.jsonl",
+      "size": 63464,
+      "sha256": "33046743e71bd1d6d1ff5cab0e50e9e0373326d60435c44aed042ce6f894f7d7"
+    },
+    {
+      "path": "time/zoneinfo/Africa_Casablanca.tzif",
+      "size": 1919,
+      "sha256": "30ca6cf13e00c2a6c437a3c837fa643623cc04406ab5165165c78b37ef6bc4c3"
+    },
+    {
+      "path": "time/zoneinfo/America_New_York.tzif",
+      "size": 1744,
+      "sha256": "d7f2206b3a45989fc9ad63d558922532fa7352280d5f87176bf1db79cb1d1fa9"
+    },
+    {
+      "path": "time/zoneinfo/America_Sao_Paulo.tzif",
+      "size": 952,
+      "sha256": "fa2ceb222f065c0289f3997ff0c54ba05a74a599b4522870fa86a96e24e18891"
+    },
+    {
+      "path": "time/zoneinfo/America_St_Johns.tzif",
+      "size": 1878,
+      "sha256": "bfdf6afc014c3e597930cc4ca7df1aa98e347268acdb07224df4eab36fe46f49"
+    },
+    {
+      "path": "time/zoneinfo/Antarctica_Troll.tzif",
+      "size": 158,
+      "sha256": "b38cf417fb8acf1ddb88a8c4cef1f06f9eb5df65d1b3a211db67c2420956e462"
+    },
+    {
+      "path": "time/zoneinfo/Asia_Kathmandu.tzif",
+      "size": 161,
+      "sha256": "76b8f1bfe072231a1d9e7f8501310e27c0d08048c48f7422860b6477c142c438"
+    },
+    {
+      "path": "time/zoneinfo/Asia_Kolkata.tzif",
+      "size": 220,
+      "sha256": "3a00bdbe1bc4959e727567c730ba51b03455ecd455f7c190c5ad14386eb79b0d"
+    },
+    {
+      "path": "time/zoneinfo/Asia_Tokyo.tzif",
+      "size": 213,
+      "sha256": "59a3871430f0d3b93e619fa30a43a41d1e88bdd49ff26f09d0f405a500706f96"
+    },
+    {
+      "path": "time/zoneinfo/Australia_Lord_Howe.tzif",
+      "size": 692,
+      "sha256": "f368bd25659c0293d02bb79ec7dac7d5b73a92dffafce14b4dd2ffb8ba11aada"
+    },
+    {
+      "path": "time/zoneinfo/Europe_Dublin.tzif",
+      "size": 1496,
+      "sha256": "11c00336e02f1318fe764ab29467c5f2afefbfffa644fa8dd24f5b083b495b71"
+    },
+    {
+      "path": "time/zoneinfo/Europe_Paris.tzif",
+      "size": 1105,
+      "sha256": "cd588e779c5737d70e4e47158dafab7945b026b2bb34454cc47741815459b068"
+    },
+    {
+      "path": "time/zoneinfo/Pacific_Chatham.tzif",
+      "size": 808,
+      "sha256": "a67858fcb6fc5787a8e9c2b7c8be8964bd3ce9223f7ad1baac2c9ca6925f4c78"
+    },
+    {
+      "path": "time/zoneinfo/Pacific_Kiritimati.tzif",
+      "size": 174,
+      "sha256": "71454698c44182595fb982775f4074ce0d017fe2cfa3d97b2dee63bbcf36771e"
+    },
+    {
+      "path": "time/zoneinfo/UTC.tzif",
+      "size": 111,
+      "sha256": "fddce1e648a1732ac29afd9a16151b2973cdf082e7ec0c690f7e42be6b598b93"
+    },
+    {
+      "path": "time/zones.jsonl",
+      "size": 1159740,
+      "sha256": "2ff8d03ffa1fb98e63902382edcf363bf6a904c20dc745a8b06fb36a1fe46c19"
+    },
+    {
+      "path": "unicode/case.tsv",
+      "size": 74600,
+      "sha256": "608d85815c6e26b94541bacbddbd7d29941e6c1bac1e2deb1fcc4323b2136a37"
+    },
+    {
+      "path": "unicode/case_ranges.tsv",
+      "size": 7252,
+      "sha256": "ea376e3a25dbfc04b0ec4c7ebfaefea5fd0648c4a04b5fd1eec5a8e4bd6d82a2"
+    },
+    {
+      "path": "unicode/categories.tsv",
+      "size": 64388,
+      "sha256": "46e8a9cc0d5277a482834ef5679fc9cd1999976450614ed424121411840c1d35"
+    },
+    {
+      "path": "unicode/fold_category.tsv",
+      "size": 16208,
+      "sha256": "d8a30eab45273e07c8b22624e14a6a32e1d14ec1bad1cca4953d07ae6b3fe7ef"
+    },
+    {
+      "path": "unicode/fold_script.tsv",
+      "size": 126,
+      "sha256": "09b6451b6ab527b0080b59c4b64b0852ab5d79d4bdd9b3c44fc90d281fcab450"
+    },
+    {
+      "path": "unicode/predicates.tsv",
+      "size": 123038,
+      "sha256": "033f8d6dfe5b0354260bb4571fc8342431ecd10a66017ebcea025be5869269db"
+    },
+    {
+      "path": "unicode/properties.tsv",
+      "size": 29302,
+      "sha256": "25bd78ca228588c722403d3e2737006ef48ac93253e6065688fe78c114666b8b"
+    },
+    {
+      "path": "unicode/scripts.tsv",
+      "size": 18159,
+      "sha256": "c6ed9890efb84e519810308e18b2ab0161eb96962b682989f49d1072426d6808"
+    },
+    {
+      "path": "unicode/version.json",
+      "size": 26,
+      "sha256": "c123e2522c1c74e918559336124ecfe830a53e3879bab29fe09bd805a3557949"
+    },
+    {
+      "path": "utf16/cases.jsonl",
+      "size": 2223,
+      "sha256": "7a567945a66f9f1623bc06bcfca14cf935fd9daf4bcc7842a49f7e05a79b48a9"
+    },
+    {
+      "path": "utf8/decode.jsonl",
+      "size": 974239,
+      "sha256": "b4c00651d394dd8890df7b2db08c4f0a4fc133324a162a169fb1783d2ddcc3ca"
+    },
+    {
+      "path": "utf8/encode.jsonl",
+      "size": 1073,
+      "sha256": "067e308bd3f1b5101d67c9a907b8aa439a663defcde7a16f12062495efaa61d1"
+    }
+  ]
+}

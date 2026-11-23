@@ -1,0 +1,41 @@
+[
+  {
+    "index": 0,
+    "kind": "utc"
+  },
+  {
+    "index": 1,
+    "kind": "fixed",
+    "name": "",
+    "offset": 3600
+  },
+  {
+    "index": 2,
+    "kind": "fixed",
+    "name": "",
+    "offset": -34200
+  },
+  {
+    "index": 3,
+    "kind": "fixed",
+    "name": "",
+    "offset": 19800
+  },
+  {
+    "index": 4,
+    "kind": "fixed",
+    "name": "X",
+    "offset": 45296
+  },
+  {
+    "index": 5,
+    "kind": "fixed",
+    "name": "",
+    "offset": -1
+  },
+  {
+    "index": 6,
+    "kind": "tzif",
+    "name": "Europe/Paris"
+  }
+]
