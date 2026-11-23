@@ -6,6 +6,11 @@
   "goarch": "arm64",
   "files": [
     {
+      "path": "cli/cases.jsonl",
+      "size": 24750,
+      "sha256": "6ff8552f08252ee9687158d72093d42d8a0906f7848fb83afa91a7fbbf5eeaa0"
+    },
+    {
       "path": "config/01.json",
       "size": 1194,
       "sha256": "e04f81662d22a4447a565071eeb4ffe246ef6699e4efeadf86c1a896d6e8c147"
