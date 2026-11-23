@@ -1,0 +1,376 @@
+{
+  "endian": "little",
+  "entries": [
+    {
+      "source": "collate/tables.go",
+      "name": "CLDRVersion",
+      "kind": "string",
+      "bytes": 2,
+      "file": "xtext/collate/CLDRVersion.bin"
+    },
+    {
+      "source": "collate/tables.go",
+      "name": "UnicodeVersion",
+      "kind": "string",
+      "bytes": 5,
+      "file": "xtext/collate/UnicodeVersion.bin"
+    },
+    {
+      "source": "collate/tables.go",
+      "name": "availableLocales",
+      "kind": "string",
+      "bytes": 413,
+      "file": "xtext/collate/availableLocales.bin"
+    },
+    {
+      "source": "collate/tables.go",
+      "name": "locales",
+      "kind": "array",
+      "elem": "tableIndex",
+      "fields": [
+        {
+          "name": "lookupOffset",
+          "type": "uint32"
+        },
+        {
+          "name": "valuesOffset",
+          "type": "uint32"
+        }
+      ],
+      "count": 95,
+      "bytes": 760,
+      "file": "xtext/collate/locales.bin"
+    },
+    {
+      "source": "collate/tables.go",
+      "name": "mainCTEntries",
+      "kind": "array",
+      "elem": "struct",
+      "fields": [
+        {
+          "name": "L",
+          "type": "uint8"
+        },
+        {
+          "name": "H",
+          "type": "uint8"
+        },
+        {
+          "name": "N",
+          "type": "uint8"
+        },
+        {
+          "name": "I",
+          "type": "uint8"
+        }
+      ],
+      "count": 2529,
+      "bytes": 10116,
+      "file": "xtext/collate/mainCTEntries.bin"
+    },
+    {
+      "source": "collate/tables.go",
+      "name": "mainContractElem",
+      "kind": "array",
+      "elem": "uint32",
+      "count": 4120,
+      "bytes": 16480,
+      "file": "xtext/collate/mainContractElem.bin"
+    },
+    {
+      "source": "collate/tables.go",
+      "name": "mainExpandElem",
+      "kind": "array",
+      "elem": "uint32",
+      "count": 46864,
+      "bytes": 187456,
+      "file": "xtext/collate/mainExpandElem.bin"
+    },
+    {
+      "source": "collate/tables.go",
+      "name": "mainLookup",
+      "kind": "array",
+      "elem": "uint16",
+      "count": 16576,
+      "bytes": 33152,
+      "file": "xtext/collate/mainLookup.bin"
+    },
+    {
+      "source": "collate/tables.go",
+      "name": "mainValues",
+      "kind": "array",
+      "elem": "uint32",
+      "count": 251456,
+      "bytes": 1005824,
+      "file": "xtext/collate/mainValues.bin"
+    },
+    {
+      "source": "collate/tables.go",
+      "name": "varTop",
+      "kind": "int",
+      "bytes": 0,
+      "value": "782"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "Version",
+      "kind": "string",
+      "bytes": 6,
+      "file": "xtext/norm/Version.bin"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "ccc",
+      "kind": "array",
+      "elem": "uint8",
+      "count": 56,
+      "bytes": 56,
+      "file": "xtext/norm/ccc.bin"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "decomps",
+      "kind": "array",
+      "elem": "byte",
+      "count": 19426,
+      "bytes": 19426,
+      "file": "xtext/norm/decomps.bin"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "endMulti",
+      "kind": "int",
+      "bytes": 0,
+      "value": "12449"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "firstCCC",
+      "kind": "int",
+      "bytes": 0,
+      "value": "11733"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "firstCCCZeroExcept",
+      "kind": "int",
+      "bytes": 0,
+      "value": "19385"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "firstLeadingCCC",
+      "kind": "int",
+      "bytes": 0,
+      "value": "19183"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "firstMulti",
+      "kind": "int",
+      "bytes": 0,
+      "value": "6554"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "firstStarterWithNLead",
+      "kind": "int",
+      "bytes": 0,
+      "value": "19424"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "lastDecomp",
+      "kind": "int",
+      "bytes": 0,
+      "value": "19426"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "maxDecomp",
+      "kind": "int",
+      "bytes": 0,
+      "value": "32768"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "nfcIndex",
+      "kind": "array",
+      "elem": "uint8",
+      "count": 1408,
+      "bytes": 1408,
+      "file": "xtext/norm/nfcIndex.bin"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "nfcSparseOffset",
+      "kind": "array",
+      "elem": "uint16",
+      "count": 163,
+      "bytes": 326,
+      "file": "xtext/norm/nfcSparseOffset.bin"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "nfcSparseValues",
+      "kind": "array",
+      "elem": "valueRange",
+      "fields": [
+        {
+          "name": "value",
+          "type": "uint16"
+        },
+        {
+          "name": "lo",
+          "type": "byte"
+        },
+        {
+          "name": "hi",
+          "type": "byte"
+        }
+      ],
+      "count": 730,
+      "bytes": 2920,
+      "file": "xtext/norm/nfcSparseValues.bin"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "nfcValues",
+      "kind": "array",
+      "elem": "uint16",
+      "count": 3072,
+      "bytes": 6144,
+      "file": "xtext/norm/nfcValues.bin"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "nfkcIndex",
+      "kind": "array",
+      "elem": "uint16",
+      "count": 1408,
+      "bytes": 2816,
+      "file": "xtext/norm/nfkcIndex.bin"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "nfkcSparseOffset",
+      "kind": "array",
+      "elem": "uint16",
+      "count": 176,
+      "bytes": 352,
+      "file": "xtext/norm/nfkcSparseOffset.bin"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "nfkcSparseValues",
+      "kind": "array",
+      "elem": "valueRange",
+      "fields": [
+        {
+          "name": "value",
+          "type": "uint16"
+        },
+        {
+          "name": "lo",
+          "type": "byte"
+        },
+        {
+          "name": "hi",
+          "type": "byte"
+        }
+      ],
+      "count": 919,
+      "bytes": 3676,
+      "file": "xtext/norm/nfkcSparseValues.bin"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "nfkcValues",
+      "kind": "array",
+      "elem": "uint16",
+      "count": 6208,
+      "bytes": 12416,
+      "file": "xtext/norm/nfkcValues.bin"
+    },
+    {
+      "source": "unicode/norm/tables15.0.0.go",
+      "name": "recompMapPacked",
+      "kind": "string",
+      "bytes": 7528,
+      "file": "xtext/norm/recompMapPacked.bin"
+    },
+    {
+      "source": "cases/tables15.0.0.go",
+      "name": "UnicodeVersion",
+      "kind": "string",
+      "bytes": 6,
+      "file": "xtext/cases/UnicodeVersion.bin"
+    },
+    {
+      "source": "cases/tables15.0.0.go",
+      "name": "caseIndex",
+      "kind": "array",
+      "elem": "uint16",
+      "count": 1728,
+      "bytes": 3456,
+      "file": "xtext/cases/caseIndex.bin"
+    },
+    {
+      "source": "cases/tables15.0.0.go",
+      "name": "caseValues",
+      "kind": "array",
+      "elem": "uint16",
+      "count": 1536,
+      "bytes": 3072,
+      "file": "xtext/cases/caseValues.bin"
+    },
+    {
+      "source": "cases/tables15.0.0.go",
+      "name": "exceptions",
+      "kind": "string",
+      "bytes": 2450,
+      "file": "xtext/cases/exceptions.bin"
+    },
+    {
+      "source": "cases/tables15.0.0.go",
+      "name": "sparseOffsets",
+      "kind": "array",
+      "elem": "uint16",
+      "count": 312,
+      "bytes": 624,
+      "file": "xtext/cases/sparseOffsets.bin"
+    },
+    {
+      "source": "cases/tables15.0.0.go",
+      "name": "sparseValues",
+      "kind": "array",
+      "elem": "valueRange",
+      "fields": [
+        {
+          "name": "value",
+          "type": "uint16"
+        },
+        {
+          "name": "lo",
+          "type": "byte"
+        },
+        {
+          "name": "hi",
+          "type": "byte"
+        }
+      ],
+      "count": 1562,
+      "bytes": 6248,
+      "file": "xtext/cases/sparseValues.bin"
+    },
+    {
+      "source": "cases/tables15.0.0.go",
+      "name": "xorData",
+      "kind": "string",
+      "bytes": 213,
+      "file": "xtext/cases/xorData.bin"
+    }
+  ],
+  "module": "golang.org/x/text v0.31.0",
+  "note": "each array element is written field by field in declaration order with the listed widths; strings are their raw bytes"
+}

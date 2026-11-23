@@ -1149,6 +1149,166 @@
       "path": "test262.json",
       "size": 476,
       "sha256": "680b453a59705d8b8a669d04b89d77aa43affd58ba04030d65310998c37bf5a0"
+    },
+    {
+      "path": "xtext/cases/UnicodeVersion.bin",
+      "size": 6,
+      "sha256": "4caeb15b237855f0e3a33d0d919b86299b3da95829c9d4c9692e82b0311dff74"
+    },
+    {
+      "path": "xtext/cases/caseIndex.bin",
+      "size": 3456,
+      "sha256": "491f0375bba441a36cfd4529bcf06bb8ed4d8ef07ad65cf14b712b92257d93a8"
+    },
+    {
+      "path": "xtext/cases/caseValues.bin",
+      "size": 3072,
+      "sha256": "cb6ef86bbcb8889d7197845a8a12e79fb88090c40db7fa6684b9b84c30060b12"
+    },
+    {
+      "path": "xtext/cases/exceptions.bin",
+      "size": 2450,
+      "sha256": "27ab59f4c015870b9f271a00d1bd8f8c6d04c60f98df4ce955dd47b7debcf824"
+    },
+    {
+      "path": "xtext/cases/sparseOffsets.bin",
+      "size": 624,
+      "sha256": "5ba28a1b2044c963483e11550f2d9f9ecf50342b4018fc687b215c293b2a7071"
+    },
+    {
+      "path": "xtext/cases/sparseValues.bin",
+      "size": 6248,
+      "sha256": "7270e67611a887eef73e83718425d0519d1118906eed0a834cfc4de9432083da"
+    },
+    {
+      "path": "xtext/cases/vectors.jsonl",
+      "size": 134191,
+      "sha256": "5024f52e7302736f76aaed544bba7dfdedacd097f9237c88fb116922063fc6e2"
+    },
+    {
+      "path": "xtext/cases/xorData.bin",
+      "size": 213,
+      "sha256": "3b91aa79dcd2912cbcd6d0c9388ca9d4a1d7873e3916db493230b2df02afa2c2"
+    },
+    {
+      "path": "xtext/collate/CLDRVersion.bin",
+      "size": 2,
+      "sha256": "535fa30d7e25dd8a49f1536779734ec8286108d115da5045d77f3b4185d8f790"
+    },
+    {
+      "path": "xtext/collate/UnicodeVersion.bin",
+      "size": 5,
+      "sha256": "2394b7a64dc20f32cd958a4724884d35c43d02e77c732604bc06047598769c59"
+    },
+    {
+      "path": "xtext/collate/availableLocales.bin",
+      "size": 413,
+      "sha256": "4e14a8d209133c207b4611a632eba4e7baa7b2d04cf6a06885494355faa3a5f1"
+    },
+    {
+      "path": "xtext/collate/locales.bin",
+      "size": 760,
+      "sha256": "66ab40a170dc197b4f7244fb0dcfd4ddf6c7b18f9a468df978c4078edf768e64"
+    },
+    {
+      "path": "xtext/collate/mainCTEntries.bin",
+      "size": 10116,
+      "sha256": "538f3344e1e48b66a3020b553d230b433df4dbf79784b6fa94960b9a8a4aff5e"
+    },
+    {
+      "path": "xtext/collate/mainContractElem.bin",
+      "size": 16480,
+      "sha256": "bf35b09c98ad65152554fa8b426ceaa3d0a776860f603f3302d0363907b1da1a"
+    },
+    {
+      "path": "xtext/collate/mainExpandElem.bin",
+      "size": 187456,
+      "sha256": "fcc86d3598073113462ee58d952a88826b856cd68dde75252cba96315cc0a0cc"
+    },
+    {
+      "path": "xtext/collate/mainLookup.bin",
+      "size": 33152,
+      "sha256": "153171cd868f392100cdbda8b54ba7184957c687d7710cb06b6cfa6341d63eda"
+    },
+    {
+      "path": "xtext/collate/mainValues.bin",
+      "size": 1005824,
+      "sha256": "59306c2a342f980a0d88e1ef081ab6e8223472f9d033191c07020ee5f3e70a14"
+    },
+    {
+      "path": "xtext/collate/vectors.jsonl",
+      "size": 126549,
+      "sha256": "5fc5d6315eda8f703ac0590e36519d5867852f67bf7aa50d05715b02fa564acd"
+    },
+    {
+      "path": "xtext/layout.json",
+      "size": 8559,
+      "sha256": "4bcd3db23b58119194b0baca7b4b805fc50df622978985d1e84ca7cab49a72af"
+    },
+    {
+      "path": "xtext/norm/Version.bin",
+      "size": 6,
+      "sha256": "4caeb15b237855f0e3a33d0d919b86299b3da95829c9d4c9692e82b0311dff74"
+    },
+    {
+      "path": "xtext/norm/ccc.bin",
+      "size": 56,
+      "sha256": "c4fa9e93b4cbcf13a147c6350a6e1cf452a0536ab40a3d572c3d06896de5afc8"
+    },
+    {
+      "path": "xtext/norm/decomps.bin",
+      "size": 19426,
+      "sha256": "ef05edb3f2332764ccfaac2a020408f7c24be1ffe3a97f6dd15ae3c9e9e93302"
+    },
+    {
+      "path": "xtext/norm/nfcIndex.bin",
+      "size": 1408,
+      "sha256": "e57e7d230d2fe41943d4bab6352129a3d3db11b12185333e51099ef2bb42b395"
+    },
+    {
+      "path": "xtext/norm/nfcSparseOffset.bin",
+      "size": 326,
+      "sha256": "005b2ed2427982523b721a314a6852694ede9eeed2e3f096ae7cd0421624015b"
+    },
+    {
+      "path": "xtext/norm/nfcSparseValues.bin",
+      "size": 2920,
+      "sha256": "e58c6bbcaa34665464889a7fb19486d9b89f83786f0ed80417044a70e8568053"
+    },
+    {
+      "path": "xtext/norm/nfcValues.bin",
+      "size": 6144,
+      "sha256": "3134bc60f72cbb3bb3c4996e4587d38c31aa6af8331f2ad48558163904da33c8"
+    },
+    {
+      "path": "xtext/norm/nfkcIndex.bin",
+      "size": 2816,
+      "sha256": "9d7971869fab69ce48a47a96f6945cb1b3359c25f82825b5869253055bded00d"
+    },
+    {
+      "path": "xtext/norm/nfkcSparseOffset.bin",
+      "size": 352,
+      "sha256": "d03b2139861db1a6a756dc75c5674d44b19efa36e9ad5b04602f794cd71e67b8"
+    },
+    {
+      "path": "xtext/norm/nfkcSparseValues.bin",
+      "size": 3676,
+      "sha256": "123c4767634674506cebb6f9935bb642f278046a622f5195e4e994ca6700c1b8"
+    },
+    {
+      "path": "xtext/norm/nfkcValues.bin",
+      "size": 12416,
+      "sha256": "fd956791c6dc43f43660e754f00b6c84c310e0ca3fb4e03b72d11e1f163591f1"
+    },
+    {
+      "path": "xtext/norm/recompMapPacked.bin",
+      "size": 7528,
+      "sha256": "35c2a541d6429494c4fa0a697433198989b3f243e838d1c59056132f02947606"
+    },
+    {
+      "path": "xtext/norm/vectors.jsonl",
+      "size": 1077398,
+      "sha256": "e1fd4af527d1b746c7b440102704e54621df068f33a39c34386173812b76235d"
     }
   ]
 }
