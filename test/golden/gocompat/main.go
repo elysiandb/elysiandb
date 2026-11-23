@@ -33,6 +33,7 @@ func run(out string) error {
 		genSort,
 		genRand,
 		genBase64,
+		genFlag,
 	}
 	for _, step := range steps {
 		if err := step(out); err != nil {
