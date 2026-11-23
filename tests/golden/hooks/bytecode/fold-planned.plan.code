@@ -1,0 +1,108 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nvar rows = __elysian_hook.view(\"order\", { group: { eq: ctx.entity.s } })\n  var total = 0\n  var __elysian_r0 = __elysian_hook.fold(0, rows, total); if (__elysian_r0) { total = __elysian_r0[0]; } else { rows = __elysian_hook.rows(rows); for (var i = 0; i < rows.length; i++) { var r = rows[i]; total += r.amount } }\n  ctx.entity.total = total\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:5 args:1}
+  1	goja.loadDynamic	"__elysian_hook"
+  2	goja.getPropCallee	"view"
+  3	goja.loadVal	{v:"order"}
+  4	goja._newObject	{}
+  5	goja._newObject	{}
+  6	goja.loadStackLex	-1
+  7	goja.getProp	"entity"
+  8	goja.getProp	"s"
+  9	goja.putProp	"eq"
+  10	goja.putProp	"group"
+  11	goja.call	2
+  12	goja.initStackP	1
+  13	goja.loadVal	{v:0}
+  14	goja.initStackP	2
+  15	goja.loadDynamic	"__elysian_hook"
+  16	goja.getPropCallee	"fold"
+  17	goja.loadVal	{v:0}
+  18	goja.loadStack	1
+  19	goja.loadStack	2
+  20	goja.call	3
+  21	goja.initStackP	3
+  22	goja.loadStack	3
+  23	goja.jneP	6
+  24	goja.loadStack	3
+  25	goja.loadVal	{v:0}
+  26	goja._getElem	{}
+  27	goja.storeStackP	2
+  28	goja.jump	26
+  29	goja.loadDynamic	"__elysian_hook"
+  30	goja.getPropCallee	"rows"
+  31	goja.loadStack	1
+  32	goja.call	1
+  33	goja.storeStackP	1
+  34	goja.loadVal	{v:0}
+  35	goja.initStackP	4
+  36	goja.loadStack	4
+  37	goja.loadStack	1
+  38	goja.getProp	"length"
+  39	goja._op_lt	{}
+  40	goja.jneP	14
+  41	goja.loadStack	1
+  42	goja.loadStack	4
+  43	goja._getElem	{}
+  44	goja.initStackP	5
+  45	goja.loadStack	2
+  46	goja.loadStack	5
+  47	goja.getProp	"amount"
+  48	goja._add	{}
+  49	goja.storeStackP	2
+  50	goja.loadStack	4
+  51	goja._inc	{}
+  52	goja.storeStackP	4
+  53	goja.jump	-17
+  54	goja.loadStackLex	-1
+  55	goja.getProp	"entity"
+  56	goja.loadStack	2
+  57	goja.setPropP	"total"
+  58	goja._loadUndef	{}
+  59	goja._ret	{}
+  positions:
+  0	0
+  1	36
+  4	65
+  5	74
+  6	80
+  7	84
+  8	91
+  11	55
+  12	29
+  14	104
+  15	135
+  18	158
+  19	164
+  20	154
+  21	120
+  22	176
+  24	192
+  24	200
+  26	212
+  29	226
+  29	233
+  31	253
+  32	252
+  35	269
+  36	276
+  37	280
+  38	285
+  39	276
+  41	308
+  42	313
+  43	312
+  44	304
+  45	317
+  46	326
+  47	328
+  50	293
+  54	341
+  55	345
+  56	360
+  57	352
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

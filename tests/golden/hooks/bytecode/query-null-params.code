@@ -1,0 +1,27 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.r = ctx.query(\"order\", null).length\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadStackLex	-1
+  4	goja.getPropCallee	"query"
+  5	goja.loadVal	{v:"order"}
+  6	goja.loadVal	{v:{}}
+  7	goja.call	2
+  8	goja.getProp	"length"
+  9	goja.setPropP	"r"
+  10	goja._loadUndef	{}
+  11	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  7	49
+  8	65
+  9	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

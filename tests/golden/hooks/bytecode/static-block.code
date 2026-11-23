@@ -1,0 +1,50 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { ctx.entity.x = A.x }" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadDynamic	"A"
+  4	goja.getProp	"x"
+  5	goja.setPropP	"x"
+  6	goja._loadUndef	{}
+  7	goja._ret	{}
+  positions:
+  0	31
+  1	56
+  2	60
+  3	71
+  4	73
+  5	67
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:["A"] consts:[] deletable:false}
+2	*goja.enterBlock	&{names:map[] stashSize:1 stackSize:0}
+3	*goja.newStaticFieldInit	&{initFields:<prog> numPrivateFields:0 numPrivateMethods:0}
+  func: "<static_initializer>"
+  code:
+  0	goja._dup	{}
+  1	*goja.newMethod	&{newFunc:{prg:<prog> name:"" source:"{ A.x = 1 }" length:0 strict:true} homeObjOffset:1}
+    func: ""
+    code:
+    0	*goja.enterFuncStashless	&{stackSize:0 args:0}
+    1	goja.loadStashLex	0
+    2	goja.loadVal	{v:1}
+    3	goja.setPropStrictP	"x"
+    4	goja._loadUndef	{}
+    5	goja._ret	{}
+    positions:
+    0	10
+    1	19
+    3	21
+  2	goja.call	0
+  3	goja._pop	{}
+  positions:
+  2	10
+4	*goja.newClass	&{ctor:<nil> name:"A" source:"class A { static { A.x = 1 } }" initFields:<nil> privateFields:[] privateMethods:[] numPrivateFields:0 numPrivateMethods:0 length:0 hasPrivateEnv:false}
+5	goja.initStash	0
+6	*goja.initStaticElements	&{privateFields:[] privateMethods:[]}
+7	*goja.leaveBlock	&{stackSize:0 popStash:true}
+8	goja.initGlobalP	"A"
+positions:
+4	0

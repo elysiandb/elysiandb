@@ -1,0 +1,9 @@
+func: ""
+code:
+0	*goja.bindGlobal	&{vars:[] funcs:[] lets:["postRead"] consts:[] deletable:false}
+1	goja.jump	1
+2	*goja.newClass	&{ctor:<nil> name:"postRead" source:"class postRead {}" initFields:<nil> privateFields:[] privateMethods:[] numPrivateFields:0 numPrivateMethods:0 length:0 hasPrivateEnv:false}
+3	goja._endVariadic	{}
+4	goja.initGlobalP	"postRead"
+positions:
+2	0

@@ -1,0 +1,76 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nvar rows = ctx.query(\"order\", { group: { eq: ctx.entity.s } })\n  var total = 0\n  for (var i = 0; i < rows.length; i++) { var r = rows[i]; total += r.amount }\n  ctx.entity.total = total\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:4 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getPropCallee	"query"
+  3	goja.loadVal	{v:"order"}
+  4	goja._newObject	{}
+  5	goja._newObject	{}
+  6	goja.loadStackLex	-1
+  7	goja.getProp	"entity"
+  8	goja.getProp	"s"
+  9	goja.putProp	"eq"
+  10	goja.putProp	"group"
+  11	goja.call	2
+  12	goja.initStackP	1
+  13	goja.loadVal	{v:0}
+  14	goja.initStackP	2
+  15	goja.loadVal	{v:0}
+  16	goja.initStackP	3
+  17	goja.loadStack	3
+  18	goja.loadStack	1
+  19	goja.getProp	"length"
+  20	goja._op_lt	{}
+  21	goja.jneP	14
+  22	goja.loadStack	1
+  23	goja.loadStack	3
+  24	goja._getElem	{}
+  25	goja.initStackP	4
+  26	goja.loadStack	2
+  27	goja.loadStack	4
+  28	goja.getProp	"amount"
+  29	goja._add	{}
+  30	goja.storeStackP	2
+  31	goja.loadStack	3
+  32	goja._inc	{}
+  33	goja.storeStackP	3
+  34	goja.jump	-17
+  35	goja.loadStackLex	-1
+  36	goja.getProp	"entity"
+  37	goja.loadStack	2
+  38	goja.setPropP	"total"
+  39	goja._loadUndef	{}
+  40	goja._ret	{}
+  positions:
+  0	0
+  1	36
+  4	55
+  5	64
+  6	70
+  7	74
+  8	81
+  11	45
+  12	29
+  14	94
+  16	115
+  17	122
+  18	126
+  19	131
+  20	122
+  22	154
+  23	159
+  24	158
+  25	150
+  26	163
+  27	172
+  28	174
+  31	139
+  35	185
+  36	189
+  37	204
+  38	196
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

@@ -1,0 +1,53 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { ctx.entity.o = {b: 1, 2: \"two\", a: 3, 1: \"one\"}; ctx.entity.k = Object.keys({b: 1, 2: \"two\", a: 3, 1: \"one\"}).join(\",\") }" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja._newObject	{}
+  4	goja.loadVal	{v:1}
+  5	goja.putProp	"b"
+  6	goja.loadVal	{v:"two"}
+  7	goja.putProp	"2"
+  8	goja.loadVal	{v:3}
+  9	goja.putProp	"a"
+  10	goja.loadVal	{v:"one"}
+  11	goja.putProp	"1"
+  12	goja.setPropP	"o"
+  13	goja.loadStackLex	-1
+  14	goja.getProp	"entity"
+  15	goja.loadDynamic	"Object"
+  16	goja.getPropCallee	"keys"
+  17	goja._newObject	{}
+  18	goja.loadVal	{v:1}
+  19	goja.putProp	"b"
+  20	goja.loadVal	{v:"two"}
+  21	goja.putProp	"2"
+  22	goja.loadVal	{v:3}
+  23	goja.putProp	"a"
+  24	goja.loadVal	{v:"one"}
+  25	goja.putProp	"1"
+  26	goja.call	1
+  27	goja.getPropCallee	"join"
+  28	goja.loadVal	{v:","}
+  29	goja.call	1
+  30	goja.setPropP	"k"
+  31	goja._loadUndef	{}
+  32	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  12	36
+  13	74
+  14	78
+  15	89
+  17	101
+  26	100
+  29	139
+  30	85
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

@@ -1,0 +1,80 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.r = [\"a\".localeCompare(\"B\"), \"a\".localeCompare(\"A\"), \"é\".localeCompare(\"f\"), \"Z\".localeCompare(\"a\"), [\"b\", \"A\", \"a\", \"B\", \"é\", \"e\"].sort(function (x, y) { return x.localeCompare(y) }).join(\"\")]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.newArray	5
+  4	goja.loadVal	{v:"a"}
+  5	goja.getPropCallee	"localeCompare"
+  6	goja.loadVal	{v:"B"}
+  7	goja.call	1
+  8	goja._pushArrayItem	{}
+  9	goja.loadVal	{v:"a"}
+  10	goja.getPropCallee	"localeCompare"
+  11	goja.loadVal	{v:"A"}
+  12	goja.call	1
+  13	goja._pushArrayItem	{}
+  14	goja.loadVal	{v:"\ufeffé"}
+  15	goja.getPropCallee	"localeCompare"
+  16	goja.loadVal	{v:"f"}
+  17	goja.call	1
+  18	goja._pushArrayItem	{}
+  19	goja.loadVal	{v:"Z"}
+  20	goja.getPropCallee	"localeCompare"
+  21	goja.loadVal	{v:"a"}
+  22	goja.call	1
+  23	goja._pushArrayItem	{}
+  24	goja.newArray	6
+  25	goja.loadVal	{v:"b"}
+  26	goja._pushArrayItem	{}
+  27	goja.loadVal	{v:"A"}
+  28	goja._pushArrayItem	{}
+  29	goja.loadVal	{v:"a"}
+  30	goja._pushArrayItem	{}
+  31	goja.loadVal	{v:"B"}
+  32	goja._pushArrayItem	{}
+  33	goja.loadVal	{v:"\ufeffé"}
+  34	goja._pushArrayItem	{}
+  35	goja.loadVal	{v:"e"}
+  36	goja._pushArrayItem	{}
+  37	goja.getPropCallee	"sort"
+  38	*goja.newFunc	&{prg:<prog> name:"" source:"function (x, y) { return x.localeCompare(y) }" length:2 strict:false}
+    func: ""
+    code:
+    0	*goja.enterFuncStashless	&{stackSize:0 args:2}
+    1	goja.loadStackLex	-1
+    2	goja.getPropCallee	"localeCompare"
+    3	goja.loadStackLex	-2
+    4	goja.call	1
+    5	goja._ret	{}
+    positions:
+    0	175
+    1	200
+    3	216
+    4	215
+  39	goja.call	1
+  40	goja.getPropCallee	"join"
+  41	goja.loadVal	{v:""}
+  42	goja.call	1
+  43	goja._pushArrayItem	{}
+  44	goja.setPropP	"r"
+  45	goja._loadUndef	{}
+  46	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  7	58
+  12	82
+  17	107
+  22	131
+  24	138
+  39	174
+  42	226
+  44	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

@@ -1,0 +1,156 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\ntry { JSON.parse(\"1 2\") } catch (e) { ctx.entity.a = String(e) } try { JSON.parse(\"\") } catch (e) { ctx.entity.b = String(e) } try { JSON.parse(\"[1,\") } catch (e) { ctx.entity.c = String(e) } try { JSON.parse(\"{bad\") } catch (e) { ctx.entity.d = String(e) } try { JSON.parse(\"\\\"\\\\x\\\"\") } catch (e) { ctx.entity.e = String(e) } try { JSON.parse(\"01\") } catch (e) { ctx.entity.f = String(e) }\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.try	{catchOffset:7 finallyOffset:0}
+  2	goja.loadDynamic	"JSON"
+  3	goja.getPropCallee	"parse"
+  4	goja.loadVal	{v:"1 2"}
+  5	goja.call	1
+  6	goja._pop	{}
+  7	goja.jump	9
+  8	*goja.enterBlock	&{names:map[] stashSize:0 stackSize:0}
+  9	goja.loadStackLex	-1
+  10	goja.getProp	"entity"
+  11	goja.loadDynamicCallee	"String"
+  12	goja.loadStackLex	1
+  13	goja.call	1
+  14	goja.setPropP	"a"
+  15	*goja.leaveBlock	&{stackSize:1 popStash:false}
+  16	goja.leaveTry	{}
+  17	goja.try	{catchOffset:7 finallyOffset:0}
+  18	goja.loadDynamic	"JSON"
+  19	goja.getPropCallee	"parse"
+  20	goja.loadVal	{v:""}
+  21	goja.call	1
+  22	goja._pop	{}
+  23	goja.jump	9
+  24	*goja.enterBlock	&{names:map[] stashSize:0 stackSize:0}
+  25	goja.loadStackLex	-1
+  26	goja.getProp	"entity"
+  27	goja.loadDynamicCallee	"String"
+  28	goja.loadStackLex	1
+  29	goja.call	1
+  30	goja.setPropP	"b"
+  31	*goja.leaveBlock	&{stackSize:1 popStash:false}
+  32	goja.leaveTry	{}
+  33	goja.try	{catchOffset:7 finallyOffset:0}
+  34	goja.loadDynamic	"JSON"
+  35	goja.getPropCallee	"parse"
+  36	goja.loadVal	{v:"[1,"}
+  37	goja.call	1
+  38	goja._pop	{}
+  39	goja.jump	9
+  40	*goja.enterBlock	&{names:map[] stashSize:0 stackSize:0}
+  41	goja.loadStackLex	-1
+  42	goja.getProp	"entity"
+  43	goja.loadDynamicCallee	"String"
+  44	goja.loadStackLex	1
+  45	goja.call	1
+  46	goja.setPropP	"c"
+  47	*goja.leaveBlock	&{stackSize:1 popStash:false}
+  48	goja.leaveTry	{}
+  49	goja.try	{catchOffset:7 finallyOffset:0}
+  50	goja.loadDynamic	"JSON"
+  51	goja.getPropCallee	"parse"
+  52	goja.loadVal	{v:"{bad"}
+  53	goja.call	1
+  54	goja._pop	{}
+  55	goja.jump	9
+  56	*goja.enterBlock	&{names:map[] stashSize:0 stackSize:0}
+  57	goja.loadStackLex	-1
+  58	goja.getProp	"entity"
+  59	goja.loadDynamicCallee	"String"
+  60	goja.loadStackLex	1
+  61	goja.call	1
+  62	goja.setPropP	"d"
+  63	*goja.leaveBlock	&{stackSize:1 popStash:false}
+  64	goja.leaveTry	{}
+  65	goja.try	{catchOffset:7 finallyOffset:0}
+  66	goja.loadDynamic	"JSON"
+  67	goja.getPropCallee	"parse"
+  68	goja.loadVal	{v:"\"\\x\""}
+  69	goja.call	1
+  70	goja._pop	{}
+  71	goja.jump	9
+  72	*goja.enterBlock	&{names:map[] stashSize:0 stackSize:0}
+  73	goja.loadStackLex	-1
+  74	goja.getProp	"entity"
+  75	goja.loadDynamicCallee	"String"
+  76	goja.loadStackLex	1
+  77	goja.call	1
+  78	goja.setPropP	"e"
+  79	*goja.leaveBlock	&{stackSize:1 popStash:false}
+  80	goja.leaveTry	{}
+  81	goja.try	{catchOffset:7 finallyOffset:0}
+  82	goja.loadDynamic	"JSON"
+  83	goja.getPropCallee	"parse"
+  84	goja.loadVal	{v:"01"}
+  85	goja.call	1
+  86	goja._pop	{}
+  87	goja.jump	9
+  88	*goja.enterBlock	&{names:map[] stashSize:0 stackSize:0}
+  89	goja.loadStackLex	-1
+  90	goja.getProp	"entity"
+  91	goja.loadDynamicCallee	"String"
+  92	goja.loadStackLex	1
+  93	goja.call	1
+  94	goja.setPropP	"f"
+  95	*goja.leaveBlock	&{stackSize:1 popStash:false}
+  96	goja.leaveTry	{}
+  97	goja._loadUndef	{}
+  98	goja._ret	{}
+  positions:
+  0	0
+  2	31
+  5	41
+  9	63
+  10	67
+  11	78
+  12	85
+  13	84
+  14	74
+  18	96
+  21	106
+  25	125
+  26	129
+  27	140
+  28	147
+  29	146
+  30	136
+  34	158
+  37	168
+  41	190
+  42	194
+  43	205
+  44	212
+  45	211
+  46	201
+  50	223
+  53	233
+  57	256
+  58	260
+  59	271
+  60	278
+  61	277
+  62	267
+  66	289
+  69	299
+  73	325
+  74	329
+  75	340
+  76	347
+  77	346
+  78	336
+  82	358
+  85	368
+  89	389
+  90	393
+  91	404
+  92	411
+  93	410
+  94	400
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

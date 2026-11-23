@@ -1,0 +1,53 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { ctx.entity.x = o.x; ctx.entity.o = o }" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadDynamic	"o"
+  4	goja.getProp	"x"
+  5	goja.setPropP	"x"
+  6	goja.loadStackLex	-1
+  7	goja.getProp	"entity"
+  8	goja.loadDynamic	"o"
+  9	goja.setPropP	"o"
+  10	goja._loadUndef	{}
+  11	goja._ret	{}
+  positions:
+  0	47
+  1	72
+  2	76
+  3	87
+  4	89
+  5	83
+  6	92
+  7	96
+  8	107
+  9	103
+1	*goja.bindGlobal	&{vars:["o"] funcs:["postRead"] lets:[] consts:[] deletable:false}
+2	goja.resolveVar1	"o"
+3	goja._newObject	{}
+4	*goja.newMethod	&{newFunc:{prg:<prog> name:"x" source:"get x() { return 1 }" length:0 strict:false} homeObjOffset:1}
+  func: "x"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:0}
+  1	goja.loadVal	{v:1}
+  2	goja._ret	{}
+  positions:
+  0	10
+5	*goja.defineGetterKeyed	&{key:"x" enumerable:true}
+6	*goja.newMethod	&{newFunc:{prg:<prog> name:"x" source:"set x(v) {}" length:1 strict:false} homeObjOffset:1}
+  func: "x"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja._loadUndef	{}
+  2	goja._ret	{}
+  positions:
+  0	32
+7	*goja.defineSetterKeyed	&{key:"x" enumerable:true}
+8	goja._initValueP	{}
+positions:
+3	8
+8	4

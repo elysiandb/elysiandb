@@ -1,0 +1,29 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { ctx.entity.a = 123456789012345678901234567890n; ctx.entity.b = [1n] }" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadVal	{v:&{neg:false abs:[14083847773837265618 6692605942]}}
+  4	goja.setPropP	"a"
+  5	goja.loadStackLex	-1
+  6	goja.getProp	"entity"
+  7	goja.newArray	1
+  8	goja.loadVal	{v:&{neg:false abs:[1]}}
+  9	goja._pushArrayItem	{}
+  10	goja.setPropP	"b"
+  11	goja._loadUndef	{}
+  12	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  4	36
+  5	73
+  6	77
+  7	88
+  10	84
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

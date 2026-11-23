@@ -1,0 +1,18 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { const a = 1; a = 2 }" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:1 args:1}
+  1	goja.loadVal	{v:1}
+  2	goja.initStackP	1
+  3	goja.loadVal	{v:2}
+  4	goja._throwAssignToConst	{}
+  5	goja._loadUndef	{}
+  6	goja._ret	{}
+  positions:
+  0	0
+  2	31
+  3	38
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

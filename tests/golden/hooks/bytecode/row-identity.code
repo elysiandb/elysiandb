@@ -1,0 +1,83 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nvar a = ctx.query(\"order\", {}); ctx.entity.r = [a[0] === a[0], a === a, ctx.query(\"order\", {}) === a, a[0].id, typeof a[5], a.length]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:1 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getPropCallee	"query"
+  3	goja.loadVal	{v:"order"}
+  4	goja._newObject	{}
+  5	goja.call	2
+  6	goja.initStackP	1
+  7	goja.loadStackLex	-1
+  8	goja.getProp	"entity"
+  9	goja.newArray	6
+  10	goja.loadStack	1
+  11	goja.loadVal	{v:0}
+  12	goja._getElem	{}
+  13	goja.loadStack	1
+  14	goja.loadVal	{v:0}
+  15	goja._getElem	{}
+  16	goja._op_strict_eq	{}
+  17	goja._pushArrayItem	{}
+  18	goja.loadStack	1
+  19	goja.loadStack	1
+  20	goja._op_strict_eq	{}
+  21	goja._pushArrayItem	{}
+  22	goja.loadStackLex	-1
+  23	goja.getPropCallee	"query"
+  24	goja.loadVal	{v:"order"}
+  25	goja._newObject	{}
+  26	goja.call	2
+  27	goja.loadStack	1
+  28	goja._op_strict_eq	{}
+  29	goja._pushArrayItem	{}
+  30	goja.loadStack	1
+  31	goja.loadVal	{v:0}
+  32	goja._getElem	{}
+  33	goja.getProp	"id"
+  34	goja._pushArrayItem	{}
+  35	goja.loadStack	1
+  36	goja.loadVal	{v:5}
+  37	goja._getElem	{}
+  38	goja._typeof	{}
+  39	goja._pushArrayItem	{}
+  40	goja.loadStack	1
+  41	goja.getProp	"length"
+  42	goja._pushArrayItem	{}
+  43	goja.setPropP	"r"
+  44	goja._loadUndef	{}
+  45	goja._ret	{}
+  positions:
+  0	0
+  1	33
+  4	52
+  5	42
+  6	29
+  7	57
+  8	61
+  9	72
+  10	73
+  12	74
+  13	82
+  15	83
+  16	73
+  18	88
+  19	94
+  20	88
+  22	97
+  25	116
+  26	106
+  27	124
+  28	97
+  30	127
+  32	128
+  33	132
+  35	143
+  37	144
+  40	149
+  41	151
+  43	68
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

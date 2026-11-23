@@ -1,0 +1,22 @@
+func: ""
+code:
+0	*goja.bindGlobal	&{vars:["postRead"] funcs:[] lets:[] consts:[] deletable:false}
+1	goja.resolveVar1	"postRead"
+2	*goja.newArrowFunc	&{newFunc:{prg:<prog> name:"postRead" source:"(ctx) => { ctx.entity.ran = 1 }" length:1 strict:false}}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadVal	{v:1}
+  4	goja.setPropP	"ran"
+  5	goja._loadUndef	{}
+  6	goja._ret	{}
+  positions:
+  0	15
+  1	26
+  2	30
+  4	37
+3	goja._initValueP	{}
+positions:
+3	4

@@ -1,0 +1,36 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nObject.defineProperty(ctx.entity, \"g\", {get: function () { return 1 }, enumerable: true})\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadDynamic	"Object"
+  2	goja.getPropCallee	"defineProperty"
+  3	goja.loadStackLex	-1
+  4	goja.getProp	"entity"
+  5	goja.loadVal	{v:"g"}
+  6	goja._newObject	{}
+  7	*goja.newFunc	&{prg:<prog> name:"get" source:"function () { return 1 }" length:0 strict:false}
+    func: "get"
+    code:
+    0	*goja.enterFuncStashless	&{stackSize:0 args:0}
+    1	goja.loadVal	{v:1}
+    2	goja._ret	{}
+    positions:
+    0	70
+  8	goja.putProp	"get"
+  9	goja.loadVal	{v:true}
+  10	goja.putProp	"enumerable"
+  11	goja.call	3
+  12	goja._pop	{}
+  13	goja._loadUndef	{}
+  14	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  3	47
+  4	51
+  6	64
+  11	46
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

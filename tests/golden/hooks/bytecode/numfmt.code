@@ -1,0 +1,178 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.a = (123.456).toString(); ctx.entity.b = (1e21).toString(); ctx.entity.c = (0.000001).toString(); ctx.entity.d = (1e-7).toString(); ctx.entity.e = (1/3).toString(); ctx.entity.f = (123.456).toFixed(2); ctx.entity.g = (0.000001234).toPrecision(2); ctx.entity.h = (255).toString(16); ctx.entity.i = (0.5).toString(2); ctx.entity.j = (1234.5).toLocaleString(); ctx.entity.k = (1.005).toFixed(2); ctx.entity.l = (-1.5).toFixed(0); ctx.entity.m = (123456789).toExponential(2); ctx.entity.n = String(-0); ctx.entity.o = (1e300*10).toString()\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadVal	{v:123.456}
+  4	goja.getPropCallee	"toString"
+  5	goja.call	0
+  6	goja.setPropP	"a"
+  7	goja.loadStackLex	-1
+  8	goja.getProp	"entity"
+  9	goja.loadVal	{v:1e+21}
+  10	goja.getPropCallee	"toString"
+  11	goja.call	0
+  12	goja.setPropP	"b"
+  13	goja.loadStackLex	-1
+  14	goja.getProp	"entity"
+  15	goja.loadVal	{v:1e-06}
+  16	goja.getPropCallee	"toString"
+  17	goja.call	0
+  18	goja.setPropP	"c"
+  19	goja.loadStackLex	-1
+  20	goja.getProp	"entity"
+  21	goja.loadVal	{v:1e-07}
+  22	goja.getPropCallee	"toString"
+  23	goja.call	0
+  24	goja.setPropP	"d"
+  25	goja.loadStackLex	-1
+  26	goja.getProp	"entity"
+  27	goja.loadVal	{v:1}
+  28	goja.loadVal	{v:3}
+  29	goja._div	{}
+  30	goja.getPropCallee	"toString"
+  31	goja.call	0
+  32	goja.setPropP	"e"
+  33	goja.loadStackLex	-1
+  34	goja.getProp	"entity"
+  35	goja.loadVal	{v:123.456}
+  36	goja.getPropCallee	"toFixed"
+  37	goja.loadVal	{v:2}
+  38	goja.call	1
+  39	goja.setPropP	"f"
+  40	goja.loadStackLex	-1
+  41	goja.getProp	"entity"
+  42	goja.loadVal	{v:1.234e-06}
+  43	goja.getPropCallee	"toPrecision"
+  44	goja.loadVal	{v:2}
+  45	goja.call	1
+  46	goja.setPropP	"g"
+  47	goja.loadStackLex	-1
+  48	goja.getProp	"entity"
+  49	goja.loadVal	{v:255}
+  50	goja.getPropCallee	"toString"
+  51	goja.loadVal	{v:16}
+  52	goja.call	1
+  53	goja.setPropP	"h"
+  54	goja.loadStackLex	-1
+  55	goja.getProp	"entity"
+  56	goja.loadVal	{v:0.5}
+  57	goja.getPropCallee	"toString"
+  58	goja.loadVal	{v:2}
+  59	goja.call	1
+  60	goja.setPropP	"i"
+  61	goja.loadStackLex	-1
+  62	goja.getProp	"entity"
+  63	goja.loadVal	{v:1234.5}
+  64	goja.getPropCallee	"toLocaleString"
+  65	goja.call	0
+  66	goja.setPropP	"j"
+  67	goja.loadStackLex	-1
+  68	goja.getProp	"entity"
+  69	goja.loadVal	{v:1.005}
+  70	goja.getPropCallee	"toFixed"
+  71	goja.loadVal	{v:2}
+  72	goja.call	1
+  73	goja.setPropP	"k"
+  74	goja.loadStackLex	-1
+  75	goja.getProp	"entity"
+  76	goja.loadVal	{v:1.5}
+  77	goja._neg	{}
+  78	goja.getPropCallee	"toFixed"
+  79	goja.loadVal	{v:0}
+  80	goja.call	1
+  81	goja.setPropP	"l"
+  82	goja.loadStackLex	-1
+  83	goja.getProp	"entity"
+  84	goja.loadVal	{v:123456789}
+  85	goja.getPropCallee	"toExponential"
+  86	goja.loadVal	{v:2}
+  87	goja.call	1
+  88	goja.setPropP	"m"
+  89	goja.loadStackLex	-1
+  90	goja.getProp	"entity"
+  91	goja.loadDynamicCallee	"String"
+  92	goja.loadVal	{v:0}
+  93	goja._neg	{}
+  94	goja.call	1
+  95	goja.setPropP	"n"
+  96	goja.loadStackLex	-1
+  97	goja.getProp	"entity"
+  98	goja.loadVal	{v:1e+300}
+  99	goja.loadVal	{v:10}
+  100	goja._mul	{}
+  101	goja.getPropCallee	"toString"
+  102	goja.call	0
+  103	goja.setPropP	"o"
+  104	goja._loadUndef	{}
+  105	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  5	58
+  6	36
+  7	62
+  8	66
+  11	92
+  12	73
+  13	96
+  14	100
+  17	130
+  18	107
+  19	134
+  20	138
+  23	164
+  24	145
+  25	168
+  26	172
+  29	184
+  31	197
+  32	179
+  33	201
+  34	205
+  38	233
+  39	212
+  40	238
+  41	242
+  45	278
+  46	249
+  47	283
+  48	287
+  52	312
+  53	294
+  54	318
+  55	322
+  59	347
+  60	329
+  61	352
+  62	356
+  65	390
+  66	363
+  67	394
+  68	398
+  72	424
+  73	405
+  74	429
+  75	433
+  80	458
+  81	440
+  82	463
+  83	467
+  87	503
+  88	474
+  89	508
+  90	512
+  91	523
+  94	529
+  95	519
+  96	535
+  97	539
+  100	551
+  102	569
+  103	546
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

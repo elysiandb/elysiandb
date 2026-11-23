@@ -1,0 +1,49 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nvar k = []; for (var x in ctx.entity) { k.push(x) } ctx.entity.k = k.join(\",\")\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:2 args:1}
+  1	goja.newArray	0
+  2	goja.initStackP	1
+  3	goja.loadStackLex	-1
+  4	goja.getProp	"entity"
+  5	goja._enumerate	{}
+  6	goja.enumNext	9
+  7	goja._enumGet	{}
+  8	goja.storeStackP	2
+  9	goja.loadStack	1
+  10	goja.getPropCallee	"push"
+  11	goja.loadStack	2
+  12	goja.call	1
+  13	goja._pop	{}
+  14	goja.jump	-8
+  15	goja._enumPop	{}
+  16	goja.jump	2
+  17	goja._enumPopClose	{}
+  18	goja.loadStackLex	-1
+  19	goja.getProp	"entity"
+  20	goja.loadStack	1
+  21	goja.getPropCallee	"join"
+  22	goja.loadVal	{v:","}
+  23	goja.call	1
+  24	goja.setPropP	"k"
+  25	goja._loadUndef	{}
+  26	goja._ret	{}
+  positions:
+  0	0
+  1	33
+  2	29
+  3	51
+  4	55
+  7	46
+  9	65
+  11	72
+  12	71
+  18	77
+  19	81
+  20	92
+  23	98
+  24	88
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

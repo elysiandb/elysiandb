@@ -1,0 +1,100 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.r = [ctx.entity.tags.map(function (t) { return t.toUpperCase() }), ctx.entity.tags.indexOf(\"b\"), ctx.entity.tags.concat([\"c\"]), Array.isArray(ctx.entity.tags), ctx.entity.tags.slice(1)]; ctx.entity.tags.reverse()\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.newArray	5
+  4	goja.loadStackLex	-1
+  5	goja.getProp	"entity"
+  6	goja.getProp	"tags"
+  7	goja.getPropCallee	"map"
+  8	*goja.newFunc	&{prg:<prog> name:"" source:"function (t) { return t.toUpperCase() }" length:1 strict:false}
+    func: ""
+    code:
+    0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+    1	goja.loadStackLex	-1
+    2	goja.getPropCallee	"toUpperCase"
+    3	goja.call	0
+    4	goja._ret	{}
+    positions:
+    0	61
+    1	83
+    3	96
+  9	goja.call	1
+  10	goja._pushArrayItem	{}
+  11	goja.loadStackLex	-1
+  12	goja.getProp	"entity"
+  13	goja.getProp	"tags"
+  14	goja.getPropCallee	"indexOf"
+  15	goja.loadVal	{v:"b"}
+  16	goja.call	1
+  17	goja._pushArrayItem	{}
+  18	goja.loadStackLex	-1
+  19	goja.getProp	"entity"
+  20	goja.getProp	"tags"
+  21	goja.getPropCallee	"concat"
+  22	goja.newArray	1
+  23	goja.loadVal	{v:"c"}
+  24	goja._pushArrayItem	{}
+  25	goja.call	1
+  26	goja._pushArrayItem	{}
+  27	goja.loadDynamic	"Array"
+  28	goja.getPropCallee	"isArray"
+  29	goja.loadStackLex	-1
+  30	goja.getProp	"entity"
+  31	goja.getProp	"tags"
+  32	goja.call	1
+  33	goja._pushArrayItem	{}
+  34	goja.loadStackLex	-1
+  35	goja.getProp	"entity"
+  36	goja.getProp	"tags"
+  37	goja.getPropCallee	"slice"
+  38	goja.loadVal	{v:1}
+  39	goja.call	1
+  40	goja._pushArrayItem	{}
+  41	goja.setPropP	"r"
+  42	goja.loadStackLex	-1
+  43	goja.getProp	"entity"
+  44	goja.getProp	"tags"
+  45	goja.getPropCallee	"reverse"
+  46	goja.call	0
+  47	goja._pop	{}
+  48	goja._loadUndef	{}
+  49	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  4	41
+  5	45
+  6	52
+  9	60
+  11	103
+  12	107
+  13	114
+  16	126
+  18	133
+  19	137
+  20	144
+  22	156
+  25	155
+  27	164
+  29	178
+  30	182
+  31	189
+  32	177
+  34	196
+  35	200
+  36	207
+  39	217
+  41	36
+  42	223
+  43	227
+  44	234
+  46	246
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

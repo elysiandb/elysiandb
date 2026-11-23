@@ -1,0 +1,56 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.r = [(0.1).toString(3), (-255.5).toString(16), (1e21).toString(36), (2 ** 60).toString(2).length, (123.456).toString(8)]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.newArray	5
+  4	goja.loadVal	{v:0.1}
+  5	goja.getPropCallee	"toString"
+  6	goja.loadVal	{v:3}
+  7	goja.call	1
+  8	goja._pushArrayItem	{}
+  9	goja.loadVal	{v:255.5}
+  10	goja._neg	{}
+  11	goja.getPropCallee	"toString"
+  12	goja.loadVal	{v:16}
+  13	goja.call	1
+  14	goja._pushArrayItem	{}
+  15	goja.loadVal	{v:1e+21}
+  16	goja.getPropCallee	"toString"
+  17	goja.loadVal	{v:36}
+  18	goja.call	1
+  19	goja._pushArrayItem	{}
+  20	goja.loadVal	{v:2}
+  21	goja.loadVal	{v:60}
+  22	goja._exp	{}
+  23	goja.getPropCallee	"toString"
+  24	goja.loadVal	{v:2}
+  25	goja.call	1
+  26	goja.getProp	"length"
+  27	goja._pushArrayItem	{}
+  28	goja.loadVal	{v:123.456}
+  29	goja.getPropCallee	"toString"
+  30	goja.loadVal	{v:8}
+  31	goja.call	1
+  32	goja._pushArrayItem	{}
+  33	goja.setPropP	"r"
+  34	goja._loadUndef	{}
+  35	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  7	55
+  13	77
+  18	98
+  22	105
+  25	122
+  26	126
+  31	152
+  33	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

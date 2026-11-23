@@ -1,0 +1,20 @@
+func: ""
+code:
+0	*goja.newGeneratorFunc	&{newFunc:{prg:<prog> name:"postRead" source:"function* postRead(ctx) { ctx.entity.ran = 1 }" length:1 strict:false}}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	*goja.yieldMarker	&{valueNull:{} resultType:1}
+  2	goja.loadStackLex	-1
+  3	goja.getProp	"entity"
+  4	goja.loadVal	{v:1}
+  5	goja.setPropP	"ran"
+  6	goja._loadUndef	{}
+  7	goja._ret	{}
+  positions:
+  0	0
+  2	26
+  3	30
+  5	37
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

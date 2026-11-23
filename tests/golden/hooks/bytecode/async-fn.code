@@ -1,0 +1,29 @@
+func: ""
+code:
+0	*goja.newAsyncFunc	&{newFunc:{prg:<prog> name:"postRead" source:"async function postRead(ctx) { ctx.entity.ran = 1; await null; ctx.entity.after = 1 }" length:1 strict:false}}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadVal	{v:1}
+  4	goja.setPropP	"ran"
+  5	goja.loadVal	{v:{}}
+  6	*goja.yieldMarker	&{valueNull:{} resultType:5}
+  7	goja._pop	{}
+  8	goja.loadStackLex	-1
+  9	goja.getProp	"entity"
+  10	goja.loadVal	{v:1}
+  11	goja.setPropP	"after"
+  12	goja._loadUndef	{}
+  13	goja._ret	{}
+  positions:
+  0	0
+  1	31
+  2	35
+  4	42
+  8	63
+  9	67
+  11	74
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

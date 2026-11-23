@@ -1,0 +1,32 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { ctx.entity.a = Symbol(); ctx.entity.b = Symbol.iterator }" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadDynamicCallee	"Symbol"
+  4	goja.call	0
+  5	goja.setPropP	"a"
+  6	goja.loadStackLex	-1
+  7	goja.getProp	"entity"
+  8	goja.loadDynamic	"Symbol"
+  9	goja.getProp	"iterator"
+  10	goja.setPropP	"b"
+  11	goja._loadUndef	{}
+  12	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  4	46
+  5	36
+  6	50
+  7	54
+  8	65
+  9	72
+  10	61
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

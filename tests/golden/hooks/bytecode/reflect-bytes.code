@@ -1,0 +1,80 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.x = new Uint8Array([1, 2]); var x = ctx.entity.x; delete ctx.entity.x; x[0] = 9; ctx.entity.r = [Object.getOwnPropertyNames(x).join(\",\"), x[0], x.length]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:1 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadDynamic	"Uint8Array"
+  4	goja.newArray	2
+  5	goja.loadVal	{v:1}
+  6	goja._pushArrayItem	{}
+  7	goja.loadVal	{v:2}
+  8	goja._pushArrayItem	{}
+  9	goja._new	1
+  10	goja.setPropP	"x"
+  11	goja.loadStackLex	-1
+  12	goja.getProp	"entity"
+  13	goja.getProp	"x"
+  14	goja.initStackP	1
+  15	goja.loadStackLex	-1
+  16	goja.getProp	"entity"
+  17	goja.deleteProp	"x"
+  18	goja._pop	{}
+  19	goja.loadStack	1
+  20	goja.loadVal	{v:0}
+  21	goja.loadVal	{v:9}
+  22	goja._setElemP	{}
+  23	goja.loadStackLex	-1
+  24	goja.getProp	"entity"
+  25	goja.newArray	3
+  26	goja.loadDynamic	"Object"
+  27	goja.getPropCallee	"getOwnPropertyNames"
+  28	goja.loadStack	1
+  29	goja.call	1
+  30	goja.getPropCallee	"join"
+  31	goja.loadVal	{v:","}
+  32	goja.call	1
+  33	goja._pushArrayItem	{}
+  34	goja.loadStack	1
+  35	goja.loadVal	{v:0}
+  36	goja._getElem	{}
+  37	goja._pushArrayItem	{}
+  38	goja.loadStack	1
+  39	goja.getProp	"length"
+  40	goja._pushArrayItem	{}
+  41	goja.setPropP	"r"
+  42	goja._loadUndef	{}
+  43	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	44
+  4	55
+  9	40
+  10	36
+  11	72
+  12	76
+  13	83
+  14	68
+  15	93
+  16	97
+  17	104
+  19	107
+  22	108
+  23	117
+  24	121
+  25	132
+  26	133
+  28	160
+  29	159
+  32	167
+  34	174
+  36	175
+  38	180
+  39	182
+  41	128
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

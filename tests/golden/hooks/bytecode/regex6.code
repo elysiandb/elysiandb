@@ -1,0 +1,78 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.r = [/^\\w+$/.test(\"é\"), /\\bé/.test(\" é\"), /[à-ü]/i.test(\"Ü\"), \"a1b2\".replace(/\\d/g, function (m) { return \"<\" + m + \">\" }), \"x\".replace(\"x\", \"$&$&\"), /(a)|(b)/.exec(\"b\")[1] === undefined]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.newArray	6
+  4	*goja.newRegexp	&{pattern:&{src:"^\\w+$" global:false ignoreCase:false multiline:false dotAll:false sticky:false unicode:false regexpWrapper:&{expr:"^\\w+$" prog:<syntax.Prog> onepass:<regexp.onePassProg> numSubexp:0 maxBitStateLen:0 subexpNames:[""] prefix:"" prefixBytes:[] prefixRune:0 prefixEnd:1 mpool:0 matchcap:2 prefixComplete:false cond:4 minInputLen:1 longest:false} regexp2Wrapper:<nil>} src:"^\\w+$"}
+  5	goja.getPropCallee	"test"
+  6	goja.loadVal	{v:"\ufeffé"}
+  7	goja.call	1
+  8	goja._pushArrayItem	{}
+  9	*goja.newRegexp	&{pattern:&{src:"\\bé" global:false ignoreCase:false multiline:false dotAll:false sticky:false unicode:false regexpWrapper:&{expr:"\\bé" prog:<syntax.Prog> onepass:<regexp.onePassProg> numSubexp:0 maxBitStateLen:65536 subexpNames:[""] prefix:"" prefixBytes:[] prefixRune:0 prefixEnd:0 mpool:0 matchcap:2 prefixComplete:false cond:16 minInputLen:2 longest:false} regexp2Wrapper:<nil>} src:"\ufeff\\bé"}
+  10	goja.getPropCallee	"test"
+  11	goja.loadVal	{v:"\ufeff é"}
+  12	goja.call	1
+  13	goja._pushArrayItem	{}
+  14	*goja.newRegexp	&{pattern:&{src:"[à-ü]" global:false ignoreCase:true multiline:false dotAll:false sticky:false unicode:false regexpWrapper:&{expr:"(?i:[à-ü])" prog:<syntax.Prog> onepass:<regexp.onePassProg> numSubexp:0 maxBitStateLen:87381 subexpNames:[""] prefix:"" prefixBytes:[] prefixRune:0 prefixEnd:0 mpool:0 matchcap:2 prefixComplete:false cond:0 minInputLen:1 longest:false} regexp2Wrapper:<nil>} src:"\ufeff[à-ü]"}
+  15	goja.getPropCallee	"test"
+  16	goja.loadVal	{v:"\ufeffÜ"}
+  17	goja.call	1
+  18	goja._pushArrayItem	{}
+  19	goja.loadVal	{v:"a1b2"}
+  20	goja.getPropCallee	"replace"
+  21	*goja.newRegexp	&{pattern:&{src:"\\d" global:true ignoreCase:false multiline:false dotAll:false sticky:false unicode:false regexpWrapper:&{expr:"\\d" prog:<syntax.Prog> onepass:<regexp.onePassProg> numSubexp:0 maxBitStateLen:87381 subexpNames:[""] prefix:"" prefixBytes:[] prefixRune:0 prefixEnd:0 mpool:0 matchcap:2 prefixComplete:false cond:0 minInputLen:1 longest:false} regexp2Wrapper:<nil>} src:"\\d"}
+  22	*goja.newFunc	&{prg:<prog> name:"" source:"function (m) { return \"<\" + m + \">\" }" length:1 strict:false}
+    func: ""
+    code:
+    0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+    1	goja.loadVal	{v:"<"}
+    2	goja.loadStackLex	-1
+    3	goja._add	{}
+    4	goja.loadVal	{v:">"}
+    5	goja._add	{}
+    6	goja._ret	{}
+    positions:
+    0	126
+    2	154
+    3	148
+  23	goja.call	2
+  24	goja._pushArrayItem	{}
+  25	goja.loadVal	{v:"x"}
+  26	goja.getPropCallee	"replace"
+  27	goja.loadVal	{v:"x"}
+  28	goja.loadVal	{v:"$&$&"}
+  29	goja.call	2
+  30	goja._pushArrayItem	{}
+  31	*goja.newRegexp	&{pattern:&{src:"(a)|(b)" global:false ignoreCase:false multiline:false dotAll:false sticky:false unicode:false regexpWrapper:&{expr:"(a)|(b)" prog:<syntax.Prog> onepass:<regexp.onePassProg> numSubexp:2 maxBitStateLen:29127 subexpNames:["" "" ""] prefix:"" prefixBytes:[] prefixRune:0 prefixEnd:0 mpool:0 matchcap:6 prefixComplete:false cond:0 minInputLen:1 longest:false} regexp2Wrapper:<nil>} src:"(a)|(b)"}
+  32	goja.getPropCallee	"exec"
+  33	goja.loadVal	{v:"b"}
+  34	goja.call	1
+  35	goja.loadVal	{v:1}
+  36	goja._getElem	{}
+  37	goja.loadDynamic	"undefined"
+  38	goja._op_strict_eq	{}
+  39	goja._pushArrayItem	{}
+  40	goja.setPropP	"r"
+  41	goja._loadUndef	{}
+  42	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  7	53
+  12	72
+  17	96
+  23	118
+  29	177
+  34	206
+  36	211
+  37	219
+  38	192
+  40	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

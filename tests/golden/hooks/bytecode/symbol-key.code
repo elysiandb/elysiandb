@@ -1,0 +1,41 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { ctx.entity[Symbol(\"s\")] = 1; ctx.entity.r = Object.getOwnPropertySymbols(ctx.entity).length }" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadDynamicCallee	"Symbol"
+  4	goja.loadVal	{v:"s"}
+  5	goja.call	1
+  6	goja.loadVal	{v:1}
+  7	goja._setElemP	{}
+  8	goja.loadStackLex	-1
+  9	goja.getProp	"entity"
+  10	goja.loadDynamic	"Object"
+  11	goja.getPropCallee	"getOwnPropertySymbols"
+  12	goja.loadStackLex	-1
+  13	goja.getProp	"entity"
+  14	goja.call	1
+  15	goja.getProp	"length"
+  16	goja.setPropP	"r"
+  17	goja._loadUndef	{}
+  18	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	36
+  5	42
+  7	35
+  8	54
+  9	58
+  10	69
+  12	98
+  13	102
+  14	97
+  15	110
+  16	65
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

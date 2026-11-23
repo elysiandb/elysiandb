@@ -1,0 +1,56 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.r = [3, 20, 100].sort().join(\",\") + \"|\" + [\"b\", undefined, \"a\", , \"c\"].sort().length\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.newArray	3
+  4	goja.loadVal	{v:3}
+  5	goja._pushArrayItem	{}
+  6	goja.loadVal	{v:20}
+  7	goja._pushArrayItem	{}
+  8	goja.loadVal	{v:100}
+  9	goja._pushArrayItem	{}
+  10	goja.getPropCallee	"sort"
+  11	goja.call	0
+  12	goja.getPropCallee	"join"
+  13	goja.loadVal	{v:","}
+  14	goja.call	1
+  15	goja.loadVal	{v:"|"}
+  16	goja._add	{}
+  17	goja.newArray	5
+  18	goja.loadVal	{v:"b"}
+  19	goja._pushArrayItem	{}
+  20	goja.loadDynamic	"undefined"
+  21	goja._pushArrayItem	{}
+  22	goja.loadVal	{v:"a"}
+  23	goja._pushArrayItem	{}
+  24	goja._loadNil	{}
+  25	goja._pushArrayItem	{}
+  26	goja.loadVal	{v:"c"}
+  27	goja._pushArrayItem	{}
+  28	goja.getPropCallee	"sort"
+  29	goja.call	0
+  30	goja.getProp	"length"
+  31	goja._add	{}
+  32	goja.setPropP	"r"
+  33	goja._loadUndef	{}
+  34	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  11	57
+  14	64
+  16	40
+  17	78
+  20	84
+  29	111
+  30	114
+  31	40
+  32	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

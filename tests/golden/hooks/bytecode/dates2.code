@@ -1,0 +1,213 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.r = [String(new Date(\"x\")), String(Date.parse(\"2026-01-02T10:00:00.123+02:00\")), String(Date.parse(\"2026-01-02T10:00\")), String(Date.parse(\"20260102\")), String(Date.parse(\"2026-01\")), String(Date.parse(\"2026\")), String(Date.parse(\"+002026-01-02\")), String(Date.parse(\"Friday, January 2, 2026\")), String(Date.parse(\"2 January 2026\")), String(Date.parse(\"Jan 2 2026 10:00 GMT+0200\")), String(Date.parse(\"2026-01-02T10:00:00.1234Z\")), String(Date.parse(\" 2026-01-02\")), String(Date.parse(\"2026-01-02T24:00:00Z\")), String(Date.parse(\"2026-02-30\")), String(new Date(2026, 1, 30).getDate()), new Date(8.64e15).toISOString(), String(new Date(8.64e15 + 1).getTime())]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.newArray	17
+  4	goja.loadDynamicCallee	"String"
+  5	goja.loadDynamic	"Date"
+  6	goja.loadVal	{v:"x"}
+  7	goja._new	1
+  8	goja.call	1
+  9	goja._pushArrayItem	{}
+  10	goja.loadDynamicCallee	"String"
+  11	goja.loadDynamic	"Date"
+  12	goja.getPropCallee	"parse"
+  13	goja.loadVal	{v:"2026-01-02T10:00:00.123+02:00"}
+  14	goja.call	1
+  15	goja.call	1
+  16	goja._pushArrayItem	{}
+  17	goja.loadDynamicCallee	"String"
+  18	goja.loadDynamic	"Date"
+  19	goja.getPropCallee	"parse"
+  20	goja.loadVal	{v:"2026-01-02T10:00"}
+  21	goja.call	1
+  22	goja.call	1
+  23	goja._pushArrayItem	{}
+  24	goja.loadDynamicCallee	"String"
+  25	goja.loadDynamic	"Date"
+  26	goja.getPropCallee	"parse"
+  27	goja.loadVal	{v:"20260102"}
+  28	goja.call	1
+  29	goja.call	1
+  30	goja._pushArrayItem	{}
+  31	goja.loadDynamicCallee	"String"
+  32	goja.loadDynamic	"Date"
+  33	goja.getPropCallee	"parse"
+  34	goja.loadVal	{v:"2026-01"}
+  35	goja.call	1
+  36	goja.call	1
+  37	goja._pushArrayItem	{}
+  38	goja.loadDynamicCallee	"String"
+  39	goja.loadDynamic	"Date"
+  40	goja.getPropCallee	"parse"
+  41	goja.loadVal	{v:"2026"}
+  42	goja.call	1
+  43	goja.call	1
+  44	goja._pushArrayItem	{}
+  45	goja.loadDynamicCallee	"String"
+  46	goja.loadDynamic	"Date"
+  47	goja.getPropCallee	"parse"
+  48	goja.loadVal	{v:"+002026-01-02"}
+  49	goja.call	1
+  50	goja.call	1
+  51	goja._pushArrayItem	{}
+  52	goja.loadDynamicCallee	"String"
+  53	goja.loadDynamic	"Date"
+  54	goja.getPropCallee	"parse"
+  55	goja.loadVal	{v:"Friday, January 2, 2026"}
+  56	goja.call	1
+  57	goja.call	1
+  58	goja._pushArrayItem	{}
+  59	goja.loadDynamicCallee	"String"
+  60	goja.loadDynamic	"Date"
+  61	goja.getPropCallee	"parse"
+  62	goja.loadVal	{v:"2 January 2026"}
+  63	goja.call	1
+  64	goja.call	1
+  65	goja._pushArrayItem	{}
+  66	goja.loadDynamicCallee	"String"
+  67	goja.loadDynamic	"Date"
+  68	goja.getPropCallee	"parse"
+  69	goja.loadVal	{v:"Jan 2 2026 10:00 GMT+0200"}
+  70	goja.call	1
+  71	goja.call	1
+  72	goja._pushArrayItem	{}
+  73	goja.loadDynamicCallee	"String"
+  74	goja.loadDynamic	"Date"
+  75	goja.getPropCallee	"parse"
+  76	goja.loadVal	{v:"2026-01-02T10:00:00.1234Z"}
+  77	goja.call	1
+  78	goja.call	1
+  79	goja._pushArrayItem	{}
+  80	goja.loadDynamicCallee	"String"
+  81	goja.loadDynamic	"Date"
+  82	goja.getPropCallee	"parse"
+  83	goja.loadVal	{v:" 2026-01-02"}
+  84	goja.call	1
+  85	goja.call	1
+  86	goja._pushArrayItem	{}
+  87	goja.loadDynamicCallee	"String"
+  88	goja.loadDynamic	"Date"
+  89	goja.getPropCallee	"parse"
+  90	goja.loadVal	{v:"2026-01-02T24:00:00Z"}
+  91	goja.call	1
+  92	goja.call	1
+  93	goja._pushArrayItem	{}
+  94	goja.loadDynamicCallee	"String"
+  95	goja.loadDynamic	"Date"
+  96	goja.getPropCallee	"parse"
+  97	goja.loadVal	{v:"2026-02-30"}
+  98	goja.call	1
+  99	goja.call	1
+  100	goja._pushArrayItem	{}
+  101	goja.loadDynamicCallee	"String"
+  102	goja.loadDynamic	"Date"
+  103	goja.loadVal	{v:2026}
+  104	goja.loadVal	{v:1}
+  105	goja.loadVal	{v:30}
+  106	goja._new	3
+  107	goja.getPropCallee	"getDate"
+  108	goja.call	0
+  109	goja.call	1
+  110	goja._pushArrayItem	{}
+  111	goja.loadDynamic	"Date"
+  112	goja.loadVal	{v:8640000000000000}
+  113	goja._new	1
+  114	goja.getPropCallee	"toISOString"
+  115	goja.call	0
+  116	goja._pushArrayItem	{}
+  117	goja.loadDynamicCallee	"String"
+  118	goja.loadDynamic	"Date"
+  119	goja.loadVal	{v:8640000000000000}
+  120	goja.loadVal	{v:1}
+  121	goja._add	{}
+  122	goja._new	1
+  123	goja.getPropCallee	"getTime"
+  124	goja.call	0
+  125	goja.call	1
+  126	goja._pushArrayItem	{}
+  127	goja.setPropP	"r"
+  128	goja._loadUndef	{}
+  129	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  4	41
+  5	52
+  7	48
+  8	47
+  10	64
+  11	71
+  14	81
+  15	70
+  17	117
+  18	124
+  21	134
+  22	123
+  24	157
+  25	164
+  28	174
+  29	163
+  31	189
+  32	196
+  35	206
+  36	195
+  38	220
+  39	227
+  42	237
+  43	226
+  45	248
+  46	255
+  49	265
+  50	254
+  52	285
+  53	292
+  56	302
+  57	291
+  59	332
+  60	339
+  63	349
+  64	338
+  66	370
+  67	377
+  70	387
+  71	376
+  73	419
+  74	426
+  77	436
+  78	425
+  80	468
+  81	475
+  84	485
+  85	474
+  87	503
+  88	510
+  91	520
+  92	509
+  94	547
+  95	554
+  98	564
+  99	553
+  101	581
+  102	592
+  106	588
+  108	617
+  109	587
+  111	626
+  113	622
+  115	651
+  117	655
+  118	666
+  121	671
+  122	662
+  124	691
+  125	661
+  127	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

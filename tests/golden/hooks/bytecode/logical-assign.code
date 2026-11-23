@@ -1,0 +1,46 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nvar a = null; a ??= 3; var b = 0; b ||= 4; ctx.entity.r = [a, b]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:2 args:1}
+  1	goja.loadVal	{v:{}}
+  2	goja.initStackP	1
+  3	*goja.resolveMixedStack	&{name:"a" idx:1 typ:0 level:0 strict:false}
+  4	goja._getValue	{}
+  5	goja.jcoalescP	4
+  6	goja.loadVal	{v:3}
+  7	goja._putValueP	{}
+  8	goja.jump	2
+  9	goja._popRef	{}
+  10	goja.loadVal	{v:0}
+  11	goja.initStackP	2
+  12	*goja.resolveMixedStack	&{name:"b" idx:2 typ:0 level:0 strict:false}
+  13	goja._getValue	{}
+  14	goja.jeqP	4
+  15	goja.loadVal	{v:4}
+  16	goja._putValueP	{}
+  17	goja.jump	2
+  18	goja._popRef	{}
+  19	goja.loadStackLex	-1
+  20	goja.getProp	"entity"
+  21	goja.newArray	2
+  22	goja.loadStack	1
+  23	goja._pushArrayItem	{}
+  24	goja.loadStack	2
+  25	goja._pushArrayItem	{}
+  26	goja.setPropP	"r"
+  27	goja._loadUndef	{}
+  28	goja._ret	{}
+  positions:
+  0	0
+  2	29
+  11	52
+  19	68
+  20	72
+  21	83
+  22	84
+  24	87
+  26	79
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:
