@@ -3,7 +3,7 @@ use std::fmt;
 
 pub type BoxError = Box<dyn StdError + Send + Sync + 'static>;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Error {
     msg: String,
 }

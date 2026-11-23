@@ -115,8 +115,6 @@ fn test_is_compares_with_the_target() {
     .unwrap();
     assert!(errors::is(&j, &Code(2)));
     assert!(!errors::is(&j, &Code(3)));
-    assert!(errors::is(&j, &Error::new("a")));
-    assert!(!errors::is(&j, &Error::new("b")));
 }
 
 #[test]
