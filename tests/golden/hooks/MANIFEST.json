@@ -24,6 +24,16 @@
       "path": "corpus-utc.jsonl",
       "size": 150962,
       "sha256": "b82b0f202ed29c209496f06d6fa177845441b2fb16a503d7ab7a5ffa91a7f412"
+    },
+    {
+      "path": "test262-pass.tsv",
+      "size": 2170406,
+      "sha256": "49104c58544c4dd328c82db82e05f1e82cfc73a795118b8f94014e6bef95299c"
+    },
+    {
+      "path": "test262.json",
+      "size": 476,
+      "sha256": "680b453a59705d8b8a669d04b89d77aa43affd58ba04030d65310998c37bf5a0"
     }
   ]
 }

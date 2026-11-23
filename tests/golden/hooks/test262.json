@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "github.com/dlclark/regexp2": "v1.11.4",
+    "github.com/go-sourcemap/sourcemap": "v2.1.3+incompatible",
+    "github.com/google/pprof": "v0.0.0-20230207041349-798e818bf904",
+    "golang.org/x/text": "v0.31.0",
+    "gopkg.in/yaml.v2": "v2.4.0"
+  },
+  "failed": 0,
+  "go_test_failed": false,
+  "goja_version": "v0.0.0-20251201205617-2bb4c724c0f9",
+  "passed": 31638,
+  "skipped": 14088,
+  "test262_commit": "cb4a6c8074671c00df8cbc17a620c0f9462b312a"
+}
