@@ -1,0 +1,22 @@
+[package]
+name = "elysiandb"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.91.1"
+license = "MIT"
+publish = false
+build = "build.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "elysiandb"
+path = "src/main.rs"
+
+[profile.release]
+strip = true
+panic = "unwind"
+
+[profile.dev]
+panic = "unwind"
