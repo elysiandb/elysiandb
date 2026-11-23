@@ -139,3 +139,21 @@ fn values_decode_with_go_string_rules() {
     let lone = json::unmarshal_value(b"\"\\ud83dx\"").expect("valid");
     assert_eq!(lone.as_str(), Some("\u{FFFD}x"));
 }
+
+#[test]
+fn quoted_text_matches_go_without_html_escaping() {
+    let rel = "gocompat/json/encode.jsonl";
+    let mut checked = 0;
+    for row in common::read_jsonl(rel) {
+        let value = row.get("value").unwrap();
+        if value.index(0).and_then(Value::as_str) != Some("str") {
+            continue;
+        }
+        let input = common::unhex(value.index(1).unwrap().as_str().unwrap());
+        let want = row.get("encode_no_html").unwrap().as_str().unwrap();
+        let got = json::quote_text(&input) + "\n";
+        assert_eq!(got, want, "{:?}", value.index(1));
+        checked += 1;
+    }
+    assert_eq!(checked, 1716);
+}
