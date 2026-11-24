@@ -44,6 +44,40 @@ fn test_promise_jobs_run_in_order_while_collecting() {
     }
 }
 
+#[cfg(target_arch = "aarch64")]
+#[test]
+fn test_exponentiation_follows_go_math() {
+    let h = std::thread::Builder::new()
+        .stack_size(256 << 20)
+        .spawn(|| {
+            let p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/golden/gomath/arm64.cases");
+            let data = std::fs::read_to_string(&p).expect("golden");
+            let mut rt = goja::Runtime::new();
+            let mut checked = 0;
+            for line in data.lines().filter(|l| l.starts_with("pow ")) {
+                let f: Vec<&str> = line.split(' ').collect();
+                let x = f64::from_bits(u64::from_str_radix(f[1], 16).expect("hex"));
+                let y = f64::from_bits(u64::from_str_radix(f[2], 16).expect("hex"));
+                let want = f64::from_bits(u64::from_str_radix(f[3], 16).expect("hex"));
+                rt.set("x", goja::Value::Float(x)).expect("set x");
+                rt.set("y", goja::Value::Float(y)).expect("set y");
+                let v = rt.run_string("x ** y").unwrap_or_else(|e| panic!("{e}"));
+                let got = v.to_float(&mut rt).expect("to_float");
+                assert!(
+                    got.to_bits() == want.to_bits() || got.is_nan() && want.is_nan(),
+                    "{x:?} ** {y:?} = {got:?}, want {want:?}"
+                );
+                checked += 1;
+            }
+            assert!(checked > 1000);
+        })
+        .expect("spawn");
+    if let Err(e) = h.join() {
+        std::panic::resume_unwind(e);
+    }
+}
+
 #[test]
 fn test_await_in_parameters() {
     let res = goja::compile(
