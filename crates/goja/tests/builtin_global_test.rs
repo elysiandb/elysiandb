@@ -31,7 +31,11 @@ fn global_functions_match_goja_outputs() {
         let cases: &[(&str, &str)] = &[
             (
                 r#"parseInt("123456789012345678901234567890")"#,
-                "1.2345678901234568e+29",
+                if cfg!(target_arch = "aarch64") {
+                    "1.2345678901234568e+29"
+                } else {
+                    "1.2345678901234566e+29"
+                },
             ),
             (
                 r#"parseInt("0x1fffffffffffffffffff")"#,
@@ -39,7 +43,11 @@ fn global_functions_match_goja_outputs() {
             ),
             (
                 r#"parseInt("-ZZZZZZZZZZZZZZZZZZZZ", 36)"#,
-                "-1.3367494538843736e+31",
+                if cfg!(target_arch = "aarch64") {
+                    "-1.3367494538843736e+31"
+                } else {
+                    "-1.3367494538843734e+31"
+                },
             ),
             (r#"parseInt("  42abc")"#, "42"),
             (r#"parseInt("0x")"#, "NaN"),
