@@ -59,7 +59,6 @@ fn big_int_builtin_matches_goja() {
 }
 
 #[test]
-#[ignore = "requires the VM to name the native frame of templated functions"]
 fn constructor_errors_name_the_native_frame() {
     check_cases(NATIVE_FRAME_CASES.to_string());
 }

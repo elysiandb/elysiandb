@@ -2193,7 +2193,35 @@ impl Runtime {
         }))
     }
 
-    pub fn vm_capture_stack(&self, ctx_offset: usize) -> Vec<StackFrame> {
+    pub fn vm_materialise_frame_names(&mut self, ctx_offset: usize) {
+        if self.vm.prg.is_none() && self.vm.sb > 0 {
+            self.vm_materialise_func_name(self.vm.sb);
+        }
+        let mut i = self.vm.call_stack.len();
+        while i > ctx_offset {
+            i -= 1;
+            let frame = &self.vm.call_stack[i];
+            if frame.prg.is_none() && frame.sb > 0 {
+                let sb = frame.sb;
+                self.vm_materialise_func_name(sb);
+            }
+        }
+    }
+
+    fn vm_materialise_func_name(&mut self, sb: isize) {
+        if let Some(Value::Object(f)) = self.vm.stack.get(sb as usize - 1) {
+            let f = *f;
+            if let ObjExt::Template(_) = &self.obj(f).ext
+                && !self.obj(f).base.values.contains_key(&*STR_NAME)
+            {
+                let _ =
+                    crate::object_template::TemplatedObject::get_own_prop_str(self, f, &STR_NAME);
+            }
+        }
+    }
+
+    pub fn vm_capture_stack(&mut self, ctx_offset: usize) -> Vec<StackFrame> {
+        self.vm_materialise_frame_names(ctx_offset);
         self.vm.capture_stack(
             self,
             Vec::with_capacity(self.vm.call_stack.len() + 1),

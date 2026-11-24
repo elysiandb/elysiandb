@@ -1650,12 +1650,13 @@ impl Runtime {
         out
     }
 
-    pub fn capture_call_stack(&self, depth: usize, stack: Vec<StackFrame>) -> Vec<StackFrame> {
+    pub fn capture_call_stack(&mut self, depth: usize, stack: Vec<StackFrame>) -> Vec<StackFrame> {
         let l = self.vm.call_stack.len();
         let mut offset = 0;
         if depth > 0 {
             offset = (l + 1).saturating_sub(depth);
         }
+        self.vm_materialise_frame_names(offset);
         self.vm.capture_stack(self, stack, offset)
     }
 
