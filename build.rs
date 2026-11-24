@@ -49,25 +49,50 @@ fn main() {
     fs::write(out.join("adminui_files.rs"), table).expect("cannot write the Admin UI table");
 }
 
+fn is_version_control_name(name: &str) -> bool {
+    matches!(name, ".bzr" | ".hg" | ".git" | ".svn")
+}
+
 fn collect(dir: &Path, prefix: &str, top: bool, files: &mut Vec<(String, String)>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
+    if top && dir.join("go.mod").exists() {
+        panic!("the Admin UI folder {} holds a go.mod file", dir.display());
+    }
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
-        if !top && (name.starts_with('.') || name.starts_with('_')) {
-            continue;
-        }
         let path = entry.path();
         let rel = if prefix.is_empty() {
             name.clone()
         } else {
             format!("{prefix}/{name}")
         };
-        if path.is_dir() {
+        if top && is_version_control_name(&name) {
+            panic!("the Admin UI folder holds {rel}, which cannot be embedded");
+        }
+        if !top && (name.starts_with('.') || name.starts_with('_')) {
+            continue;
+        }
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if file_type.is_dir() {
+            if path.join("go.mod").exists() {
+                if top {
+                    panic!("the Admin UI folder {rel} holds a go.mod file");
+                }
+                continue;
+            }
+            let before = files.len();
             collect(&path, &rel, false, files);
-        } else if path.is_file() {
+            if top && files.len() == before {
+                panic!("the Admin UI folder {rel} holds no file to embed");
+            }
+        } else if file_type.is_file() {
             files.push((rel, path.to_string_lossy().into_owned()));
+        } else if top {
+            panic!("the Admin UI folder holds {rel}, which is not a regular file or folder");
         }
     }
 }
