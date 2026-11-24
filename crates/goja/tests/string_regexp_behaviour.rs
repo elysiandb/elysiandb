@@ -745,3 +745,22 @@ fn imported_strings_follow_the_test_imported_string_tables() {
         }
     });
 }
+
+#[test]
+fn trim_of_an_imported_string_gives_a_native_string() {
+    on_big_stack(|| {
+        let mut rt = Runtime::new();
+        let sp = rt.get_string_prototype();
+        for name in ["trim", "trimStart", "trimEnd"] {
+            let f = method(&mut rt, sp, name);
+            let imported = Value::String(JsString::Imported(
+                goja::string_imported::ImportedString::new(b"ab"),
+            ));
+            let r = call(&mut rt, &f, imported, &[]).expect("trim");
+            assert!(
+                matches!(&r, Value::String(JsString::Ascii(a)) if a.as_bytes() == b"ab"),
+                "{name}"
+            );
+        }
+    });
+}

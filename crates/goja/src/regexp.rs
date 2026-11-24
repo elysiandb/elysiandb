@@ -5,7 +5,7 @@ use crate::deps::regexp2;
 use crate::heap::{ObjRef, SymRef, Tracer};
 use crate::object::{BASE_CLASS, BaseObject, ObjClass, ObjData, PropertyDescriptor, UStr};
 use crate::runtime::{JsResult, Runtime, to_length};
-use crate::string::{JsString, devirtualize_string};
+use crate::string::JsString;
 use crate::string_unicode::UnicodeString;
 use crate::value::{Value, int_to_value, nil_safe};
 use gocompat::utf8;
@@ -197,18 +197,17 @@ impl RegexpPattern {
                 .find_all_submatch_index(s, start, limit, sticky, unicode);
         };
         if start == 0 {
-            let (a, u) = devirtualize_string(s);
-            let Some(u) = u else {
-                return match &a {
-                    Some(a) => w.find_all_submatch_index(a.as_bytes(), limit, sticky),
-                    None => w.find_all_submatch_index(b"", limit, sticky),
-                };
+            let units = StrUnits::of(s);
+            let u = match (&units, units.ascii()) {
+                (_, Some(a)) => return w.find_all_submatch_index(a, limit, sticky),
+                (StrUnits::Unicode(u), _) => u,
+                _ => unreachable!("string units"),
             };
             if limit == 1 {
-                let result = w.find_submatch_index_unicode(&u, unicode)?;
+                let result = w.find_submatch_index_unicode(u, unicode)?;
                 return Some(vec![result]);
             }
-            if unicode && let Some((pm, s)) = build_utf8_pos_map(&u) {
+            if unicode && let Some((pm, s)) = build_utf8_pos_map(u) {
                 let mut res = w.find_all_submatch_index(&s, limit, sticky);
                 if let Some(res) = &mut res {
                     for result in res.iter_mut() {
@@ -303,9 +302,10 @@ fn pos_map_reverse_lookup(pos_map: &[isize], pos: isize) -> (isize, bool) {
 }
 
 fn utf16_runes(s: &StrUnits) -> Arc<[i32]> {
-    match s {
-        StrUnits::Ascii(a) => a.as_bytes().iter().map(|&c| i32::from(c)).collect(),
-        StrUnits::Unicode(u) => u.raw()[1..].iter().map(|&c| i32::from(c)).collect(),
+    match (s, s.ascii()) {
+        (StrUnits::Unicode(u), _) => u.raw()[1..].iter().map(|&c| i32::from(c)).collect(),
+        (_, Some(a)) => a.iter().map(|&c| i32::from(c)).collect(),
+        _ => unreachable!("string units"),
     }
 }
 
@@ -589,11 +589,12 @@ impl RegexpWrapper {
     }
 
     pub fn find_submatch_index(&self, s: &JsString, full_unicode: bool) -> Option<Vec<isize>> {
-        let (a, u) = devirtualize_string(s);
-        if let Some(u) = u {
-            return self.find_submatch_index_unicode(&u, full_unicode);
+        let units = StrUnits::of(s);
+        match (&units, units.ascii()) {
+            (_, Some(a)) => self.find_submatch_index_ascii(a),
+            (StrUnits::Unicode(u), _) => self.find_submatch_index_unicode(u, full_unicode),
+            _ => unreachable!("string units"),
         }
-        self.find_submatch_index_ascii(a.as_ref().map(|a| a.as_bytes()).unwrap_or_default())
     }
 
     pub fn find_submatch_index_ascii(&self, s: &[u8]) -> Option<Vec<isize>> {
@@ -697,15 +698,16 @@ impl RegexpObject {
         let capture_count = result.len() >> 1;
         let mut value_array = Vec::with_capacity(capture_count);
         let match_index = result[0];
+        let units = StrUnits::of(target);
         value_array.push(Value::String(
-            target.substring(result[0] as usize, result[1] as usize),
+            units.substring(result[0] as usize, result[1] as usize),
         ));
         let mut lower_bound = 0;
         for index in 1..capture_count {
             let offset = index << 1;
             if result[offset] >= 0 && result[offset + 1] >= lower_bound {
                 value_array.push(Value::String(
-                    target.substring(result[offset] as usize, result[offset + 1] as usize),
+                    units.substring(result[offset] as usize, result[offset + 1] as usize),
                 ));
                 lower_bound = result[offset];
             } else {

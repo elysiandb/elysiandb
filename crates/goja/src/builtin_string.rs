@@ -18,9 +18,10 @@ use crate::runtime::{JsResult, Runtime, Throw, to_length, to_uint16, to_uint32};
 use crate::string::{
     JsString, RuneReader, STRING_EMPTY, STRING_ITER_OBJECT_CLASS, STRING_OBJECT_CLASS,
     StringBuilder, StringIterObject, StringObject, UnicodeStringBuilder, ascii_string,
-    devirtualize_string, is_utf16_first_surrogate, is_utf16_second_surrogate, new_string_value,
+    is_utf16_first_surrogate, is_utf16_second_surrogate, new_string_value,
 };
 use crate::string_ascii::AsciiString;
+use crate::string_imported::ImportedString;
 use crate::string_unicode::UnicodeString;
 use crate::unistring;
 use crate::value::{Value, int_to_value, nil_safe, value_prop};
@@ -37,15 +38,28 @@ thread_local! {
 #[derive(Clone, Debug)]
 pub(crate) enum StrUnits {
     Ascii(AsciiString),
+    Imported(ImportedString),
     Unicode(UnicodeString),
 }
 
 impl StrUnits {
     pub(crate) fn of(s: &JsString) -> StrUnits {
-        match devirtualize_string(s) {
-            (_, Some(u)) => StrUnits::Unicode(u),
-            (Some(a), None) => StrUnits::Ascii(a),
-            (None, None) => StrUnits::Ascii(AsciiString::new(b"")),
+        match s {
+            JsString::Ascii(a) => StrUnits::Ascii(a.clone()),
+            JsString::Unicode(u) => StrUnits::Unicode(u.clone()),
+            JsString::Imported(i) => match i.unicode() {
+                Some(u) => StrUnits::Unicode(u.clone()),
+                None => StrUnits::Imported(i.clone()),
+            },
+        }
+    }
+
+    #[inline]
+    pub(crate) fn ascii(&self) -> Option<&[u8]> {
+        match self {
+            StrUnits::Ascii(a) => Some(a.as_bytes()),
+            StrUnits::Imported(i) => Some(i.utf8()),
+            StrUnits::Unicode(_) => None,
         }
     }
 
@@ -53,7 +67,31 @@ impl StrUnits {
     pub(crate) fn len(&self) -> usize {
         match self {
             StrUnits::Ascii(a) => a.len(),
+            StrUnits::Imported(i) => i.utf8().len(),
             StrUnits::Unicode(u) => u.length(),
+        }
+    }
+
+    pub(crate) fn substring(&self, start: usize, end: usize) -> JsString {
+        match self {
+            StrUnits::Unicode(u) => u.substring(start, end),
+            _ => match self.ascii() {
+                Some(b) => JsString::Ascii(AsciiString::new(&b[start..end])),
+                None => unreachable!("ascii units"),
+            },
+        }
+    }
+
+    pub(crate) fn write_substring(&self, buf: &mut StringBuilder, start: usize, end: usize) {
+        match self {
+            StrUnits::Unicode(u) => {
+                buf.write_substring(&JsString::Unicode(u.clone()), start, end);
+            }
+            _ => {
+                if let Some(b) = self.ascii() {
+                    buf.write_ascii(&b[start..end]);
+                }
+            }
         }
     }
 }
@@ -74,8 +112,11 @@ pub(crate) fn lenient_decode_units(units: &[u16], pos: usize) -> (i32, usize) {
 
 pub(crate) fn lenient_decode_at(s: &StrUnits, pos: usize) -> (i32, usize) {
     match s {
-        StrUnits::Ascii(a) => (i32::from(a.as_bytes()[pos]), 1),
         StrUnits::Unicode(u) => lenient_decode_units(&u.raw()[1..], pos),
+        _ => match s.ascii() {
+            Some(b) => (i32::from(b[pos]), 1),
+            None => unreachable!("ascii units"),
+        },
     }
 }
 
@@ -180,49 +221,53 @@ fn units_last_index<N: Copy + Into<u16>>(s1: &[u16], ss: &[N], start: usize) -> 
 }
 
 pub(crate) fn string_index(s: &JsString, substr: &JsString, start: usize) -> isize {
-    match StrUnits::of(s) {
-        StrUnits::Ascii(a) => {
-            if let StrUnits::Ascii(sub) = StrUnits::of(substr) {
+    let s = StrUnits::of(s);
+    let sub = StrUnits::of(substr);
+    match (&s, s.ascii()) {
+        (StrUnits::Unicode(u), _) => {
+            let s1 = &u.raw()[1..];
+            match (&sub, sub.ascii()) {
+                (_, Some(b)) => units_index(s1, b, start),
+                (StrUnits::Unicode(su), _) => units_index(s1, &su.raw()[1..], start),
+                _ => -1,
+            }
+        }
+        (_, Some(a)) => {
+            if let Some(b) = sub.ascii() {
                 if start > a.len() {
                     return -1;
                 }
-                if let Some(p) = bytes_index(&a.as_bytes()[start..], sub.as_bytes()) {
+                if let Some(p) = bytes_index(&a[start..], b) {
                     return (p + start) as isize;
                 }
             }
             -1
         }
-        StrUnits::Unicode(u) => {
-            let s1 = &u.raw()[1..];
-            match StrUnits::of(substr) {
-                StrUnits::Unicode(sub) => units_index(s1, &sub.raw()[1..], start),
-                StrUnits::Ascii(sub) => units_index(s1, sub.as_bytes(), start),
-            }
-        }
+        _ => -1,
     }
 }
 
 pub(crate) fn string_last_index(s: &JsString, substr: &JsString, pos: usize) -> isize {
-    match StrUnits::of(s) {
-        StrUnits::Ascii(a) => {
-            if let StrUnits::Ascii(sub) = StrUnits::of(substr) {
-                let end = pos + sub.len();
-                let ss = if end > a.len() {
-                    a.as_bytes()
-                } else {
-                    &a.as_bytes()[..end]
-                };
-                return bytes_last_index(ss, sub.as_bytes());
+    let s = StrUnits::of(s);
+    let sub = StrUnits::of(substr);
+    match (&s, s.ascii()) {
+        (StrUnits::Unicode(u), _) => {
+            let s1 = &u.raw()[1..];
+            match (&sub, sub.ascii()) {
+                (_, Some(b)) => units_last_index(s1, b, pos),
+                (StrUnits::Unicode(su), _) => units_last_index(s1, &su.raw()[1..], pos),
+                _ => -1,
+            }
+        }
+        (_, Some(a)) => {
+            if let Some(b) = sub.ascii() {
+                let end = pos + b.len();
+                let ss = if end > a.len() { a } else { &a[..end] };
+                return bytes_last_index(ss, b);
             }
             -1
         }
-        StrUnits::Unicode(u) => {
-            let s1 = &u.raw()[1..];
-            match StrUnits::of(substr) {
-                StrUnits::Unicode(sub) => units_last_index(s1, &sub.raw()[1..], pos),
-                StrUnits::Ascii(sub) => units_last_index(s1, sub.as_bytes(), pos),
-            }
-        }
+        _ => -1,
     }
 }
 
@@ -335,8 +380,8 @@ fn trim_bytes(b: &[u8], kind: TrimKind) -> &[u8] {
 }
 
 fn string_trim(s: &JsString, kind: TrimKind) -> JsString {
-    if let StrUnits::Ascii(a) = StrUnits::of(s) {
-        let b = a.as_bytes();
+    let units = StrUnits::of(s);
+    if let Some(b) = units.ascii() {
         return trim_result(s, trim_bytes(b, kind), b.len());
     }
     let b = s.go_string();
@@ -419,13 +464,6 @@ pub(crate) fn get_replace_value(
     Ok((Some(replace_value.to_string(rt)?), None))
 }
 
-fn substring_of(u: &StrUnits, start: usize, end: usize) -> JsString {
-    match u {
-        StrUnits::Ascii(a) => JsString::Ascii(AsciiString::new(&a.as_bytes()[start..end])),
-        StrUnits::Unicode(u) => u.substring(start, end),
-    }
-}
-
 pub(crate) fn write_substitution<F: FnMut(usize) -> JsResult<JsString>>(
     s: &JsString,
     position: usize,
@@ -434,7 +472,8 @@ pub(crate) fn write_substitution<F: FnMut(usize) -> JsResult<JsString>>(
     replace_str: &JsString,
     buf: &mut StringBuilder,
 ) -> JsResult<()> {
-    let l = s.length();
+    let units = StrUnits::of(s);
+    let l = units.len();
     let rl = replace_str.length();
     let matched = get_capture(0)?;
     let tail_pos = position + matched.length();
@@ -445,10 +484,10 @@ pub(crate) fn write_substitution<F: FnMut(usize) -> JsResult<JsString>>(
             let ch = replace_str.char_at(i + 1);
             match ch {
                 0x24 => buf.write_rune('$' as i32),
-                0x60 => buf.write_string(&s.substring(0, position)),
+                0x60 => units.write_substring(buf, 0, position),
                 0x27 => {
                     if tail_pos < l {
-                        buf.write_string(&s.substring(tail_pos, l));
+                        units.write_substring(buf, tail_pos, l);
                     }
                 }
                 0x26 => buf.write_string(&matched),
@@ -503,18 +542,16 @@ pub(crate) fn string_replace(
     if let Some(rcall) = rcall {
         for item in found {
             if item[0] as usize != last_index {
-                buf.write_substring(s, last_index, item[0] as usize);
+                units.write_substring(&mut buf, last_index, item[0] as usize);
             }
             let match_count = item.len() / 2;
             let mut argument_list = Vec::with_capacity(match_count + 2);
             for index in 0..match_count {
                 let offset = 2 * index;
                 if item[offset] != -1 {
-                    argument_list.push(Value::String(substring_of(
-                        &units,
-                        item[offset] as usize,
-                        item[offset + 1] as usize,
-                    )));
+                    argument_list.push(Value::String(
+                        units.substring(item[offset] as usize, item[offset + 1] as usize),
+                    ));
                 } else {
                     argument_list.push(Value::Undefined);
                 }
@@ -534,7 +571,7 @@ pub(crate) fn string_replace(
         };
         for item in found {
             if item[0] as usize != last_index {
-                buf.write_string(&s.substring(last_index, item[0] as usize));
+                units.write_substring(&mut buf, last_index, item[0] as usize);
             }
             let match_count = item.len() / 2;
             write_substitution(
@@ -543,11 +580,9 @@ pub(crate) fn string_replace(
                 match_count,
                 |idx| {
                     if item[idx * 2] != -1 {
-                        return Ok(substring_of(
-                            &units,
-                            item[idx * 2] as usize,
-                            item[idx * 2 + 1] as usize,
-                        ));
+                        return Ok(
+                            units.substring(item[idx * 2] as usize, item[idx * 2 + 1] as usize)
+                        );
                     }
                     Ok(STRING_EMPTY.clone())
                 },
@@ -558,7 +593,7 @@ pub(crate) fn string_replace(
         }
     }
     if last_index != length_s {
-        buf.write_string(&s.substring(last_index, length_s));
+        units.write_substring(&mut buf, last_index, length_s);
     }
     Ok(Value::String(buf.string()))
 }
@@ -966,14 +1001,14 @@ impl Runtime {
         let mut all_ascii = true;
         let mut total_len = 0;
         let first = StrUnits::of(&this);
-        if let StrUnits::Unicode(_) = first {
+        if first.ascii().is_none() {
             all_ascii = false;
         }
         total_len += first.len();
         strs.push(first);
         for arg in call.arguments {
             let s = StrUnits::of(&arg.to_string(self)?);
-            if let StrUnits::Unicode(_) = s {
+            if s.ascii().is_none() {
                 all_ascii = false;
             }
             total_len += s.len();
@@ -982,8 +1017,8 @@ impl Runtime {
         if all_ascii {
             let mut buf = Vec::with_capacity(total_len);
             for s in &strs {
-                if let StrUnits::Ascii(a) = s {
-                    buf.extend_from_slice(a.as_bytes());
+                if let Some(a) = s.ascii() {
+                    buf.extend_from_slice(a);
                 }
             }
             return Ok(Value::String(JsString::Ascii(AsciiString::new(&buf))));
@@ -991,9 +1026,10 @@ impl Runtime {
         let mut buf = Vec::with_capacity(total_len + 1);
         buf.push(unistring::BOM);
         for s in &strs {
-            match s {
-                StrUnits::Ascii(a) => buf.extend(a.as_bytes().iter().map(|&c| u16::from(c))),
-                StrUnits::Unicode(u) => buf.extend_from_slice(&u.raw()[1..]),
+            match (s, s.ascii()) {
+                (StrUnits::Unicode(u), _) => buf.extend_from_slice(&u.raw()[1..]),
+                (_, Some(a)) => buf.extend(a.iter().map(|&c| u16::from(c))),
+                _ => {}
             }
         }
         Ok(Value::String(JsString::Unicode(UnicodeString::from_raw(
@@ -1218,24 +1254,22 @@ impl Runtime {
             }
         }
         let mut remaining = (max_length - string_length) as usize;
-        if let (StrUnits::Ascii(filler_ascii), StrUnits::Ascii(str_ascii)) =
-            (&filler_units, &str_units)
-        {
+        if let (Some(filler_ascii), Some(str_ascii)) = (filler_units.ascii(), str_units.ascii()) {
             let fl = filler_ascii.len();
             let mut sb = Vec::new();
             reserve_or_panic(&mut sb, max_length as usize);
             if !start {
-                sb.extend_from_slice(str_ascii.as_bytes());
+                sb.extend_from_slice(str_ascii);
             }
             while remaining >= fl {
-                sb.extend_from_slice(filler_ascii.as_bytes());
+                sb.extend_from_slice(filler_ascii);
                 remaining -= fl;
             }
             if remaining > 0 {
-                sb.extend_from_slice(&filler_ascii.as_bytes()[..remaining]);
+                sb.extend_from_slice(&filler_ascii[..remaining]);
             }
             if start {
-                sb.extend_from_slice(str_ascii.as_bytes());
+                sb.extend_from_slice(str_ascii);
             }
             return Ok(Value::String(JsString::Ascii(AsciiString::new(&sb))));
         }
@@ -1282,23 +1316,25 @@ impl Runtime {
             return Ok(Value::String(STRING_EMPTY.clone()));
         }
         let num = num_int as usize;
-        match StrUnits::of(&s) {
-            StrUnits::Ascii(a) => {
+        let units = StrUnits::of(&s);
+        match (&units, units.ascii()) {
+            (_, Some(a)) => {
                 let mut sb = Vec::new();
                 reserve_or_panic(&mut sb, total_size(a.len(), num));
                 for _ in 0..num {
-                    sb.extend_from_slice(a.as_bytes());
+                    sb.extend_from_slice(a);
                 }
                 Ok(Value::String(JsString::Ascii(AsciiString::new(&sb))))
             }
-            StrUnits::Unicode(u) => {
+            (StrUnits::Unicode(u), _) => {
                 let mut sb = UnicodeStringBuilder::default();
                 reserve_or_panic(&mut sb.buf, total_size(u.length(), num).saturating_add(1));
                 for _ in 0..num {
-                    sb.write_unicode_string(&u);
+                    sb.write_unicode_string(u);
                 }
                 Ok(Value::String(sb.string()))
             }
+            _ => unreachable!("string units"),
         }
     }
 
@@ -1445,10 +1481,14 @@ impl Runtime {
             return Ok(Value::Object(self.new_array_values(vec![Value::String(s)])));
         }
         let split_limit = if limit > 0 { limit + 1 } else { limit };
-        if let (StrUnits::Ascii(a), Value::String(sep)) = (StrUnits::of(&s), &separator_value)
-            && let StrUnits::Ascii(sep) = StrUnits::of(sep)
+        let s_units = StrUnits::of(&s);
+        let sep_units = match &separator_value {
+            Value::String(sep) => Some(StrUnits::of(sep)),
+            _ => None,
+        };
+        if let (Some(a), Some(sep)) = (s_units.ascii(), sep_units.as_ref().and_then(|u| u.ascii()))
         {
-            let mut split = split_n(a.as_bytes(), sep.as_bytes(), split_limit);
+            let mut split = split_n(a, sep, split_limit);
             if limit > 0 && split.len() > limit as usize {
                 split.truncate(limit as usize);
             }

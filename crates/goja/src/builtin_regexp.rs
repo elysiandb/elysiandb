@@ -924,9 +924,12 @@ impl Runtime {
                 Some(r) if !r.is_empty() => r,
                 _ => return Ok(Value::Null),
             };
+            let units = StrUnits::of(&s);
             let a = res
                 .iter()
-                .map(|result| Value::String(s.substring(result[0] as usize, result[1] as usize)))
+                .map(|result| {
+                    Value::String(units.substring(result[0] as usize, result[1] as usize))
+                })
                 .collect();
             return Ok(Value::Object(self.new_array_values(a)));
         }

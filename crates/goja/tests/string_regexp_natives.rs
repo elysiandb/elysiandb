@@ -558,3 +558,8 @@ fn generic_replace() {
 fn generic_match() {
     run_generic_cases(cases::GENERIC_MATCH);
 }
+
+#[test]
+fn imported_ascii() {
+    run_cases(cases::IMPORTED_ASCII);
+}
