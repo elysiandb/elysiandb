@@ -107,6 +107,10 @@ path = "tests/internal/transaction_test/main.rs"
 name = "metrics_test"
 path = "tests/internal/metrics_test/main.rs"
 
+[[test]]
+name = "tcp_parsing_test"
+path = "tests/internal/transport_test/tcp_test/parsing_test/main.rs"
+
 [profile.release]
 strip = true
 panic = "unwind"
