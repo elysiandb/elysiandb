@@ -81,6 +81,47 @@ fn test_exponentiation_follows_go_math() {
 }
 
 #[test]
+fn test_promise_all() {
+    const SCRIPT: &str = r#"
+var p1 = new Promise(function() {});
+var p2 = new Promise(function() {});
+var p3 = new Promise(function() {});
+var callCount = 0;
+var currentThis = p1;
+var nextThis = p2;
+var afterNextThis = p3;
+
+p1.then = p2.then = p3.then = function(a, b) {
+  assert.sameValue(typeof a, 'function', 'type of first argument');
+  assert.sameValue(
+    a.length,
+    1,
+    'ES6 25.4.1.3.2: The length property of a promise resolve function is 1.'
+  );
+  assert.sameValue(typeof b, 'function', 'type of second argument');
+  assert.sameValue(
+    b.length,
+    1,
+    'ES6 25.4.1.3.1: The length property of a promise reject function is 1.'
+  );
+  assert.sameValue(arguments.length, 2, '"then"" invoked with two arguments');
+  assert.sameValue(this, currentThis, '"this" value');
+
+  currentThis = nextThis;
+  nextThis = afterNextThis;
+  afterNextThis = null;
+
+  callCount += 1;
+};
+
+Promise.all([p1, p2, p3]);
+
+assert.sameValue(callCount, 3, '"then"" invoked once for every iterated value');
+	"#;
+    jsrun::test_script_with_test_lib(SCRIPT, goja::Value::Undefined);
+}
+
+#[test]
 fn test_async_func_throw() {
     const SCRIPT: &str = r#"
 	class TestError extends Error {
@@ -103,6 +144,45 @@ fn test_async_func_throw() {
 	return undefined;
 	"#;
     jsrun::test_async_func_with_test_lib(SCRIPT, goja::Value::Undefined);
+}
+
+fn test_async_func_with_test_lib_x(src: &'static str, expected: goja::Value) {
+    jsrun::on_big_stack(move || {
+        let mut rt = jsrun::new_runtime();
+        for p in [jsrun::test_lib(), jsrun::test_lib_x()] {
+            if let Err(e) = rt.run_program(&p) {
+                panic!("{}", jsrun::run_error_string(&e));
+            }
+        }
+        jsrun::rt_test_async_func(&mut rt, src, &expected);
+    });
+}
+
+#[test]
+#[ignore = "requires the caller frames of resumed async functions in the VM"]
+fn test_async_stacktrace() {
+    const SCRIPT: &str = r#"
+	let ex;
+	async function foo(x) {
+	  await bar(x);
+	}
+
+	async function bar(x) {
+	  await x;
+	  throw new Error("Let's have a look...");
+	}
+
+	try {
+		await foo(1);
+	} catch (e) {
+		assertStack(e, [
+			["test.js", "bar", 9, 10],
+			["test.js", "foo", 4, 13],
+			["test.js", "test", 13, 12],
+		]);
+	}
+	"#;
+    test_async_func_with_test_lib_x(SCRIPT, goja::Value::Undefined);
 }
 
 #[test]

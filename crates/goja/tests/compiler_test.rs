@@ -6394,7 +6394,6 @@ fn test_tagged_template() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_src_locations() {
     test_script_with_test_lib_x(
         r#"
