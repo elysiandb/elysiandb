@@ -2122,7 +2122,48 @@ impl Vm {
             }
             i -= 1;
         }
+        if ctx_offset == 0
+            && let Some(runner) = self.cur_async_runner
+        {
+            capture_async_stack(rt, &mut stack, runner);
+        }
         stack
+    }
+}
+
+fn capture_async_stack(rt: &Runtime, stack: &mut Vec<StackFrame>, mut runner: ObjRef) {
+    loop {
+        let Some(ar) = rt.ext_dyn::<crate::func::AsyncRunner>(runner) else {
+            return;
+        };
+        let Some(cap) = &ar.promise_cap else {
+            return;
+        };
+        let Some(promise) = rt.ext_dyn::<crate::builtin_promise::Promise>(cap.promise) else {
+            return;
+        };
+        if promise.fulfill_reactions.len() != 1 {
+            return;
+        }
+        let Some(r) = promise.fulfill_reactions[0].async_runner else {
+            return;
+        };
+        let Some(next) = rt.ext_dyn::<crate::func::AsyncRunner>(r) else {
+            return;
+        };
+        let ctx = &next.gen_.ctx;
+        if ctx.context.prg.is_some() || ctx.context.sb > 0 {
+            let func_name = match &ctx.context.prg {
+                Some(p) => p.func_name.clone(),
+                None => get_func_name(rt, &ctx.stack, 1),
+            };
+            stack.push(StackFrame {
+                prg: ctx.context.prg.clone(),
+                pc: ctx.context.pc,
+                func_name,
+            });
+        }
+        runner = r;
     }
 }
 
@@ -2214,8 +2255,7 @@ impl Runtime {
             if let ObjExt::Template(_) = &self.obj(f).ext
                 && !self.obj(f).base.values.contains_key(&*STR_NAME)
             {
-                let _ =
-                    crate::object_template::TemplatedObject::get_own_prop_str(self, f, &STR_NAME);
+                let _ = TemplatedObject::get_own_prop_str(self, f, &STR_NAME);
             }
         }
     }

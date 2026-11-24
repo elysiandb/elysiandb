@@ -159,7 +159,6 @@ fn test_async_func_with_test_lib_x(src: &'static str, expected: goja::Value) {
 }
 
 #[test]
-#[ignore = "requires the caller frames of resumed async functions in the VM"]
 fn test_async_stacktrace() {
     const SCRIPT: &str = r#"
 	let ex;
