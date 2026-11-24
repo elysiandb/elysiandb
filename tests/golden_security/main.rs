@@ -3,6 +3,7 @@ mod common;
 #[path = "../internal/tempdir.rs"]
 mod tempdir;
 
+mod acl;
 mod basic_header;
 mod bcrypt;
 mod bcrypt_parse;

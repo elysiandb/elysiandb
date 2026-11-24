@@ -124,6 +124,10 @@ name = "security_test"
 path = "tests/internal/security_test/main.rs"
 
 [[test]]
+name = "acl_test"
+path = "tests/internal/acl_test/main.rs"
+
+[[test]]
 name = "golden_security"
 path = "tests/golden_security/main.rs"
 

@@ -1,3 +1,4 @@
+pub mod acl;
 pub mod api;
 pub mod archive;
 pub mod cache;
