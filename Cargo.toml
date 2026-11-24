@@ -88,6 +88,10 @@ name = "cache_test"
 path = "tests/internal/cache_test/main.rs"
 
 [[test]]
+name = "api_test"
+path = "tests/internal/api_test/main.rs"
+
+[[test]]
 name = "golden_api"
 path = "tests/golden_api/main.rs"
 

@@ -1,4 +1,4 @@
-use crate::gocompat::json::Value;
+use crate::gocompat::json::{Map, Value};
 use crate::gocompat::strings;
 use crate::gocompat::time::{self, Time};
 
@@ -100,6 +100,65 @@ pub fn sort_value<'a, N: Node>(m: &'a N, path: &[u8]) -> SortValue<'a, N> {
         }
     }
 
+    sort_value_at(cur)
+}
+
+pub fn sort_map_value<'a>(m: &'a Map, path: &[u8]) -> SortValue<'a, Value> {
+    let mut parts = path.split(|&b| b == b'.');
+    let mut cur = parts.next().and_then(|p| map_field(m, p));
+    for p in parts {
+        match cur {
+            Some(mm) if mm.is_object() => cur = mm.field(p),
+            _ => return SortValue::Nil,
+        }
+    }
+
+    sort_value_at(cur)
+}
+
+fn map_field<'a>(m: &'a Map, key: &[u8]) -> Option<&'a Value> {
+    std::str::from_utf8(key).ok().and_then(|k| m.get(k))
+}
+
+pub enum Resolved<'a> {
+    Value(&'a Value),
+    Map(&'a Map),
+}
+
+pub fn resolve_map_values<'a>(data: &'a Map, path: &[u8]) -> Vec<Resolved<'a>> {
+    let parts = split(path);
+    let mut out = Vec::new();
+    let mut stack: Vec<(Resolved<'a>, usize)> = vec![(Resolved::Map(data), 0)];
+    while let Some((current, i)) = stack.pop() {
+        if i == parts.len() {
+            out.push(current);
+            continue;
+        }
+
+        match current {
+            Resolved::Map(m) | Resolved::Value(Value::Object(m)) => {
+                if let Some(next) = map_field(m, parts[i]) {
+                    stack.push((Resolved::Value(next), i + 1));
+                }
+            }
+            Resolved::Value(Value::Array(items)) => {
+                for item in items.iter().rev() {
+                    stack.push((Resolved::Value(item), i));
+                }
+            }
+            Resolved::Value(Value::DocList(maps)) => {
+                for m in maps.iter().rev() {
+                    stack.push((Resolved::Map(m), i));
+                }
+            }
+            Resolved::Value(_) => {}
+        }
+    }
+
+    out
+}
+
+fn sort_value_at<'a, N: Node>(cur: Option<&'a N>) -> SortValue<'a, N> {
     let Some(cur) = cur else {
         return SortValue::Nil;
     };
