@@ -18,6 +18,7 @@ pub mod pagetree;
 pub mod ptree;
 pub mod query;
 pub mod schema;
+pub mod stat;
 pub mod storage;
 pub mod sync;
 pub mod transaction;

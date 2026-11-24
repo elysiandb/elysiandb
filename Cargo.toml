@@ -96,6 +96,10 @@ name = "golden_api"
 path = "tests/golden_api/main.rs"
 
 [[test]]
+name = "stat_test"
+path = "tests/internal/stat_test/main.rs"
+
+[[test]]
 name = "transaction_test"
 path = "tests/internal/transaction_test/main.rs"
 

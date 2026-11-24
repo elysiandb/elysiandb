@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use elysiandb::api;
 use elysiandb::cache;
 use elysiandb::configuration::{Config, StoreConfig};
 use elysiandb::crypto::sha256;
@@ -8,8 +9,8 @@ use elysiandb::globals;
 use elysiandb::gocompat::json::{self, Map, Value};
 use elysiandb::gocompat::strconv;
 use elysiandb::gocompat::time::Duration;
-use elysiandb::schema;
 use elysiandb::storage;
+use elysiandb::transport::http::api::decode_query_payload;
 
 use super::common::{hex, read_jsonl, str_field, unhex};
 use super::serial;
@@ -115,6 +116,9 @@ fn check_query_hash(row: &Value, seen: &mut BTreeMap<String, String>) {
     };
     let payload_hash = str_field(row, "payload_hash");
     assert_eq!(payload_hash.len(), 2 * sha256::SIZE, "{row:?}");
+    let decoded_payload = decode_query_payload(payload.as_bytes())
+        .unwrap_or_else(|e| panic!("bad payload {payload}: {e}"));
+    assert_eq!(hex(&decoded_payload.hash()), payload_hash, "{row:?}");
 
     if let Some(previous) = seen.insert(payload.to_string(), payload_hash.to_string()) {
         assert_eq!(previous, payload_hash, "{row:?}");
@@ -128,48 +132,9 @@ fn check_query_hash(row: &Value, seen: &mut BTreeMap<String, String>) {
     assert_eq!(hex(&h.sum()), str_field(row, "hex"), "{row:?}");
 }
 
-fn entity_version(entity: &[u8]) -> String {
-    let Some(e) = storage::engine() else {
-        return String::new();
-    };
-
-    let snap = e.snapshot(entity);
-
-    format!(
-        "{}.{}.{}",
-        strconv::format_uint(e.instance(), 36),
-        strconv::format_uint(snap.generation(), 36),
-        strconv::format_uint(snap.version(), 36)
-    )
-}
-
 fn write_entity(entity: &[u8], id: &str) {
-    let Some(e) = storage::engine() else {
-        panic!("the store is not open");
-    };
-    let doc = Map::from([("id".to_string(), Value::String(id.to_string()))]);
-    e.update(|tx| {
-        tx.put(entity, id.as_bytes(), &doc)?;
-        tx.ensure_type(entity);
-        Ok(())
-    })
-    .unwrap_or_else(|err| panic!("{err}"));
-}
-
-fn delete_all_entities(entity: &[u8]) {
-    let Some(e) = storage::engine() else {
-        panic!("the store is not open");
-    };
-    e.update(|tx| {
-        let current = tx.read(schema::SCHEMA_ENTITY.as_bytes(), entity);
-        if !schema::is_manual_schema(entity, current.as_ref()) {
-            tx.delete(schema::SCHEMA_ENTITY.as_bytes(), entity);
-        }
-        tx.reset_entity(entity);
-        tx.drop_type(entity);
-        Ok(())
-    })
-    .unwrap_or_else(|err| panic!("{err}"));
+    let mut doc = Map::from([("id".to_string(), Value::String(id.to_string()))]);
+    api::write_entity(entity, &mut doc);
 }
 
 fn rest_of_version(version: &str, instance: &str) -> String {
@@ -202,14 +167,14 @@ fn check_entity_versions(rows: &[&Value]) -> usize {
     globals::set_config(Some(Arc::new(cfg)));
     storage::load_db();
     storage::load_json_db();
-    let _guard = VersionOfGuard(cache::set_version_of(Some(entity_version)));
+    let _guard = VersionOfGuard(cache::set_version_of(Some(api::index::entity_version)));
     cache::init_cache(Duration::SECOND * 30);
 
     let Some(e) = storage::engine() else {
         panic!("the store is not open");
     };
     let instance = strconv::format_uint(e.instance(), 36);
-    e.update(|_| Ok(())).unwrap_or_else(|err| panic!("{err}"));
+    api::delete_all();
 
     let Some(version_of) = cache::version_of() else {
         panic!("the version hook is not set");
@@ -225,7 +190,7 @@ fn check_entity_versions(rows: &[&Value]) -> usize {
                     write_entity(b"book", &format!("x{i}"));
                 }
             }
-            "after-reset" => delete_all_entities(b"book"),
+            "after-reset" => api::delete_all_entities(b"book"),
             other => panic!("unknown step {other}"),
         }
 

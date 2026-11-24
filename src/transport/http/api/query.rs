@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
+use crate::crypto::sha256;
 use crate::gocompat::json::{self, Decode, DecodeState, Error, Expected, Map, RawMessage, Value};
 use crate::gocompat::strconv;
 use crate::json_struct;
@@ -83,7 +84,54 @@ fn object_keys_in_order(raw: &[u8]) -> Vec<String> {
     keys
 }
 
+json_struct! {
+    #[derive(Default)]
+    struct NormalizedSort {
+        field: Vec<u8> => "Field",
+        ascending: bool => "Ascending",
+    }
+}
+
+json_struct! {
+    #[derive(Default)]
+    struct NormalizedPayload {
+        count_only: bool => "countOnly",
+        entity: String => "entity",
+        fields: String => "fields",
+        filters: Option<Map> => "filters",
+        limit: i64 => "limit",
+        offset: i64 => "offset",
+        sort_order: Vec<NormalizedSort> => "sortOrder",
+        sorts: Option<BTreeMap<String, String>> => "sorts",
+    }
+}
+
 impl QueryPayload {
+    pub fn hash(&self) -> [u8; sha256::SIZE] {
+        let normalized = NormalizedPayload {
+            count_only: self.count_only,
+            entity: self.entity.clone(),
+            fields: self.fields.clone(),
+            filters: Some(self.filters.clone().unwrap_or_default()),
+            limit: self.limit,
+            offset: self.offset,
+            sort_order: self
+                .query_for_sorts()
+                .ordered_sorts()
+                .into_iter()
+                .map(|s| NormalizedSort {
+                    field: s.field,
+                    ascending: s.ascending,
+                })
+                .collect(),
+            sorts: self.sorts.clone(),
+        };
+
+        let b = json::marshal(&normalized).unwrap_or_default();
+
+        sha256::sum256(&b)
+    }
+
     pub fn query_for_sorts(&self) -> Query {
         Query {
             sorts: sort_map(self.sorts.as_ref()),
