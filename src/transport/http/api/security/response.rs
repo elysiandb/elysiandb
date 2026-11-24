@@ -27,7 +27,7 @@ pub(crate) fn error_body(message: &[u8]) -> Vec<u8> {
 
 pub(crate) fn write_error(ctx: &mut RequestCtx, status: u16, err: &SecurityError) {
     if status >= STATUS_INTERNAL_SERVER_ERROR {
-        observe::set_error(ctx, err);
+        observe::set_error_bytes(ctx, err.message());
     }
 
     ctx.set_status_code(status);
