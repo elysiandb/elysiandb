@@ -93,6 +93,9 @@ impl TemplatedObject {
         name: &UStr,
         receiver: Option<&Value>,
     ) -> JsResult<Option<Value>> {
+        if matches!(rt.obj(o).base.values.get(name), Some(v) if !v.is_empty()) {
+            return BaseObject::get_str(rt, o, name, receiver);
+        }
         let own_prop = TemplatedObject::get_own_prop_str(rt, o, name)?;
         if own_prop.is_none() {
             TemplatedObject::materialise_proto(rt, o);
@@ -171,6 +174,9 @@ impl TemplatedObject {
         v: Value,
         throw: bool,
     ) -> JsResult<bool> {
+        if matches!(rt.obj(o).base.values.get(p), Some(v) if !v.is_empty()) {
+            return BaseObject::set_own_str(rt, o, p, v, throw);
+        }
         let existing = TemplatedObject::get_own_prop_str(rt, o, p)?;
         if existing.is_none() {
             TemplatedObject::materialise_proto(rt, o);

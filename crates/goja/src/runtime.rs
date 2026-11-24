@@ -2,7 +2,9 @@ use crate::ast;
 use crate::builtin_symbol::{SYM_ITERATOR, SYM_SPECIES};
 use crate::compiler::{Compiler, CompilerError, CompilerSyntaxError, EvalContext, Program};
 use crate::file;
-use crate::func::{NATIVE_FUNC_CLASS, NativeCtor, NativeFn, NativeFuncObject};
+use crate::func::{
+    BaseJsFuncObject, FuncKind, NATIVE_FUNC_CLASS, NativeCtor, NativeFn, NativeFuncObject,
+};
 use crate::heap::{FxHashMap, Heap, ObjRef, StashRef, SymRef, SymbolData, Tracer};
 use crate::object::{
     BASE_OBJECT_CLASS, BaseObject, CLASS_FUNCTION, CLASS_OBJECT, CallFn, CtorFn, FunctionCall,
@@ -806,6 +808,176 @@ impl Runtime {
         )
     }
 
+    pub fn new_func(&mut self, name: &unistring::String, length: isize, strict: bool) -> ObjRef {
+        let f = self.init_base_js_function(&crate::func::FUNC_CLASS, FuncKind::Func, strict);
+        crate::func::base_func_init(self, f, name, int_to_value(length as i64));
+        f
+    }
+
+    pub fn new_async_func(
+        &mut self,
+        name: &unistring::String,
+        length: isize,
+        strict: bool,
+    ) -> ObjRef {
+        let f = self.init_base_js_function(&crate::func::ASYNC_FUNC_CLASS, FuncKind::Async, strict);
+        let p = self.get_async_function_prototype();
+        self.obj_mut(f).base.prototype = Some(p);
+        crate::func::base_func_init(self, f, name, int_to_value(length as i64));
+        f
+    }
+
+    pub fn new_generator_func(
+        &mut self,
+        name: &unistring::String,
+        length: isize,
+        strict: bool,
+    ) -> ObjRef {
+        let f = self.init_base_js_function(
+            &crate::func::GENERATOR_FUNC_CLASS,
+            FuncKind::Generator,
+            strict,
+        );
+        let p = self.get_generator_function_prototype();
+        self.obj_mut(f).base.prototype = Some(p);
+        crate::func::base_func_init(self, f, name, int_to_value(length as i64));
+        let gp = self.get_generator_prototype();
+        let proto = self.new_base_object(Some(gp), CLASS_OBJECT);
+        BaseObject::_put_prop(
+            self,
+            f,
+            &crate::vm::STR_PROTOTYPE,
+            Value::Object(proto),
+            true,
+            false,
+            false,
+        );
+        f
+    }
+
+    pub fn new_class_func(
+        &mut self,
+        name: &unistring::String,
+        length: isize,
+        proto: Option<ObjRef>,
+        derived: bool,
+    ) -> ObjRef {
+        let mut d = BaseJsFuncObject::new(FuncKind::Class, true);
+        d.derived = derived;
+        let f = self.alloc_object(
+            &crate::func::CLASS_FUNC_CLASS,
+            BaseObject::new(CLASS_FUNCTION, proto),
+            ObjExt::JsFunc(Box::new(d)),
+        );
+        crate::func::base_func_init(self, f, name, int_to_value(length as i64));
+        f
+    }
+
+    pub fn init_base_js_function(
+        &mut self,
+        class: &'static crate::object::ObjClass,
+        kind: FuncKind,
+        strict: bool,
+    ) -> ObjRef {
+        let proto = self.get_function_prototype();
+        self.alloc_object(
+            class,
+            BaseObject::new(CLASS_FUNCTION, Some(proto)),
+            ObjExt::JsFunc(Box::new(BaseJsFuncObject::new(kind, strict))),
+        )
+    }
+
+    pub fn new_method(&mut self, name: &unistring::String, length: isize, strict: bool) -> ObjRef {
+        let f =
+            self.init_base_js_function(&crate::func::METHOD_FUNC_CLASS, FuncKind::Method, strict);
+        crate::func::base_func_init(self, f, name, int_to_value(length as i64));
+        f
+    }
+
+    pub fn new_generator_method(
+        &mut self,
+        name: &unistring::String,
+        length: isize,
+        strict: bool,
+    ) -> ObjRef {
+        let f = self.init_base_js_function(
+            &crate::func::GENERATOR_METHOD_FUNC_CLASS,
+            FuncKind::GeneratorMethod,
+            strict,
+        );
+        let p = self.get_generator_function_prototype();
+        self.obj_mut(f).base.prototype = Some(p);
+        crate::func::base_func_init(self, f, name, int_to_value(length as i64));
+        let gp = self.get_generator_prototype();
+        let proto = self.new_base_object(Some(gp), CLASS_OBJECT);
+        BaseObject::_put_prop(
+            self,
+            f,
+            &crate::vm::STR_PROTOTYPE,
+            Value::Object(proto),
+            true,
+            false,
+            false,
+        );
+        f
+    }
+
+    pub fn new_async_method(
+        &mut self,
+        name: &unistring::String,
+        length: isize,
+        strict: bool,
+    ) -> ObjRef {
+        let f = self.init_base_js_function(
+            &crate::func::ASYNC_METHOD_FUNC_CLASS,
+            FuncKind::AsyncMethod,
+            strict,
+        );
+        crate::func::base_func_init(self, f, name, int_to_value(length as i64));
+        f
+    }
+
+    pub fn init_arrow_func(
+        &mut self,
+        class: &'static crate::object::ObjClass,
+        kind: FuncKind,
+        strict: bool,
+    ) -> ObjRef {
+        let f = self.init_base_js_function(class, kind, strict);
+        let nt = self.vm.new_target.clone();
+        BaseJsFuncObject::data_mut(self, f).new_target = nt;
+        f
+    }
+
+    pub fn new_arrow_func(
+        &mut self,
+        name: &unistring::String,
+        length: isize,
+        strict: bool,
+    ) -> ObjRef {
+        let f = self.init_arrow_func(&crate::func::ARROW_FUNC_CLASS, FuncKind::Arrow, strict);
+        crate::func::base_func_init(self, f, name, int_to_value(length as i64));
+        f
+    }
+
+    pub fn new_async_arrow_func(
+        &mut self,
+        name: &unistring::String,
+        length: isize,
+        strict: bool,
+    ) -> ObjRef {
+        let f = self.init_arrow_func(
+            &crate::func::ASYNC_ARROW_FUNC_CLASS,
+            FuncKind::AsyncArrow,
+            strict,
+        );
+        self.obj_mut(f).base.class = CLASS_OBJECT;
+        let p = self.get_async_function_prototype();
+        self.obj_mut(f).base.prototype = Some(p);
+        crate::func::base_func_init(self, f, name, int_to_value(length as i64));
+        f
+    }
+
     pub fn new_native_func(&mut self, call: NativeFn, name: &str, length: i64) -> ObjRef {
         let proto = self.get_function_prototype();
         let v = self.alloc_object(
@@ -1052,15 +1224,13 @@ impl Runtime {
     }
 
     pub fn to_constructor(&mut self, v: &Value) -> JsResult<CtorFn> {
-        if let Value::Object(o) = v
-            && let Some(c) = o.assert_constructor(self)
-        {
+        let o = self.to_object(v)?;
+        if let Some(c) = o.assert_constructor(self) {
             return Ok(c);
         }
-        let s = v.to_string(self)?.to_rust_string();
-        Err(Throw::Value(self.new_type_error(&format!(
-            "Value is not a constructor: {s}"
-        ))))
+        Err(Throw::Value(
+            self.new_type_error("Value is not a constructor"),
+        ))
     }
 
     pub fn check_object_coercible(&mut self, v: &Value) -> JsResult<()> {
@@ -1415,7 +1585,9 @@ impl Runtime {
     pub fn run_program(&mut self, p: &Arc<Program>) -> Result<Value, RunError> {
         let recursive = !self.vm.call_stack.is_empty();
         if recursive {
-            self.vm.push_ctx_unchecked();
+            if let Err(t) = self.vm_push_ctx() {
+                return Err(self.throw_to_run_error(t));
+            }
             self.vm.stash = Some(self.global.stash);
             self.vm.priv_env = None;
             self.vm.new_target = Value::Empty;
@@ -1433,37 +1605,39 @@ impl Runtime {
         self.vm.pc = 0;
         self.vm.result = Value::Undefined;
         let res = self.vm_run_try();
+        let mut uncatchable = false;
         let mut out = match res {
             Ok(None) => Ok(self.vm.result.clone()),
             Ok(Some(mut ex)) => {
                 ex.resolve_value_string(self);
                 Err(RunError::Exception(ex))
             }
-            Err(t) => Err(self.throw_to_run_error(t)),
-        };
-        if recursive {
-            if out.is_ok() || matches!(out, Err(RunError::Exception(_))) {
-                self.vm.clear_stack();
+            Err(t) => {
+                uncatchable = true;
+                Err(self.throw_to_run_error(t))
             }
+        };
+        if !uncatchable {
+            if recursive {
+                self.vm.clear_stack();
+            } else {
+                self.vm.prg = None;
+                self.vm.sb = -1;
+                if let Err(t) = self.leave() {
+                    uncatchable = t.is_uncatchable();
+                    out = Err(self.throw_to_run_error(t));
+                }
+            }
+        }
+        if recursive {
             self.vm.sp -= 2;
             self.vm.pop_ctx();
         } else {
             let l = self.vm.call_stack.len();
             self.vm.call_stack.truncate(l.saturating_sub(1));
-            match &out {
-                Ok(_) | Err(RunError::Exception(_)) => {
-                    self.vm.prg = None;
-                    self.vm.sb = -1;
-                    if let Err(t) = self.leave() {
-                        out = Err(self.throw_to_run_error(t));
-                    }
-                }
-                _ => {
-                    if self.vm.call_stack.is_empty() {
-                        self.leave_abrupt();
-                    }
-                }
-            }
+        }
+        if uncatchable && self.vm.call_stack.is_empty() {
+            self.leave_abrupt();
         }
         out
     }
@@ -1508,6 +1682,7 @@ impl Runtime {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct IteratorRecord {
     pub iterator: Option<ObjRef>,
     pub next: Option<CallFn>,
@@ -2066,8 +2241,45 @@ pub fn assert_callable(r: &Runtime, v: &Value) -> Option<CallFn> {
 }
 
 impl Runtime {
-    pub fn eval(&mut self, _src_val: &JsString, _direct: bool, _strict: bool) -> JsResult<Value> {
-        todo!("Runtime.eval")
+    pub fn eval(&mut self, src_val: &JsString, direct: bool, strict: bool) -> JsResult<Value> {
+        let src = escape_invalid_utf16(src_val);
+        let mut in_global = true;
+        if direct {
+            let mut s = self.vm.stash;
+            while let Some(st) = s {
+                let stash = self.heap.stash(st);
+                if stash.is_variable() {
+                    in_global = false;
+                    break;
+                }
+                s = stash.outer;
+            }
+        }
+        self.vm_push_ctx()?;
+        let mut func_obj = Value::Undefined;
+        if !direct {
+            self.vm.stash = Some(self.global.stash);
+            self.vm.priv_env = None;
+        } else if self.vm.sb > 0 {
+            func_obj = self.vm.stack[self.vm.sb as usize - 1].clone();
+        }
+        let ctx: Rc<dyn EvalContext> = Rc::new(crate::vm::VmEvalContext::new(self));
+        let p = self.compile_with_runtime("<eval>", &src, strict, in_global, Some(ctx))?;
+        self.vm.prg = Some(p);
+        self.vm.pc = 0;
+        self.vm.args = 0;
+        self.vm.result = Value::Undefined;
+        self.vm.push(func_obj);
+        self.vm.sb = self.vm.sp;
+        self.vm.push(Value::Empty);
+        let ex = self.vm_run_try()?;
+        let retval = self.vm.result.clone();
+        self.vm.pop_ctx();
+        if let Some(ex) = ex {
+            return Err(Throw::Exception(ex));
+        }
+        self.vm.sp -= 2;
+        Ok(retval)
     }
 
     pub fn builtin_eval(&mut self, call: FunctionCall<'_>) -> JsResult<Value> {
@@ -2080,4 +2292,90 @@ impl Runtime {
         }
         Ok(call.arguments[0].clone())
     }
+}
+
+fn push_rune(b: &mut Vec<u8>, r: u32) {
+    if let Some(c) = char::from_u32(r) {
+        let mut buf = [0u8; 4];
+        b.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
+    }
+}
+
+fn write_hex4(b: &mut Vec<u8>, i: u32) {
+    const HEX: &[u8] = b"0123456789abcdef";
+    b.push(HEX[(i >> 12) as usize & 0xF]);
+    b.push(HEX[(i >> 8) as usize & 0xF]);
+    b.push(HEX[(i >> 4) as usize & 0xF]);
+    b.push(HEX[i as usize & 0xF]);
+}
+
+fn read_lenient_utf16(
+    chars: &[u16],
+    i: &mut usize,
+    prev: &mut Option<u16>,
+) -> Option<(u32, usize)> {
+    let c = match prev.take() {
+        Some(p) => p,
+        None => {
+            if *i >= chars.len() {
+                return None;
+            }
+            let c = chars[*i];
+            *i += 1;
+            c
+        }
+    };
+    if (0xD800..0xDC00).contains(&c) {
+        if *i >= chars.len() {
+            return Some((u32::from(c), 1));
+        }
+        let second = chars[*i];
+        *i += 1;
+        if (0xDC00..0xE000).contains(&second) {
+            let r = 0x10000 + ((u32::from(c) - 0xD800) << 10) + (u32::from(second) - 0xDC00);
+            return Some((r, 2));
+        }
+        *prev = Some(second);
+    }
+    Some((u32::from(c), 1))
+}
+
+pub fn escape_invalid_utf16(s: &JsString) -> Vec<u8> {
+    let u = match s {
+        JsString::Imported(i) => return i.utf8().to_vec(),
+        JsString::Ascii(a) => return a.as_bytes().to_vec(),
+        JsString::Unicode(u) => u,
+    };
+    let chars = &u.raw()[1..];
+    let mut sb: Vec<u8> = Vec::new();
+    let mut pos = 0usize;
+    let mut i = 0usize;
+    let mut prev = None;
+    while let Some((c, size)) = read_lenient_utf16(chars, &mut i, &mut prev) {
+        if (0xD800..0xE000).contains(&c) {
+            if sb.is_empty() {
+                let mut last = 0u32;
+                let mut hi = 0usize;
+                let mut hprev = None;
+                let head = &chars[..pos];
+                while let Some((hc, _)) = read_lenient_utf16(head, &mut hi, &mut hprev) {
+                    push_rune(&mut sb, hc);
+                    last = hc;
+                }
+                if last == u32::from(b'\\') {
+                    sb.push(b'\\');
+                }
+            }
+            sb.extend_from_slice(b"\\u");
+            write_hex4(&mut sb, c);
+        } else if !sb.is_empty() {
+            push_rune(&mut sb, c);
+        } else {
+            pos += size;
+        }
+    }
+    if !sb.is_empty() {
+        return sb;
+    }
+    u.go_string()
 }

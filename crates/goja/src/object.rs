@@ -563,9 +563,9 @@ pub type PrivateNames = FxHashMap<unistring::String, Rc<PrivateId>>;
 
 #[derive(Debug, Default)]
 pub struct PrivateEnv {
-    pub instance_type: Option<Arc<PrivateEnvType>>,
-    pub static_type: Option<Arc<PrivateEnvType>>,
-    pub names: PrivateNames,
+    pub instance_type: std::cell::RefCell<Option<Arc<PrivateEnvType>>>,
+    pub static_type: std::cell::RefCell<Option<Arc<PrivateEnvType>>>,
+    pub names: std::cell::RefCell<PrivateNames>,
     pub outer: Option<Rc<PrivateEnv>>,
 }
 
@@ -1162,7 +1162,9 @@ impl BaseObject {
                 Ok(true)
             }
             Some(_) => {
-                rt.obj_mut(o).base.values.insert(name.clone(), val);
+                if let Some(slot) = rt.obj_mut(o).base.values.get_mut(name) {
+                    *slot = val;
+                }
                 Ok(true)
             }
         }

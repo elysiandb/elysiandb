@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 pub const MAX_INT: i64 = 1 << 53;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub enum Value {
     #[default]
     Undefined,
@@ -33,6 +33,27 @@ pub enum Value {
     Unresolved(Box<Unresolved>),
     #[doc(hidden)]
     YieldMarker(YieldMarker),
+}
+
+impl Clone for Value {
+    #[inline(always)]
+    fn clone(&self) -> Value {
+        match self {
+            Value::Undefined => Value::Undefined,
+            Value::Null => Value::Null,
+            Value::Bool(b) => Value::Bool(*b),
+            Value::Int(i) => Value::Int(*i),
+            Value::Float(f) => Value::Float(*f),
+            Value::String(s) => Value::String(s.clone()),
+            Value::BigInt(b) => Value::BigInt(b.clone()),
+            Value::Symbol(s) => Value::Symbol(*s),
+            Value::Object(o) => Value::Object(*o),
+            Value::Empty => Value::Empty,
+            Value::Property(p) => Value::Property(p.clone()),
+            Value::Unresolved(u) => Value::Unresolved(u.clone()),
+            Value::YieldMarker(y) => Value::YieldMarker(*y),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -226,6 +247,24 @@ fn float_string(f: f64) -> Vec<u8> {
 }
 
 impl Value {
+    #[inline(always)]
+    pub fn is_pod(&self) -> bool {
+        !matches!(
+            self,
+            Value::String(_) | Value::BigInt(_) | Value::Property(_) | Value::Unresolved(_)
+        )
+    }
+
+    #[inline(always)]
+    pub fn set(&mut self, v: Value) {
+        let old = std::mem::replace(self, v);
+        if old.is_pod() {
+            std::mem::forget(old);
+        } else {
+            drop(old);
+        }
+    }
+
     pub fn is_undefined(&self) -> bool {
         matches!(self, Value::Undefined)
     }

@@ -1,14 +1,16 @@
 use crate::compiler::Program;
 use crate::heap::{ObjRef, StashRef, Tracer};
 use crate::object::{
-    BASE_CLASS, BaseObject, CallFn, ConstructorCall, CtorFn, FunctionCall, ObjClass, ObjExt,
-    PrivateEnv, PrivateEnvType, UStr, instance_of_operator,
+    BASE_CLASS, BaseObject, CallFn, ConstructorCall, CtorFn, FunctionCall, ObjClass, ObjData,
+    ObjExt, PrivateEnv, PrivateEnvType, UStr, instance_of_operator, to_method,
 };
-use crate::runtime::{IteratorRecord, JsResult, Runtime, Throw};
+use crate::runtime::{
+    Exception, IteratorRecord, JsResult, Runtime, Throw, iterator_complete, iterator_value,
+};
 use crate::string::{JsString, STRING_FUNCTION, new_string_value, string_value_from_raw};
 use crate::unistring;
 use crate::value::{Value, ValueProperty, nil_safe};
-use crate::vm::ExecCtx;
+use crate::vm::{Context, ExecCtx, TRY_PANIC_MARKER};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -265,7 +267,7 @@ pub fn native_vm_call(rt: &mut Runtime, f: Option<NativeFn>, n: usize) -> JsResu
     let sp = rt.vm.sp as usize;
     match f {
         Some(f) => {
-            rt.vm.push_ctx()?;
+            rt.vm_push_ctx_for_call()?;
             rt.vm.prg = None;
             rt.vm.sb = (sp - n) as isize;
             let this = rt.vm.stack[sp - n - 2].clone();
@@ -661,8 +663,28 @@ impl BoundFuncObject {
     }
 }
 
+#[derive(Default)]
+pub struct Generator {
+    pub ctx: ExecCtx,
+    pub try_stack_len: u32,
+    pub iter_stack_len: u32,
+    pub ref_stack_len: u32,
+}
+
+impl Generator {
+    pub fn trace(&self, t: &mut Tracer) {
+        self.ctx.trace(t);
+    }
+
+    fn store_lengths(&mut self, rt: &Runtime) {
+        self.try_stack_len = rt.vm.try_stack.len() as u32;
+        self.iter_stack_len = rt.vm.iter_stack.len() as u32;
+        self.ref_stack_len = rt.vm.ref_stack.len() as u32;
+    }
+}
+
 pub struct GeneratorObject {
-    pub gen_ctx: ExecCtx,
+    pub gen_: Generator,
     pub delegated: Option<IteratorRecord>,
     pub state: GeneratorState,
 }
@@ -680,12 +702,16 @@ pub enum GeneratorState {
 
 impl GeneratorObject {
     pub fn trace(&self, t: &mut Tracer) {
-        self.gen_ctx.trace(t);
+        self.gen_.trace(t);
         if let Some(d) = &self.delegated {
             d.trace(t);
         }
     }
 }
+
+pub type VmCallFn = fn(&mut Runtime, ObjRef, usize) -> JsResult<()>;
+
+pub type StepResult = (Value, ResultType, Option<Box<Exception>>);
 
 pub const BASE_FUNC_CLASS: ObjClass = ObjClass {
     type_of: BaseFuncObject::type_of,
@@ -728,15 +754,34 @@ pub static CLASS_FUNC_CLASS: ObjClass = ObjClass {
     ..BASE_JS_FUNC_CLASS
 };
 
-pub static GENERATOR_FUNC_CLASS: ObjClass = BASE_JS_FUNC_CLASS;
-pub static GENERATOR_METHOD_FUNC_CLASS: ObjClass = BASE_JS_FUNC_CLASS;
-pub static ASYNC_FUNC_CLASS: ObjClass = BASE_JS_FUNC_CLASS;
-pub static ASYNC_METHOD_FUNC_CLASS: ObjClass = BASE_JS_FUNC_CLASS;
-pub static ASYNC_ARROW_FUNC_CLASS: ObjClass = ARROW_FUNC_CLASS_CONST;
+pub static GENERATOR_FUNC_CLASS: ObjClass = ObjClass {
+    assert_callable: GeneratorFuncObject::assert_callable,
+    vm_call: GeneratorFuncObject::vm_call,
+    assert_constructor: GeneratorFuncObject::assert_constructor,
+    ..BASE_JS_FUNC_CLASS
+};
 
-const ARROW_FUNC_CLASS_CONST: ObjClass = ObjClass {
-    assert_callable: ArrowFuncObject::assert_callable,
-    vm_call: ArrowFuncObject::vm_call,
+pub static GENERATOR_METHOD_FUNC_CLASS: ObjClass = ObjClass {
+    assert_callable: GeneratorFuncObject::assert_callable,
+    vm_call: GeneratorFuncObject::vm_call,
+    ..BASE_JS_FUNC_CLASS
+};
+
+pub static ASYNC_FUNC_CLASS: ObjClass = ObjClass {
+    assert_callable: AsyncFuncObject::assert_callable,
+    vm_call: AsyncFuncObject::vm_call,
+    ..BASE_JS_FUNC_CLASS
+};
+
+pub static ASYNC_METHOD_FUNC_CLASS: ObjClass = ObjClass {
+    assert_callable: AsyncFuncObject::assert_callable,
+    vm_call: AsyncFuncObject::vm_call,
+    ..BASE_JS_FUNC_CLASS
+};
+
+pub static ASYNC_ARROW_FUNC_CLASS: ObjClass = ObjClass {
+    assert_callable: AsyncArrowFuncObject::assert_callable,
+    vm_call: AsyncArrowFuncObject::vm_call,
     ..BASE_JS_FUNC_CLASS
 };
 
@@ -755,6 +800,768 @@ pub static BOUND_FUNC_CLASS: ObjClass = ObjClass {
 };
 
 pub static GENERATOR_OBJECT_CLASS: ObjClass = BASE_CLASS;
+
+pub struct GeneratorFuncObject;
+
+impl GeneratorFuncObject {
+    pub fn call(rt: &mut Runtime, o: ObjRef, call: FunctionCall<'_>) -> JsResult<Value> {
+        prepare_for_vm_call(rt, o, call);
+        generator_call(rt, o, crate::vm::js_func_vm_call, call.arguments.len())
+    }
+
+    pub fn assert_callable(_rt: &Runtime, o: ObjRef) -> Option<CallFn> {
+        Some(CallFn {
+            obj: o,
+            f: GeneratorFuncObject::call,
+        })
+    }
+
+    pub fn vm_call(rt: &mut Runtime, o: ObjRef, n: usize) -> JsResult<()> {
+        generator_vm_call(rt, o, crate::vm::js_func_vm_call, n)
+    }
+
+    pub fn assert_constructor(_rt: &Runtime, _o: ObjRef) -> Option<CtorFn> {
+        None
+    }
+}
+
+pub struct AsyncFuncObject;
+
+impl AsyncFuncObject {
+    pub fn call(rt: &mut Runtime, o: ObjRef, call: FunctionCall<'_>) -> JsResult<Value> {
+        async_call(rt, o, call, crate::vm::js_func_vm_call)
+    }
+
+    pub fn assert_callable(_rt: &Runtime, o: ObjRef) -> Option<CallFn> {
+        Some(CallFn {
+            obj: o,
+            f: AsyncFuncObject::call,
+        })
+    }
+
+    pub fn vm_call(rt: &mut Runtime, o: ObjRef, n: usize) -> JsResult<()> {
+        async_vm_call(rt, o, n, crate::vm::js_func_vm_call)
+    }
+}
+
+pub struct AsyncArrowFuncObject;
+
+impl AsyncArrowFuncObject {
+    pub fn call(rt: &mut Runtime, o: ObjRef, call: FunctionCall<'_>) -> JsResult<Value> {
+        async_call(rt, o, call, crate::vm::arrow_func_vm_call)
+    }
+
+    pub fn assert_callable(_rt: &Runtime, o: ObjRef) -> Option<CallFn> {
+        Some(CallFn {
+            obj: o,
+            f: AsyncArrowFuncObject::call,
+        })
+    }
+
+    pub fn vm_call(rt: &mut Runtime, o: ObjRef, n: usize) -> JsResult<()> {
+        async_vm_call(rt, o, n, crate::vm::arrow_func_vm_call)
+    }
+}
+
+pub fn prepare_for_vm_call(rt: &mut Runtime, f: ObjRef, call: FunctionCall<'_>) {
+    let args = call.arguments;
+    let sp = rt.vm.sp;
+    rt.vm.stack_expand(sp + args.len() as isize + 1);
+    rt.vm.stack[rt.vm.sp as usize] = call.this.clone();
+    rt.vm.sp += 1;
+    rt.vm.stack[rt.vm.sp as usize] = Value::Object(f);
+    rt.vm.sp += 1;
+    for arg in args {
+        rt.vm.stack[rt.vm.sp as usize] = if arg.is_empty() {
+            Value::Undefined
+        } else {
+            arg.clone()
+        };
+        rt.vm.sp += 1;
+    }
+}
+
+impl Runtime {
+    pub fn gen_enter(&mut self, g: &mut Generator) -> JsResult<()> {
+        self.vm_push_ctx()?;
+        self.vm.push_try_frame(TRY_PANIC_MARKER, -1);
+        self.vm.prg = None;
+        self.vm.sb = -1;
+        self.vm.pc = -2;
+        g.store_lengths(self);
+        Ok(())
+    }
+
+    pub fn gen_step(&mut self, g: &mut Generator) -> JsResult<StepResult> {
+        if let Some(ex) = self.vm_run_try_loop()? {
+            return Ok((Value::Empty, ResultType::Normal, Some(ex)));
+        }
+        let mut res = self.vm.pop();
+        let mut result_type = ResultType::Normal;
+        if let Value::YieldMarker(ym) = res {
+            result_type = ym.result_type();
+            g.ctx = ExecCtx::default();
+            self.vm.pc = -self.vm.pc + 1;
+            if ym != YieldMarker::YieldEmpty {
+                res = self.vm.pop();
+            } else {
+                res = Value::Empty;
+            }
+            let (t, i, r) = (g.try_stack_len, g.iter_stack_len, g.ref_stack_len);
+            self.vm_suspend(&mut g.ctx, t, i, r);
+            self.vm.sp = self.vm.sb - 1;
+            self.vm.call_stack.pop();
+        }
+        Ok((res, result_type, None))
+    }
+
+    pub fn gen_enter_next(&mut self, g: &mut Generator) -> JsResult<()> {
+        self.vm_push_ctx()?;
+        self.vm.push_try_frame(TRY_PANIC_MARKER, -1);
+        self.vm.call_stack.push(Context {
+            pc: -2,
+            ..Context::default()
+        });
+        g.store_lengths(self);
+        self.vm_resume(&mut g.ctx);
+        Ok(())
+    }
+
+    pub fn gen_next(&mut self, g: &mut Generator, v: Value) -> JsResult<StepResult> {
+        self.gen_enter_next(g)?;
+        if !v.is_empty() {
+            self.vm.push(v);
+        }
+        let r = self.gen_step(g)?;
+        self.vm.pop_try_frame();
+        self.vm.pop_ctx();
+        Ok(r)
+    }
+
+    pub fn gen_next_throw(&mut self, g: &mut Generator, v: Throw) -> JsResult<StepResult> {
+        self.gen_enter_next(g)?;
+        match self.vm_handle_throw(v) {
+            Ok(()) => {}
+            Err(Throw::Exception(ex)) => {
+                self.vm.pop_try_frame();
+                self.vm.pop_ctx();
+                return Ok((Value::Empty, ResultType::Normal, Some(ex)));
+            }
+            Err(other) => return Err(other),
+        }
+        let r = self.gen_step(g)?;
+        self.vm.pop_try_frame();
+        self.vm.pop_ctx();
+        Ok(r)
+    }
+}
+
+fn gen_obj(rt: &Runtime, o: ObjRef) -> &GeneratorObject {
+    match &rt.obj(o).ext {
+        ObjExt::Generator(g) => g,
+        _ => unreachable!("not a generator object"),
+    }
+}
+
+fn gen_obj_mut(rt: &mut Runtime, o: ObjRef) -> &mut GeneratorObject {
+    match &mut rt.obj_mut(o).ext {
+        ObjExt::Generator(g) => g,
+        _ => unreachable!("not a generator object"),
+    }
+}
+
+fn take_gen(rt: &mut Runtime, o: ObjRef) -> Generator {
+    std::mem::take(&mut gen_obj_mut(rt, o).gen_)
+}
+
+fn put_gen(rt: &mut Runtime, o: ObjRef, g: Generator) {
+    gen_obj_mut(rt, o).gen_ = g;
+}
+
+fn set_gen_state(rt: &mut Runtime, o: ObjRef, state: GeneratorState) {
+    gen_obj_mut(rt, o).state = state;
+}
+
+fn gen_state(rt: &Runtime, o: ObjRef) -> GeneratorState {
+    gen_obj(rt, o).state
+}
+
+fn generator_object_gen_next(rt: &mut Runtime, o: ObjRef, v: Value) -> JsResult<StepResult> {
+    let mut g = take_gen(rt, o);
+    let r = rt.gen_next(&mut g, v);
+    put_gen(rt, o, g);
+    r
+}
+
+fn generator_object_gen_next_throw(rt: &mut Runtime, o: ObjRef, v: Throw) -> JsResult<StepResult> {
+    let mut g = take_gen(rt, o);
+    let r = rt.gen_next_throw(&mut g, v);
+    put_gen(rt, o, g);
+    r
+}
+
+pub fn generator_object_init(
+    rt: &mut Runtime,
+    o: ObjRef,
+    f: ObjRef,
+    vm_call: VmCallFn,
+    n_args: usize,
+) -> JsResult<()> {
+    let mut g = Generator::default();
+    rt.gen_enter(&mut g)?;
+    vm_call(rt, f, n_args)?;
+    let r = rt.gen_step(&mut g);
+    put_gen(rt, o, g);
+    let (_, _, ex) = r?;
+    rt.vm.pop_try_frame();
+    if let Some(ex) = ex {
+        return Err(Throw::Exception(ex));
+    }
+    set_gen_state(rt, o, GeneratorState::SuspendedStart);
+    rt.vm.pop_ctx();
+    Ok(())
+}
+
+pub fn generator_call(
+    rt: &mut Runtime,
+    f: ObjRef,
+    vm_call: VmCallFn,
+    n_args: usize,
+) -> JsResult<Value> {
+    let o = rt.alloc_object(
+        &GENERATOR_OBJECT_CLASS,
+        BaseObject::new(crate::object::CLASS_OBJECT, None),
+        ObjExt::Generator(Box::new(GeneratorObject {
+            gen_: Generator::default(),
+            delegated: None,
+            state: GeneratorState::Undefined,
+        })),
+    );
+    rt.handles.push(o);
+    generator_object_init(rt, o, f, vm_call, n_args)?;
+    let gp = rt.get_generator_prototype();
+    let proto = rt.get_prototype_from_ctor(f, None, Some(gp))?;
+    rt.obj_mut(o).base.prototype = proto;
+    Ok(Value::Object(o))
+}
+
+pub fn generator_vm_call(
+    rt: &mut Runtime,
+    f: ObjRef,
+    vm_call: VmCallFn,
+    n_args: usize,
+) -> JsResult<()> {
+    let v = generator_call(rt, f, vm_call, n_args)?;
+    rt.vm.push(v);
+    rt.vm.pc += 1;
+    Ok(())
+}
+
+fn generator_object_validate(rt: &mut Runtime, o: ObjRef) -> JsResult<()> {
+    if gen_state(rt, o) == GeneratorState::Executing {
+        return Err(Throw::Value(rt.new_type_error("Illegal generator state")));
+    }
+    Ok(())
+}
+
+fn generator_object_step(rt: &mut Runtime, o: ObjRef, r: StepResult) -> JsResult<Value> {
+    let (res, res_type, ex) = r;
+    if let Some(ex) = ex {
+        let g = gen_obj_mut(rt, o);
+        g.delegated = None;
+        g.state = GeneratorState::Completed;
+        return Err(Throw::Exception(ex));
+    }
+    match res_type {
+        ResultType::Yield => {
+            set_gen_state(rt, o, GeneratorState::SuspendedYield);
+            Ok(rt.create_iter_result_object(res, false))
+        }
+        ResultType::YieldDelegate => {
+            set_gen_state(rt, o, GeneratorState::SuspendedYield);
+            generator_object_delegate(rt, o, res)
+        }
+        ResultType::YieldRes => {
+            set_gen_state(rt, o, GeneratorState::SuspendedYieldRes);
+            Ok(rt.create_iter_result_object(res, false))
+        }
+        ResultType::YieldDelegateRes => {
+            set_gen_state(rt, o, GeneratorState::SuspendedYieldRes);
+            generator_object_delegate(rt, o, res)
+        }
+        ResultType::Normal => {
+            set_gen_state(rt, o, GeneratorState::Completed);
+            Ok(rt.create_iter_result_object(res, true))
+        }
+        ResultType::Await => Err(Throw::Value(rt.new_type_error(&format!(
+            "Runtime bug: unexpected result type: {}",
+            res_type as u8
+        )))),
+    }
+}
+
+fn generator_object_delegate(rt: &mut Runtime, o: ObjRef, v: Value) -> JsResult<Value> {
+    if let Value::Object(obj) = &v {
+        rt.handles.push(*obj);
+    }
+    let mut iter = None;
+    let ex = rt.vm_try_result(|rt| {
+        iter = Some(rt.get_iterator(&v, None)?);
+        Ok(())
+    })?;
+    if let Some(ex) = ex {
+        let g = gen_obj_mut(rt, o);
+        g.delegated = None;
+        g.state = GeneratorState::Completed;
+        let r = generator_object_gen_next_throw(rt, o, Throw::Exception(ex))?;
+        return generator_object_step(rt, o, r);
+    }
+    gen_obj_mut(rt, o).delegated = iter;
+    generator_object_next(rt, o, Value::Undefined)
+}
+
+fn generator_object_try_call_delegated(
+    rt: &mut Runtime,
+    o: ObjRef,
+    f: impl FnOnce(&mut Runtime) -> JsResult<(Value, bool)>,
+) -> JsResult<(Value, bool)> {
+    let mut ret = (Value::Empty, false);
+    let ex = rt.vm_try_result(|rt| {
+        ret = f(rt)?;
+        Ok(())
+    })?;
+    if let Some(ex) = ex {
+        let g = gen_obj_mut(rt, o);
+        g.delegated = None;
+        g.state = GeneratorState::Executing;
+        let r = generator_object_gen_next_throw(rt, o, Throw::Exception(ex))?;
+        return Ok((generator_object_step(rt, o, r)?, false));
+    }
+    Ok(ret)
+}
+
+fn generator_object_call_delegated(
+    rt: &mut Runtime,
+    o: ObjRef,
+    method: Option<CallFn>,
+    v: Value,
+) -> JsResult<(Value, bool)> {
+    let this = gen_obj(rt, o)
+        .delegated
+        .and_then(|d| d.iterator)
+        .map(Value::Object)
+        .unwrap_or_default();
+    let Some(method) = method else {
+        return Err(Throw::Value(
+            rt.new_type_error("iterator.next is missing or not a function"),
+        ));
+    };
+    let r = method.call(rt, this, &[v])?;
+    let res = rt.to_object(&r)?;
+    rt.handles.push(res);
+    if iterator_complete(rt, res)? {
+        gen_obj_mut(rt, o).delegated = None;
+        return Ok((iterator_value(rt, res)?, true));
+    }
+    Ok((Value::Object(res), false))
+}
+
+pub fn generator_object_next(rt: &mut Runtime, o: ObjRef, v: Value) -> JsResult<Value> {
+    generator_object_validate(rt, o)?;
+    if gen_state(rt, o) == GeneratorState::Completed {
+        return Ok(rt.create_iter_result_object(Value::Undefined, true));
+    }
+    let mut v = v;
+    if let Some(d) = gen_obj(rt, o).delegated {
+        let arg = v.clone();
+        let (res, done) = generator_object_try_call_delegated(rt, o, |rt| {
+            generator_object_call_delegated(rt, o, d.next, arg)
+        })?;
+        if !done {
+            return Ok(res);
+        }
+        v = res;
+    }
+    if gen_state(rt, o) != GeneratorState::SuspendedYieldRes {
+        v = Value::Empty;
+    }
+    set_gen_state(rt, o, GeneratorState::Executing);
+    let r = generator_object_gen_next(rt, o, v)?;
+    generator_object_step(rt, o, r)
+}
+
+pub fn generator_object_throw(rt: &mut Runtime, o: ObjRef, v: Value) -> JsResult<Value> {
+    generator_object_validate(rt, o)?;
+    if gen_state(rt, o) == GeneratorState::SuspendedStart {
+        set_gen_state(rt, o, GeneratorState::Completed);
+    }
+    if gen_state(rt, o) == GeneratorState::Completed {
+        return Err(Throw::Value(v));
+    }
+    if let Some(d) = gen_obj(rt, o).delegated {
+        let arg = v.clone();
+        let (mut res, done) = generator_object_try_call_delegated(rt, o, |rt| {
+            let it = gen_obj(rt, o).delegated.and_then(|d| d.iterator);
+            let m = match it {
+                Some(it) => it.get_str(rt, &"throw".into(), None)?,
+                None => None,
+            };
+            let method = to_method(rt, m)?;
+            if method.is_some() {
+                return generator_object_call_delegated(rt, o, method, arg);
+            }
+            gen_obj_mut(rt, o).delegated = None;
+            let mut d = d;
+            d.return_iter(rt)?;
+            Err(Throw::Value(rt.new_type_error(
+                "The iterator does not provide a 'throw' method",
+            )))
+        })?;
+        if !done {
+            return Ok(res);
+        }
+        if gen_state(rt, o) != GeneratorState::SuspendedYieldRes {
+            res = Value::Empty;
+        }
+        set_gen_state(rt, o, GeneratorState::Executing);
+        let r = generator_object_gen_next(rt, o, res)?;
+        return generator_object_step(rt, o, r);
+    }
+    set_gen_state(rt, o, GeneratorState::Executing);
+    let r = generator_object_gen_next_throw(rt, o, Throw::Value(v))?;
+    generator_object_step(rt, o, r)
+}
+
+pub fn generator_object_return(rt: &mut Runtime, o: ObjRef, v: Value) -> JsResult<Value> {
+    generator_object_validate(rt, o)?;
+    if gen_state(rt, o) == GeneratorState::SuspendedStart {
+        set_gen_state(rt, o, GeneratorState::Completed);
+    }
+    if gen_state(rt, o) == GeneratorState::Completed {
+        return Ok(rt.create_iter_result_object(v, true));
+    }
+    let mut v = v;
+    if gen_obj(rt, o).delegated.is_some() {
+        let arg = v.clone();
+        let (res, done) = generator_object_try_call_delegated(rt, o, |rt| {
+            let it = gen_obj(rt, o).delegated.and_then(|d| d.iterator);
+            let m = match it {
+                Some(it) => it.get_str(rt, &"return".into(), None)?,
+                None => None,
+            };
+            let method = to_method(rt, m)?;
+            if method.is_some() {
+                return generator_object_call_delegated(rt, o, method, arg);
+            }
+            gen_obj_mut(rt, o).delegated = None;
+            Ok((arg, true))
+        })?;
+        if !done {
+            return Ok(res);
+        }
+        v = res;
+    }
+    if let Value::Object(obj) = &v {
+        rt.handles.push(*obj);
+    }
+
+    set_gen_state(rt, o, GeneratorState::Executing);
+
+    let mut g = take_gen(rt, o);
+    let r = generator_object_return_inner(rt, o, &mut g);
+    put_gen(rt, o, g);
+    r?;
+    Ok(rt.create_iter_result_object(v, true))
+}
+
+fn generator_object_return_inner(rt: &mut Runtime, o: ObjRef, g: &mut Generator) -> JsResult<()> {
+    rt.gen_enter_next(g)?;
+    let mut ex = None;
+    loop {
+        let Some(tf) = rt.vm.try_stack.last() else {
+            break;
+        };
+        if tf.call_stack_len as usize != rt.vm.call_stack.len() {
+            break;
+        }
+        if tf.finally_pos >= 0 {
+            let (sp, stash, priv_env, iter_len, ref_len, finally_pos) = (
+                tf.sp,
+                tf.stash,
+                tf.priv_env.clone(),
+                tf.iter_len,
+                tf.ref_len,
+                tf.finally_pos,
+            );
+            rt.vm.sp = sp as isize;
+            rt.vm.stash = stash;
+            rt.vm.priv_env = priv_env;
+            if let Some(e) = rt.vm_restore_stacks(iter_len, ref_len)? {
+                ex = Some(e);
+                rt.vm.pop_try_frame();
+                continue;
+            }
+            rt.vm.pc = finally_pos as isize;
+            if let Some(tf) = rt.vm.try_stack.last_mut() {
+                tf.catch_pos = TRY_PANIC_MARKER;
+                tf.finally_pos = -1;
+                tf.finally_ret = -2;
+            }
+            loop {
+                if let Some(e) = rt.vm_run_try_inner()? {
+                    ex = Some(e);
+                    rt.vm.pop_try_frame();
+                    break;
+                }
+                if rt.vm.halted() {
+                    break;
+                }
+            }
+        } else {
+            rt.vm.pop_try_frame();
+        }
+    }
+
+    set_gen_state(rt, o, GeneratorState::Completed);
+
+    rt.vm.pop_try_frame();
+
+    if ex.is_none() {
+        ex = rt.vm_restore_stacks(g.iter_stack_len, g.ref_stack_len)?;
+    }
+
+    if let Some(ex) = ex {
+        return Err(Throw::Exception(ex));
+    }
+
+    rt.vm.call_stack.pop();
+    rt.vm.sp = rt.vm.sb - 1;
+    rt.vm.pop_ctx();
+    Ok(())
+}
+
+#[derive(Clone)]
+pub struct PromiseCapability {
+    pub promise: Value,
+    pub resolve_obj: Value,
+    pub reject_obj: Value,
+}
+
+impl PromiseCapability {
+    pub fn trace(&self, t: &mut Tracer) {
+        t.value(&self.promise);
+        t.value(&self.resolve_obj);
+        t.value(&self.reject_obj);
+    }
+
+    pub fn resolve(&self, rt: &mut Runtime, v: Value) -> JsResult<()> {
+        let f = rt.to_callable(&self.resolve_obj)?;
+        f.call(rt, Value::Undefined, &[v])?;
+        Ok(())
+    }
+
+    pub fn reject(&self, rt: &mut Runtime, v: Value) -> JsResult<()> {
+        let f = rt.to_callable(&self.reject_obj)?;
+        f.call(rt, Value::Undefined, &[v])?;
+        Ok(())
+    }
+}
+
+pub struct AsyncRunner {
+    pub gen_: Generator,
+    pub promise_cap: Option<PromiseCapability>,
+    pub f: ObjRef,
+    pub vm_call: VmCallFn,
+}
+
+impl ObjData for AsyncRunner {
+    fn trace(&self, t: &mut Tracer) {
+        self.gen_.trace(t);
+        if let Some(p) = &self.promise_cap {
+            p.trace(t);
+        }
+        t.obj(self.f);
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
+
+fn async_runner(rt: &Runtime, ar: ObjRef) -> &AsyncRunner {
+    rt.ext_dyn::<AsyncRunner>(ar).expect("async runner")
+}
+
+fn async_runner_mut(rt: &mut Runtime, ar: ObjRef) -> &mut AsyncRunner {
+    rt.ext_dyn_mut::<AsyncRunner>(ar).expect("async runner")
+}
+
+fn take_async_gen(rt: &mut Runtime, ar: ObjRef) -> Generator {
+    std::mem::take(&mut async_runner_mut(rt, ar).gen_)
+}
+
+fn put_async_gen(rt: &mut Runtime, ar: ObjRef, g: Generator) {
+    async_runner_mut(rt, ar).gen_ = g;
+}
+
+pub fn new_async_runner(rt: &mut Runtime, f: ObjRef, vm_call: VmCallFn) -> ObjRef {
+    let ar = rt.alloc_object(
+        &crate::object::BASE_OBJECT_CLASS,
+        BaseObject::new(crate::object::CLASS_OBJECT, None),
+        ObjExt::Dyn(Box::new(AsyncRunner {
+            gen_: Generator::default(),
+            promise_cap: None,
+            f,
+            vm_call,
+        })),
+    );
+    rt.handles.push(ar);
+    ar
+}
+
+pub fn async_runner_on_fulfilled(
+    rt: &mut Runtime,
+    ar: ObjRef,
+    call: FunctionCall<'_>,
+) -> JsResult<Value> {
+    rt.vm.cur_async_runner = Some(ar);
+    let arg = call.argument(0);
+    let mut g = take_async_gen(rt, ar);
+    let r = rt.gen_next(&mut g, arg);
+    put_async_gen(rt, ar, g);
+    let r = match r {
+        Ok((res, res_type, ex)) => {
+            async_runner_step(rt, ar, res, res_type == ResultType::Normal, ex)
+        }
+        Err(e) => Err(e),
+    };
+    rt.vm.cur_async_runner = None;
+    r?;
+    Ok(Value::Undefined)
+}
+
+pub fn async_runner_on_rejected(
+    rt: &mut Runtime,
+    ar: ObjRef,
+    call: FunctionCall<'_>,
+) -> JsResult<Value> {
+    rt.vm.cur_async_runner = Some(ar);
+    let reason = call.argument(0);
+    let mut g = take_async_gen(rt, ar);
+    let r = rt.gen_next_throw(&mut g, Throw::Value(reason));
+    put_async_gen(rt, ar, g);
+    let r = match r {
+        Ok((res, res_type, ex)) => {
+            async_runner_step(rt, ar, res, res_type == ResultType::Normal, ex)
+        }
+        Err(e) => Err(e),
+    };
+    rt.vm.cur_async_runner = None;
+    r?;
+    Ok(Value::Undefined)
+}
+
+pub fn async_runner_step(
+    rt: &mut Runtime,
+    ar: ObjRef,
+    res: Value,
+    done: bool,
+    ex: Option<Box<Exception>>,
+) -> JsResult<()> {
+    if done || ex.is_some() {
+        let cap = async_runner(rt, ar).promise_cap.clone();
+        return match (&cap, ex) {
+            (Some(cap), None) => cap.resolve(rt, res),
+            (Some(cap), Some(ex)) => cap.reject(rt, ex.val),
+            (None, _) => Ok(()),
+        };
+    }
+    let p = rt.get_promise();
+    let promise = rt.promise_resolve(p, res)?;
+    rt.promise_add_async_runner_reactions(promise, ar)
+}
+
+pub fn async_runner_start(rt: &mut Runtime, ar: ObjRef, n_args: usize) -> JsResult<()> {
+    let p = rt.get_promise();
+    let cap = rt.new_promise_capability(p)?;
+    async_runner_mut(rt, ar).promise_cap = Some(cap);
+    let sp = rt.vm.sp;
+    let mut g = Generator::default();
+    let entered = rt.gen_enter(&mut g);
+    put_async_gen(rt, ar, g);
+    entered?;
+    let (f, vm_call) = {
+        let a = async_runner(rt, ar);
+        (a.f, a.vm_call)
+    };
+    vm_call(rt, f, n_args)?;
+    let mut g = take_async_gen(rt, ar);
+    let r = rt.gen_step(&mut g);
+    put_async_gen(rt, ar, g);
+    let (res, res_type, ex) = r?;
+    let failed = ex.is_some();
+    async_runner_step(rt, ar, res, res_type == ResultType::Normal, ex)?;
+    if failed {
+        rt.vm.sp = sp - n_args as isize - 2;
+    }
+    rt.vm.pop_try_frame();
+    rt.vm.pop_ctx();
+    Ok(())
+}
+
+pub fn async_runner_promise(rt: &Runtime, ar: ObjRef) -> Value {
+    async_runner(rt, ar)
+        .promise_cap
+        .as_ref()
+        .map(|c| c.promise.clone())
+        .unwrap_or_default()
+}
+
+pub fn async_call(
+    rt: &mut Runtime,
+    f: ObjRef,
+    call: FunctionCall<'_>,
+    vm_call: VmCallFn,
+) -> JsResult<Value> {
+    prepare_for_vm_call(rt, f, call);
+    let ar = new_async_runner(rt, f, vm_call);
+    async_runner_start(rt, ar, call.arguments.len())?;
+    Ok(async_runner_promise(rt, ar))
+}
+
+pub fn async_vm_call(rt: &mut Runtime, f: ObjRef, n: usize, vm_call: VmCallFn) -> JsResult<()> {
+    let ar = new_async_runner(rt, f, vm_call);
+    async_runner_start(rt, ar, n)?;
+    let p = async_runner_promise(rt, ar);
+    rt.vm.push(p);
+    rt.vm.pc += 1;
+    Ok(())
+}
+
+impl Runtime {
+    pub fn new_promise_capability(&mut self, c: ObjRef) -> JsResult<PromiseCapability> {
+        let _ = c;
+        todo!("newPromiseCapability: Promise is not ported yet")
+    }
+
+    pub fn promise_resolve(&mut self, c: ObjRef, x: Value) -> JsResult<ObjRef> {
+        let _ = (c, x);
+        todo!("promiseResolve: Promise is not ported yet")
+    }
+
+    pub fn promise_add_async_runner_reactions(
+        &mut self,
+        promise: ObjRef,
+        ar: ObjRef,
+    ) -> JsResult<()> {
+        let _ = (promise, ar);
+        todo!("Promise.addReactions with asyncRunner: Promise is not ported yet")
+    }
+}
 
 pub fn func_source(rt: &mut Runtime, o: ObjRef) -> Option<JsResult<JsString>> {
     match &rt.obj(o).ext {
