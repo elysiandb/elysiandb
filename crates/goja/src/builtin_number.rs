@@ -72,9 +72,12 @@ impl Runtime {
         if let Some(r) = self.global.parse_float {
             return r;
         }
-        let ret = self.reserve_object();
+        let ret = self.new_native_func(
+            crate::func::NativeFn::Fn(|r, c| r.builtin_parse_float(c)),
+            "parseFloat",
+            1,
+        );
         self.global.parse_float = Some(ret);
-        self.new_templated_func_object(get_parse_float_template(), Some(ret), None, None);
         ret
     }
 
@@ -82,9 +85,12 @@ impl Runtime {
         if let Some(r) = self.global.parse_int {
             return r;
         }
-        let ret = self.reserve_object();
+        let ret = self.new_native_func(
+            crate::func::NativeFn::Fn(|r, c| r.builtin_parse_int(c)),
+            "parseInt",
+            2,
+        );
         self.global.parse_int = Some(ret);
-        self.new_templated_func_object(get_parse_int_template(), Some(ret), None, None);
         ret
     }
 }
