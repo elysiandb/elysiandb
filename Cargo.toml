@@ -103,6 +103,10 @@ path = "tests/internal/stat_test/main.rs"
 name = "transaction_test"
 path = "tests/internal/transaction_test/main.rs"
 
+[[test]]
+name = "metrics_test"
+path = "tests/internal/metrics_test/main.rs"
+
 [profile.release]
 strip = true
 panic = "unwind"

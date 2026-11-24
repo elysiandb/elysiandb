@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-env-changed=ELYSIANDB_VERSION");
@@ -12,6 +13,23 @@ fn main() {
         Err(_) => "dev".to_string(),
     };
     println!("cargo:rustc-env=ELYSIANDB_BUILD_VERSION={version}");
+
+    println!("cargo:rerun-if-env-changed=RUSTC");
+    let rustc = env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
+    let rust_version = Command::new(rustc)
+        .arg("--version")
+        .output()
+        .ok()
+        .and_then(|out| String::from_utf8(out.stdout).ok())
+        .and_then(|text| {
+            let mut words = text.split_whitespace();
+            match (words.next(), words.next()) {
+                (Some(name), Some(number)) => Some(format!("{name} {number}")),
+                _ => None,
+            }
+        })
+        .unwrap_or_else(|| "rustc".to_string());
+    println!("cargo:rustc-env=ELYSIANDB_RUST_VERSION={rust_version}");
 
     println!("cargo:rerun-if-env-changed=ELYSIANDB_ADMINUI_DIST");
     let dist = env::var_os("ELYSIANDB_ADMINUI_DIST")

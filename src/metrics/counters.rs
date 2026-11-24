@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::error::Error as StdError;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crate::gocompat::json::{Encode, EncodeState, Error as JsonError};
 use crate::gocompat::sort;
@@ -10,6 +10,7 @@ use crate::gocompat::time::Time;
 use crate::sync::{Mutex, RwLock};
 
 use super::histogram::{Hist, Histogram, nanos};
+use super::sampler::Moment;
 use super::series::{Number, num, round};
 
 pub const C_HTTP: usize = 0;
@@ -72,8 +73,7 @@ pub static TCP_AUTH: Histogram = Histogram::new();
 pub static HEAVY_WAIT: Histogram = Histogram::new();
 pub static HOOK_LATENCY: Histogram = Histogram::new();
 pub static TCP_OPEN: AtomicI64 = AtomicI64::new(0);
-pub static STARTED_AT: LazyLock<RwLock<(Time, Instant)>> =
-    LazyLock::new(|| RwLock::new((Time::now(), Instant::now())));
+pub static STARTED_AT: LazyLock<RwLock<Moment>> = LazyLock::new(|| RwLock::new(Moment::now()));
 pub static ROUTE_STATS: RwLock<BTreeMap<Vec<u8>, Arc<RouteStat>>> = RwLock::new(BTreeMap::new());
 pub static HOOK_STATS: RwLock<BTreeMap<Vec<u8>, Arc<HookStat>>> = RwLock::new(BTreeMap::new());
 pub static AUTH_FAILURES: Mutex<AddressCounter> = Mutex::new(AddressCounter::new());
@@ -82,7 +82,7 @@ pub static RECOVERY_STATE: Mutex<TimedError> = Mutex::new(TimedError::new());
 pub static HOOK_FAILURE: Mutex<TimedError> = Mutex::new(TimedError::new());
 pub static REPLAYED: AtomicI64 = AtomicI64::new(0);
 
-pub fn started_at() -> (Time, Instant) {
+pub fn started_at() -> Moment {
     STARTED_AT.read().clone()
 }
 
@@ -350,7 +350,7 @@ pub struct PersistenceStatus {
     pub last_success_at: Option<Time>,
 }
 
-fn encode_time(t: &Time, e: &mut EncodeState) -> Result<(), JsonError> {
+pub(super) fn encode_time(t: &Time, e: &mut EncodeState) -> Result<(), JsonError> {
     let mut b = Vec::with_capacity(40);
     b.push(b'"');
     t.append_strict_rfc3339(&mut b)
@@ -360,7 +360,7 @@ fn encode_time(t: &Time, e: &mut EncodeState) -> Result<(), JsonError> {
     Ok(())
 }
 
-fn encode_optional_time(t: &Option<Time>, e: &mut EncodeState) -> Result<(), JsonError> {
+pub(super) fn encode_optional_time(t: &Option<Time>, e: &mut EncodeState) -> Result<(), JsonError> {
     match t {
         Some(t) => encode_time(t, e),
         None => {
@@ -409,7 +409,7 @@ pub fn flush_failing_since() -> Option<Time> {
 
 #[derive(Clone, Debug, Default)]
 pub struct TimedError {
-    pub at: Option<(Time, Instant)>,
+    pub at: Option<Moment>,
     pub message: String,
     pub key: Vec<u8>,
 }
@@ -424,12 +424,12 @@ impl TimedError {
     }
 
     pub fn set(&mut self, message: String, key: &[u8]) {
-        self.at = Some((Time::now(), Instant::now()));
+        self.at = Some(Moment::now());
         self.message = message;
         self.key = key.to_vec();
     }
 
-    pub fn get(&self) -> (Option<(Time, Instant)>, Vec<u8>) {
+    pub fn get(&self) -> (Option<Moment>, Vec<u8>) {
         (self.at.clone(), self.key.clone())
     }
 }
@@ -804,7 +804,7 @@ fn zero(h: &Histogram) {
     h.sum.store(0, Ordering::SeqCst);
 }
 
-pub fn reset() {
+pub(super) fn reset_counters() {
     for c in &COUNTERS {
         c.store(0, Ordering::SeqCst);
     }
@@ -821,5 +821,5 @@ pub fn reset() {
     *RECOVERY_STATE.lock() = TimedError::new();
     *HOOK_FAILURE.lock() = TimedError::new();
     REPLAYED.store(0, Ordering::SeqCst);
-    *STARTED_AT.write() = (Time::now(), Instant::now());
+    *STARTED_AT.write() = Moment::now();
 }
