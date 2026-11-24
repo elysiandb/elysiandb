@@ -49,6 +49,10 @@ impl ByteFields {
         self.0.is_empty()
     }
 
+    fn holds_invalid_utf8(&self) -> bool {
+        self.0.values().any(|v| std::str::from_utf8(v).is_err())
+    }
+
     pub fn apply(&self, data: &mut Map) {
         for (key, value) in &self.0 {
             data.insert(key.clone(), Value::String(utf8::decode_string(value)));
@@ -89,7 +93,7 @@ impl Encode for Document<'_> {
 }
 
 pub fn encode_document(data: &Map, fields: &ByteFields) -> Result<Vec<u8>, json::Error> {
-    if fields.is_empty() {
+    if !fields.holds_invalid_utf8() {
         return json::marshal(data);
     }
 
@@ -525,7 +529,7 @@ fn put_document(
     data: &Map,
     fields: &ByteFields,
 ) -> Result<(), BoxError> {
-    if fields.is_empty() {
+    if !fields.holds_invalid_utf8() {
         return tx.put(entity, id, data);
     }
 
