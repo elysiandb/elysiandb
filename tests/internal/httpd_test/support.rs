@@ -36,6 +36,17 @@ impl LogBuffer {
     pub fn clear(&self) {
         self.0.lock().clear();
     }
+
+    pub fn wait_for(&self, needle: &str) -> String {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let text = self.text();
+            if text.contains(needle) || Instant::now() >= deadline {
+                return text;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
 }
 
 pub struct LogCapture {

@@ -346,8 +346,13 @@ fn test_connection_errors() {
             Some("text/plain; charset=utf-8")
         );
         assert!(closed);
-        std::thread::sleep(Duration::from_millis(50));
-        let line = logs.buf.text();
+        let line = match reason {
+            Some(r) => logs.buf.wait_for(&format!("error=\"{r}\"")),
+            None => {
+                std::thread::sleep(Duration::from_millis(50));
+                logs.buf.text()
+            }
+        };
         match reason {
             Some(r) => {
                 assert!(line.contains("http connection error"), "{line}");
@@ -366,13 +371,10 @@ fn test_connection_errors() {
         text(&raw)
     );
     assert!(closed);
-    std::thread::sleep(Duration::from_millis(50));
+    let line = logs.buf.wait_for("unexpected end of the request head");
     assert!(
-        logs.buf
-            .text()
-            .contains("unexpected end of the request head"),
-        "{}",
-        logs.buf.text()
+        line.contains("unexpected end of the request head"),
+        "{line}"
     );
 
     logs.buf.clear();
@@ -415,8 +417,11 @@ fn test_limits() {
     assert_eq!(r.status, "HTTP/1.1 400 Bad Request");
     assert_eq!(r.body, b"request body too large");
     assert!(closed);
-    std::thread::sleep(Duration::from_millis(50));
-    assert!(logs.buf.text().contains("error=\"request body too large\""));
+    assert!(
+        logs.buf
+            .wait_for("error=\"request body too large\"")
+            .contains("error=\"request body too large\"")
+    );
 
     let chunked = |n: usize| {
         let mut req = b"PUT /kv/c HTTP/1.1\r\nHost: h\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n".to_vec();
@@ -485,8 +490,11 @@ fn test_chunked_request_bodies() {
     );
     assert_eq!(parse_responses(&raw)[0].body, b"bad request");
     assert!(closed);
-    std::thread::sleep(Duration::from_millis(50));
-    assert!(logs.buf.text().contains("error=\"invalid chunked body\""));
+    assert!(
+        logs.buf
+            .wait_for("error=\"invalid chunked body\"")
+            .contains("error=\"invalid chunked body\"")
+    );
 
     logs.buf.clear();
     let (raw, _) = roundtrip(
@@ -494,8 +502,11 @@ fn test_chunked_request_bodies() {
         b"POST /c HTTP/1.1\r\nHost: h\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\nabc\r\n0\r\n\r\n",
     );
     assert_eq!(parse_responses(&raw)[0].body, b"bad request");
-    std::thread::sleep(Duration::from_millis(50));
-    assert!(logs.buf.text().contains("error=\"invalid chunked body\""));
+    assert!(
+        logs.buf
+            .wait_for("error=\"invalid chunked body\"")
+            .contains("error=\"invalid chunked body\"")
+    );
 
     logs.buf.clear();
     let (raw, _) = roundtrip_half_close(
@@ -744,8 +755,9 @@ fn test_concurrency_limit() {
         "HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nServer: ElysianDB\r\nDate: <DATE>\r\nContent-Type: text/plain\r\nContent-Length: 20\r\n\r\ntoo many connections"
     );
     assert!(closed);
-    assert!(logs.buf.text().contains("http connection limit reached"));
-    assert!(logs.buf.text().contains("limit=1"));
+    let line = logs.buf.wait_for("http connection limit reached");
+    assert!(line.contains("http connection limit reached"), "{line}");
+    assert!(line.contains("limit=1"), "{line}");
 }
 
 #[test]
