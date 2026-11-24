@@ -1,3 +1,4 @@
+use goja::deps::regexp;
 use goja::parser::{RE2_DOT, WHITESPACE_CHARS, transform_reg_exp};
 
 fn test_err(input: &str, expect: &str) {
@@ -16,6 +17,9 @@ fn test_ok(input: &str, expect: &str) {
     let result = transform_reg_exp(input.as_bytes(), false, false)
         .unwrap_or_else(|e| panic!("{input:?}: {e}"));
     assert_eq!(String::from_utf8_lossy(&result), expect, "{input:?}");
+    if let Err(e) = regexp::compile(&result) {
+        panic!("{input:?}: {e}");
+    }
 }
 
 #[test]
@@ -87,6 +91,7 @@ fn test_transform_reg_exp() {
         String::from_utf8_lossy(&pattern),
         ["[", WHITESPACE_CHARS, "]+abc[", WHITESPACE_CHARS, "]+"].concat()
     );
+    assert!(regexp::must_compile(&pattern).match_string(b"\t abc def"));
     let pattern = transform_reg_exp(b"\\u{1d306}", false, true).expect("pattern");
     assert_eq!(String::from_utf8_lossy(&pattern), "\\x{1d306}");
     let pattern = transform_reg_exp(b"\\u1234", false, false).expect("pattern");
