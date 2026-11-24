@@ -326,10 +326,25 @@ pub fn to_numeric(v: &Value) -> Result<Value, ValueError> {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
+pub fn go_float_to_int(f: f64) -> i64 {
+    let min = i64::MIN as f64;
+    if f.is_nan() || !(min..-min).contains(&f) {
+        i64::MIN
+    } else {
+        f as i64
+    }
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+pub fn go_float_to_int(f: f64) -> i64 {
+    f as i64
+}
+
 pub fn to_int32(v: &Value) -> Result<i32, ValueError> {
     match v.to_number()? {
         Value::Int(i) => Ok(i as i32),
-        Value::Float(f) if !f.is_nan() && !f.is_infinite() => Ok((f as i64) as i32),
+        Value::Float(f) if !f.is_nan() && !f.is_infinite() => Ok(go_float_to_int(f) as i32),
         _ => Ok(0),
     }
 }
@@ -337,7 +352,7 @@ pub fn to_int32(v: &Value) -> Result<i32, ValueError> {
 pub fn to_uint32(v: &Value) -> Result<u32, ValueError> {
     match v.to_number()? {
         Value::Int(i) => Ok(i as u32),
-        Value::Float(f) if !f.is_nan() && !f.is_infinite() => Ok((f as i64) as u32),
+        Value::Float(f) if !f.is_nan() && !f.is_infinite() => Ok(go_float_to_int(f) as u32),
         _ => Ok(0),
     }
 }

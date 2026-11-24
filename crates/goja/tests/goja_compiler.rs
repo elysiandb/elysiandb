@@ -145,3 +145,17 @@ fn compiled_programs_can_be_shared_between_threads() {
     assert_send_sync::<goja::Program>();
     assert_send_sync::<std::sync::Arc<goja::Program>>();
 }
+
+#[test]
+fn out_of_range_float_conversions_follow_the_go_architecture() {
+    let p = goja::compile("", b"var x = [1e20 | 0, 1e20 >>> 0];", false).expect("compiled");
+    let d = goja::gojadump::program(&p);
+    let want = if cfg!(target_arch = "x86_64") {
+        ["{v:0}", "{v:0}"]
+    } else {
+        ["{v:-1}", "{v:4294967295}"]
+    };
+    for w in want {
+        assert!(d.contains(&format!("goja.loadVal\t{w}")), "{d}");
+    }
+}
