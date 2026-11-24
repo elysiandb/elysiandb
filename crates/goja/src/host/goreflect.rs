@@ -21,6 +21,12 @@ pub enum GoKind {
     Ptr,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GoIntKind {
+    Int,
+    Int64,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct GoMethod {
     pub name: &'static str,
@@ -37,6 +43,9 @@ pub trait GoMethods: Any {
         None
     }
     fn value_of(&self) -> Option<Value> {
+        None
+    }
+    fn go_int(&self) -> Option<(GoIntKind, i64)> {
         None
     }
     fn export_value(&self, this: &HostRef) -> DocValue {
@@ -421,16 +430,37 @@ pub fn to_int64(rt: &mut Runtime, v: &Value) -> JsResult<i64> {
     }
 }
 
-pub fn arg_int(rt: &mut Runtime, call: &FunctionCall<'_>, i: usize) -> JsResult<i64> {
+pub fn reflect_int(rt: &Runtime, v: &Value, kind: GoIntKind) -> Option<i64> {
+    let Value::Object(o) = v else {
+        return None;
+    };
+    match reflect_value(rt, *o)?.go_int()? {
+        (k, n) if k == kind => Some(n),
+        _ => None,
+    }
+}
+
+fn arg_int_kind(
+    rt: &mut Runtime,
+    call: &FunctionCall<'_>,
+    i: usize,
+    kind: GoIntKind,
+) -> JsResult<i64> {
     let Some(v) = arg_present(call, i) else {
         return Ok(0);
     };
-    if let Value::Object(o) = &v
-        && let Some(Value::Int(n)) = reflect_value_of(rt, *o)
-    {
+    if let Some(n) = reflect_int(rt, &v, kind) {
         return Ok(n);
     }
     to_int64(rt, &v)
+}
+
+pub fn arg_int(rt: &mut Runtime, call: &FunctionCall<'_>, i: usize) -> JsResult<i64> {
+    arg_int_kind(rt, call, i, GoIntKind::Int)
+}
+
+pub fn arg_int64(rt: &mut Runtime, call: &FunctionCall<'_>, i: usize) -> JsResult<i64> {
+    arg_int_kind(rt, call, i, GoIntKind::Int64)
 }
 
 pub fn arg_string(rt: &mut Runtime, call: &FunctionCall<'_>, i: usize) -> JsResult<String> {

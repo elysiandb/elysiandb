@@ -1,5 +1,6 @@
 use super::goreflect::{
-    GoKind, GoMethod, GoMethods, arg_bytes, arg_int, arg_location, arg_string, arg_time, go_error,
+    GoIntKind, GoKind, GoMethod, GoMethods, arg_bytes, arg_int, arg_int64, arg_location,
+    arg_string, arg_time, go_error,
 };
 use super::{DocValue, HostRef, TypedSlice};
 use crate::object::FunctionCall;
@@ -190,7 +191,7 @@ impl GoMethods for GoTime {
         let t = self.0.borrow().clone();
         match TIME_METHODS[idx].name {
             "Add" => {
-                let d = arg_int(rt, &call, 0)?;
+                let d = arg_int64(rt, &call, 0)?;
                 ret(rt, DocValue::Time(t.add(Duration(d))))
             }
             "AddDate" => {
@@ -307,11 +308,11 @@ impl GoMethods for GoTime {
             "Month" => ret(rt, host(GoMonth(t.month().0))),
             "Nanosecond" => Ok(int_to_value(t.nanosecond())),
             "Round" => {
-                let d = arg_int(rt, &call, 0)?;
+                let d = arg_int64(rt, &call, 0)?;
                 ret(rt, DocValue::Time(t.round(Duration(d))))
             }
             "Truncate" => {
-                let d = arg_int(rt, &call, 0)?;
+                let d = arg_int64(rt, &call, 0)?;
                 ret(rt, DocValue::Time(t.truncate(Duration(d))))
             }
             "Second" => Ok(int_to_value(t.second())),
@@ -433,13 +434,13 @@ impl GoMethods for GoDuration {
             "Minutes" => Ok(float_to_value(d.minutes())),
             "Nanoseconds" => Ok(int_to_value(d.nanoseconds())),
             "Round" => {
-                let m = arg_int(rt, &call, 0)?;
+                let m = arg_int64(rt, &call, 0)?;
                 ret(rt, duration_value(d.round(Duration(m)).0))
             }
             "Seconds" => Ok(float_to_value(d.seconds())),
             "String" => ret(rt, DocValue::String(d.to_string().into())),
             "Truncate" => {
-                let m = arg_int(rt, &call, 0)?;
+                let m = arg_int64(rt, &call, 0)?;
                 ret(rt, duration_value(d.truncate(Duration(m)).0))
             }
             _ => Ok(Value::Undefined),
@@ -452,6 +453,10 @@ impl GoMethods for GoDuration {
 
     fn value_of(&self) -> Option<Value> {
         Some(int_to_value(self.0))
+    }
+
+    fn go_int(&self) -> Option<(GoIntKind, i64)> {
+        Some((GoIntKind::Int64, self.0))
     }
 
     fn same(&self, other: &dyn GoMethods) -> bool {
@@ -497,6 +502,10 @@ macro_rules! int_stringer {
 
             fn value_of(&self) -> Option<Value> {
                 Some(int_to_value(self.0))
+            }
+
+            fn go_int(&self) -> Option<(GoIntKind, i64)> {
+                Some((GoIntKind::Int, self.0))
             }
 
             fn same(&self, other: &dyn GoMethods) -> bool {

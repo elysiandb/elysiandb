@@ -21,7 +21,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 pub use dynamic::{DynamicArray, DynamicObject};
-pub use goreflect::{GoKind, GoMethod, GoMethods, GoReflect};
+pub use goreflect::{GoIntKind, GoKind, GoMethod, GoMethods, GoReflect};
 
 pub type DocMap = BTreeMap<String, DocValue>;
 pub type MapRef = Rc<RefCell<DocMap>>;

@@ -49,7 +49,21 @@ int_elem!(u16, crate::runtime::to_uint16, Uint16s);
 int_elem!(i16, crate::runtime::to_int16, Int16s);
 int_elem!(u32, crate::runtime::to_uint32, Uint32s);
 int_elem!(i32, crate::runtime::to_int32, Int32s);
-int_elem!(i64, crate::runtime::to_int64, Int64s);
+
+impl GoElem for i64 {
+    fn to_js(&self, _rt: &mut Runtime) -> JsResult<Value> {
+        Ok(int_to_value(*self))
+    }
+    fn from_js(rt: &mut Runtime, v: &Value) -> JsResult<Result<Self, String>> {
+        if let Some(n) = super::goreflect::reflect_int(rt, v, super::goreflect::GoIntKind::Int64) {
+            return Ok(Ok(n));
+        }
+        Ok(Ok(crate::runtime::to_int64(rt, v)?))
+    }
+    fn wrap(s: TypedSlice<Self>) -> DocValue {
+        DocValue::Int64s(s)
+    }
+}
 
 impl GoElem for u64 {
     fn to_js(&self, _rt: &mut Runtime) -> JsResult<Value> {

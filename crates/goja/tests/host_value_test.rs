@@ -840,3 +840,22 @@ fn pair_index_write_panics_like_go() {
     let msg = err.downcast_ref::<String>().cloned().unwrap_or_default();
     assert_eq!(msg, goja::host::goarray_reflect::ARRAY_INDEX_PANIC);
 }
+
+#[test]
+fn reflect_integers_are_passed_without_floats() {
+    on_big_stack(|| {
+        let mut rt = new_runtime();
+        let e = decode(INPUT);
+        ctx_with(&mut rt, &e);
+        let a = TypedSlice::new(vec![0i64]);
+        rt.set_value("a", &DocValue::Int64s(a.clone())).expect("a");
+        let v = run(
+            &mut rt,
+            r#"var e = ctx.entity; e.d = new Date(0); var d = e.d;
+            var m = d.Sub(new Date(-8.64e15)); a[0] = m;
+            [String(m), d.Add(m).Year(), d.Round(m).Year(), d.AddDate(0, d.Month(), 0).Month() * 1].join()"#,
+        );
+        assert_eq!(s(&mut rt, &v), "2562047h47m16.854775807s,2262,2046,2");
+        assert_eq!(a.to_vec(), vec![i64::MAX]);
+    });
+}

@@ -1,7 +1,7 @@
 mod jsrun;
 
 use gocompat::time::Duration;
-use goja::host::goreflect::arg_int;
+use goja::host::goreflect::arg_int64;
 use goja::host::gotime::duration_value;
 use goja::host::{DocValue, FuncRef, HostFn};
 use goja::{Throw, Value};
@@ -16,7 +16,7 @@ fn go_reflect_preserve_type() {
             rt.to_value(&duration_value(expect))
         });
         let handle = HostFn::new("handle", move |rt, call| {
-            let d = arg_int(rt, &call, 0)?;
+            let d = arg_int64(rt, &call, 0)?;
             if Duration(d).to_string() != Duration(expect).to_string() {
                 return Err(Throw::TypeError(format!("expect {expect}, but get {d}")));
             }
