@@ -14,9 +14,12 @@ pub mod memory;
 pub mod metrics;
 pub mod pagetree;
 pub mod ptree;
+pub mod query;
 pub mod schema;
 pub mod storage;
 pub mod sync;
+pub mod uuid;
+pub mod wildcard;
 pub mod yaml;
 
 pub use ::gocompat::json_struct;
