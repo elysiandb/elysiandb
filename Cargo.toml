@@ -115,6 +115,10 @@ path = "tests/internal/transport_test/tcp_test/parsing_test/main.rs"
 name = "tcp_handler_test"
 path = "tests/internal/transport_test/tcp_test/handler/main.rs"
 
+[[test]]
+name = "tcp_routing_test"
+path = "tests/internal/transport_test/tcp_test/tcp_routing_test/main.rs"
+
 [profile.release]
 strip = true
 panic = "unwind"
