@@ -193,10 +193,8 @@ impl AsciiString {
             return JsString::Unicode(UnicodeString::from_raw(b));
         }
         let a = a.unwrap_or_else(|| AsciiString::new(b""));
-        let mut b = Vec::with_capacity(self.0.len() + a.0.len());
-        b.extend_from_slice(&self.0);
-        b.extend_from_slice(&a.0);
-        JsString::Ascii(AsciiString::new(&b))
+        let joined: Arc<[u8]> = self.0.iter().chain(a.0.iter()).copied().collect();
+        JsString::Ascii(AsciiString(joined))
     }
 
     pub fn compare_to(&self, other: &JsString) -> i32 {

@@ -121,3 +121,90 @@ fn smoke_functions() {
         assert!(r.as_ref().unwrap().same_as(&str_value("ab")), "{r:?}");
     });
 }
+
+fn interrupt_after(rt: &goja::Runtime, ms: u64) -> std::thread::JoinHandle<()> {
+    let h = rt.interrupt_handle();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(ms));
+        h.interrupt("halt");
+    })
+}
+
+#[test]
+fn interrupt_skips_catch_and_finally() {
+    on_big_stack(|| {
+        let mut rt = new_runtime();
+        let t = interrupt_after(&rt, 50);
+        let r = rt.run_string(
+            "var i = 0; var caught = 'no'; try { for (;;) { i++; } } catch (e) { caught = 'catch'; } finally { caught = 'finally'; }",
+        );
+        t.join().expect("join");
+        match r {
+            Err(goja::RunError::Interrupted(e)) => {
+                assert!(e.error().starts_with("halt at <eval>:1:"), "{}", e.error());
+                assert_eq!(e.text, "halt");
+            }
+            Err(e) => panic!("unexpected error {}", run_error_string(&e)),
+            Ok(v) => panic!("unexpected result {v:?}"),
+        }
+        assert_eq!(rt.vm.sp, 0);
+        assert!(rt.vm.call_stack.is_empty());
+        let v = rt.run_string("caught").expect("run after interrupt");
+        assert!(v.same_as(&str_value("no")), "{v:?}");
+    });
+}
+
+#[test]
+fn interrupt_inside_native_callback() {
+    on_big_stack(|| {
+        let mut rt = new_runtime();
+        let t = interrupt_after(&rt, 50);
+        let r = rt.run_string(
+            "function f() { for (;;) {} } var r = 'no'; try { f.call(null); } catch (e) { r = 'catch'; } r",
+        );
+        t.join().expect("join");
+        match r {
+            Err(goja::RunError::Interrupted(e)) => {
+                let s = e.string();
+                assert!(s.starts_with("halt\n\tat f (<eval>:1:"), "{s}");
+                assert!(s.contains("\tat call (native)\n"), "{s}");
+            }
+            Err(e) => panic!("unexpected error {}", run_error_string(&e)),
+            Ok(v) => panic!("unexpected result {v:?}"),
+        }
+        assert_eq!(rt.vm.sp, 0);
+        let v = rt.run_string("r").expect("run after interrupt");
+        assert!(v.same_as(&str_value("no")), "{v:?}");
+    });
+}
+
+#[test]
+fn stack_overflow_is_uncatchable() {
+    on_big_stack(|| {
+        let mut rt = new_runtime();
+        rt.set_max_call_stack_size(100);
+        let r = rt.run_string(
+            "var c = 'no'; function f() { f(); } try { f(); } catch (e) { c = 'catch'; } finally { c = 'finally'; }",
+        );
+        match r {
+            Err(goja::RunError::StackOverflow(e)) => {
+                assert!(e.exception.stack.len() > 100, "{}", e.exception.stack.len());
+            }
+            Err(e) => panic!("unexpected error {}", run_error_string(&e)),
+            Ok(v) => panic!("unexpected result {v:?}"),
+        }
+        let v = rt.run_string("c").expect("run after overflow");
+        assert!(v.same_as(&str_value("no")), "{v:?}");
+    });
+}
+
+#[test]
+fn native_frame_stays_visible_in_stack() {
+    on_big_stack(|| {
+        let r = run("function f() { null.x } function g() { f.call(); } g()");
+        assert_eq!(
+            r.unwrap_err(),
+            "TypeError: Cannot read property 'x' of undefined\n\tat f (<eval>:1:21(2))\n\tat call (native)\n\tat g (<eval>:1:46(3))\n\tat <eval>:1:53(4)\n"
+        );
+    });
+}

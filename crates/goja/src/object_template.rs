@@ -93,8 +93,16 @@ impl TemplatedObject {
         name: &UStr,
         receiver: Option<&Value>,
     ) -> JsResult<Option<Value>> {
-        if matches!(rt.obj(o).base.values.get(name), Some(v) if !v.is_empty()) {
-            return BaseObject::get_str(rt, o, name, receiver);
+        match rt.obj(o).base.values.get(name) {
+            Some(Value::Property(prop)) if prop.getter_func.is_none() => {
+                if prop.value.is_empty() {
+                    return Ok(Some(Value::Undefined));
+                }
+                return Ok(Some(prop.value.clone()));
+            }
+            Some(Value::Property(_)) => return BaseObject::get_str(rt, o, name, receiver),
+            Some(v) if !v.is_empty() => return Ok(Some(v.clone())),
+            _ => {}
         }
         let own_prop = TemplatedObject::get_own_prop_str(rt, o, name)?;
         if own_prop.is_none() {
@@ -174,8 +182,17 @@ impl TemplatedObject {
         v: Value,
         throw: bool,
     ) -> JsResult<bool> {
-        if matches!(rt.obj(o).base.values.get(p), Some(v) if !v.is_empty()) {
-            return BaseObject::set_own_str(rt, o, p, v, throw);
+        match rt.obj_mut(o).base.values.get_mut(p) {
+            Some(Value::Property(prop)) if prop.writable && prop.setter_func.is_none() => {
+                prop.value = v;
+                return Ok(true);
+            }
+            Some(Value::Property(_)) => return BaseObject::set_own_str(rt, o, p, v, throw),
+            Some(Value::Empty) | None => {}
+            Some(slot) => {
+                *slot = v;
+                return Ok(true);
+            }
         }
         let existing = TemplatedObject::get_own_prop_str(rt, o, p)?;
         if existing.is_none() {

@@ -383,7 +383,7 @@ impl Value {
             Value::Null => STRING_NULL.clone(),
             Value::Bool(true) => STRING_TRUE.clone(),
             Value::Bool(false) => STRING_FALSE.clone(),
-            Value::Int(i) => JsString::Ascii(AsciiString::new(i.to_string().as_bytes())),
+            Value::Int(i) => JsString::Ascii(int_to_ascii(*i)),
             Value::Float(f) => JsString::Ascii(AsciiString::new(&float_string(*f))),
             Value::String(s) => s.clone(),
             Value::BigInt(b) => JsString::Ascii(AsciiString::new(b.string().as_bytes())),
@@ -695,6 +695,29 @@ impl Value {
     pub fn to_property_key(&self, rt: &mut Runtime) -> JsResult<Value> {
         self.to_string_value(rt)
     }
+}
+
+pub fn int_to_ascii(i: i64) -> AsciiString {
+    let mut buf = [0u8; 20];
+    let mut pos = buf.len();
+    let neg = i < 0;
+    let mut n = i.unsigned_abs();
+    loop {
+        pos -= 1;
+        buf[pos] = b'0' + (n % 10) as u8;
+        n /= 10;
+        if n == 0 {
+            break;
+        }
+    }
+    if neg {
+        let mut out = [0u8; 21];
+        out[0] = b'-';
+        let len = buf.len() - pos;
+        out[1..=len].copy_from_slice(&buf[pos..]);
+        return AsciiString::new(&out[..=len]);
+    }
+    AsciiString::new(&buf[pos..])
 }
 
 pub fn float_to_int_clip(n: f64) -> i64 {

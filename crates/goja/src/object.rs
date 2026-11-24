@@ -1124,6 +1124,17 @@ impl BaseObject {
         val: Value,
         throw: bool,
     ) -> JsResult<bool> {
+        match rt.obj_mut(o).base.values.get_mut(name) {
+            Some(Value::Property(p)) if p.writable && p.setter_func.is_none() => {
+                p.value = val;
+                return Ok(true);
+            }
+            Some(Value::Property(_)) | Some(Value::Empty) | None => {}
+            Some(slot) => {
+                *slot = val;
+                return Ok(true);
+            }
+        }
         let obj = rt.obj(o);
         match obj.base.values.get(name) {
             None | Some(Value::Empty) => {

@@ -210,10 +210,28 @@ impl Default for String {
     }
 }
 
+#[inline(always)]
+fn short_bytes_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    if a.len() <= 8 {
+        let mut x = 0u64;
+        let mut y = 0u64;
+        for i in 0..a.len() {
+            x |= u64::from(a[i]) << (8 * i);
+            y |= u64::from(b[i]) << (8 * i);
+        }
+        return x == y;
+    }
+    a == b
+}
+
 impl PartialEq for String {
+    #[inline]
     fn eq(&self, other: &String) -> bool {
         match (&self.0, &other.0) {
-            (Repr::Bytes(a), Repr::Bytes(b)) => a == b,
+            (Repr::Bytes(a), Repr::Bytes(b)) => Arc::ptr_eq(a, b) || short_bytes_eq(a, b),
             (Repr::Utf16(a), Repr::Utf16(b)) => a == b,
             _ => false,
         }
@@ -257,6 +275,7 @@ impl PartialOrd for String {
 }
 
 impl Hash for String {
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         match &self.0 {
             Repr::Bytes(b) => {

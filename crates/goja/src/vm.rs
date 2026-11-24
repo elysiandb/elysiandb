@@ -1418,14 +1418,14 @@ pub enum Ref {
     Obj {
         base: ObjRef,
         name: Value,
-        this: Option<Value>,
+        this: Option<Box<Value>>,
         strict: bool,
         name_converted: bool,
     },
     ObjStr {
         base: ObjRef,
         name: unistring::String,
-        this: Option<Value>,
+        this: Option<Box<Value>>,
         strict: bool,
         binding: bool,
     },
@@ -1478,17 +1478,21 @@ impl Ref {
             Ref::Obj {
                 base, name, this, ..
             } => {
-                rt.handles.push(*base);
+                if *base != rt.global_object {
+                    rt.handles.push(*base);
+                }
                 if let Value::Object(o) = name {
                     rt.handles.push(*o);
                 }
-                if let Some(Value::Object(o)) = this {
+                if let Some(Value::Object(o)) = this.as_deref() {
                     rt.handles.push(*o);
                 }
             }
             Ref::ObjStr { base, this, .. } => {
-                rt.handles.push(*base);
-                if let Some(Value::Object(o)) = this {
+                if *base != rt.global_object {
+                    rt.handles.push(*base);
+                }
+                if let Some(Value::Object(o)) = this.as_deref() {
                     rt.handles.push(*o);
                 }
             }
@@ -1537,7 +1541,7 @@ impl Ref {
                     unreachable!()
                 };
                 let (base, this) = (*base, this.clone());
-                Ok(nil_safe(base.get(rt, &key, this.as_ref())?))
+                Ok(nil_safe(base.get(rt, &key, this.as_deref())?))
             }
             Ref::ObjStr {
                 base,
@@ -1546,14 +1550,13 @@ impl Ref {
                 binding,
                 ..
             } => {
-                let (base, name, this, binding) = (*base, name.clone(), this.clone(), *binding);
-                if let Some(v) = base.get_str(rt, &name, this.as_ref())?
+                if let Some(v) = base.get_str(rt, name, this.as_deref())?
                     && !v.is_empty()
                 {
                     return Ok(v);
                 }
-                if binding {
-                    return rt.throw_reference_error(&name);
+                if *binding {
+                    return rt.throw_reference_error(name);
                 }
                 Ok(Value::Undefined)
             }
@@ -1648,14 +1651,12 @@ impl Ref {
                 strict,
                 binding,
             } => {
-                let (base, name, this, strict, binding) =
-                    (*base, name.clone(), this.clone(), *strict, *binding);
-                if strict && binding && !base.has_own_property_str(rt, &name)? {
+                if *strict && *binding && !base.has_own_property_str(rt, name)? {
                     return Err(Throw::ReferenceError(format!("{name} is not defined")));
                 }
                 match this {
-                    Some(this) => base.set_str(rt, &name, v, &this, strict)?,
-                    None => base.set_own_str(rt, &name, v, strict)?,
+                    Some(this) => base.set_str(rt, name, v, this, *strict)?,
+                    None => base.set_own_str(rt, name, v, *strict)?,
                 };
                 Ok(())
             }
@@ -2453,6 +2454,7 @@ impl Runtime {
     pub fn set_max_call_stack_size(&mut self, size: usize) {
         self.vm.max_call_stack_size = size;
     }
+    #[inline(always)]
     pub fn exec(&mut self, ins: &Instruction) -> JsResult<()> {
         match ins {
             Instruction::Placeholder => panic!("invalid instruction"),
@@ -3082,9 +3084,11 @@ impl Runtime {
             Instruction::GetValue => {
                 let l = self.vm.ref_stack.len() - 1;
                 self.vm_ref_convert_key(l)?;
-                let mut r = self.vm.ref_stack[l].clone();
-                let v = r.get(self)?;
-                self.vm.push(v);
+                let mut r = self.vm.ref_stack.pop().expect("ref");
+                r.root(self);
+                let v = r.get(self);
+                self.vm.ref_stack.push(r);
+                self.vm.push(v?);
                 self.vm.pc += 1;
             }
             Instruction::PutValue => {
@@ -4412,7 +4416,11 @@ impl Runtime {
             self.vm.ref_stack.push(Ref::Obj {
                 base,
                 name,
-                this: if this.is_empty() { None } else { Some(this) },
+                this: if this.is_empty() {
+                    None
+                } else {
+                    Some(Box::new(this))
+                },
                 strict,
                 name_converted: false,
             });
@@ -4502,7 +4510,11 @@ impl Runtime {
         let sp = self.vm.sp as usize;
         let this = if recv {
             let t = self.vm.stack[sp - 2].clone();
-            if t.is_empty() { None } else { Some(t) }
+            if t.is_empty() {
+                None
+            } else {
+                Some(Box::new(t))
+            }
         } else {
             None
         };

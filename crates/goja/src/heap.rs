@@ -40,9 +40,11 @@ impl Hasher for FxHasher {
         }
         let rest = chunks.remainder();
         if !rest.is_empty() {
-            let mut buf = [0u8; 8];
-            buf[..rest.len()].copy_from_slice(rest);
-            self.add(u64::from_le_bytes(buf));
+            let mut w = 0u64;
+            for (i, &b) in rest.iter().enumerate() {
+                w |= u64::from(b) << (8 * i);
+            }
+            self.add(w);
         }
     }
 
