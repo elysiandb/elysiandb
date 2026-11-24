@@ -1,35 +1,9 @@
 const HEX: &[u8; 16] = b"0123456789abcdef";
 
-#[cfg(target_os = "linux")]
-fn fill_random(buf: &mut [u8]) -> bool {
-    let mut done = 0;
-    while done < buf.len() {
-        let rest = &mut buf[done..];
-        let n = unsafe { libc::getrandom(rest.as_mut_ptr().cast(), rest.len(), 0) };
-        if n < 0 {
-            if std::io::Error::last_os_error().kind() == std::io::ErrorKind::Interrupted {
-                continue;
-            }
-            return false;
-        }
-        done += n as usize;
-    }
-
-    true
-}
-
-#[cfg(not(target_os = "linux"))]
-fn fill_random(buf: &mut [u8]) -> bool {
-    unsafe { libc::getentropy(buf.as_mut_ptr().cast(), buf.len()) == 0 }
-}
-
 pub fn random_bytes() -> [u8; 16] {
     let mut b = [0u8; 16];
-    if !fill_random(&mut b) {
-        panic!(
-            "cannot read random bytes: {}",
-            std::io::Error::last_os_error()
-        );
+    if let Err(e) = crate::crypto::rand::os_random(&mut b) {
+        panic!("cannot read random bytes: {e}");
     }
 
     b

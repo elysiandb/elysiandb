@@ -119,6 +119,18 @@ path = "tests/internal/transport_test/tcp_test/handler/main.rs"
 name = "tcp_routing_test"
 path = "tests/internal/transport_test/tcp_test/tcp_routing_test/main.rs"
 
+[[test]]
+name = "golden_security"
+path = "tests/golden_security/main.rs"
+
+[[test]]
+name = "bcrypt_test"
+path = "tests/crypto/bcrypt_test/main.rs"
+
+[[test]]
+name = "blowfish_test"
+path = "tests/crypto/blowfish_test/main.rs"
+
 [profile.release]
 strip = true
 panic = "unwind"
