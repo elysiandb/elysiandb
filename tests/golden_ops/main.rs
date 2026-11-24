@@ -6,6 +6,7 @@ mod tempdir;
 mod config;
 mod fmt;
 mod logs;
+mod metrics;
 mod yaml;
 
 use elysiandb::log::{self, Options};
