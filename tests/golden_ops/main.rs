@@ -8,6 +8,7 @@ mod config;
 mod fmt;
 mod logs;
 mod metrics;
+mod tar_archives;
 mod tcp;
 mod yaml;
 

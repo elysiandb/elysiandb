@@ -7,6 +7,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 
 const GZIP_VECTORS: usize = 6;
+const TAR_VECTORS: usize = 10;
 const ARCHIVES: usize = 7;
 
 pub(super) fn archive(rel: &str) -> Vec<u8> {
@@ -140,15 +141,20 @@ fn check_gzip_vector(row: &Value) {
 }
 
 #[test]
-fn gzip_vectors_match_go() {
+fn vectors_match_go() {
     let mut gzip_rows = 0;
+    let mut tar_rows = 0;
     for row in &read_jsonl("ops/archives/vectors.jsonl") {
         if str_field(row, "kind").starts_with("gzip-") {
             check_gzip_vector(row);
             gzip_rows += 1;
+        } else {
+            super::tar_archives::check_tar_vector(row);
+            tar_rows += 1;
         }
     }
     assert_eq!(gzip_rows, GZIP_VECTORS);
+    assert_eq!(tar_rows, TAR_VECTORS);
 }
 
 #[test]

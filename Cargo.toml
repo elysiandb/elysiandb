@@ -139,6 +139,10 @@ path = "tests/archive/flate_test/main.rs"
 name = "gzip_test"
 path = "tests/archive/gzip_test/main.rs"
 
+[[test]]
+name = "tar_test"
+path = "tests/archive/tar_test/main.rs"
+
 [profile.release]
 strip = true
 panic = "unwind"

@@ -1,5 +1,6 @@
 pub mod flate;
 pub mod gzip;
+pub mod tar;
 
 use std::io::{self, BufRead, Read};
 
