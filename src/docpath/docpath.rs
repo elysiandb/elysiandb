@@ -32,7 +32,7 @@ impl Node for Value {
 
     fn field(&self, key: &[u8]) -> Option<&Value> {
         match self {
-            Value::Object(m) => m.iter().find(|(k, _)| k.as_bytes() == key).map(|(_, v)| v),
+            Value::Object(m) => std::str::from_utf8(key).ok().and_then(|k| m.get(k)),
             _ => None,
         }
     }
@@ -62,22 +62,25 @@ pub fn resolve_values<'a, N: Node>(data: &'a N, path: &[u8]) -> Vec<&'a N> {
     out
 }
 
-fn resolve<'a, N: Node>(current: &'a N, parts: &[&[u8]], out: &mut Vec<&'a N>) {
-    if parts.is_empty() {
-        out.push(current);
-        return;
-    }
-
-    if current.is_object() {
-        if let Some(next) = current.field(parts[0]) {
-            resolve(next, &parts[1..], out);
+fn resolve<'a, N: Node>(root: &'a N, parts: &[&[u8]], out: &mut Vec<&'a N>) {
+    let mut stack: Vec<(&'a N, usize)> = vec![(root, 0)];
+    while let Some((current, i)) = stack.pop() {
+        if i == parts.len() {
+            out.push(current);
+            continue;
         }
-        return;
-    }
 
-    if let Some(items) = current.items() {
-        for item in items {
-            resolve(item, parts, out);
+        if current.is_object() {
+            if let Some(next) = current.field(parts[i]) {
+                stack.push((next, i + 1));
+            }
+            continue;
+        }
+
+        if let Some(items) = current.items() {
+            for item in items.iter().rev() {
+                stack.push((item, i));
+            }
         }
     }
 }
