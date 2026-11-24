@@ -6,6 +6,7 @@ use elysiandb::journal::{self, Record};
 use elysiandb::pagetree::Ref;
 
 use super::common;
+use super::folders::{folder_options, run_workload};
 use super::support::{array, copy_tree, field, string, uint};
 use super::tempdir::TempDir;
 
@@ -19,7 +20,7 @@ const CHECKED_HERE: [&str; 7] = [
     "short page read",
 ];
 
-const CHECKED_LATER: [&str; 6] = [
+const CHECKED_BY_ENGINE: [&str; 6] = [
     "second open of a locked folder",
     "MANIFEST and MANIFEST.prev both unreadable",
     "live key 9x in MANIFEST",
@@ -57,10 +58,10 @@ fn log_and_kv_file_messages_match_go() {
     let sites: Vec<&str> = rows.iter().map(|r| string(r, "site")).collect();
     for site in &sites {
         let here = CHECKED_HERE.contains(site);
-        let later = CHECKED_LATER.contains(site);
+        let later = CHECKED_BY_ENGINE.contains(site);
         assert!(here != later, "{site} must be in exactly one list");
     }
-    assert_eq!(sites.len(), CHECKED_HERE.len() + CHECKED_LATER.len());
+    assert_eq!(sites.len(), CHECKED_HERE.len() + CHECKED_BY_ENGINE.len());
     assert_eq!(rows.len(), 13);
     assert!(!sites.contains(&"journal close"));
 
@@ -248,4 +249,149 @@ fn page_messages(rows: &[Value], root: &Path) -> usize {
     checked += 1;
 
     checked
+}
+
+fn open_err(dir: &Path) -> String {
+    match elysiandb::datastore::open(folder_options(dir)) {
+        Ok(_) => panic!("{} must not open", dir.display()),
+        Err(err) => err.to_string(),
+    }
+}
+
+fn rewrite_manifest(dir: &Path, f: impl FnOnce(&mut elysiandb::gocompat::json::Map)) {
+    let p = filepath::join(dir, "MANIFEST");
+    let data = std::fs::read(&p).unwrap_or_else(|e| panic!("{e}"));
+    let mut v = elysiandb::gocompat::json::unmarshal_value(&data).unwrap_or_else(|e| panic!("{e}"));
+    let Value::Object(m) = &mut v else {
+        panic!("MANIFEST is not an object");
+    };
+    f(m);
+    let mut out =
+        elysiandb::gocompat::json::marshal_indent(&v, "", "  ").unwrap_or_else(|e| panic!("{e}"));
+    out.push(b'\n');
+    std::fs::write(&p, out).unwrap_or_else(|e| panic!("{e}"));
+}
+
+fn remove(path: &Path) {
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn engine_messages_match_go() {
+    use elysiandb::gocompat::json::{Map, Value as J};
+
+    let doc = common::read_json("persistence/messages.json");
+    let rows = doc.as_array().expect("messages.json is an array");
+    let tmp = TempDir::new();
+    let mut checked = 0;
+
+    let locked = filepath::join(tmp.path(), "locked");
+    let e = elysiandb::datastore::open(folder_options(&locked)).unwrap_or_else(|e| panic!("{e}"));
+    let err = open_err(&locked);
+    assert_eq!(
+        err,
+        message(rows, "second open of a locked folder")
+            .replace("<dir>", &locked.display().to_string())
+    );
+    e.close().unwrap_or_else(|e| panic!("{e}"));
+    checked += 1;
+
+    let base = filepath::join(tmp.path(), "base");
+    run_workload(&base);
+
+    let both = filepath::join(tmp.path(), "corrupt-both");
+    copy_tree(&base, &both);
+    for name in ["MANIFEST", "MANIFEST.prev"] {
+        std::fs::write(filepath::join(&both, name), b"{\"format\":")
+            .unwrap_or_else(|e| panic!("{e}"));
+    }
+    let (text, kinds) = wrapped(rows, "MANIFEST and MANIFEST.prev both unreadable");
+    assert_eq!(kinds, vec!["json".to_string()]);
+    assert_eq!(
+        open_err(&both),
+        text.replace("<go:json>", "invalid JSON: unexpected end of input")
+    );
+    checked += 1;
+
+    let bad_live = filepath::join(tmp.path(), "bad-live");
+    copy_tree(&base, &bad_live);
+    rewrite_manifest(&bad_live, |m| {
+        let mut live = Map::new();
+        live.insert("9x".into(), J::Number(1.0));
+        m.insert("live".into(), J::Object(live));
+    });
+    remove(&filepath::join(&bad_live, "MANIFEST.prev"));
+    assert_eq!(
+        open_err(&bad_live),
+        message(rows, "live key 9x in MANIFEST")
+    );
+    checked += 1;
+
+    let unknown = filepath::join(tmp.path(), "unknown-index");
+    copy_tree(&base, &unknown);
+    rewrite_manifest(&unknown, |m| {
+        let Some(J::Array(ents)) = m.get_mut("entities") else {
+            panic!("no entities");
+        };
+        let J::Object(first) = &mut ents[0] else {
+            panic!("bad entity");
+        };
+        let mut root = Map::new();
+        root.insert("id".into(), J::Number(0.0));
+        root.insert("size".into(), J::Number(0.0));
+        let mut zz = Map::new();
+        zz.insert("name".into(), J::String("zz".into()));
+        zz.insert("root".into(), J::Object(root));
+        match first.get_mut("indexes") {
+            Some(J::Array(list)) => list.push(J::Object(zz)),
+            _ => {
+                first.insert("indexes".into(), J::Array(vec![J::Object(zz)]));
+            }
+        }
+    });
+    remove(&filepath::join(&unknown, "MANIFEST.prev"));
+    assert_eq!(
+        open_err(&unknown),
+        message(rows, "unknown index name in MANIFEST")
+    );
+    checked += 1;
+
+    let upgraded = filepath::join(tmp.path(), "format1-prev");
+    copy_tree(&super::format1::fixture("pr-format1/format1"), &upgraded);
+    let e = elysiandb::datastore::open(folder_options(&upgraded)).unwrap_or_else(|e| panic!("{e}"));
+    e.abandon();
+    let unreadable = filepath::join(tmp.path(), "format1-prev-unreadable");
+    copy_tree(&upgraded, &unreadable);
+    remove(&filepath::join(&upgraded, "MANIFEST"));
+    let missing = |dir: &Path| {
+        format!(
+            "open {}: No such file or directory (os error 2)",
+            filepath::join(dir, "checkpoint-0000000000000192.ckpt").display()
+        )
+    };
+    let (text, kinds) = wrapped(
+        rows,
+        "format-1 MANIFEST.prev after upgrade, MANIFEST removed",
+    );
+    assert_eq!(kinds, vec!["file_system".to_string()]);
+    assert_eq!(
+        open_err(&upgraded),
+        text.replace("<go:file_system>", &missing(&upgraded))
+    );
+    checked += 1;
+
+    std::fs::write(filepath::join(&unreadable, "MANIFEST"), b"garbage")
+        .unwrap_or_else(|e| panic!("{e}"));
+    let (text, kinds) = wrapped(
+        rows,
+        "format-1 MANIFEST.prev after upgrade, MANIFEST unreadable",
+    );
+    assert_eq!(kinds, vec!["file_system".to_string()]);
+    assert_eq!(
+        open_err(&unreadable),
+        text.replace("<go:file_system>", &missing(&unreadable))
+    );
+    checked += 1;
+
+    assert_eq!(checked, CHECKED_BY_ENGINE.len());
 }

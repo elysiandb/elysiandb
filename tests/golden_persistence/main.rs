@@ -7,10 +7,13 @@ mod support;
 mod tempdir;
 
 mod crc32c;
+mod folders;
+mod format1;
 mod journal_damage;
 mod journal_encode;
 mod kvfile;
 mod legacy;
+mod manifest;
 mod messages;
 mod page_store;
 mod pages;

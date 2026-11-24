@@ -223,6 +223,11 @@ impl Engine {
         Some((entry.value.clone(), entry.expires_at))
     }
 
+    #[doc(hidden)]
+    pub fn kv_lsn(&self, key: &[u8]) -> Option<u64> {
+        self.kv.shard(key).read().get(key).map(|e| e.lsn)
+    }
+
     pub fn kv_expiration(&self, key: &[u8]) -> Option<i64> {
         let (_, exp) = self.kv_get(key)?;
         if exp <= 0 {
