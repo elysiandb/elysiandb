@@ -124,32 +124,7 @@ pub fn outcomes(file: &str, arch_file: &str) -> Vec<(String, bool, String)> {
     out
 }
 
-const PENDING: [&str; 24] = [
-    "surface",
-    "num2",
-    "dates3",
-    "entity-in",
-    "json-parse",
-    "json-bad",
-    "json-circular",
-    "typed-out",
-    "proxy-out",
-    "big-ints-out",
-    "date-tostring-variants",
-    "json-stringify-opts",
-    "fn-tostring",
-    "reflect-pairs",
-    "reflect-bytes",
-    "reflect-proxy",
-    "numbers",
-    "date-strings",
-    "es6",
-    "proxy-reflect",
-    "json",
-    "keys-order-3",
-    "math",
-    "json-bad-2",
-];
+const PENDING: [&str; 3] = ["surface", "typed-out", "reflect-bytes"];
 
 fn replay(file: &str, arch_file: &str, with_pending: bool) {
     let results = outcomes(file, arch_file);
@@ -199,7 +174,7 @@ fn entity_corpus_europe_paris() {
 }
 
 #[test]
-#[ignore = "requires the JSON, Math, Proxy, Reflect and typed array builtins"]
+#[ignore = "requires the typed array builtins"]
 fn entity_corpus_pending_utc() {
     run_in_zone("entity_corpus_pending_utc", Zone::Env("UTC"), || {
         on_big_stack(|| replay("hooks/corpus-utc.jsonl", "hooks/arch-amd64-utc.jsonl", true))
@@ -207,7 +182,7 @@ fn entity_corpus_pending_utc() {
 }
 
 #[test]
-#[ignore = "requires the JSON, Math, Proxy, Reflect and typed array builtins"]
+#[ignore = "requires the typed array builtins"]
 fn entity_corpus_pending_europe_paris() {
     run_in_zone(
         "entity_corpus_pending_europe_paris",

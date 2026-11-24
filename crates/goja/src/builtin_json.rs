@@ -2,6 +2,7 @@ use crate::array::ARRAY_OBJECT_CLASS;
 use crate::builtin_symbol::SYM_TO_STRING_TAG;
 use crate::func::NativeFn;
 use crate::heap::ObjRef;
+use crate::host::goreflect::{go_error, reflect_marshal_json, reflect_number_class};
 use crate::object::{
     BASE_OBJECT_CLASS, CLASS_JSON, CLASS_NUMBER, CLASS_OBJECT, CLASS_STRING, CallFn, Flag,
     FunctionCall, ObjExt, PropertyDescriptor,
@@ -720,6 +721,21 @@ impl BuiltinJsonStringifyContext {
                 }
                 ObjExt::StringObj(_) => {
                     value = Value::String(Value::Object(o).to_string(rt)?);
+                }
+                ObjExt::Dyn(_) => {
+                    if let Some(r) = reflect_marshal_json(rt, o) {
+                        match r {
+                            Ok(b) => {
+                                self.buf.extend_from_slice(&b);
+                                self.all_ascii = false;
+                                return Ok(Str::Done(true));
+                            }
+                            Err(e) => return Err(go_error(rt, &e)),
+                        }
+                    }
+                    if reflect_number_class(rt, o) {
+                        value = o.ordinary_to_primitive_number(rt)?;
+                    }
                 }
                 _ => {}
             }
