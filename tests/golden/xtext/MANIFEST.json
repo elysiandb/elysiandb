@@ -1,0 +1,64 @@
+{
+  "part": "xtext",
+  "baseline": "1a11e5e",
+  "go_version": "go1.24.7",
+  "goos": "darwin",
+  "goarch": "amd64",
+  "files": [
+    {
+      "path": "cases/context.jsonl",
+      "size": 18386,
+      "sha256": "9d1fad8eac270da5cfadb85aa7fbc94c96bed909b7dc44e6f9da690ad825a9a1"
+    },
+    {
+      "path": "cases/invalid.jsonl",
+      "size": 25490,
+      "sha256": "f909f5788c65ede95d9199f5759b0ff49f905e2d90aab13ffacc0b464eba6f8a"
+    },
+    {
+      "path": "cases/sigma.jsonl",
+      "size": 686944,
+      "sha256": "16db4bc54ba68c848b12a13da32625c58a6811be875004afb82b5c26743dd7b6"
+    },
+    {
+      "path": "cases/strings.jsonl",
+      "size": 653092,
+      "sha256": "ac853c20e02aeb3534b4192af1e6dc91a267bd90587d683f374d59592d81ae1a"
+    },
+    {
+      "path": "collate/invalid.jsonl",
+      "size": 16530,
+      "sha256": "7418458ee421bd672764f31528c1bb5f3bf735bc03fc3e481b1d58aa0504defa"
+    },
+    {
+      "path": "collate/marks.jsonl",
+      "size": 17624,
+      "sha256": "6f0ced7e80eb6b81adc82617e8752ab0ce2a042f996d363e8534fcb0e661befe"
+    },
+    {
+      "path": "collate/runes.jsonl",
+      "size": 35250,
+      "sha256": "ea43568792585afa9ef316eb3a5883ff02d93eadb8f91954ffc7de1ba1e94116"
+    },
+    {
+      "path": "collate/strings.jsonl",
+      "size": 578170,
+      "sha256": "7b02f218daa8378e6497c01bbef7e197ff0187adfcfe765d144e1fea0a79c6be"
+    },
+    {
+      "path": "norm/invalid.jsonl",
+      "size": 25234,
+      "sha256": "0ebbb0a2031d1eafc18789ff6f2834cb5a6af392b857f79a9a82b9c431a09671"
+    },
+    {
+      "path": "norm/marks.jsonl",
+      "size": 121900,
+      "sha256": "f38db6ac4c1af90b3c13eff3b63dbd633e836aa1ad24b091c14ad1ad4fac6380"
+    },
+    {
+      "path": "norm/strings.jsonl",
+      "size": 916728,
+      "sha256": "364c753c5def760ace355ce6d97ff59d053ec7e7b87ac29383584f71c0c36940"
+    }
+  ]
+}
