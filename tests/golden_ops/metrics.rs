@@ -8,9 +8,11 @@ use elysiandb::gocompat::errors;
 use elysiandb::gocompat::json::{self, Encode, Map, Value};
 use elysiandb::gocompat::time::{Duration, Time};
 use elysiandb::log::{self, Options};
+use elysiandb::metrics::counters::HOOK_FAILURE;
 use elysiandb::metrics::{self, Moment, Sources};
 
 use super::common;
+use super::tempdir::TempDir;
 use super::{Restore, log_state};
 
 const START: i64 = 1_800_000_000;
@@ -103,7 +105,7 @@ fn millis(n: u64) -> StdDuration {
     StdDuration::from_millis(n)
 }
 
-fn run_scenario() {
+fn run_scenario(missing_folder: String) {
     globals::set_config(Some(Arc::new({
         let mut cfg = Config::default();
         cfg.stats.enabled = true;
@@ -111,7 +113,7 @@ fn run_scenario() {
     })));
     metrics::reset();
     metrics::set_sources(Sources {
-        data_folder: Some(Arc::new(|| "/data".to_string())),
+        data_folder: Some(Arc::new(move || missing_folder.clone())),
         kv_keys: Some(Arc::new(|| (10, 2))),
         entity_counts: Some(Arc::new(|| {
             BTreeMap::from([(b"book".to_vec(), 30), (b"author".to_vec(), 8)])
@@ -149,6 +151,8 @@ fn run_scenario() {
         }
         if s == 60 {
             metrics::observe_hook("h2", "book", "pre_read", millis(1), Some(&*boom));
+            HOOK_FAILURE.lock().at =
+                Some(Moment::from_wall(Time::from_unix(START - 30 * 86_400, 0)));
             metrics::record_flush("checkpoint", millis(40), true, None);
             metrics::heavy_query(millis(15));
             metrics::heavy_rejected();
@@ -287,7 +291,8 @@ fn metrics_golden_matches_go() {
     .expect("configure");
     log::set_output(Some(Box::new(std::io::sink())), false);
 
-    run_scenario();
+    let tmp = TempDir::new();
+    run_scenario(tmp.path().join("data").to_string_lossy().into_owned());
 
     let prom = String::from_utf8(metrics::prometheus()).expect("UTF-8 Prometheus text");
     let (warnings, errors_count) = log::counts();
