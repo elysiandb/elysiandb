@@ -527,7 +527,6 @@ fn test_this_strict() {
 }
 
 #[test]
-#[ignore = "requires the Number builtin"]
 fn test_this_no_strict() {
     test_script(
         r#"
@@ -1667,7 +1666,6 @@ fn test_post_dec_obj() {
 }
 
 #[test]
-#[ignore = "requires the Number builtin"]
 fn test_prop_acc1() {
     test_script(
         r#"
@@ -3122,7 +3120,6 @@ fn test_for_break() {
 }
 
 #[test]
-#[ignore = "requires the Number builtin"]
 fn test_large_number_literal() {
     test_script(
         r#"

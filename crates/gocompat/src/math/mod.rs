@@ -2,11 +2,13 @@
 
 mod bits;
 mod exp;
+mod floor;
 mod log;
 mod pow;
 
 pub use bits::{frexp, ldexp, modf, modf_arm64, modf_go};
 pub use exp::{exp, exp_amd64, exp_arm64, exp_go};
+pub use floor::{abs, floor, floor_arch, floor_go};
 pub use log::{log, log_amd64, log_go};
 pub use pow::{pow, pow_amd64, pow_arm64, pow_go};
 

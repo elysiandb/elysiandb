@@ -26,6 +26,8 @@ pub mod builtin_weakset;
 pub mod compiler;
 pub mod compiler_expr;
 pub mod compiler_stmt;
+pub mod date;
+pub mod date_parser;
 pub mod deps;
 pub mod destruct;
 pub mod file;
