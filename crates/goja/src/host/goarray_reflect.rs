@@ -12,7 +12,7 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub const ARRAY_INDEX_PANIC: &str = "reflect: array index out of range";
+pub const ARRAY_INDEX_PANIC: &str = "array index out of range";
 
 #[derive(Clone)]
 pub enum PairCell {

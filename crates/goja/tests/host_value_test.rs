@@ -783,3 +783,60 @@ fn exported_host_values_stay_traced() {
         assert_eq!(s(&mut rt, &v), "Get,1");
     });
 }
+
+struct Busy;
+
+#[test]
+fn go_errors_keep_their_cause() {
+    on_big_stack(|| {
+        let mut rt = new_runtime();
+        let f = HostFn::new("query", |rt, _call| {
+            let e = rt.new_go_error_with("server busy", Rc::new(Busy));
+            Err(goja::Throw::Value(e))
+        });
+        rt.set_value("f", &DocValue::Func(goja::host::FuncRef::Native(f)))
+            .expect("f");
+        for src in ["f()", "try { f() } catch (e) { throw e }"] {
+            let err = rt.run_string(src).expect_err(src);
+            assert!(err.error().starts_with("Error: server busy"), "{src}");
+            let cause = rt.run_error_cause(&err).expect("cause");
+            assert!(cause.downcast_ref::<Busy>().is_some(), "{src}");
+        }
+        let err = rt
+            .run_string(r#"throw new Error("server busy")"#)
+            .expect_err("plain");
+        assert!(rt.run_error_cause(&err).is_none());
+    });
+}
+
+#[test]
+fn reset_shells_reject_previous_handles() {
+    on_big_stack(|| {
+        let mut rt = new_runtime();
+        let v = run(&mut rt, "(function named() { return 1 })");
+        let f = rt.export(&v).expect("export");
+        rt.host.reset();
+        let g = rt.to_value(&f).expect("to_value");
+        rt.set("g", g).expect("g");
+        let err = run_err(&mut rt, "g()");
+        assert!(
+            err.starts_with("TypeError: Illegal runtime transition of an Object"),
+            "{err}"
+        );
+    });
+}
+
+#[test]
+fn pair_index_write_panics_like_go() {
+    let r = std::thread::Builder::new()
+        .stack_size(64 << 20)
+        .spawn(|| {
+            let (_rt, _e, _v) =
+                script(r#"ctx.entity.x = new Map([["a", 1]]); var p = ctx.entity.x[0]; p[5] = 1"#);
+        })
+        .expect("spawn")
+        .join();
+    let err = r.expect_err("a panic");
+    let msg = err.downcast_ref::<String>().cloned().unwrap_or_default();
+    assert_eq!(msg, goja::host::goarray_reflect::ARRAY_INDEX_PANIC);
+}

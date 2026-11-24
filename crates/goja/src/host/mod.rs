@@ -318,9 +318,13 @@ impl Drop for DocValue {
         while let Some(mut v) = stack.pop() {
             take_children(&mut v, &mut stack);
         }
-        DROP_STACK.set(stack);
+        if stack.capacity() <= DROP_STACK_KEEP {
+            DROP_STACK.set(stack);
+        }
     }
 }
+
+const DROP_STACK_KEEP: usize = 1024;
 
 thread_local! {
     static DROP_STACK: std::cell::Cell<Vec<DocValue>> = const { std::cell::Cell::new(Vec::new()) };
@@ -374,6 +378,7 @@ pub struct HostState {
     obj_set: FxHashSet<ObjRef>,
     hosts: Vec<HostRef>,
     host_set: FxHashSet<usize>,
+    causes: crate::heap::FxHashMap<ObjRef, Rc<dyn std::any::Any>>,
 }
 
 impl Default for HostState {
@@ -384,6 +389,7 @@ impl Default for HostState {
             obj_set: FxHashSet::default(),
             hosts: Vec::new(),
             host_set: FxHashSet::default(),
+            causes: crate::heap::FxHashMap::default(),
         }
     }
 }
@@ -391,6 +397,19 @@ impl Default for HostState {
 impl HostState {
     pub fn id(&self) -> u64 {
         self.id
+    }
+
+    pub fn reset(&mut self) {
+        *self = HostState::default();
+    }
+
+    pub fn set_cause(&mut self, o: ObjRef, cause: Rc<dyn std::any::Any>) {
+        self.keep(o);
+        self.causes.insert(o, cause);
+    }
+
+    pub fn cause(&self, o: ObjRef) -> Option<Rc<dyn std::any::Any>> {
+        self.causes.get(&o).cloned()
     }
 
     pub fn keep(&mut self, o: ObjRef) {

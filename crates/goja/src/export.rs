@@ -187,6 +187,8 @@ enum Frame {
     },
 }
 
+const EXPORTER_KEEP: usize = 256;
+
 thread_local! {
     static EXPORTER: std::cell::Cell<Option<Exporter>> = const { std::cell::Cell::new(None) };
 }
@@ -829,7 +831,9 @@ impl Runtime {
         let root = std::mem::take(&mut ex.root);
         ex.cache.clear();
         ex.stack.clear();
-        EXPORTER.set(Some(ex));
+        if ex.cache.capacity() <= EXPORTER_KEEP && ex.stack.capacity() <= EXPORTER_KEEP {
+            EXPORTER.set(Some(ex));
+        }
         r?;
         Ok(root)
     }
@@ -973,6 +977,28 @@ impl Runtime {
     pub fn new_go_error(&mut self, msg: &str) -> Value {
         let e = self.get_error();
         self.new_error(e, msg)
+    }
+
+    pub fn new_go_error_with(&mut self, msg: &str, cause: Rc<dyn std::any::Any>) -> Value {
+        let v = self.new_go_error(msg);
+        if let Value::Object(o) = &v {
+            self.host.set_cause(*o, cause);
+        }
+        v
+    }
+
+    pub fn go_error_cause(&self, v: &Value) -> Option<Rc<dyn std::any::Any>> {
+        match v {
+            Value::Object(o) => self.host.cause(*o),
+            _ => None,
+        }
+    }
+
+    pub fn run_error_cause(&self, e: &RunError) -> Option<Rc<dyn std::any::Any>> {
+        match e {
+            RunError::Exception(ex) => self.go_error_cause(ex.value()),
+            _ => None,
+        }
     }
 
     pub fn call_function(
