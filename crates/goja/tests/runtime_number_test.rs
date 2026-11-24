@@ -46,7 +46,6 @@ fn test_number_format_rounding() {
 }
 
 #[test]
-#[ignore = "requires the Reflect builtin"]
 fn test_native_ctor_new_target() {
     const SCRIPT: &str = r#"
 	function NewTarget() {

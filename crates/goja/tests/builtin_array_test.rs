@@ -293,7 +293,6 @@ fn test_array_sort_non_std_array() {
 }
 
 #[test]
-#[ignore = "requires the Reflect builtin"]
 fn test_array_concat() {
     test_script_with_test_lib_x(
         r#"
@@ -331,7 +330,6 @@ fn test_array_concat() {
 }
 
 #[test]
-#[ignore = "requires the Reflect builtin"]
 fn test_array_flat() {
     test_script_with_test_lib_x(
         r#"
@@ -347,7 +345,6 @@ fn test_array_flat() {
 }
 
 #[test]
-#[ignore = "requires the Reflect builtin"]
 fn test_array_flat_map() {
     test_script_with_test_lib_x(
         r#"

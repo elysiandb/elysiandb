@@ -43,6 +43,7 @@ pub mod object;
 pub mod object_args;
 pub mod object_template;
 pub mod parser;
+pub mod proxy;
 pub mod regexp;
 pub mod runtime;
 pub mod string;

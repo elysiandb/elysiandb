@@ -4096,7 +4096,6 @@ fn test_load_mixed_lex() {
 }
 
 #[test]
-#[ignore = "requires the Reflect builtin"]
 fn test_object_literal_spread() {
     test_script_with_test_lib_x(
         r#"
@@ -4286,7 +4285,6 @@ fn test_array_assignment_pattern_eval_order() {
 }
 
 #[test]
-#[ignore = "requires the Reflect builtin"]
 fn test_object_assign_pattern_rest() {
     test_script_with_test_lib_x(
         r#"
@@ -4302,7 +4300,6 @@ fn test_object_assign_pattern_rest() {
 }
 
 #[test]
-#[ignore = "requires the Reflect builtin"]
 fn test_object_bind_pattern() {
     test_script_with_test_lib_x(
         r#"
