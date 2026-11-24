@@ -48,8 +48,8 @@ fn s(v: &str) -> Value {
 
 fn write_acl(username: &str, entity: &str, permissions: Permissions) {
     let a = Acl {
-        username: username.to_string(),
-        entity: entity.to_string(),
+        username: username.as_bytes().to_vec(),
+        entity: entity.as_bytes().to_vec(),
         permissions,
     };
     api::write_entity(acl::ACL_ENTITY.as_bytes(), &mut a.to_data_map());

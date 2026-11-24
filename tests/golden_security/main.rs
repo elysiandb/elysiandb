@@ -12,6 +12,7 @@ mod cookies;
 mod dto_decode;
 mod guard;
 mod http;
+mod invalid_utf8;
 mod ip;
 mod keyfile;
 mod origin;

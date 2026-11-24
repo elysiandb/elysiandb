@@ -24,14 +24,15 @@ pub use authentication::{
     token_authentication_is_enabled, user_authentication_is_enabled,
 };
 pub use basic_user::{
-    ADMIN_PASSWORD_ENV_VAR, BasicHashedUser, BasicHeader, BasicUser, Check, DEFAULT_ADMIN_PASSWORD,
-    DEFAULT_ADMIN_USERNAME, KEY_FILENAME, MAX_USERNAME_LENGTH, MIN_PASSWORD_LENGTH, ROLE_ADMIN,
-    ROLE_USER, Role, SESSIONS_FILENAME, SecurityError, USER_ENTITY, authenticate_user,
-    basic_user_exists, change_user_password, change_user_password_keeping_session,
-    change_user_role, check_basic_authentication, create_basic_user, create_key_file_or_get_key,
-    delete_basic_user, generate_key, get_basic_user_by_username, init_admin_user_if_not_exists,
-    init_basic_users_storage, list_basic_users, parse_basic_header, set_check_basic_authentication,
-    user_entity_schema, validate_password, validate_username, write_key,
+    ADMIN_PASSWORD_ENV_VAR, BasicHashedUser, BasicHeader, BasicUser, ByteString, Check,
+    DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_USERNAME, KEY_FILENAME, MAX_USERNAME_LENGTH,
+    MIN_PASSWORD_LENGTH, ROLE_ADMIN, ROLE_USER, Role, SESSIONS_FILENAME, SecurityError,
+    USER_ENTITY, authenticate_user, basic_user_exists, change_user_password,
+    change_user_password_keeping_session, change_user_role, check_basic_authentication,
+    create_basic_user, create_key_file_or_get_key, delete_basic_user, generate_key,
+    get_basic_user_by_username, init_admin_user_if_not_exists, init_basic_users_storage,
+    list_basic_users, parse_basic_header, set_check_basic_authentication, user_entity_schema,
+    validate_password, validate_username, write_key,
 };
 pub use cors::{cors, origin_is_allowed};
 pub use http_protection::{

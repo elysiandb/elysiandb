@@ -54,7 +54,7 @@ pub fn admin_auth(next: Handler) -> Handler {
             return;
         }
 
-        ctx.set_user_value(USERNAME_KEY, session.username);
+        ctx.set_user_value(USERNAME_KEY, session.username.into_bytes());
         ctx.set_user_value(ROLE_KEY, session.role);
 
         next(ctx);

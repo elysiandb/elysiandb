@@ -9,7 +9,7 @@ use super::session::get_current_username;
 pub fn actor(ctx: &RequestCtx) -> Vec<u8> {
     let username = get_current_username(ctx);
     if !username.is_empty() {
-        return username.into_bytes();
+        return username;
     }
 
     if basic_authentication_is_enabled() {

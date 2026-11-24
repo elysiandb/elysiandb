@@ -21,8 +21,8 @@ fn acl_rows_match_go() {
 
     for row in rows.iter().filter(|r| str_field(r, "fn") == "default") {
         let a = Acl {
-            username: "u".to_string(),
-            entity: "book".to_string(),
+            username: b"u".to_vec(),
+            entity: b"book".to_vec(),
             permissions: acl::default_permissions_for_role(&Role::new(str_field(row, "role"))),
         };
         let encoded = json::marshal(&a).expect("marshal");

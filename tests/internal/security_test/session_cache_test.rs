@@ -148,7 +148,7 @@ fn actor_names_the_caller() {
         String::from_utf8_lossy(&got)
     );
 
-    ctx.set_user_value(security::USERNAME_KEY, "bob".to_string());
+    ctx.set_user_value(security::USERNAME_KEY, b"bob".to_vec());
     let got = security::actor(&ctx);
     assert_eq!(
         got,

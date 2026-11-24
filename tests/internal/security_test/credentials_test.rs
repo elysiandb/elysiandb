@@ -281,7 +281,7 @@ fn get_session_removes_only_expired_sessions() {
 
     let s = security::get_session(live.id.as_bytes());
     assert!(
-        matches!(&s, Ok(Some(found)) if found.username == "b"),
+        matches!(&s, Ok(Some(found)) if found.username.as_bytes() == b"b"),
         "expected the live session, got {s:?}"
     );
 
@@ -300,7 +300,7 @@ fn get_session_removes_only_expired_sessions() {
 
     let sessions = sf.sessions.unwrap_or_default();
     assert!(
-        sessions.len() == 1 && sessions[0].username == "b",
+        sessions.len() == 1 && sessions[0].username.as_bytes() == b"b",
         "expected only the live session to remain, got {sessions:?}"
     );
 

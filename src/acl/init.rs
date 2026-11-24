@@ -54,20 +54,30 @@ impl Permission {
 pub type Permissions = [bool; 8];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AclError(pub String);
+pub struct AclError(pub Vec<u8>);
+
+impl AclError {
+    pub fn message(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 impl fmt::Display for AclError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
+        f.write_str(&text(&self.0))
     }
+}
+
+fn concat(parts: &[&[u8]]) -> Vec<u8> {
+    parts.concat()
 }
 
 impl std::error::Error for AclError {}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Acl {
-    pub username: String,
-    pub entity: String,
+    pub username: Vec<u8>,
+    pub entity: Vec<u8>,
     pub permissions: Permissions,
 }
 
@@ -100,12 +110,12 @@ impl Acl {
             );
         }
 
-        let id = get_acl_entity_id(self.username.as_bytes(), self.entity.as_bytes());
+        let id = get_acl_entity_id(&self.username, &self.entity);
 
         let mut m = Map::new();
         m.insert("id".to_string(), Value::String(text(&id)));
-        m.insert("username".to_string(), Value::String(self.username.clone()));
-        m.insert("entity".to_string(), Value::String(self.entity.clone()));
+        m.insert("username".to_string(), Value::String(text(&self.username)));
+        m.insert("entity".to_string(), Value::String(text(&self.entity)));
         m.insert("permissions".to_string(), Value::Object(perms));
         m
     }
@@ -127,9 +137,9 @@ impl Encode for Acl {
     fn encode(&self, e: &mut EncodeState) -> Result<(), json::Error> {
         let mut first = true;
         e.write_field_name(&mut first, "username");
-        e.write_string(self.username.as_bytes());
+        e.write_string(&self.username);
         e.write_field_name(&mut first, "entity");
-        e.write_string(self.entity.as_bytes());
+        e.write_string(&self.entity);
         e.write_field_name(&mut first, "permissions");
         e.write_byte(b'{');
         for (i, allowed) in self.permissions.iter().enumerate() {
@@ -225,7 +235,7 @@ pub fn init_acl() -> Result<(), AclError> {
     if let Err(err) = save_acl_list(&generate_acl_fo_allr_entities()) {
         log::error(
             "cannot create the default ACLs",
-            kv!["component" => "acl", "err" => err.0],
+            kv!["component" => "acl", "err" => err.message()],
         );
         return Err(err);
     }
@@ -238,7 +248,7 @@ pub fn init_acl() -> Result<(), AclError> {
 fn save_acl_list(acls: &[Acl]) -> Result<(), AclError> {
     let mut errs = Vec::new();
     for acl in acls {
-        let id = get_acl_entity_id(acl.username.as_bytes(), acl.entity.as_bytes());
+        let id = get_acl_entity_id(&acl.username, &acl.entity);
         if engine::entity_exists(ACL_ENTITY.as_bytes(), &id) {
             continue;
         }
@@ -252,7 +262,7 @@ fn save_acl_list(acls: &[Acl]) -> Result<(), AclError> {
         return Ok(());
     }
 
-    Err(AclError(errs.join("\n")))
+    Err(AclError(errs.join(&b'\n')))
 }
 
 fn write_acl(a: &Acl) -> Result<(), AclError> {
@@ -266,12 +276,14 @@ fn write_acl(a: &Acl) -> Result<(), AclError> {
         .map(|e| e.to_error().to_string())
         .collect();
 
-    Err(AclError(format!(
-        "unable to write the ACL of {} on {}: {}",
-        a.username,
-        a.entity,
-        messages.join("; ")
-    )))
+    Err(AclError(concat(&[
+        b"unable to write the ACL of ",
+        &a.username,
+        b" on ",
+        &a.entity,
+        b": ",
+        messages.join("; ").as_bytes(),
+    ])))
 }
 
 fn string_of<'a>(data: &'a Map, key: &str) -> Option<&'a str> {
@@ -300,8 +312,8 @@ pub fn generate_acl_fo_allr_entities() -> Vec<Acl> {
 
         for entity in &entities {
             acls.push(Acl {
-                username: username.to_string(),
-                entity: text(entity),
+                username: username.as_bytes().to_vec(),
+                entity: entity.clone(),
                 permissions: default_permissions_for_role(&role),
             });
         }
@@ -323,8 +335,14 @@ pub fn get_acl_entity_for_username(entity: &[u8], username: &[u8]) -> Option<Acl
         engine::read_entity_by_id(ACL_ENTITY.as_bytes(), &get_acl_entity_id(username, entity))?;
 
     let mut acl = Acl {
-        username: string_of(&data, "username").unwrap_or_default().to_string(),
-        entity: string_of(&data, "entity").unwrap_or_default().to_string(),
+        username: string_of(&data, "username")
+            .unwrap_or_default()
+            .as_bytes()
+            .to_vec(),
+        entity: string_of(&data, "entity")
+            .unwrap_or_default()
+            .as_bytes()
+            .to_vec(),
         permissions: new_permissions(),
     };
 
@@ -345,11 +363,12 @@ pub fn update_acl_entity_for_username(
     permissions: Permissions,
 ) -> Result<(), AclError> {
     let Some(mut existing) = get_acl_entity_for_username(entity, username) else {
-        return Err(AclError(format!(
-            "ACL does not exist for username {} and entity {}",
-            text(username),
-            text(entity)
-        )));
+        return Err(AclError(concat(&[
+            b"ACL does not exist for username ",
+            username,
+            b" and entity ",
+            entity,
+        ])));
     };
 
     existing.permissions = permissions;
@@ -373,7 +392,7 @@ pub fn delete_user_acls(username: &[u8]) -> Result<(), AclError> {
 }
 
 pub fn delete_acl_for_entity_type(entity: &[u8]) -> Result<(), AclError> {
-    let users = security::list_basic_users().map_err(|e| AclError(e.to_string()))?;
+    let users = security::list_basic_users().map_err(|e| AclError(e.message()))?;
 
     for user in &users {
         let Some(username) = string_of(user, "username") else {
@@ -390,7 +409,7 @@ pub fn delete_acl_for_entity_type(entity: &[u8]) -> Result<(), AclError> {
 }
 
 pub fn reset_acl_entity_to_default(entity: &[u8], username: &[u8]) -> Result<(), AclError> {
-    let users = security::list_basic_users().map_err(|e| AclError(e.to_string()))?;
+    let users = security::list_basic_users().map_err(|e| AclError(e.message()))?;
 
     let role = users.iter().find_map(|user| {
         match (string_of(user, "username"), string_of(user, "role")) {
@@ -400,7 +419,7 @@ pub fn reset_acl_entity_to_default(entity: &[u8], username: &[u8]) -> Result<(),
     });
 
     let Some(role) = role else {
-        return Err(AclError(format!("user {} not found", text(username))));
+        return Err(AclError(concat(&[b"user ", username, b" not found"])));
     };
 
     let permissions = default_permissions_for_role(&role);
@@ -411,8 +430,8 @@ pub fn reset_acl_entity_to_default(entity: &[u8], username: &[u8]) -> Result<(),
             existing
         }
         None => Acl {
-            username: text(username),
-            entity: text(entity),
+            username: username.to_vec(),
+            entity: entity.to_vec(),
             permissions,
         },
     };

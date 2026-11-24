@@ -17,7 +17,7 @@ use super::authentication::{
     authentication_is_enabled, basic_authentication_is_enabled, token_authentication_is_enabled,
 };
 use super::basic_user::{
-    BasicHashedUser, Role, SESSIONS_FILENAME, SecurityError, USER_ENTITY,
+    BasicHashedUser, ByteString, Role, SESSIONS_FILENAME, SecurityError, USER_ENTITY,
     check_basic_authentication, hex_string,
 };
 use super::token::check_token_authentication;
@@ -31,7 +31,7 @@ json_struct! {
     pub struct Session {
         pub id: String => -,
         pub token_hash: String => "token_hash",
-        pub username: String => "username",
+        pub username: ByteString => "username",
         pub role: Role => "role",
         pub credentials: String => "credentials",
         pub expires_at: i64 => "expires_at",
@@ -45,8 +45,8 @@ json_struct! {
     }
 }
 
-pub fn get_current_username(ctx: &RequestCtx) -> String {
-    ctx.user_value::<String>(USERNAME_KEY)
+pub fn get_current_username(ctx: &RequestCtx) -> Vec<u8> {
+    ctx.user_value::<Vec<u8>>(USERNAME_KEY)
         .cloned()
         .unwrap_or_default()
 }
@@ -278,7 +278,7 @@ pub fn create_session(
     let session = Session {
         token_hash: hash_session_id(id.as_bytes()),
         id,
-        username: text(username),
+        username: ByteString::from(username),
         role,
         credentials: credentials_fingerprint(user.password.as_bytes()),
         expires_at: now + i64::try_from(ttl.as_secs()).unwrap_or(i64::MAX),

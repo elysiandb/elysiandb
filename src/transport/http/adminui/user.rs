@@ -4,7 +4,7 @@ use crate::httpd::{
     STATUS_TOO_MANY_REQUESTS, STATUS_UNAUTHORIZED,
 };
 use crate::json_struct;
-use crate::security::{self, Role, SESSION_COOKIE_NAME};
+use crate::security::{self, ByteString, Role, SESSION_COOKIE_NAME};
 use crate::transport::http::observe;
 
 json_struct! {
@@ -18,7 +18,7 @@ json_struct! {
 json_struct! {
     #[derive(Clone, Debug, Default, PartialEq, Eq)]
     pub struct UserResponse {
-        pub username: String => "username",
+        pub username: ByteString => "username",
         pub role: Role => "role",
     }
 }
@@ -75,7 +75,7 @@ pub fn login_controller(ctx: &mut RequestCtx) {
     security::log_login(user.username.as_bytes(), source);
 
     let resp = UserResponse {
-        username: user.username,
+        username: ByteString::from(user.username.as_str()),
         role: user.role,
     };
 
@@ -90,7 +90,7 @@ pub fn logout_controller(ctx: &mut RequestCtx) {
         let _ = security::delete_session(&id);
     }
 
-    security::log_logout(security::get_current_username(ctx).as_bytes());
+    security::log_logout(&security::get_current_username(ctx));
     security::clear_session_cookie(ctx);
 
     ctx.set_status_code(STATUS_NO_CONTENT);

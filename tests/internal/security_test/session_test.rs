@@ -41,7 +41,7 @@ fn read_sessions(dir: &str) -> Vec<Session> {
 fn old_session(id: &str, username: &str, role: Role) -> Session {
     Session {
         id: id.to_string(),
-        username: username.to_string(),
+        username: username.into(),
         role,
         expires_at: unix_now() - 10,
         ..Session::default()
@@ -57,16 +57,15 @@ fn session_ctx(role: Role, username: &str, ttl: Duration) -> RequestCtx {
 #[test]
 fn get_current_username() {
     let mut ctx = RequestCtx::new();
-    assert_eq!(
-        security::get_current_username(&ctx),
-        "",
+    assert!(
+        security::get_current_username(&ctx).is_empty(),
         "expected empty username"
     );
 
-    ctx.set_user_value(security::USERNAME_KEY, "alice".to_string());
+    ctx.set_user_value(security::USERNAME_KEY, b"alice".to_vec());
     assert_eq!(
         security::get_current_username(&ctx),
-        "alice",
+        b"alice",
         "expected alice"
     );
 }
@@ -79,7 +78,7 @@ fn create_session() {
     let s = security::create_session(b"user1", Role::admin(), SECOND)
         .unwrap_or_else(|e| panic!("unexpected error: {e}"));
     assert!(
-        s.username == "user1" && s.role == Role::admin(),
+        s.username.as_bytes() == b"user1" && s.role == Role::admin(),
         "invalid session data"
     );
     assert!(!s.id.is_empty(), "session id not generated");
@@ -119,7 +118,7 @@ fn get_session() {
     let res =
         security::get_session(s.id.as_bytes()).unwrap_or_else(|e| panic!("unexpected error: {e}"));
     assert!(
-        res.is_some_and(|r| r.username == "user"),
+        res.is_some_and(|r| r.username.as_bytes() == b"user"),
         "session not returned"
     );
 }
@@ -144,7 +143,7 @@ fn get_session_expired() {
 
     let sessions = read_sessions(&store.path());
     assert!(
-        sessions.len() == 1 && sessions[0].username == "other",
+        sessions.len() == 1 && sessions[0].username.as_bytes() == b"other",
         "expired sessions are removed at the next session change, got {sessions:?}"
     );
 }
@@ -191,7 +190,7 @@ fn current_session() {
 
     let cs = security::current_session(&ctx);
     assert!(
-        matches!(&cs, Ok(Some(s)) if s.username == "me"),
+        matches!(&cs, Ok(Some(s)) if s.username.as_bytes() == b"me"),
         "current session not resolved"
     );
 }

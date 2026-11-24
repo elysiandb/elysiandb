@@ -11,7 +11,9 @@ use crate::durable::{self, Fs, FsError};
 use crate::engine;
 use crate::gocompat::base64::STD_ENCODING;
 use crate::gocompat::fmt::{ScanError, fscanf_word};
-use crate::gocompat::json::{self, Decode, DecodeState, Encode, EncodeState, Expected, Map, Value};
+use crate::gocompat::json::{
+    self, Decode, DecodeState, Encode, EncodeState, Expected, Kind, Map, Value,
+};
 use crate::gocompat::{unicode, utf8};
 use crate::httpd::{HEADER_AUTHORIZATION, RequestCtx};
 use crate::sync::RwLock;
@@ -143,6 +145,57 @@ impl Decode for Role {
 impl Encode for Role {
     fn encode(&self, e: &mut EncodeState) -> Result<(), json::Error> {
         self.0.encode(e)
+    }
+
+    fn is_empty_value(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ByteString(pub Vec<u8>);
+
+impl ByteString {
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.0
+    }
+}
+
+impl From<&[u8]> for ByteString {
+    fn from(b: &[u8]) -> ByteString {
+        ByteString(b.to_vec())
+    }
+}
+
+impl From<&str> for ByteString {
+    fn from(s: &str) -> ByteString {
+        ByteString(s.as_bytes().to_vec())
+    }
+}
+
+impl Decode for ByteString {
+    const EXPECTED: Expected = Expected::String;
+
+    fn decode(&mut self, d: &mut DecodeState<'_>) -> Result<(), json::Error> {
+        if d.peek() == Kind::Null {
+            d.skip();
+            return Ok(());
+        }
+        let mut text = String::new();
+        text.decode(d)?;
+        self.0 = text.into_bytes();
+        Ok(())
+    }
+}
+
+impl Encode for ByteString {
+    fn encode(&self, e: &mut EncodeState) -> Result<(), json::Error> {
+        e.write_string(&self.0);
+        Ok(())
     }
 
     fn is_empty_value(&self) -> bool {
