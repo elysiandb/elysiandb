@@ -357,6 +357,24 @@ fn test_bad_object_key() {
 }
 
 #[test]
+fn test_async_func() {
+    const SCRIPT: &str = r#"
+	async (x = true, y) => {};
+	async x => {};
+	let passed = false;
+	async function f() {
+		return true;
+	}
+	async function f1(arg = true) {
+		passed = await f();
+	}
+	await f1();
+	return passed;
+	"#;
+    jsrun::test_async_func(SCRIPT, Value::Bool(true));
+}
+
+#[test]
 fn test_object_literal_computed_method_keys() {
     expect_ok(
         "
@@ -564,7 +582,6 @@ fn test_nested_func_var_resolution1() {
 }
 
 #[test]
-#[ignore = "requires the String builtin"]
 fn test_call_fewer_args_closure_no_args() {
     test_script(
         r#"
@@ -582,7 +599,6 @@ fn test_call_fewer_args_closure_no_args() {
 }
 
 #[test]
-#[ignore = "requires the String builtin"]
 fn test_call_fewer_args_closure_args() {
     test_script(
         r#"
@@ -1309,7 +1325,6 @@ fn test_continue_out_of_try() {
 }
 
 #[test]
-#[ignore = "requires the String builtin"]
 fn test_this_in_catch() {
     test_script(
         r#"
@@ -1459,7 +1474,6 @@ fn test_new() {
 }
 
 #[test]
-#[ignore = "requires the String builtin"]
 fn test_string_constructor() {
     test_script(
         r#"
@@ -1504,7 +1518,6 @@ fn test_type_error() {
 }
 
 #[test]
-#[ignore = "requires the String builtin"]
 fn test_to_string() {
     test_script(
         r#"
@@ -2028,7 +2041,6 @@ fn test_strict_scope() {
 }
 
 #[test]
-#[ignore = "requires the String builtin"]
 fn test_string_obj() {
     test_script(
         r#"
@@ -2040,7 +2052,6 @@ fn test_string_obj() {
 }
 
 #[test]
-#[ignore = "requires the String builtin"]
 fn test_string_primitive() {
     test_script(
         r#"
@@ -2081,7 +2092,6 @@ fn test_func_length() {
 }
 
 #[test]
-#[ignore = "requires the String builtin"]
 fn test_native_func_length() {
     test_script(
         r#"
@@ -5047,7 +5057,7 @@ fn test_class_dyn_capture_this_in_static_field_init() {
 }
 
 #[test]
-#[ignore = "requires the String builtin"]
+#[ignore = "requires the Math builtin"]
 fn test_compile_class() {
     test_script(
         r#"
@@ -6251,7 +6261,6 @@ fn test_wrong_this_forward_ref() {
 }
 
 #[test]
-#[ignore = "requires the String builtin"]
 fn test_call_fewer_args() {
     test_script(
         r#"
@@ -6299,7 +6308,6 @@ A(1, 2, 3);
 }
 
 #[test]
-#[ignore = "requires the String builtin"]
 fn test_call_less_args_dynamic() {
     test_script(
         r#"
@@ -6428,7 +6436,7 @@ fn test_tagged_template() {
 }
 
 #[test]
-#[ignore = "requires the String builtin"]
+#[ignore = "requires the Array builtin"]
 fn test_src_locations() {
     test_script_with_test_lib_x(
         r#"

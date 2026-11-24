@@ -1,3 +1,5 @@
+mod jsrun;
+
 use goja::ipow::ipow;
 
 #[test]
@@ -76,6 +78,31 @@ fn test_exponentiation_follows_go_math() {
     if let Err(e) = h.join() {
         std::panic::resume_unwind(e);
     }
+}
+
+#[test]
+fn test_async_func_throw() {
+    const SCRIPT: &str = r#"
+	class TestError extends Error {
+	}
+
+	async function f() {
+		throw new TestError();
+	}
+
+	async function f1() {
+		try {
+			await f();
+		} catch (e) {
+			assert.sameValue(e.constructor.name, TestError.name);
+			return;
+		}
+		throw new Error("No exception was thrown");
+	}
+	await f1();
+	return undefined;
+	"#;
+    jsrun::test_async_func_with_test_lib(SCRIPT, goja::Value::Undefined);
 }
 
 #[test]

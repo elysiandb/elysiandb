@@ -253,6 +253,56 @@ pub fn test_script_with_test_lib_x(script: &'static str, expected: Value) {
     });
 }
 
+pub fn rt_test_async_func(rt: &mut Runtime, src: &str, expected: &Value) {
+    let script = format!("(async function test() {{{src}\n}})()");
+    let v = match rt.run_script("test.js", &script) {
+        Ok(v) => v,
+        Err(e) => panic!("{}", run_error_string(&e)),
+    };
+    let Value::Object(p) = v else {
+        panic!("not a promise");
+    };
+    use goja::builtin_promise::{Promise, PromiseState};
+    match Promise::state(rt, p) {
+        PromiseState::Fulfilled => {
+            let res = Promise::result(rt, p);
+            match res {
+                Some(r) if r.same_as(expected) => {}
+                other => panic!("Result: {other:?}, expected: {expected:?}"),
+            }
+        }
+        PromiseState::Rejected => {
+            let res = Promise::result(rt, p).unwrap_or_default();
+            if let Value::Object(o) = &res
+                && let Ok(Some(stack)) = o.get_str(rt, &"stack".into(), None)
+            {
+                let s = stack.go_string(rt).unwrap_or_default();
+                panic!("{s}");
+            }
+            let s = res.go_string(rt).unwrap_or_default();
+            panic!("{s}");
+        }
+        s => panic!("Unexpected promise state: {s:?}"),
+    }
+}
+
+pub fn test_async_func(src: &'static str, expected: Value) {
+    on_big_stack(move || {
+        let mut rt = new_runtime();
+        rt_test_async_func(&mut rt, src, &expected);
+    });
+}
+
+pub fn test_async_func_with_test_lib(src: &'static str, expected: Value) {
+    on_big_stack(move || {
+        let mut rt = new_runtime();
+        if let Err(e) = rt.run_program(&test_lib()) {
+            panic!("{}", run_error_string(&e));
+        }
+        rt_test_async_func(&mut rt, src, &expected);
+    });
+}
+
 pub fn int(i: i64) -> Value {
     Value::Int(i)
 }
