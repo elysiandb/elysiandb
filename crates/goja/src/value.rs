@@ -634,7 +634,14 @@ impl Value {
             Value::Object(o) => Ok(Some(*o)),
             Value::Bool(_) => Ok(Some(rt.get_boolean_prototype())),
             Value::Int(_) | Value::Float(_) => Ok(Some(rt.get_number_prototype())),
-            Value::String(_) => Ok(Some(rt.get_string_prototype())),
+            Value::String(s) => {
+                let ss = rt.get_string_singleton()?;
+                if let crate::object::ObjExt::StringObj(so) = &mut rt.obj_mut(ss).ext {
+                    so.value = Some(s.clone());
+                }
+                crate::string::StringObject::set_length(rt, ss);
+                Ok(Some(ss))
+            }
             Value::BigInt(_) => Ok(Some(rt.get_big_int_prototype())),
             Value::Symbol(_) => {
                 let proto = rt.get_symbol_prototype();

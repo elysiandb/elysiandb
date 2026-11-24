@@ -1,3 +1,5 @@
+use crate::deps::xtext::cases;
+use crate::deps::xtext::language::UND;
 use crate::parser::WHITESPACE_CHARS;
 use crate::string::{JsString, RuneReader, Utf16Reader, devirtualize_string};
 use crate::string_ascii::AsciiString;
@@ -125,7 +127,7 @@ impl UnicodeString {
     }
 
     pub fn to_integer(&self) -> i64 {
-        todo!("unicodeString.ToInteger")
+        0
     }
 
     pub fn substring(&self, start: usize, end: usize) -> JsString {
@@ -141,40 +143,226 @@ impl UnicodeString {
     }
 
     pub fn reader(&self) -> Box<dyn RuneReader> {
-        todo!("unicodeString.Reader")
+        Box::new(UnicodeRuneReader {
+            s: self.clone(),
+            pos: 1,
+            invalid: false,
+        })
     }
 
     pub fn utf16_reader(&self) -> Box<dyn Utf16Reader> {
-        todo!("unicodeString.utf16Reader")
+        Box::new(Utf16RuneReaderImpl {
+            s: self.clone(),
+            pos: 1,
+        })
     }
 
     pub fn utf16_rune_reader(&self) -> Box<dyn RuneReader> {
-        todo!("unicodeString.utf16RuneReader")
+        Box::new(Utf16RuneReaderImpl {
+            s: self.clone(),
+            pos: 1,
+        })
     }
 
     pub fn utf16_runes(&self) -> Vec<i32> {
         self.0[1..].iter().map(|&c| i32::from(c)).collect()
     }
 
-    pub fn index(&self, _substr: &JsString, _start: isize) -> isize {
-        todo!("unicodeString.index")
+    fn units_of(substr: &JsString) -> Vec<u16> {
+        let (a, u) = devirtualize_string(substr);
+        match u {
+            Some(u) => u.0[1..].to_vec(),
+            None => a
+                .map(|a| a.as_bytes().iter().map(|&c| u16::from(c)).collect())
+                .unwrap_or_default(),
+        }
     }
 
-    pub fn last_index(&self, _substr: &JsString, _start: isize) -> isize {
-        todo!("unicodeString.lastIndex")
+    pub fn index(&self, substr: &JsString, start: isize) -> isize {
+        let ss = UnicodeString::units_of(substr);
+        let s1 = &self.0[1..];
+        let end = s1.len() as isize - ss.len() as isize;
+        let mut start = start;
+        while start <= end {
+            let st = start as usize;
+            if s1[st..st + ss.len()] == ss[..] {
+                return start;
+            }
+            start += 1;
+        }
+        -1
+    }
+
+    pub fn last_index(&self, substr: &JsString, start: isize) -> isize {
+        let ss = UnicodeString::units_of(substr);
+        let s1 = &self.0[1..];
+        let max_start = s1.len() as isize - ss.len() as isize;
+        let mut start = start.min(max_start);
+        while start >= 0 {
+            let st = start as usize;
+            if s1[st..st + ss.len()] == ss[..] {
+                return start;
+            }
+            start -= 1;
+        }
+        -1
     }
 
     pub fn to_lower(&self) -> JsString {
-        todo!("unicodeString.toLower")
+        to_lower(&self.go_string())
     }
 
     pub fn to_upper(&self) -> JsString {
-        todo!("unicodeString.toUpper")
+        let caser = cases::upper(UND, &[]);
+        crate::string::new_string_value(&caser.string(&self.go_string()))
     }
 }
 
-pub fn lenient_utf16_decoder(_r: Box<dyn Utf16Reader>) -> Box<dyn RuneReader> {
-    todo!("lenientUtf16Decoder")
+pub fn unicode_string_from_runes(r: &[i32]) -> UnicodeString {
+    match unistring::new_from_runes(r).as_utf16() {
+        Some(u) => UnicodeString::from_raw(u.to_vec()),
+        None => {
+            let mut buf = Vec::with_capacity(r.len() + 1);
+            buf.push(unistring::BOM);
+            buf.extend(r.iter().map(|&c| c as u16));
+            UnicodeString::from_raw(buf)
+        }
+    }
+}
+
+pub fn to_lower(s: &[u8]) -> JsString {
+    let caser = cases::lower(UND, &[]);
+    let lowered = caser.string(s);
+    let mut r = Vec::with_capacity(lowered.len());
+    let mut i = 0;
+    while i < lowered.len() {
+        let (c, size) = utf8::decode_rune(&lowered[i..]);
+        r.push(c);
+        i += size;
+    }
+    let mut ascii = true;
+    let mut i = 0;
+    while i + 1 < r.len() {
+        if (i == 0 || r[i - 1] != 0x3b1) && r[i] == 0x345 && r[i + 1] == 0x3c2 {
+            i += 1;
+            r[i] = 0x3c3;
+        }
+        if r[i] >= 0x80 {
+            ascii = false;
+        }
+        i += 1;
+    }
+    if ascii {
+        ascii = r[r.len() - 1] < 0x80;
+    }
+    if ascii {
+        let b: Vec<u8> = r.iter().map(|&c| c as u8).collect();
+        return JsString::Ascii(AsciiString::new(&b));
+    }
+    JsString::Unicode(unicode_string_from_runes(&r))
+}
+
+struct UnicodeRuneReader {
+    s: UnicodeString,
+    pos: usize,
+    invalid: bool,
+}
+
+impl RuneReader for UnicodeRuneReader {
+    fn read_rune(&mut self) -> Option<(i32, usize)> {
+        let s = &self.s.0;
+        self.invalid = false;
+        if self.pos < s.len() {
+            let c = s[self.pos];
+            let mut size = 1;
+            self.pos += 1;
+            if crate::string::is_utf16_first_surrogate(c) {
+                if self.pos < s.len() {
+                    let second = s[self.pos];
+                    if crate::string::is_utf16_second_surrogate(second) {
+                        let r = utf16::decode_rune(i32::from(c), i32::from(second));
+                        size += 1;
+                        self.pos += 1;
+                        return Some((r, size));
+                    }
+                }
+                self.invalid = true;
+            } else if crate::string::is_utf16_second_surrogate(c) {
+                self.invalid = true;
+            }
+            return Some((i32::from(c), size));
+        }
+        None
+    }
+
+    fn last_rune_invalid(&self) -> bool {
+        self.invalid
+    }
+}
+
+struct Utf16RuneReaderImpl {
+    s: UnicodeString,
+    pos: usize,
+}
+
+impl Utf16Reader for Utf16RuneReaderImpl {
+    fn read_char(&mut self) -> Option<u16> {
+        if self.pos < self.s.0.len() {
+            let c = self.s.0[self.pos];
+            self.pos += 1;
+            return Some(c);
+        }
+        None
+    }
+}
+
+impl RuneReader for Utf16RuneReaderImpl {
+    fn read_rune(&mut self) -> Option<(i32, usize)> {
+        if self.pos < self.s.0.len() {
+            let r = i32::from(self.s.0[self.pos]);
+            self.pos += 1;
+            return Some((r, 1));
+        }
+        None
+    }
+}
+
+struct LenientUtf16Decoder {
+    utf16_reader: Box<dyn Utf16Reader>,
+    prev: u16,
+    prev_set: bool,
+}
+
+impl RuneReader for LenientUtf16Decoder {
+    fn read_rune(&mut self) -> Option<(i32, usize)> {
+        let c = if self.prev_set {
+            self.prev_set = false;
+            self.prev
+        } else {
+            self.utf16_reader.read_char()?
+        };
+        let mut size = 1;
+        if crate::string::is_utf16_first_surrogate(c) {
+            let Some(second) = self.utf16_reader.read_char() else {
+                return Some((i32::from(c), size));
+            };
+            if crate::string::is_utf16_second_surrogate(second) {
+                size += 1;
+                return Some((utf16::decode_rune(i32::from(c), i32::from(second)), size));
+            }
+            self.prev = second;
+            self.prev_set = true;
+        }
+        Some((i32::from(c), size))
+    }
+}
+
+pub fn lenient_utf16_decoder(r: Box<dyn Utf16Reader>) -> Box<dyn RuneReader> {
+    Box::new(LenientUtf16Decoder {
+        utf16_reader: r,
+        prev: 0,
+        prev_set: false,
+    })
 }
 
 #[derive(Default)]

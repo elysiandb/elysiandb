@@ -107,13 +107,17 @@ pub(crate) fn devirtualize_string(s: &JsString) -> (Option<AsciiString>, Option<
         JsString::Unicode(u) => (None, Some(u.clone())),
         JsString::Imported(i) => match i.unicode() {
             Some(u) => (None, Some(u.clone())),
-            None => (Some(AsciiString::new(i.utf8())), None),
+            None => (Some(i.ascii()), None),
         },
     }
 }
 
 pub trait RuneReader {
     fn read_rune(&mut self) -> Option<(i32, usize)>;
+
+    fn last_rune_invalid(&self) -> bool {
+        false
+    }
 }
 
 pub trait Utf16Reader {

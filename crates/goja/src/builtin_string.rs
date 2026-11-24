@@ -2,9 +2,6 @@ use crate::builtin_regexp::is_regexp;
 use crate::builtin_symbol::{
     SYM_ITERATOR, SYM_MATCH, SYM_MATCH_ALL, SYM_REPLACE, SYM_SEARCH, SYM_SPLIT, SYM_TO_STRING_TAG,
 };
-use crate::deps::xtext::cases;
-use crate::deps::xtext::collate::Collator;
-use crate::deps::xtext::language::UND;
 use crate::deps::xtext::norm::Form;
 use crate::func::NativeFn;
 use crate::heap::ObjRef;
@@ -28,12 +25,7 @@ use crate::value::{Value, int_to_value, nil_safe, value_prop};
 use gocompat::strings;
 use gocompat::utf8;
 use gocompat::utf16;
-use std::cell::RefCell;
 use std::sync::OnceLock;
-
-thread_local! {
-    static COLLATOR: RefCell<Option<Collator>> = const { RefCell::new(None) };
-}
 
 #[derive(Clone, Debug)]
 pub(crate) enum StrUnits {
@@ -158,193 +150,20 @@ fn bytes_index(hay: &[u8], needle: &[u8]) -> Option<usize> {
     None
 }
 
-fn bytes_last_index(hay: &[u8], needle: &[u8]) -> isize {
-    let n = needle.len();
-    if n == 0 {
-        return hay.len() as isize;
-    }
-    if n > hay.len() {
-        return -1;
-    }
-    let mut i = hay.len() - n;
-    loop {
-        if hay[i..i + n] == *needle {
-            return i as isize;
-        }
-        if i == 0 {
-            return -1;
-        }
-        i -= 1;
-    }
-}
-
-fn units_match<N: Copy + Into<u16>>(s1: &[u16], at: usize, ss: &[N]) -> bool {
-    ss.iter()
-        .zip(&s1[at..at + ss.len()])
-        .all(|(&a, &b)| a.into() == b)
-}
-
-fn units_index<N: Copy + Into<u16>>(s1: &[u16], ss: &[N], start: usize) -> isize {
-    let n = ss.len();
-    if start > s1.len() || n > s1.len() - start {
-        return -1;
-    }
-    if n == 0 {
-        return start as isize;
-    }
-    let first: u16 = ss[0].into();
-    let last_start = s1.len() - n;
-    let mut i = start;
-    while i <= last_start {
-        let Some(p) = s1[i..=last_start].iter().position(|&c| c == first) else {
-            return -1;
-        };
-        i += p;
-        if units_match(s1, i + 1, &ss[1..]) {
-            return i as isize;
-        }
-        i += 1;
-    }
-    -1
-}
-
-fn units_last_index<N: Copy + Into<u16>>(s1: &[u16], ss: &[N], start: usize) -> isize {
-    let max_start = s1.len() as isize - ss.len() as isize;
-    let mut start = (start as isize).min(max_start);
-    while start >= 0 {
-        if units_match(s1, start as usize, ss) {
-            return start;
-        }
-        start -= 1;
-    }
-    -1
-}
-
 pub(crate) fn string_index(s: &JsString, substr: &JsString, start: usize) -> isize {
-    let s = StrUnits::of(s);
-    let sub = StrUnits::of(substr);
-    match (&s, s.ascii()) {
-        (StrUnits::Unicode(u), _) => {
-            let s1 = &u.raw()[1..];
-            match (&sub, sub.ascii()) {
-                (_, Some(b)) => units_index(s1, b, start),
-                (StrUnits::Unicode(su), _) => units_index(s1, &su.raw()[1..], start),
-                _ => -1,
-            }
-        }
-        (_, Some(a)) => {
-            if let Some(b) = sub.ascii() {
-                if start > a.len() {
-                    return -1;
-                }
-                if let Some(p) = bytes_index(&a[start..], b) {
-                    return (p + start) as isize;
-                }
-            }
-            -1
-        }
-        _ => -1,
-    }
+    s.index(substr, start as isize)
 }
 
 pub(crate) fn string_last_index(s: &JsString, substr: &JsString, pos: usize) -> isize {
-    let s = StrUnits::of(s);
-    let sub = StrUnits::of(substr);
-    match (&s, s.ascii()) {
-        (StrUnits::Unicode(u), _) => {
-            let s1 = &u.raw()[1..];
-            match (&sub, sub.ascii()) {
-                (_, Some(b)) => units_last_index(s1, b, pos),
-                (StrUnits::Unicode(su), _) => units_last_index(s1, &su.raw()[1..], pos),
-                _ => -1,
-            }
-        }
-        (_, Some(a)) => {
-            if let Some(b) = sub.ascii() {
-                let end = pos + b.len();
-                let ss = if end > a.len() { a } else { &a[..end] };
-                return bytes_last_index(ss, b);
-            }
-            -1
-        }
-        _ => -1,
-    }
-}
-
-fn decode_utf8_runes(s: &[u8]) -> Vec<i32> {
-    let mut out = Vec::with_capacity(s.len());
-    let mut i = 0;
-    while i < s.len() {
-        let (r, size) = utf8::decode_rune(&s[i..]);
-        out.push(r);
-        i += size;
-    }
-    out
-}
-
-fn unicode_string_from_runes(r: &[i32]) -> JsString {
-    let mut buf = Vec::with_capacity(r.len() + 1);
-    buf.push(unistring::BOM);
-    for &c in r {
-        utf16::append_rune(&mut buf, c);
-    }
-    JsString::Unicode(UnicodeString::from_raw(buf))
-}
-
-fn to_lower(s: &[u8]) -> JsString {
-    let caser = cases::lower(UND, &[]);
-    let mut r = decode_utf8_runes(&caser.string(s));
-    let mut ascii = true;
-    let mut i = 0;
-    while i + 1 < r.len() {
-        if (i == 0 || r[i - 1] != 0x3b1) && r[i] == 0x345 && r[i + 1] == 0x3c2 {
-            i += 1;
-            r[i] = 0x3c3;
-        }
-        if r[i] >= 0x80 {
-            ascii = false;
-        }
-        i += 1;
-    }
-    if ascii {
-        ascii = r[r.len() - 1] < 0x80;
-    }
-    if ascii {
-        let b: Vec<u8> = r.iter().map(|&c| c as u8).collect();
-        return JsString::Ascii(AsciiString::new(&b));
-    }
-    unicode_string_from_runes(&r)
-}
-
-fn to_upper(s: &[u8]) -> JsString {
-    let caser = cases::upper(UND, &[]);
-    new_string_value(&caser.string(s))
+    s.last_index(substr, pos as isize)
 }
 
 pub(crate) fn string_to_lower(s: &JsString) -> JsString {
-    match s {
-        JsString::Ascii(a) => JsString::Ascii(AsciiString::new(&a.as_bytes().to_ascii_lowercase())),
-        JsString::Unicode(u) => to_lower(&u.go_string()),
-        JsString::Imported(i) => {
-            if i.unicode().is_some() {
-                return to_lower(i.utf8());
-            }
-            JsString::Ascii(AsciiString::new(&i.utf8().to_ascii_lowercase()))
-        }
-    }
+    s.to_lower()
 }
 
 pub(crate) fn string_to_upper(s: &JsString) -> JsString {
-    match s {
-        JsString::Ascii(a) => JsString::Ascii(AsciiString::new(&a.as_bytes().to_ascii_uppercase())),
-        JsString::Unicode(u) => to_upper(&u.go_string()),
-        JsString::Imported(i) => {
-            if i.unicode().is_some() {
-                return to_upper(i.utf8());
-            }
-            JsString::Ascii(AsciiString::new(&i.utf8().to_ascii_uppercase()))
-        }
-    }
+    s.to_upper()
 }
 
 pub fn is_whitespace_char(r: i32) -> bool {
@@ -769,14 +588,6 @@ pub fn get_string_proto_template() -> &'static ObjectTemplate {
     T.get_or_init(create_string_proto_template)
 }
 
-fn collator_compare(a: &[u8], b: &[u8]) -> i32 {
-    COLLATOR.with(|c| {
-        let mut c = c.borrow_mut();
-        c.get_or_insert_with(|| Collator::new(UND, &[]))
-            .compare_string(a, b)
-    })
-}
-
 impl Runtime {
     pub fn builtin_string(&mut self, call: FunctionCall<'_>) -> JsResult<Value> {
         if let Some(a) = call.arguments.first() {
@@ -1135,7 +946,9 @@ impl Runtime {
         let this = Form::Nfd.string(&this);
         let that = call.arg(0).to_string(self)?.go_string();
         let that = Form::Nfd.string(&that);
-        Ok(int_to_value(i64::from(collator_compare(&this, &that))))
+        Ok(int_to_value(i64::from(
+            self.collator().compare_string(&this, &that),
+        )))
     }
 
     pub fn stringproto_match(&mut self, call: FunctionCall<'_>) -> JsResult<Value> {

@@ -623,6 +623,7 @@ pub struct Runtime {
     pub in_native: bool,
     pub extra_roots: Vec<Value>,
     pub pending_uncatchable: Option<Throw>,
+    pub _collator: Option<crate::deps::xtext::collate::Collator>,
     pub interrupt_state: Arc<InterruptState>,
 }
 
@@ -653,6 +654,7 @@ impl Runtime {
             in_native: false,
             extra_roots: Vec::new(),
             pending_uncatchable: None,
+            _collator: None,
             interrupt_state,
         };
         r.init();
@@ -687,6 +689,12 @@ impl Runtime {
             t.obj(*h);
         }
         t.values(&self.extra_roots);
+    }
+
+    pub fn collator(&mut self) -> &mut crate::deps::xtext::collate::Collator {
+        self._collator.get_or_insert_with(|| {
+            crate::deps::xtext::collate::Collator::new(crate::deps::xtext::language::UND, &[])
+        })
     }
 
     pub fn interrupt_handle(&self) -> InterruptHandle {

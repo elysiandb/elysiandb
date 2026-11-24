@@ -211,7 +211,32 @@ impl AsciiString {
     }
 
     pub fn to_integer(&self) -> i64 {
-        todo!("asciiString.ToInteger")
+        let ss = trim_space(&self.0);
+        if ss.is_empty() {
+            return 0;
+        }
+        if ss == b"Infinity" || ss == b"+Infinity" {
+            return i64::MAX;
+        }
+        if ss == b"-Infinity" {
+            return i64::MIN;
+        }
+        match string_to_int(ss) {
+            Ok(i) => i,
+            Err(e) => match to_float_trimmed(ss) {
+                Ok(f) => crate::value::go_float_to_int(f),
+                Err(_) => match e {
+                    ParseErr::Range => {
+                        if ss[0] == b'-' {
+                            i64::MIN
+                        } else {
+                            i64::MAX
+                        }
+                    }
+                    ParseErr::Syntax => 0,
+                },
+            },
+        }
     }
 
     pub fn char_at(&self, idx: usize) -> u16 {
@@ -227,27 +252,64 @@ impl AsciiString {
     }
 
     pub fn reader(&self) -> Box<dyn crate::string::RuneReader> {
-        todo!("asciiString.Reader")
+        Box::new(AsciiRuneReader {
+            s: self.clone(),
+            pos: 0,
+        })
     }
 
     pub fn utf16_reader(&self) -> Box<dyn crate::string::Utf16Reader> {
-        todo!("asciiString.utf16Reader")
+        Box::new(AsciiUtf16Reader {
+            s: self.clone(),
+            pos: 0,
+        })
     }
 
     pub fn utf16_rune_reader(&self) -> Box<dyn crate::string::RuneReader> {
-        todo!("asciiString.utf16RuneReader")
+        Box::new(AsciiUtf16Reader {
+            s: self.clone(),
+            pos: 0,
+        })
     }
 
     pub fn utf16_runes(&self) -> Vec<i32> {
         self.0.iter().map(|&c| i32::from(c)).collect()
     }
 
-    pub fn index(&self, _substr: &JsString, _start: isize) -> isize {
-        todo!("asciiString.index")
+    pub fn index(&self, substr: &JsString, start: isize) -> isize {
+        let (a, u) = devirtualize_string(substr);
+        if u.is_none() {
+            let a = a.unwrap_or_else(|| AsciiString::new(b""));
+            if start > self.0.len() as isize {
+                return -1;
+            }
+            if let Some(p) = bytes_index(&self.0[start as usize..], &a.0) {
+                return p as isize + start;
+            }
+        }
+        -1
     }
 
-    pub fn last_index(&self, _substr: &JsString, _pos: isize) -> isize {
-        todo!("asciiString.lastIndex")
+    pub fn last_index(&self, substr: &JsString, pos: isize) -> isize {
+        let (a, u) = devirtualize_string(substr);
+        if u.is_none() {
+            let a = a.unwrap_or_else(|| AsciiString::new(b""));
+            let end = pos + a.0.len() as isize;
+            let ss = if end > self.0.len() as isize {
+                &self.0[..]
+            } else {
+                &self.0[..end as usize]
+            };
+            return match bytes_last_index(ss, &a.0) {
+                Some(p) => p as isize,
+                None => -1,
+            };
+        }
+        -1
+    }
+
+    pub fn from_arc(a: Arc<[u8]>) -> AsciiString {
+        AsciiString(a)
     }
 
     pub fn to_lower(&self) -> JsString {
@@ -256,5 +318,92 @@ impl AsciiString {
 
     pub fn to_upper(&self) -> JsString {
         JsString::Ascii(AsciiString::new(&self.0.to_ascii_uppercase()))
+    }
+}
+
+pub(crate) fn bytes_index(s: &[u8], sub: &[u8]) -> Option<usize> {
+    if sub.is_empty() {
+        return Some(0);
+    }
+    if sub.len() > s.len() {
+        return None;
+    }
+    let first = sub[0];
+    let last = s.len() - sub.len();
+    let mut i = 0;
+    while i <= last {
+        match s[i..=last].iter().position(|&c| c == first) {
+            None => return None,
+            Some(p) => {
+                i += p;
+                if &s[i..i + sub.len()] == sub {
+                    return Some(i);
+                }
+                i += 1;
+            }
+        }
+    }
+    None
+}
+
+pub(crate) fn bytes_last_index(s: &[u8], sub: &[u8]) -> Option<usize> {
+    if sub.is_empty() {
+        return Some(s.len());
+    }
+    if sub.len() > s.len() {
+        return None;
+    }
+    let mut i = s.len() - sub.len();
+    loop {
+        if &s[i..i + sub.len()] == sub {
+            return Some(i);
+        }
+        if i == 0 {
+            return None;
+        }
+        i -= 1;
+    }
+}
+
+struct AsciiRuneReader {
+    s: AsciiString,
+    pos: usize,
+}
+
+impl crate::string::RuneReader for AsciiRuneReader {
+    fn read_rune(&mut self) -> Option<(i32, usize)> {
+        if self.pos < self.s.0.len() {
+            let r = i32::from(self.s.0[self.pos]);
+            self.pos += 1;
+            return Some((r, 1));
+        }
+        None
+    }
+}
+
+struct AsciiUtf16Reader {
+    s: AsciiString,
+    pos: usize,
+}
+
+impl crate::string::Utf16Reader for AsciiUtf16Reader {
+    fn read_char(&mut self) -> Option<u16> {
+        if self.pos < self.s.0.len() {
+            let c = u16::from(self.s.0[self.pos]);
+            self.pos += 1;
+            return Some(c);
+        }
+        None
+    }
+}
+
+impl crate::string::RuneReader for AsciiUtf16Reader {
+    fn read_rune(&mut self) -> Option<(i32, usize)> {
+        if self.pos < self.s.0.len() {
+            let r = i32::from(self.s.0[self.pos]);
+            self.pos += 1;
+            return Some((r, 1));
+        }
+        None
     }
 }
