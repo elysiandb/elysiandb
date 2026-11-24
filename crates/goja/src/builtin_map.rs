@@ -38,11 +38,7 @@ impl ObjData for MapObject {
 impl MapObject {
     pub fn export(&self) -> Vec<[Value; 2]> {
         let mut m = Vec::with_capacity(self.m.size());
-        let mut pos = 0;
-        for _ in 0..self.m.size() {
-            let Some((k, v)) = self.m.next_entry(&mut pos) else {
-                break;
-            };
+        for (k, v) in self.m.entries() {
             m.push([k.clone(), v.clone()]);
         }
         m
@@ -52,7 +48,7 @@ impl MapObject {
 #[derive(Clone, Copy)]
 struct OrderedMapIter {
     m: ObjRef,
-    pos: usize,
+    it: crate::map::OrderedMapIter,
 }
 
 pub struct MapIterObject {
@@ -109,10 +105,7 @@ impl MapIterObject {
             return rt.create_iter_result_object(Value::Undefined, true);
         };
         let kind = rt.ext_dyn::<MapIterObject>(o).map(|i| i.kind);
-        let entry = map_data(rt, it.m)
-            .m
-            .next_entry(&mut it.pos)
-            .map(|(k, v)| (k.clone(), v.clone()));
+        let entry = map_data_mut(rt, it.m).m.iter_next(&mut it.it);
         let Some((key, value)) = entry else {
             if let Some(i) = rt.ext_dyn_mut::<MapIterObject>(o) {
                 i.iter = None;
@@ -186,16 +179,18 @@ impl Runtime {
             ));
         };
         let t = call.argument(1);
-        let mut pos = 0;
+        let mut it = crate::map::OrderedMapIter::new();
         loop {
-            let entry = map_data(self, this_obj)
-                .m
-                .next_entry(&mut pos)
-                .map(|(k, v)| (k.clone(), v.clone()));
+            let entry = map_data_mut(self, this_obj).m.iter_next(&mut it);
             let Some((key, value)) = entry else {
                 break;
             };
-            callback_fn.call(self, t.clone(), &[value, key, Value::Object(this_obj)])?;
+            if let Err(e) =
+                callback_fn.call(self, t.clone(), &[value, key, Value::Object(this_obj)])
+            {
+                map_data_mut(self, this_obj).m.iter_close(&mut it);
+                return Err(e);
+            }
         }
         Ok(Value::Undefined)
     }
@@ -271,7 +266,10 @@ impl Runtime {
             &BASE_OBJECT_CLASS,
             BaseObject::new(CLASS_OBJECT, Some(proto)),
             ObjExt::Dyn(Box::new(MapIterObject {
-                iter: Some(OrderedMapIter { m: obj, pos: 0 }),
+                iter: Some(OrderedMapIter {
+                    m: obj,
+                    it: crate::map::OrderedMapIter::new(),
+                }),
                 kind,
             })),
         );

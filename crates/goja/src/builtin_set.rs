@@ -38,11 +38,7 @@ impl ObjData for SetObject {
 impl SetObject {
     pub fn export(&self) -> Vec<Value> {
         let mut a = Vec::with_capacity(self.m.size());
-        let mut pos = 0;
-        for _ in 0..self.m.size() {
-            let Some((k, _)) = self.m.next_entry(&mut pos) else {
-                break;
-            };
+        for (k, _) in self.m.entries() {
             a.push(k.clone());
         }
         a
@@ -52,7 +48,7 @@ impl SetObject {
 #[derive(Clone, Copy)]
 struct OrderedMapIter {
     m: ObjRef,
-    pos: usize,
+    it: crate::map::OrderedMapIter,
 }
 
 pub struct SetIterObject {
@@ -134,10 +130,10 @@ impl SetIterObject {
             return rt.create_iter_result_object(Value::Undefined, true);
         };
         let kind = rt.ext_dyn::<SetIterObject>(o).map(|i| i.kind);
-        let entry = set_data(rt, it.m)
+        let entry = set_data_mut(rt, it.m)
             .m
-            .next_entry(&mut it.pos)
-            .map(|(k, _)| k.clone());
+            .iter_next(&mut it.it)
+            .map(|(k, _)| k);
         let Some(key) = entry else {
             if let Some(i) = rt.ext_dyn_mut::<SetIterObject>(o) {
                 i.iter = None;
@@ -195,20 +191,23 @@ impl Runtime {
             ));
         };
         let t = call.argument(1);
-        let mut pos = 0;
+        let mut it = crate::map::OrderedMapIter::new();
         loop {
-            let entry = set_data(self, this_obj)
+            let entry = set_data_mut(self, this_obj)
                 .m
-                .next_entry(&mut pos)
-                .map(|(k, _)| k.clone());
+                .iter_next(&mut it)
+                .map(|(k, _)| k);
             let Some(key) = entry else {
                 break;
             };
-            callback_fn.call(
+            if let Err(e) = callback_fn.call(
                 self,
                 t.clone(),
                 &[key.clone(), key, Value::Object(this_obj)],
-            )?;
+            ) {
+                set_data_mut(self, this_obj).m.iter_close(&mut it);
+                return Err(e);
+            }
         }
         Ok(Value::Undefined)
     }
@@ -294,7 +293,10 @@ impl Runtime {
             &BASE_OBJECT_CLASS,
             BaseObject::new(CLASS_OBJECT, Some(proto)),
             ObjExt::Dyn(Box::new(SetIterObject {
-                iter: Some(OrderedMapIter { m: obj, pos: 0 }),
+                iter: Some(OrderedMapIter {
+                    m: obj,
+                    it: crate::map::OrderedMapIter::new(),
+                }),
                 kind,
             })),
         );

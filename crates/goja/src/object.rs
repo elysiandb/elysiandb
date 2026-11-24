@@ -424,19 +424,19 @@ pub fn enumerate_recursive(rt: &mut Runtime, o: ObjRef) -> JsResult<IterNextFunc
 
 pub struct ObjectSymbolIter {
     pub o: ObjRef,
-    pub pos: usize,
+    pub it: crate::map::OrderedMapIter,
 }
 
 impl PropIter for ObjectSymbolIter {
     fn next(&mut self, rt: &mut Runtime) -> JsResult<Option<PropIterItem>> {
-        let obj = rt.obj(self.o);
-        let Some(m) = &obj.base.sym_values else {
+        let it = &mut self.it;
+        let Some(m) = &mut rt.obj_mut(self.o).base.sym_values else {
             return Ok(None);
         };
-        match m.next_entry(&mut self.pos) {
+        match m.iter_next(it) {
             Some((k, v)) => Ok(Some(PropIterItem {
-                name: k.clone(),
-                value: Some(v.clone()),
+                name: k,
+                value: Some(v),
                 enumerable: EnumerableFlag::Unknown,
             })),
             None => Ok(None),
@@ -1740,7 +1740,10 @@ impl BaseObject {
 
     pub fn iterate_symbols(rt: &mut Runtime, o: ObjRef) -> JsResult<IterNextFunc> {
         if rt.obj(o).base.sym_values.is_some() {
-            return Ok(Box::new(ObjectSymbolIter { o, pos: 0 }));
+            return Ok(Box::new(ObjectSymbolIter {
+                o,
+                it: crate::map::OrderedMapIter::new(),
+            }));
         }
         Ok(Box::new(EmptyIter))
     }
@@ -1813,8 +1816,7 @@ impl BaseObject {
         mut accum: Vec<Value>,
     ) -> JsResult<Vec<Value>> {
         if let Some(m) = &rt.obj(o).base.sym_values {
-            let mut pos = 0;
-            while let Some((k, v)) = m.next_entry(&mut pos) {
+            for (k, v) in m.entries() {
                 if !all
                     && let Value::Property(p) = v
                     && !p.enumerable
@@ -2589,7 +2591,7 @@ impl ObjRef {
         }
     }
 
-    pub fn get_weak_refs(self, rt: &mut Runtime) -> &mut FxHashMap<ObjRef, Value> {
+    pub fn get_weak_refs(self, rt: &mut Runtime) -> &mut FxHashMap<u64, Value> {
         rt.obj_mut(self)
             .weak_refs
             .get_or_insert_with(|| Box::new(FxHashMap::default()))

@@ -621,7 +621,7 @@ impl Runtime {
     }
 
     pub fn enqueue_promise_job(&mut self, job: Box<dyn Job>) {
-        self.job_queue.push(job);
+        self.job_queue.push_back(job);
     }
 
     pub fn trigger_promise_reactions(&mut self, reactions: Vec<PromiseReaction>, argument: Value) {

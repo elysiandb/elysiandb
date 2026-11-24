@@ -617,7 +617,7 @@ pub struct Runtime {
     pub symbol_registry: FxHashMap<unistring::String, SymRef>,
     pub heap: Heap,
     pub vm: Vm,
-    pub job_queue: Vec<Box<dyn Job>>,
+    pub job_queue: std::collections::VecDeque<Box<dyn Job>>,
     pub id_seq: u64,
     pub handles: Vec<ObjRef>,
     pub in_native: bool,
@@ -648,7 +648,7 @@ impl Runtime {
             symbol_registry: FxHashMap::default(),
             heap,
             vm: Vm::new(global_stash, interrupt_state.clone()),
-            job_queue: Vec::new(),
+            job_queue: std::collections::VecDeque::new(),
             id_seq: 0,
             handles: Vec::new(),
             in_native: false,
@@ -1367,19 +1367,16 @@ impl Runtime {
     }
 
     pub fn leave(&mut self) -> JsResult<()> {
-        while !self.job_queue.is_empty() {
-            let jobs = std::mem::take(&mut self.job_queue);
-            for job in jobs {
-                job.run(self)?;
-            }
+        while let Some(job) = self.job_queue.pop_front() {
+            job.run(self)?;
         }
-        self.job_queue = Vec::new();
+        self.job_queue = std::collections::VecDeque::new();
         self.vm.stack = Vec::new();
         Ok(())
     }
 
     pub fn leave_abrupt(&mut self) {
-        self.job_queue = Vec::new();
+        self.job_queue = std::collections::VecDeque::new();
         self.clear_interrupt();
     }
 

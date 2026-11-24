@@ -87,7 +87,7 @@ pub struct Object {
     pub class: &'static ObjClass,
     pub base: BaseObject,
     pub ext: ObjExt,
-    pub weak_refs: Option<Box<FxHashMap<ObjRef, Value>>>,
+    pub weak_refs: Option<Box<FxHashMap<u64, Value>>>,
 }
 
 #[derive(Clone, Debug)]

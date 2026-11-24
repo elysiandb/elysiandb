@@ -11,11 +11,11 @@ use crate::string::ascii_string;
 use crate::value::{Value, nil_safe, value_prop};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct WeakMap(pub ObjRef);
+pub struct WeakMap(pub u64);
 
 impl WeakMap {
     pub fn new(rt: &mut Runtime) -> WeakMap {
-        WeakMap(ObjRef(rt.gen_id() as u32))
+        WeakMap(rt.gen_id())
     }
 
     pub fn set(self, rt: &mut Runtime, key: ObjRef, value: Value) {

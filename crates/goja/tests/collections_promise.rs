@@ -646,8 +646,7 @@ fn to_string_tag(rt: &mut Runtime, v: &Value) -> String {
 }
 
 fn drain(rt: &mut Runtime) {
-    while !rt.job_queue.is_empty() {
-        let job = rt.job_queue.remove(0);
+    while let Some(job) = rt.job_queue.pop_front() {
         if let Err(t) = job.run(rt) {
             let m = thrown(rt, Err(t));
             panic!("job failed: {m}");
