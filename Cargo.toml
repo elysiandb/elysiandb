@@ -83,6 +83,10 @@ path = "tests/internal/storage_test/main.rs"
 name = "schema_test"
 path = "tests/internal/schema_test/main.rs"
 
+[[test]]
+name = "cache_test"
+path = "tests/internal/cache_test/main.rs"
+
 [profile.release]
 strip = true
 panic = "unwind"

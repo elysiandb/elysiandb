@@ -1,3 +1,4 @@
+pub mod cache;
 pub mod configuration;
 pub mod crypto;
 pub mod datastore;
