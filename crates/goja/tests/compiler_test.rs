@@ -5020,7 +5020,6 @@ fn test_class_dyn_capture_this_in_static_field_init() {
 }
 
 #[test]
-#[ignore = "requires the Math builtin"]
 fn test_compile_class() {
     test_script(
         r#"
@@ -5979,7 +5978,6 @@ fn test_class_method_num_literal() {
 }
 
 #[test]
-#[ignore = "requires the Math builtin"]
 fn test_generator_func() {
     test_script_with_test_lib(
         r#"

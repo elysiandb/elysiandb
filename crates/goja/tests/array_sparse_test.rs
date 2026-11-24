@@ -39,7 +39,6 @@ fn is_dense(rt: &Runtime, a: ObjRef) -> bool {
 }
 
 #[test]
-#[ignore = "requires the Math builtin"]
 fn test_sparse_array_switch() {
     on_big_stack(|| {
         let mut vm = new_runtime();
