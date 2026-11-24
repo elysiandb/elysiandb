@@ -1356,7 +1356,16 @@ impl BaseObject {
             let obj = rt.obj_mut(o);
             obj.base.ensure_prop_order();
             if obj.base.idx_prop_count == 0 {
-                return BaseObject::_set_foreign_idx(rt, o, name, None, val, receiver, throw);
+                let prop = Value::Int(name);
+                return BaseObject::_set_foreign_idx(
+                    rt,
+                    o,
+                    name,
+                    Some(&prop),
+                    Value::Undefined,
+                    receiver,
+                    throw,
+                );
             }
         }
         o.set_foreign_str(rt, &idx_string(name), val, receiver, throw)
