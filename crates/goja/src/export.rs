@@ -14,7 +14,7 @@ use crate::host::goslice_reflect::typed_slice_export;
 use crate::host::{
     DocMap, DocValue, FuncRef, HandleKind, HostFn, JsHandle, MapRef, Pair, SliceHeader,
 };
-use crate::object::{BaseObject, FunctionCall, ObjExt};
+use crate::object::{FunctionCall, ObjExt};
 use crate::runtime::{JsResult, RunError, Runtime, Throw};
 use crate::string::{JsString, STRING_EMPTY};
 use crate::string_ascii::AsciiString;
@@ -245,7 +245,7 @@ impl Exporter {
     }
 
     fn object(&mut self, rt: &mut Runtime, o: ObjRef) -> JsResult<DocValue> {
-        if let Some(dv) = export_host(rt, o) {
+        if let Some(dv) = export_host_kept(rt, o) {
             return Ok(dv);
         }
         enum Kind {
@@ -649,7 +649,7 @@ fn export_func(rt: &mut Runtime, o: ObjRef, ctor: bool) -> DocValue {
         }
         return DocValue::Func(f);
     }
-    let name = match BaseObject::get_own_prop_str(rt, o, &"name".into()) {
+    let name = match o.get_own_prop_str(rt, &"name".into()) {
         Ok(Some(Value::Property(p))) => match &p.value {
             Value::String(s) => go_string_of(s),
             _ => String::new(),
@@ -664,6 +664,14 @@ fn export_func(rt: &mut Runtime, o: ObjRef, ctor: bool) -> DocValue {
         name,
         ctor,
     })
+}
+
+fn export_host_kept(rt: &mut Runtime, o: ObjRef) -> Option<DocValue> {
+    let dv = export_host(rt, o)?;
+    if let DocValue::Host(h) = &dv {
+        rt.host.keep_host(h);
+    }
+    Some(dv)
 }
 
 fn export_host(rt: &Runtime, o: ObjRef) -> Option<DocValue> {
@@ -803,7 +811,7 @@ impl Runtime {
         let Value::Object(o) = v else {
             return Ok(export_primitive(self, v));
         };
-        if let Some(dv) = export_host(self, *o) {
+        if let Some(dv) = export_host_kept(self, *o) {
             return Ok(dv);
         }
         let mark = self.handle_scope_enter();

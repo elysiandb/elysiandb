@@ -108,9 +108,10 @@ fn spare_capacity_is_shared_like_go_append() {
             r#"var e = ctx.entity;
             var a = e.t3, b = e.t3; a.push(1); b.push(2);
             var c = e.t2, d = e.t2; c.push(1); d.push(2);
-            [a[3], b[3], c[2], d[2], e.t3.length].join()"#,
+            var f = e.t3, g = e.t3; f.push(9); g.length = 4;
+            [a[3], b[3], c[2], d[2], e.t3.length, f[3], g[3]].join()"#,
         );
-        assert_eq!(s(&mut rt, &v), "2,2,1,2,3");
+        assert_eq!(s(&mut rt, &v), ",,1,2,3,,");
     });
 }
 
@@ -450,7 +451,7 @@ fn time_values_in_utc() {
             var r = [Object.getOwnPropertyNames(d).length, typeof d.Year, d.Year(), d.UnixMilli(),
                 d instanceof Date, Object.getPrototypeOf(d) === Object.prototype, d.Add.length, d.Year.name];
             r.push(String(d.Month()), d.Month() + 1, String(d.Sub(new Date(0))), d.Sub(new Date(0)) * 1);
-            r.push(d.Format("2006-01-02"), d.GoString(), d.In({}).String());
+            r.push(d.Format("2006-01-02"), d.GoString(), d.In({}).String(), String(d), String(d.Weekday()), d.Weekday() * 1, String(d.Location()));
             var c = d.Clock(); r.push(Array.isArray(c), c.join("-"));
             var dt = d.Date(); r.push(String(dt[1]));
             r.push(d.Add("x").UnixMilli(), d.Format({}));
@@ -463,7 +464,7 @@ fn time_values_in_utc() {
         );
         assert_eq!(
             s(&mut rt, &v),
-            "47|function|1970|1500|false|true|1|Year|January|2|1.5s|1500000000|1970-01-01|time.Date(1970, time.January, 1, 0, 0, 1, 500000000, time.Local)|1970-01-01 00:00:01.5 +0000 UTC|true|0-0-1|January|1500|[object Object]|TypeError: could not convert function call parameter 0: could not convert 5 to an object|TypeError: could not convert function call parameter 0: could not convert 5 to an object|24|true|true|2020|1970|Error: \"x\" is not a valid RFC 3339 time|true"
+            "47|function|1970|1500|false|true|1|Year|January|2|1.5s|1500000000|1970-01-01|time.Date(1970, time.January, 1, 0, 0, 1, 500000000, time.Local)|1970-01-01 00:00:01.5 +0000 UTC|1970-01-01 00:00:01.5 +0000 UTC|Thursday|4|UTC|true|0-0-1|January|1500|[object Object]|TypeError: could not convert function call parameter 0: could not convert 5 to an object|TypeError: could not convert function call parameter 0: could not convert 5 to an object|24|true|true|2020|1970|Error: \"x\" is not a valid RFC 3339 time|true"
         );
     }
 }
@@ -684,5 +685,101 @@ fn released_graphs_free_cycles() {
         drop(e);
         drop(rt);
         assert!(weak.upgrade().is_none());
+    });
+}
+
+struct Holder {
+    v: std::cell::RefCell<Option<Value>>,
+}
+
+static HOLDER_METHODS: &[goja::host::GoMethod] = &[goja::host::GoMethod {
+    name: "Get",
+    num_in: 0,
+}];
+
+impl goja::host::DynamicObject for Holder {
+    fn get(&self, _rt: &mut Runtime, key: &str) -> goja::JsResult<Option<Value>> {
+        Ok((key == "v").then(|| self.v.borrow().clone()).flatten())
+    }
+
+    fn set(&self, _rt: &mut Runtime, key: &str, val: Value) -> goja::JsResult<bool> {
+        if key == "v" {
+            *self.v.borrow_mut() = Some(val);
+        }
+        Ok(true)
+    }
+
+    fn has(&self, _rt: &mut Runtime, key: &str) -> goja::JsResult<bool> {
+        Ok(key == "v")
+    }
+
+    fn delete(&self, _rt: &mut Runtime, _key: &str) -> goja::JsResult<bool> {
+        Ok(true)
+    }
+
+    fn keys(&self, _rt: &mut Runtime) -> goja::JsResult<Vec<String>> {
+        Ok(vec!["v".to_string()])
+    }
+
+    fn export(self: Rc<Self>) -> DocValue {
+        DocValue::Host(self)
+    }
+
+    fn trace(&self, t: &mut goja::heap::Tracer) {
+        if let Some(v) = &*self.v.borrow() {
+            t.value(v);
+        }
+    }
+}
+
+impl goja::host::GoMethods for Holder {
+    fn methods(&self) -> &'static [goja::host::GoMethod] {
+        HOLDER_METHODS
+    }
+
+    fn call(
+        &self,
+        _rt: &mut Runtime,
+        _idx: usize,
+        _call: goja::FunctionCall<'_>,
+    ) -> goja::JsResult<Value> {
+        Ok(self.v.borrow().clone().unwrap_or_default())
+    }
+
+    fn trace(&self, t: &mut goja::heap::Tracer) {
+        if let Some(v) = &*self.v.borrow() {
+            t.value(v);
+        }
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+#[test]
+fn exported_host_values_stay_traced() {
+    on_big_stack(|| {
+        let mut rt = new_runtime();
+        let h = rt.new_dynamic_object(Rc::new(Holder {
+            v: std::cell::RefCell::new(None),
+        }));
+        rt.set("h", Value::Object(h)).expect("h");
+        rt.set_value("m", &DocValue::new_map(DocMap::new()))
+            .expect("m");
+        run(&mut rt, "h.v = {k: 1}; m.x = h; h = null;");
+        for _ in 0..3 {
+            run(
+                &mut rt,
+                "var junk = []; for (var i = 0; i < 5000; i++) junk.push({i: i}); junk = null;",
+            );
+            rt.handles.clear();
+            rt.collect_garbage();
+        }
+        let v = run(
+            &mut rt,
+            "var x = m.x; [Object.getOwnPropertyNames(x).join(), x.Get().k].join()",
+        );
+        assert_eq!(s(&mut rt, &v), "Get,1");
     });
 }
