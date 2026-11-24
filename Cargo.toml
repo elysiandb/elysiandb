@@ -144,6 +144,14 @@ name = "http_observe_test"
 path = "tests/internal/transport_test/http_test/observe_test/main.rs"
 
 [[test]]
+name = "http_monitoring_test"
+path = "tests/internal/transport_test/http_test/monitoring_test/main.rs"
+
+[[test]]
+name = "http_controller_test"
+path = "tests/internal/transport_test/http_test/controller_test/main.rs"
+
+[[test]]
 name = "byte_ids_test"
 path = "tests/byte_ids/main.rs"
 

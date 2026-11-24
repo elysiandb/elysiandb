@@ -1,4 +1,5 @@
 pub mod acl;
+pub mod adminui;
 pub mod api;
 pub mod archive;
 pub mod cache;

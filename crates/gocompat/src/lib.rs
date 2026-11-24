@@ -4,6 +4,7 @@ pub mod errors;
 pub mod flag;
 pub mod fmt;
 pub mod json;
+pub mod path;
 pub mod rand;
 pub mod sort;
 pub mod strconv;

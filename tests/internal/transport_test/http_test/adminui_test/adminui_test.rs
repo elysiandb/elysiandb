@@ -382,3 +382,15 @@ fn login_controller_secure_cookie_over_tls() {
         "expected a Secure cookie over TLS, got {cookie:?}"
     );
 }
+
+#[test]
+fn is_built_matches_embedded_assets() {
+    let embedded = elysiandb::adminui::files()
+        .iter()
+        .any(|(name, _)| *name == "index.html");
+    assert_eq!(
+        adminui::is_built(),
+        embedded,
+        "IsBuilt must report whether dist/index.html is embedded"
+    );
+}

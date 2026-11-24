@@ -85,6 +85,10 @@ pub fn parse(raw_url: &[u8]) -> Result<Url, Error> {
     Ok(url)
 }
 
+pub fn path_unescape(s: &[u8]) -> Result<Vec<u8>, Error> {
+    unescape(s, Encoding::Path)
+}
+
 fn string_contains_ctl_byte(s: &[u8]) -> bool {
     s.iter().any(|&b| b < b' ' || b == 0x7f)
 }
