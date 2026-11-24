@@ -1,4 +1,5 @@
 pub mod api;
+pub mod archive;
 pub mod cache;
 pub mod configuration;
 pub mod crypto;

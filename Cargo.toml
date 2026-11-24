@@ -131,6 +131,10 @@ path = "tests/crypto/bcrypt_test/main.rs"
 name = "blowfish_test"
 path = "tests/crypto/blowfish_test/main.rs"
 
+[[test]]
+name = "flate_test"
+path = "tests/archive/flate_test/main.rs"
+
 [profile.release]
 strip = true
 panic = "unwind"
