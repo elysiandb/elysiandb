@@ -43,6 +43,14 @@ path = "tests/golden_engine/main.rs"
 name = "golden_persistence"
 path = "tests/golden_persistence/main.rs"
 
+[[test]]
+name = "durable_test"
+path = "tests/internal/durable_test/main.rs"
+
+[[test]]
+name = "journal_test"
+path = "tests/internal/journal_test/main.rs"
+
 [profile.release]
 strip = true
 panic = "unwind"

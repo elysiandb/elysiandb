@@ -1,6 +1,9 @@
 pub mod docpath;
+pub mod durable;
 pub mod globals;
 pub mod gocompat;
+pub mod hash;
+pub mod journal;
 pub mod memory;
 pub mod pagetree;
 pub mod ptree;

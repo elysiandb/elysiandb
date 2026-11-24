@@ -1,4 +1,5 @@
 pub mod base64;
+pub mod binary;
 pub mod errors;
 pub mod flag;
 pub mod fmt;
