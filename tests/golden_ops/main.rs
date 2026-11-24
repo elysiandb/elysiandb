@@ -3,6 +3,7 @@ mod common;
 #[path = "../internal/tempdir.rs"]
 mod tempdir;
 
+mod archives;
 mod config;
 mod fmt;
 mod logs;

@@ -4,7 +4,7 @@ pub const SIZE: usize = 4;
 
 static TABLES: [[u32; 256]; 8] = make_tables(CASTAGNOLI);
 
-const fn make_tables(poly: u32) -> [[u32; 256]; 8] {
+pub(super) const fn make_tables(poly: u32) -> [[u32; 256]; 8] {
     let mut t = [[0u32; 256]; 8];
     let mut i = 0;
     while i < 256 {
@@ -35,8 +35,7 @@ const fn make_tables(poly: u32) -> [[u32; 256]; 8] {
     t
 }
 
-fn raw_update(mut crc: u32, mut p: &[u8]) -> u32 {
-    let t = &TABLES;
+pub(super) fn raw_update(t: &[[u32; 256]; 8], mut crc: u32, mut p: &[u8]) -> u32 {
     while p.len() >= 8 {
         let lo = u32::from_le_bytes([p[0], p[1], p[2], p[3]]) ^ crc;
         crc = t[0][p[7] as usize]
@@ -56,7 +55,7 @@ fn raw_update(mut crc: u32, mut p: &[u8]) -> u32 {
 }
 
 pub fn update(crc: u32, p: &[u8]) -> u32 {
-    !raw_update(!crc, p)
+    !raw_update(&TABLES, !crc, p)
 }
 
 pub fn checksum(data: &[u8]) -> u32 {

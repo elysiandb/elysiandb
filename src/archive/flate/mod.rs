@@ -9,6 +9,9 @@ mod token;
 pub use deflate::{BEST_SPEED, Writer};
 pub use inflate::{CorruptInputError, Reader, new_reader};
 
+pub(crate) use huffman_bit_writer::write_once;
+pub(crate) use inflate::Decompressor;
+
 #[doc(hidden)]
 pub use deflatefast::{BUFFER_RESET, DeflateFast, INPUT_MARGIN};
 #[doc(hidden)]
