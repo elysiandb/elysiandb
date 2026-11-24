@@ -6180,8 +6180,12 @@ impl Runtime {
     }
 
     fn new_reg_expp_value(&mut self, n: &NewRegexp) -> JsResult<Value> {
-        let _ = n;
-        todo!("newRegExpp: the RegExp object is not ported yet")
+        let proto = self.get_reg_exp_prototype();
+        Ok(Value::Object(self.new_reg_expp(
+            (*n.pattern).clone(),
+            n.src.clone(),
+            Some(proto),
+        )))
     }
 }
 
