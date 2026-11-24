@@ -10,15 +10,38 @@ build = "build.rs"
 [workspace]
 members = ["crates/gocompat", "crates/goja"]
 
-[dependencies]
-gocompat = { path = "crates/gocompat" }
-
 [lib]
 path = "src/lib.rs"
 
 [[bin]]
 name = "elysiandb"
 path = "src/main.rs"
+
+[dependencies]
+arc-swap = "=1.7.1"
+gocompat = { path = "crates/gocompat" }
+libc = "=0.2.191"
+mimalloc = "=0.1.52"
+
+[[test]]
+name = "pagetree_test"
+path = "tests/internal/pagetree_test/main.rs"
+
+[[test]]
+name = "ptree_test"
+path = "tests/internal/ptree_test/main.rs"
+
+[[test]]
+name = "memory_test"
+path = "tests/internal/memory_test/main.rs"
+
+[[test]]
+name = "golden_engine"
+path = "tests/golden_engine/main.rs"
+
+[[test]]
+name = "golden_persistence"
+path = "tests/golden_persistence/main.rs"
 
 [profile.release]
 strip = true
