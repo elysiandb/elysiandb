@@ -134,7 +134,7 @@ impl Engine {
                     || self.log_since_checkpoint() >= self.forced_checkpoint_log()))
         {
             *compacted = false;
-            if let Err(err) = self.checkpoint(volume) {
+            if let Err(err) = self.checkpoint_with(volume) {
                 self.log_checkpoint_failure(&err);
             }
             self.measure_dirty();

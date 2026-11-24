@@ -157,7 +157,7 @@ fn test_random_operations_against_a_model() {
                 if step % 3 == 0 {
                     e.compact_pages().map(|_| ())
                 } else {
-                    e.checkpoint_now()
+                    e.checkpoint()
                 }
             } else if op < 95 {
                 e.compact(4).map(|_| ())
@@ -216,11 +216,11 @@ fn test_compaction_removes_dead_segments() {
         .unwrap_or_else(|err| panic!("{err}"));
 
     let before = e.stats();
-    e.checkpoint_now().unwrap_or_else(|err| panic!("{err}"));
+    e.checkpoint().unwrap_or_else(|err| panic!("{err}"));
 
     for _ in 0..10 {
         e.compact(10).unwrap_or_else(|err| panic!("{err}"));
-        e.checkpoint_now().unwrap_or_else(|err| panic!("{err}"));
+        e.checkpoint().unwrap_or_else(|err| panic!("{err}"));
     }
 
     let after = e.stats();
@@ -391,7 +391,7 @@ fn crash_child(dir: &std::path::Path) -> ! {
         let _ = w.flush();
 
         if i % 200 == 199 {
-            let _ = e.checkpoint_now();
+            let _ = e.checkpoint();
         }
         i += 1;
     }
@@ -545,7 +545,7 @@ fn test_old_snapshots_read_pages_of_cleaned_segments() {
         });
     }
 
-    e.checkpoint_now().unwrap_or_else(|err| panic!("{err}"));
+    e.checkpoint().unwrap_or_else(|err| panic!("{err}"));
 
     let old = e.snapshot(b"a");
     let _ = e.update(|tx| {

@@ -16,6 +16,7 @@ use super::tempdir::TempDir;
 pub struct GateState {
     mem: MemFs,
     gate: Mutex<Option<Arc<Stop>>>,
+    delay: Mutex<Duration>,
     pub syncs: AtomicI64,
 }
 
@@ -27,6 +28,7 @@ impl GateFs {
         GateFs(Arc::new(GateState {
             mem,
             gate: Mutex::new(None),
+            delay: Mutex::new(Duration::ZERO),
             syncs: AtomicI64::new(0),
         }))
     }
@@ -37,6 +39,10 @@ impl GateFs {
 
     pub fn set_gate(&self, gate: Option<Arc<Stop>>) {
         *self.0.gate.lock() = gate;
+    }
+
+    pub fn set_delay(&self, d: Duration) {
+        *self.0.delay.lock() = d;
     }
 
     pub fn syncs(&self) -> i64 {
@@ -99,6 +105,10 @@ impl File for GateFile {
         let gate = self.fs.0.gate.lock().clone();
         if let Some(gate) = gate {
             gate.wait();
+        }
+        let delay = *self.fs.0.delay.lock();
+        if !delay.is_zero() {
+            std::thread::sleep(delay);
         }
 
         self.file.sync()

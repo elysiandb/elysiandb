@@ -826,7 +826,7 @@ impl Engine {
     }
 
     pub(crate) fn finish_upgrade(&self) -> Result<(), BoxError> {
-        if let Err(err) = self.checkpoint(true) {
+        if let Err(err) = self.checkpoint_with(true) {
             return Err(errors::wrap("cannot write the upgraded checkpoint: ", err));
         }
 
@@ -871,11 +871,11 @@ impl Engine {
         }
     }
 
-    pub fn checkpoint_now(&self) -> Result<(), BoxError> {
-        self.checkpoint(false)
+    pub fn checkpoint(&self) -> Result<(), BoxError> {
+        self.checkpoint_with(false)
     }
 
-    pub(crate) fn checkpoint(&self, force: bool) -> Result<(), BoxError> {
+    pub(crate) fn checkpoint_with(&self, force: bool) -> Result<(), BoxError> {
         let mut ck = self.ckpt.lock();
 
         let start = Instant::now();
@@ -1142,7 +1142,7 @@ impl Engine {
         let left = self.reclaim.fetch_sub(1, Ordering::SeqCst) - 1;
         self.pages.rotate()?;
 
-        self.checkpoint(true)?;
+        self.checkpoint_with(true)?;
 
         if left <= 0 && self.reclaim.load(Ordering::SeqCst) <= 0 {
             return_memory(RETURN_MEMORY_ABOVE);
@@ -1156,7 +1156,7 @@ impl Engine {
         for _ in 0..COMPACT_PAGES_ROUNDS {
             self.ckpt.lock().last_page_walk = None;
 
-            self.checkpoint(true)?;
+            self.checkpoint_with(true)?;
         }
 
         Ok(before.saturating_sub(self.pages.segment_sizes().len()))

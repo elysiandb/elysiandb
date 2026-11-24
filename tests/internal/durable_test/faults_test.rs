@@ -253,7 +253,7 @@ fn run_mixed_workload(e: &Engine, l: &mut MixedLedger, steps: usize) {
         l.in_flight.remove(&id);
 
         if i % 11 == 10 {
-            let _ = e.checkpoint_now();
+            let _ = e.checkpoint();
         } else if i % 19 == 18 {
             let _ = e.compact(2);
         } else if i == 45 {
@@ -425,6 +425,7 @@ fn test_power_cut_at_every_point_keeps_synced_writes() {
 #[test]
 fn test_concurrent_writers_share_their_syncs() {
     let fs = GateFs::new(new_mem_fs());
+    fs.set_delay(Duration::from_micros(200));
     let tmp = TempDir::new();
     let shared: Arc<dyn Fs> = Arc::new(fs.clone());
     let e = datastore::open(Options {
@@ -474,7 +475,7 @@ fn log_image(dir: &Path) -> (MemFs, MixedLedger) {
 
     let mut l = MixedLedger::default();
     run_mixed_workload(&e, &mut l, 30);
-    let _ = e.checkpoint_now();
+    let _ = e.checkpoint();
     for i in 0..40 {
         let id = format!("tail{i:02}");
         e.update(|tx| {
@@ -683,7 +684,7 @@ fn test_an_interrupted_checkpoint_and_a_partial_page_are_ignored() {
         .unwrap_or_else(|err| panic!("{err}"));
 
     check_mixed("interrupted checkpoint", &e, &l);
-    e.checkpoint_now().unwrap_or_else(|err| panic!("{err}"));
+    e.checkpoint().unwrap_or_else(|err| panic!("{err}"));
     e.close().unwrap_or_else(|err| panic!("{err}"));
 
     let e = datastore::open(mixed_options(dir, &image, journal::Mode::Sync))
@@ -765,7 +766,7 @@ fn test_a_full_disk_refuses_writes_and_comes_back() {
 
     put("after").unwrap_or_else(|err| panic!("writes resume by themselves: {err}"));
 
-    e.checkpoint_now()
+    e.checkpoint()
         .unwrap_or_else(|err| panic!("checkpoints resume: {err}"));
     e.abandon();
 

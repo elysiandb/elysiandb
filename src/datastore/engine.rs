@@ -745,7 +745,7 @@ impl Engine {
         self.settle_all();
 
         let mut errs: Vec<Option<BoxError>> = Vec::new();
-        if let Err(err) = self.checkpoint(true) {
+        if let Err(err) = self.checkpoint_with(true) {
             errs.push(Some(err));
         }
 

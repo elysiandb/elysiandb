@@ -33,7 +33,7 @@ fn test_stats_answer_during_a_checkpoint() {
         std::thread::scope(|sc| {
             sc.spawn(|| {
                 let t0 = Instant::now();
-                if let Err(err) = e.checkpoint_now() {
+                if let Err(err) = e.checkpoint() {
                     panic!("{err}");
                 }
                 let _ = tx.send(t0.elapsed());
@@ -119,7 +119,7 @@ fn test_disk_is_given_back_after_an_entity_is_emptied() {
         i += 500;
     }
 
-    e.checkpoint_now().unwrap_or_else(|err| panic!("{err}"));
+    e.checkpoint().unwrap_or_else(|err| panic!("{err}"));
 
     let pages = filepath::join(dir, "pages");
     let full = dir_bytes(&pages);

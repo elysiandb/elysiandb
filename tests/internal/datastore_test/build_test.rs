@@ -388,7 +388,7 @@ fn test_fragmented_page_segments_are_cleaned() {
     let spec = IndexSpec::new(INDEX_SORT, "text");
     put_docs(&e, b"frag", 0, 20000, work_doc);
     e.ensure_index(b"frag", &spec);
-    e.checkpoint_now().unwrap_or_else(|err| panic!("{err}"));
+    e.checkpoint().unwrap_or_else(|err| panic!("{err}"));
 
     for round in 0..3 {
         put_docs(&e, b"frag", 0, 20000, |i| {
@@ -396,7 +396,7 @@ fn test_fragmented_page_segments_are_cleaned() {
             d.insert("text".into(), s(format!("round{round}-{:05}", 20000 - i)));
             d
         });
-        e.checkpoint_now().unwrap_or_else(|err| panic!("{err}"));
+        e.checkpoint().unwrap_or_else(|err| panic!("{err}"));
     }
 
     let before = pages_on_disk(&opts.folder);

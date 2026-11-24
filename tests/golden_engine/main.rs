@@ -1,6 +1,7 @@
 #[path = "../common/mod.rs"]
 mod common;
 mod dates;
+mod deep;
 mod keys;
 mod memory;
 mod pages;

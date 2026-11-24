@@ -305,7 +305,7 @@ pub fn checkpoint() -> Result<(), BoxError> {
     };
 
     let start = Instant::now();
-    let res = e.checkpoint_now();
+    let res = e.checkpoint();
     let failure: Option<&dyn StdError> = match &res {
         Err(err) => Some(err.as_ref()),
         Ok(()) => None,

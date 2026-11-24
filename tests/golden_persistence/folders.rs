@@ -378,7 +378,7 @@ pub fn run_workload(dir: &Path) {
     e.kv_put(b"gone", b"x", 0)
         .unwrap_or_else(|err| panic!("{err}"));
     e.kv_delete(b"gone");
-    e.checkpoint_now().unwrap_or_else(|err| panic!("{err}"));
+    e.checkpoint().unwrap_or_else(|err| panic!("{err}"));
     must(&e, |tx| {
         tx.reset_entity(b"b");
         Ok(())
@@ -402,6 +402,6 @@ pub fn run_workload(dir: &Path) {
     }
     e.compact(2).unwrap_or_else(|err| panic!("{err}"));
     e.compact_pages().unwrap_or_else(|err| panic!("{err}"));
-    e.checkpoint_now().unwrap_or_else(|err| panic!("{err}"));
+    e.checkpoint().unwrap_or_else(|err| panic!("{err}"));
     e.close().unwrap_or_else(|err| panic!("{err}"));
 }

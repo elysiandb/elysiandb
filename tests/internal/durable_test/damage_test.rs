@@ -15,7 +15,7 @@ fn filled_disk(dir: &Path) -> (MemFs, Ledger) {
 
     let mut l = Ledger::default();
     run_workload(&e, &mut l, 60);
-    e.checkpoint_now().unwrap_or_else(|err| panic!("{err}"));
+    e.checkpoint().unwrap_or_else(|err| panic!("{err}"));
 
     for i in 0..8 {
         let id = format!("late{i}");
@@ -23,7 +23,7 @@ fn filled_disk(dir: &Path) -> (MemFs, Ledger) {
             .unwrap_or_else(|err| panic!("{err}"));
         l.docs.insert(id.clone(), id);
     }
-    e.checkpoint_now().unwrap_or_else(|err| panic!("{err}"));
+    e.checkpoint().unwrap_or_else(|err| panic!("{err}"));
     e.abandon();
 
     (fs, l)
@@ -149,7 +149,7 @@ fn test_damaged_files_never_prevent_a_start() {
 
         e.update(|tx| tx.put(b"a", b"fresh", &doc(vec![("v", text("fresh"))])))
             .unwrap_or_else(|err| panic!("{name}: the engine must accept writes: {err}"));
-        e.checkpoint_now()
+        e.checkpoint()
             .unwrap_or_else(|err| panic!("{name}: the engine must checkpoint again: {err}"));
         e.close().unwrap_or_else(|err| panic!("{name}: {err}"));
 
@@ -199,7 +199,7 @@ fn test_a_full_disk_never_acknowledges_a_lost_write() {
     }
 
     assert!(
-        e.checkpoint_now().is_err(),
+        e.checkpoint().is_err(),
         "a checkpoint cannot succeed on a full disk"
     );
 
@@ -217,7 +217,7 @@ fn test_a_full_disk_never_acknowledges_a_lost_write() {
     let _ = writer.join();
     l.docs.insert("blocked".into(), "blocked".into());
 
-    e.checkpoint_now()
+    e.checkpoint()
         .unwrap_or_else(|err| panic!("checkpoints resume once the disk has room: {err}"));
     e.abandon();
 

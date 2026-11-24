@@ -95,7 +95,7 @@ pub fn run_workload(e: &Engine, l: &mut Ledger, steps: usize) {
         }
 
         if i % 13 == 12 {
-            let _ = e.checkpoint_now();
+            let _ = e.checkpoint();
         }
 
         if i % 29 == 28 {
@@ -204,7 +204,7 @@ fn reopen_and_check(label: &str, dir: &Path, image: &MemFs, acked: &Ledger) {
         tx.put(b"a", b"after", &doc(vec![("v", text("after"))]))
     })
     .unwrap_or_else(|err| panic!("{label}: cannot write after recovery: {err}"));
-    e.checkpoint_now()
+    e.checkpoint()
         .unwrap_or_else(|err| panic!("{label}: cannot checkpoint after recovery: {err}"));
     e.close()
         .unwrap_or_else(|err| panic!("{label}: cannot close after recovery: {err}"));
@@ -274,7 +274,7 @@ fn test_state_survives_repeated_restarts() {
                 let _ = e.close();
             }
             1 => {
-                let _ = e.checkpoint_now();
+                let _ = e.checkpoint();
                 e.abandon();
                 fs = fs.after_power_loss();
             }
