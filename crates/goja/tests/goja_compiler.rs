@@ -138,3 +138,10 @@ fn bytecode_dumps_match_goja() {
         ]
     );
 }
+
+#[test]
+fn compiled_programs_can_be_shared_between_threads() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<goja::Program>();
+    assert_send_sync::<std::sync::Arc<goja::Program>>();
+}
