@@ -150,8 +150,12 @@ fn sourcemap_consumer_follows_go() {
             (Err(_), Some("panic")) => continue,
             (Ok(Err(e)), Some(class_want)) => {
                 assert_eq!(class(&e), class_want, "{name}: {e}");
-                if let (Error::Json(se), Some(Value::Number(off))) = (&e, row.get("offset")) {
-                    assert_eq!(se.offset.to_string(), off.as_str(), "{name}");
+                if let Error::Json(se) = &e {
+                    match row.get("offset") {
+                        Some(Value::Number(off)) => assert_eq!(se.offset as f64, *off, "{name}"),
+                        Some(Value::Int(off)) => assert_eq!(se.offset, *off, "{name}"),
+                        _ => {}
+                    }
                 }
                 continue;
             }
