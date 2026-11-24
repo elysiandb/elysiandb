@@ -101,6 +101,10 @@ fn parse_uint(s: &[u8], min: i64, max: i64, ok: &mut bool) -> i64 {
     x
 }
 
+pub fn parse_strict_rfc3339(s: &[u8]) -> Option<Time> {
+    parse_rfc3339(s, &Location::local())
+}
+
 pub(crate) fn parse_rfc3339(s: &[u8], local: &Location) -> Option<Time> {
     let mut ok = true;
     if s.len() < 19 {

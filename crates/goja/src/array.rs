@@ -1085,7 +1085,7 @@ fn go_nextslicecap(new_len: usize, old_cap: usize) -> usize {
     newcap
 }
 
-pub fn go_append(values: &mut Vec<Value>, v: Value) {
+pub fn go_append<T>(values: &mut Vec<T>, v: T) {
     if values.len() == values.capacity() {
         let newcap = go_nextslicecap(values.len() + 1, values.capacity());
         let newcap = go_roundupsize(newcap * GO_VALUE_SIZE) / GO_VALUE_SIZE;

@@ -24,6 +24,13 @@ impl ImportedString {
         }))
     }
 
+    pub fn from_arc(s: Arc<[u8]>) -> ImportedString {
+        ImportedString(Arc::new(ImportedInner {
+            s,
+            u: OnceLock::new(),
+        }))
+    }
+
     pub fn utf8(&self) -> &[u8] {
         &self.0.s
     }

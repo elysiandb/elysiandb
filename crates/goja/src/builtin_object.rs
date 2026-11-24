@@ -486,6 +486,9 @@ impl Runtime {
             Value::Undefined => Ok(Value::String(STRING_OBJECT_UNDEFINED.clone())),
             o => {
                 let obj = o.to_object(self)?;
+                if let Some(s) = crate::host::goreflect::reflect_to_string(self, obj) {
+                    return Ok(Value::String(new_string_value(s.as_bytes())));
+                }
                 let mut cls_name = if is_array(self, obj)? {
                     CLASS_ARRAY.to_string()
                 } else {

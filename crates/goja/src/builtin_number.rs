@@ -7,7 +7,9 @@ use crate::heap::ObjRef;
 use crate::object::{CLASS_NUMBER, FunctionCall, ObjExt};
 use crate::object_template::ObjectTemplate;
 use crate::runtime::{JsResult, Runtime, Throw};
-use crate::string::{STRING_INFINITY, STRING_NAN, STRING_NEG_INFINITY, ascii_string};
+use crate::string::{
+    STRING_INFINITY, STRING_NAN, STRING_NEG_INFINITY, ascii_string, new_string_value,
+};
 use crate::string_ascii::AsciiString;
 use crate::value::{MAX_INT, Value, f_to_str, int_to_value, value_prop};
 use gocompat::math::floor;
@@ -25,6 +27,9 @@ impl Runtime {
                 if let ObjExt::Primitive(p) = &self.obj(*o).ext {
                     let p = p.clone();
                     return self.to_number(&p);
+                }
+                if let Some(v) = crate::host::goreflect::reflect_number_value(self, *o) {
+                    return Ok(v);
                 }
                 if Some(*o) == self.global.number_prototype {
                     return Ok(Value::Int(0));
@@ -50,6 +55,12 @@ impl Runtime {
                 if let ObjExt::Primitive(p) = &self.obj(*t).ext {
                     let p = p.clone();
                     num_val = Some(self.to_number(&p)?);
+                }
+                if let Some(r) = crate::host::goreflect::reflect_number_to_string(self, *t) {
+                    match r {
+                        Ok(s) => return Ok(Value::String(new_string_value(s.as_bytes()))),
+                        Err(v) => num_val = Some(v),
+                    }
                 }
                 if Some(*t) == self.global.number_prototype {
                     return Ok(Value::String(ascii_string("0")));

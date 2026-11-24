@@ -56,6 +56,9 @@ pub type NativeCtorPtr = fn(&mut Runtime, &[Value], Option<ObjRef>) -> JsResult<
 pub trait NativeCallable {
     fn call(&self, rt: &mut Runtime, call: FunctionCall<'_>) -> JsResult<Value>;
     fn trace(&self, t: &mut Tracer);
+    fn as_any(&self) -> Option<&dyn std::any::Any> {
+        None
+    }
 }
 
 pub trait NativeConstructor {

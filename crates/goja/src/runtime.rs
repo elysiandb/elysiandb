@@ -625,6 +625,7 @@ pub struct Runtime {
     pub pending_uncatchable: Option<Throw>,
     pub _collator: Option<crate::deps::xtext::collate::Collator>,
     pub interrupt_state: Arc<InterruptState>,
+    pub host: crate::host::HostState,
 }
 
 impl Default for Runtime {
@@ -656,6 +657,7 @@ impl Runtime {
             pending_uncatchable: None,
             _collator: None,
             interrupt_state,
+            host: crate::host::HostState::default(),
         };
         r.init();
         r
@@ -689,6 +691,7 @@ impl Runtime {
             t.obj(*h);
         }
         t.values(&self.extra_roots);
+        self.host.trace(t);
     }
 
     pub fn collator(&mut self) -> &mut crate::deps::xtext::collate::Collator {
