@@ -1,0 +1,504 @@
+{"dot_all":false,"pattern":"","result":"","unicode":false}
+{"dot_all":false,"pattern":"","result":"","unicode":true}
+{"dot_all":true,"pattern":"","result":"","unicode":false}
+{"dot_all":true,"pattern":"","result":"","unicode":true}
+{"dot_all":false,"pattern":"abc","result":"abc","unicode":false}
+{"dot_all":false,"pattern":"abc","result":"abc","unicode":true}
+{"dot_all":true,"pattern":"abc","result":"abc","unicode":false}
+{"dot_all":true,"pattern":"abc","result":"abc","unicode":true}
+{"dot_all":false,"pattern":"\\abc","result":"abc","unicode":false}
+{"dot_all":false,"pattern":"\\abc","result":"abc","unicode":true}
+{"dot_all":true,"pattern":"\\abc","result":"abc","unicode":false}
+{"dot_all":true,"pattern":"\\abc","result":"abc","unicode":true}
+{"dot_all":false,"pattern":"\\a\\b\\c","result":"a\\bc","unicode":false}
+{"dot_all":false,"pattern":"\\a\\b\\c","result":"a\\bc","unicode":true}
+{"dot_all":true,"pattern":"\\a\\b\\c","result":"a\\bc","unicode":false}
+{"dot_all":true,"pattern":"\\a\\b\\c","result":"a\\bc","unicode":true}
+{"dot_all":false,"pattern":"\\x","result":"x","unicode":false}
+{"dot_all":false,"pattern":"\\x","result":"x","unicode":true}
+{"dot_all":true,"pattern":"\\x","result":"x","unicode":false}
+{"dot_all":true,"pattern":"\\x","result":"x","unicode":true}
+{"dot_all":false,"pattern":"\\c","result":"c","unicode":false}
+{"dot_all":false,"pattern":"\\c","result":"c","unicode":true}
+{"dot_all":true,"pattern":"\\c","result":"c","unicode":false}
+{"dot_all":true,"pattern":"\\c","result":"c","unicode":true}
+{"dot_all":false,"pattern":"\\cA","result":"\\x01","unicode":false}
+{"dot_all":false,"pattern":"\\cA","result":"\\x01","unicode":true}
+{"dot_all":true,"pattern":"\\cA","result":"\\x01","unicode":false}
+{"dot_all":true,"pattern":"\\cA","result":"\\x01","unicode":true}
+{"dot_all":false,"pattern":"\\cz","result":"\\x1a","unicode":false}
+{"dot_all":false,"pattern":"\\cz","result":"\\x1a","unicode":true}
+{"dot_all":true,"pattern":"\\cz","result":"\\x1a","unicode":false}
+{"dot_all":true,"pattern":"\\cz","result":"\\x1a","unicode":true}
+{"dot_all":false,"pattern":"\\ca","result":"\\x01","unicode":false}
+{"dot_all":false,"pattern":"\\ca","result":"\\x01","unicode":true}
+{"dot_all":true,"pattern":"\\ca","result":"\\x01","unicode":false}
+{"dot_all":true,"pattern":"\\ca","result":"\\x01","unicode":true}
+{"dot_all":false,"pattern":"\\cj","result":"\\x0a","unicode":false}
+{"dot_all":false,"pattern":"\\cj","result":"\\x0a","unicode":true}
+{"dot_all":true,"pattern":"\\cj","result":"\\x0a","unicode":false}
+{"dot_all":true,"pattern":"\\cj","result":"\\x0a","unicode":true}
+{"dot_all":false,"pattern":"\\ck","result":"\\x0b","unicode":false}
+{"dot_all":false,"pattern":"\\ck","result":"\\x0b","unicode":true}
+{"dot_all":true,"pattern":"\\ck","result":"\\x0b","unicode":false}
+{"dot_all":true,"pattern":"\\ck","result":"\\x0b","unicode":true}
+{"dot_all":false,"pattern":"\\c1","result":"c1","unicode":false}
+{"dot_all":false,"pattern":"\\c1","result":"c1","unicode":true}
+{"dot_all":true,"pattern":"\\c1","result":"c1","unicode":false}
+{"dot_all":true,"pattern":"\\c1","result":"c1","unicode":true}
+{"dot_all":false,"pattern":"\\+","result":"\\+","unicode":false}
+{"dot_all":false,"pattern":"\\+","result":"\\+","unicode":true}
+{"dot_all":true,"pattern":"\\+","result":"\\+","unicode":false}
+{"dot_all":true,"pattern":"\\+","result":"\\+","unicode":true}
+{"dot_all":false,"pattern":"[\\b]","result":"[\\x08]","unicode":false}
+{"dot_all":false,"pattern":"[\\b]","result":"[\\x08]","unicode":true}
+{"dot_all":true,"pattern":"[\\b]","result":"[\\x08]","unicode":false}
+{"dot_all":true,"pattern":"[\\b]","result":"[\\x08]","unicode":true}
+{"dot_all":false,"pattern":"\\b","result":"\\b","unicode":false}
+{"dot_all":false,"pattern":"\\b","result":"\\b","unicode":true}
+{"dot_all":true,"pattern":"\\b","result":"\\b","unicode":false}
+{"dot_all":true,"pattern":"\\b","result":"\\b","unicode":true}
+{"dot_all":false,"pattern":"\\B","result":"\\B","unicode":false}
+{"dot_all":false,"pattern":"\\B","result":"\\B","unicode":true}
+{"dot_all":true,"pattern":"\\B","result":"\\B","unicode":false}
+{"dot_all":true,"pattern":"\\B","result":"\\B","unicode":true}
+{"dot_all":false,"pattern":"\\u0z01\\x\\undefined","result":"u0z01xundefined","unicode":false}
+{"dot_all":false,"pattern":"\\u0z01\\x\\undefined","result":"u0z01xundefined","unicode":true}
+{"dot_all":true,"pattern":"\\u0z01\\x\\undefined","result":"u0z01xundefined","unicode":false}
+{"dot_all":true,"pattern":"\\u0z01\\x\\undefined","result":"u0z01xundefined","unicode":true}
+{"dot_all":false,"pattern":"\\\\|'|\\r|\\n|\\t|\\u2028|\\u2029","result":"\\\\|'|\\r|\\n|\\t|\\x{2028}|\\x{2029}","unicode":false}
+{"dot_all":false,"pattern":"\\\\|'|\\r|\\n|\\t|\\u2028|\\u2029","result":"\\\\|'|\\r|\\n|\\t|\\x{2028}|\\x{2029}","unicode":true}
+{"dot_all":true,"pattern":"\\\\|'|\\r|\\n|\\t|\\u2028|\\u2029","result":"\\\\|'|\\r|\\n|\\t|\\x{2028}|\\x{2029}","unicode":false}
+{"dot_all":true,"pattern":"\\\\|'|\\r|\\n|\\t|\\u2028|\\u2029","result":"\\\\|'|\\r|\\n|\\t|\\x{2028}|\\x{2029}","unicode":true}
+{"dot_all":false,"pattern":"]","result":"]","unicode":false}
+{"dot_all":false,"pattern":"]","result":"]","unicode":true}
+{"dot_all":true,"pattern":"]","result":"]","unicode":false}
+{"dot_all":true,"pattern":"]","result":"]","unicode":true}
+{"dot_all":false,"pattern":"}","result":"}","unicode":false}
+{"dot_all":false,"pattern":"}","result":"}","unicode":true}
+{"dot_all":true,"pattern":"}","result":"}","unicode":false}
+{"dot_all":true,"pattern":"}","result":"}","unicode":true}
+{"dot_all":false,"pattern":"%","result":"%","unicode":false}
+{"dot_all":false,"pattern":"%","result":"%","unicode":true}
+{"dot_all":true,"pattern":"%","result":"%","unicode":false}
+{"dot_all":true,"pattern":"%","result":"%","unicode":true}
+{"dot_all":false,"pattern":"(%)","result":"(%)","unicode":false}
+{"dot_all":false,"pattern":"(%)","result":"(%)","unicode":true}
+{"dot_all":true,"pattern":"(%)","result":"(%)","unicode":false}
+{"dot_all":true,"pattern":"(%)","result":"(%)","unicode":true}
+{"dot_all":false,"pattern":"(?:[%\\s])","result":"(?:[% \f\n\r\t\u000b             \u2028\u2029  　﻿])","unicode":false}
+{"dot_all":false,"pattern":"(?:[%\\s])","result":"(?:[% \f\n\r\t\u000b             \u2028\u2029  　﻿])","unicode":true}
+{"dot_all":true,"pattern":"(?:[%\\s])","result":"(?:[% \f\n\r\t\u000b             \u2028\u2029  　﻿])","unicode":false}
+{"dot_all":true,"pattern":"(?:[%\\s])","result":"(?:[% \f\n\r\t\u000b             \u2028\u2029  　﻿])","unicode":true}
+{"dot_all":false,"pattern":"[[]","result":"[[]","unicode":false}
+{"dot_all":false,"pattern":"[[]","result":"[[]","unicode":true}
+{"dot_all":true,"pattern":"[[]","result":"[[]","unicode":false}
+{"dot_all":true,"pattern":"[[]","result":"[[]","unicode":true}
+{"dot_all":false,"pattern":"\\101","result":"\\x41","unicode":false}
+{"dot_all":false,"pattern":"\\101","result":"\\x41","unicode":true}
+{"dot_all":true,"pattern":"\\101","result":"\\x41","unicode":false}
+{"dot_all":true,"pattern":"\\101","result":"\\x41","unicode":true}
+{"dot_all":false,"pattern":"\\51","result":"\\x29","unicode":false}
+{"dot_all":false,"pattern":"\\51","result":"\\x29","unicode":true}
+{"dot_all":true,"pattern":"\\51","result":"\\x29","unicode":false}
+{"dot_all":true,"pattern":"\\51","result":"\\x29","unicode":true}
+{"dot_all":false,"pattern":"\\051","result":"\\x29","unicode":false}
+{"dot_all":false,"pattern":"\\051","result":"\\x29","unicode":true}
+{"dot_all":true,"pattern":"\\051","result":"\\x29","unicode":false}
+{"dot_all":true,"pattern":"\\051","result":"\\x29","unicode":true}
+{"dot_all":false,"pattern":"\\175","result":"\\x7d","unicode":false}
+{"dot_all":false,"pattern":"\\175","result":"\\x7d","unicode":true}
+{"dot_all":true,"pattern":"\\175","result":"\\x7d","unicode":false}
+{"dot_all":true,"pattern":"\\175","result":"\\x7d","unicode":true}
+{"dot_all":false,"pattern":"\\0","result":"\\0","unicode":false}
+{"dot_all":false,"pattern":"\\0","result":"\\0","unicode":true}
+{"dot_all":true,"pattern":"\\0","result":"\\0","unicode":false}
+{"dot_all":true,"pattern":"\\0","result":"\\0","unicode":true}
+{"dot_all":false,"pattern":"\\04","result":"\\x04","unicode":false}
+{"dot_all":false,"pattern":"\\04","result":"\\x04","unicode":true}
+{"dot_all":true,"pattern":"\\04","result":"\\x04","unicode":false}
+{"dot_all":true,"pattern":"\\04","result":"\\x04","unicode":true}
+{"dot_all":false,"pattern":"\\00","result":"\\x00","unicode":false}
+{"dot_all":false,"pattern":"\\00","result":"\\x00","unicode":true}
+{"dot_all":true,"pattern":"\\00","result":"\\x00","unicode":false}
+{"dot_all":true,"pattern":"\\00","result":"\\x00","unicode":true}
+{"dot_all":false,"pattern":"\\000","result":"\\x00","unicode":false}
+{"dot_all":false,"pattern":"\\000","result":"\\x00","unicode":true}
+{"dot_all":true,"pattern":"\\000","result":"\\x00","unicode":false}
+{"dot_all":true,"pattern":"\\000","result":"\\x00","unicode":true}
+{"dot_all":false,"pattern":"\\0000","result":"\\x00","unicode":false}
+{"dot_all":false,"pattern":"\\0000","result":"\\x00","unicode":true}
+{"dot_all":true,"pattern":"\\0000","result":"\\x00","unicode":false}
+{"dot_all":true,"pattern":"\\0000","result":"\\x00","unicode":true}
+{"dot_all":false,"pattern":"\\08","result":"\\08","unicode":false}
+{"dot_all":false,"pattern":"\\08","result":"\\08","unicode":true}
+{"dot_all":true,"pattern":"\\08","result":"\\08","unicode":false}
+{"dot_all":true,"pattern":"\\08","result":"\\08","unicode":true}
+{"dot_all":false,"pattern":"\\377","result":"\\xff","unicode":false}
+{"dot_all":false,"pattern":"\\377","result":"\\xff","unicode":true}
+{"dot_all":true,"pattern":"\\377","result":"\\xff","unicode":false}
+{"dot_all":true,"pattern":"\\377","result":"\\xff","unicode":true}
+{"dot_all":false,"pattern":"\\400","result":"\\x100","unicode":false}
+{"dot_all":false,"pattern":"\\400","result":"\\x100","unicode":true}
+{"dot_all":true,"pattern":"\\400","result":"\\x100","unicode":false}
+{"dot_all":true,"pattern":"\\400","result":"\\x100","unicode":true}
+{"dot_all":false,"pattern":"(.)^","result":"([^\r\n\u2028\u2029])^","unicode":false}
+{"dot_all":false,"pattern":"(.)^","result":"([^\r\n\u2028\u2029])^","unicode":true}
+{"dot_all":true,"pattern":"(.)^","result":"(.)^","unicode":false}
+{"dot_all":true,"pattern":"(.)^","result":"(.)^","unicode":true}
+{"dot_all":false,"pattern":"\\$","result":"\\$","unicode":false}
+{"dot_all":false,"pattern":"\\$","result":"\\$","unicode":true}
+{"dot_all":true,"pattern":"\\$","result":"\\$","unicode":false}
+{"dot_all":true,"pattern":"\\$","result":"\\$","unicode":true}
+{"dot_all":false,"pattern":"[G-b]","result":"[G-b]","unicode":false}
+{"dot_all":false,"pattern":"[G-b]","result":"[G-b]","unicode":true}
+{"dot_all":true,"pattern":"[G-b]","result":"[G-b]","unicode":false}
+{"dot_all":true,"pattern":"[G-b]","result":"[G-b]","unicode":true}
+{"dot_all":false,"pattern":"[G-b\\0]","result":"[G-b\\0]","unicode":false}
+{"dot_all":false,"pattern":"[G-b\\0]","result":"[G-b\\0]","unicode":true}
+{"dot_all":true,"pattern":"[G-b\\0]","result":"[G-b\\0]","unicode":false}
+{"dot_all":true,"pattern":"[G-b\\0]","result":"[G-b\\0]","unicode":true}
+{"dot_all":false,"pattern":"\\k","result":"k","unicode":false}
+{"dot_all":false,"pattern":"\\k","result":"k","unicode":true}
+{"dot_all":true,"pattern":"\\k","result":"k","unicode":false}
+{"dot_all":true,"pattern":"\\k","result":"k","unicode":true}
+{"dot_all":false,"pattern":"\\x20","result":"\\x20","unicode":false}
+{"dot_all":false,"pattern":"\\x20","result":"\\x20","unicode":true}
+{"dot_all":true,"pattern":"\\x20","result":"\\x20","unicode":false}
+{"dot_all":true,"pattern":"\\x20","result":"\\x20","unicode":true}
+{"dot_all":false,"pattern":"\\x2","result":"x2","unicode":false}
+{"dot_all":false,"pattern":"\\x2","result":"x2","unicode":true}
+{"dot_all":true,"pattern":"\\x2","result":"x2","unicode":false}
+{"dot_all":true,"pattern":"\\x2","result":"x2","unicode":true}
+{"dot_all":false,"pattern":"\\x2g","result":"x2g","unicode":false}
+{"dot_all":false,"pattern":"\\x2g","result":"x2g","unicode":true}
+{"dot_all":true,"pattern":"\\x2g","result":"x2g","unicode":false}
+{"dot_all":true,"pattern":"\\x2g","result":"x2g","unicode":true}
+{"dot_all":false,"pattern":"😊","result":"😊","unicode":false}
+{"dot_all":false,"pattern":"😊","result":"😊","unicode":true}
+{"dot_all":true,"pattern":"😊","result":"😊","unicode":false}
+{"dot_all":true,"pattern":"😊","result":"😊","unicode":true}
+{"dot_all":false,"pattern":"^.*","result":"^[^\r\n\u2028\u2029]*","unicode":false}
+{"dot_all":false,"pattern":"^.*","result":"^[^\r\n\u2028\u2029]*","unicode":true}
+{"dot_all":true,"pattern":"^.*","result":"^.*","unicode":false}
+{"dot_all":true,"pattern":"^.*","result":"^.*","unicode":true}
+{"dot_all":false,"pattern":"(\\n)","result":"(\\n)","unicode":false}
+{"dot_all":false,"pattern":"(\\n)","result":"(\\n)","unicode":true}
+{"dot_all":true,"pattern":"(\\n)","result":"(\\n)","unicode":false}
+{"dot_all":true,"pattern":"(\\n)","result":"(\\n)","unicode":true}
+{"dot_all":false,"pattern":"(a(bc))","result":"(a(bc))","unicode":false}
+{"dot_all":false,"pattern":"(a(bc))","result":"(a(bc))","unicode":true}
+{"dot_all":true,"pattern":"(a(bc))","result":"(a(bc))","unicode":false}
+{"dot_all":true,"pattern":"(a(bc))","result":"(a(bc))","unicode":true}
+{"dot_all":false,"pattern":"[]","result":"[^\u0000-🿿]","unicode":false}
+{"dot_all":false,"pattern":"[]","result":"[^\u0000-🿿]","unicode":true}
+{"dot_all":true,"pattern":"[]","result":"[^\u0000-🿿]","unicode":false}
+{"dot_all":true,"pattern":"[]","result":"[^\u0000-🿿]","unicode":true}
+{"dot_all":false,"pattern":"[^]","result":"[\u0000-🿿]","unicode":false}
+{"dot_all":false,"pattern":"[^]","result":"[\u0000-🿿]","unicode":true}
+{"dot_all":true,"pattern":"[^]","result":"[\u0000-🿿]","unicode":false}
+{"dot_all":true,"pattern":"[^]","result":"[\u0000-🿿]","unicode":true}
+{"dot_all":false,"pattern":"[]a","result":"[^\u0000-🿿]a","unicode":false}
+{"dot_all":false,"pattern":"[]a","result":"[^\u0000-🿿]a","unicode":true}
+{"dot_all":true,"pattern":"[]a","result":"[^\u0000-🿿]a","unicode":false}
+{"dot_all":true,"pattern":"[]a","result":"[^\u0000-🿿]a","unicode":true}
+{"dot_all":false,"pattern":"[^]a","result":"[\u0000-🿿]a","unicode":false}
+{"dot_all":false,"pattern":"[^]a","result":"[\u0000-🿿]a","unicode":true}
+{"dot_all":true,"pattern":"[^]a","result":"[\u0000-🿿]a","unicode":false}
+{"dot_all":true,"pattern":"[^]a","result":"[\u0000-🿿]a","unicode":true}
+{"dot_all":false,"pattern":"\\s+","result":"[ \f\n\r\t\u000b             \u2028\u2029  　﻿]+","unicode":false}
+{"dot_all":false,"pattern":"\\s+","result":"[ \f\n\r\t\u000b             \u2028\u2029  　﻿]+","unicode":true}
+{"dot_all":true,"pattern":"\\s+","result":"[ \f\n\r\t\u000b             \u2028\u2029  　﻿]+","unicode":false}
+{"dot_all":true,"pattern":"\\s+","result":"[ \f\n\r\t\u000b             \u2028\u2029  　﻿]+","unicode":true}
+{"dot_all":false,"pattern":"\\S+","result":"[^ \f\n\r\t\u000b             \u2028\u2029  　﻿]+","unicode":false}
+{"dot_all":false,"pattern":"\\S+","result":"[^ \f\n\r\t\u000b             \u2028\u2029  　﻿]+","unicode":true}
+{"dot_all":true,"pattern":"\\S+","result":"[^ \f\n\r\t\u000b             \u2028\u2029  　﻿]+","unicode":false}
+{"dot_all":true,"pattern":"\\S+","result":"[^ \f\n\r\t\u000b             \u2028\u2029  　﻿]+","unicode":true}
+{"dot_all":false,"pattern":"[\\s]","result":"[ \f\n\r\t\u000b             \u2028\u2029  　﻿]","unicode":false}
+{"dot_all":false,"pattern":"[\\s]","result":"[ \f\n\r\t\u000b             \u2028\u2029  　﻿]","unicode":true}
+{"dot_all":true,"pattern":"[\\s]","result":"[ \f\n\r\t\u000b             \u2028\u2029  　﻿]","unicode":false}
+{"dot_all":true,"pattern":"[\\s]","result":"[ \f\n\r\t\u000b             \u2028\u2029  　﻿]","unicode":true}
+{"dot_all":false,"incompatible":"S in class","pattern":"[\\S]","unicode":false}
+{"dot_all":false,"incompatible":"S in class","pattern":"[\\S]","unicode":true}
+{"dot_all":true,"incompatible":"S in class","pattern":"[\\S]","unicode":false}
+{"dot_all":true,"incompatible":"S in class","pattern":"[\\S]","unicode":true}
+{"dot_all":false,"pattern":"[","syntax":"Unterminated character class","unicode":false}
+{"dot_all":false,"pattern":"[","syntax":"Unterminated character class","unicode":true}
+{"dot_all":true,"pattern":"[","syntax":"Unterminated character class","unicode":false}
+{"dot_all":true,"pattern":"[","syntax":"Unterminated character class","unicode":true}
+{"dot_all":false,"pattern":"(","syntax":"Unterminated group","unicode":false}
+{"dot_all":false,"pattern":"(","syntax":"Unterminated group","unicode":true}
+{"dot_all":true,"pattern":"(","syntax":"Unterminated group","unicode":false}
+{"dot_all":true,"pattern":"(","syntax":"Unterminated group","unicode":true}
+{"dot_all":false,"pattern":"\\(?=)","syntax":"Unmatched ')'","unicode":false}
+{"dot_all":false,"pattern":"\\(?=)","syntax":"Unmatched ')'","unicode":true}
+{"dot_all":true,"pattern":"\\(?=)","syntax":"Unmatched ')'","unicode":false}
+{"dot_all":true,"pattern":"\\(?=)","syntax":"Unmatched ')'","unicode":true}
+{"dot_all":false,"pattern":")","syntax":"Unmatched ')'","unicode":false}
+{"dot_all":false,"pattern":")","syntax":"Unmatched ')'","unicode":true}
+{"dot_all":true,"pattern":")","syntax":"Unmatched ')'","unicode":false}
+{"dot_all":true,"pattern":")","syntax":"Unmatched ')'","unicode":true}
+{"dot_all":false,"pattern":"0:(?)","syntax":"Invalid group","unicode":false}
+{"dot_all":false,"pattern":"0:(?)","syntax":"Invalid group","unicode":true}
+{"dot_all":true,"pattern":"0:(?)","syntax":"Invalid group","unicode":false}
+{"dot_all":true,"pattern":"0:(?)","syntax":"Invalid group","unicode":true}
+{"dot_all":false,"pattern":"(?)","syntax":"Invalid group","unicode":false}
+{"dot_all":false,"pattern":"(?)","syntax":"Invalid group","unicode":true}
+{"dot_all":true,"pattern":"(?)","syntax":"Invalid group","unicode":false}
+{"dot_all":true,"pattern":"(?)","syntax":"Invalid group","unicode":true}
+{"dot_all":false,"pattern":"(?U)","syntax":"Invalid group","unicode":false}
+{"dot_all":false,"pattern":"(?U)","syntax":"Invalid group","unicode":true}
+{"dot_all":true,"pattern":"(?U)","syntax":"Invalid group","unicode":false}
+{"dot_all":true,"pattern":"(?U)","syntax":"Invalid group","unicode":true}
+{"dot_all":false,"pattern":"(?)|(?i)","syntax":"Invalid group","unicode":false}
+{"dot_all":false,"pattern":"(?)|(?i)","syntax":"Invalid group","unicode":true}
+{"dot_all":true,"pattern":"(?)|(?i)","syntax":"Invalid group","unicode":false}
+{"dot_all":true,"pattern":"(?)|(?i)","syntax":"Invalid group","unicode":true}
+{"dot_all":false,"pattern":"(?P\u003cw\u003e)(?P\u003cw\u003e)(?P\u003cD\u003e)","syntax":"Invalid group","unicode":false}
+{"dot_all":false,"pattern":"(?P\u003cw\u003e)(?P\u003cw\u003e)(?P\u003cD\u003e)","syntax":"Invalid group","unicode":true}
+{"dot_all":true,"pattern":"(?P\u003cw\u003e)(?P\u003cw\u003e)(?P\u003cD\u003e)","syntax":"Invalid group","unicode":false}
+{"dot_all":true,"pattern":"(?P\u003cw\u003e)(?P\u003cw\u003e)(?P\u003cD\u003e)","syntax":"Invalid group","unicode":true}
+{"dot_all":false,"incompatible":"S in class","pattern":"\u003c%([\\s\\S]+?)%\u003e","unicode":false}
+{"dot_all":false,"incompatible":"S in class","pattern":"\u003c%([\\s\\S]+?)%\u003e","unicode":true}
+{"dot_all":true,"incompatible":"S in class","pattern":"\u003c%([\\s\\S]+?)%\u003e","unicode":false}
+{"dot_all":true,"incompatible":"S in class","pattern":"\u003c%([\\s\\S]+?)%\u003e","unicode":true}
+{"dot_all":false,"incompatible":"re2: Invalid (?\u003c) \u003clookbehind\u003e","pattern":"(?\u003c=y)x","unicode":false}
+{"dot_all":false,"incompatible":"re2: Invalid (?\u003c) \u003clookbehind\u003e","pattern":"(?\u003c=y)x","unicode":true}
+{"dot_all":true,"incompatible":"re2: Invalid (?\u003c) \u003clookbehind\u003e","pattern":"(?\u003c=y)x","unicode":false}
+{"dot_all":true,"incompatible":"re2: Invalid (?\u003c) \u003clookbehind\u003e","pattern":"(?\u003c=y)x","unicode":true}
+{"dot_all":false,"incompatible":"re2: Invalid (?\u003c) \u003clookbehind\u003e","pattern":"(?\u003c!y)x","unicode":false}
+{"dot_all":false,"incompatible":"re2: Invalid (?\u003c) \u003clookbehind\u003e","pattern":"(?\u003c!y)x","unicode":true}
+{"dot_all":true,"incompatible":"re2: Invalid (?\u003c) \u003clookbehind\u003e","pattern":"(?\u003c!y)x","unicode":false}
+{"dot_all":true,"incompatible":"re2: Invalid (?\u003c) \u003clookbehind\u003e","pattern":"(?\u003c!y)x","unicode":true}
+{"dot_all":false,"incompatible":"re2: Invalid (?!) \u003clookahead\u003e","pattern":"(?!test)","unicode":false}
+{"dot_all":false,"incompatible":"re2: Invalid (?!) \u003clookahead\u003e","pattern":"(?!test)","unicode":true}
+{"dot_all":true,"incompatible":"re2: Invalid (?!) \u003clookahead\u003e","pattern":"(?!test)","unicode":false}
+{"dot_all":true,"incompatible":"re2: Invalid (?!) \u003clookahead\u003e","pattern":"(?!test)","unicode":true}
+{"dot_all":false,"incompatible":"re2: Invalid (?=) \u003clookahead\u003e","pattern":"(?=test)","unicode":false}
+{"dot_all":false,"incompatible":"re2: Invalid (?=) \u003clookahead\u003e","pattern":"(?=test)","unicode":true}
+{"dot_all":true,"incompatible":"re2: Invalid (?=) \u003clookahead\u003e","pattern":"(?=test)","unicode":false}
+{"dot_all":true,"incompatible":"re2: Invalid (?=) \u003clookahead\u003e","pattern":"(?=test)","unicode":true}
+{"dot_all":false,"incompatible":"re2: Invalid \\1 \u003cbackreference\u003e","pattern":"\\1","unicode":false}
+{"dot_all":false,"incompatible":"re2: Invalid \\1 \u003cbackreference\u003e","pattern":"\\1","unicode":true}
+{"dot_all":true,"incompatible":"re2: Invalid \\1 \u003cbackreference\u003e","pattern":"\\1","unicode":false}
+{"dot_all":true,"incompatible":"re2: Invalid \\1 \u003cbackreference\u003e","pattern":"\\1","unicode":true}
+{"dot_all":false,"incompatible":"re2: Invalid \\8 \u003cbackreference\u003e","pattern":"\\8","unicode":false}
+{"dot_all":false,"incompatible":"re2: Invalid \\8 \u003cbackreference\u003e","pattern":"\\8","unicode":true}
+{"dot_all":true,"incompatible":"re2: Invalid \\8 \u003cbackreference\u003e","pattern":"\\8","unicode":false}
+{"dot_all":true,"incompatible":"re2: Invalid \\8 \u003cbackreference\u003e","pattern":"\\8","unicode":true}
+{"dot_all":false,"incompatible":"re2: Invalid \\9 \u003cbackreference\u003e","pattern":"\\9","unicode":false}
+{"dot_all":false,"incompatible":"re2: Invalid \\9 \u003cbackreference\u003e","pattern":"\\9","unicode":true}
+{"dot_all":true,"incompatible":"re2: Invalid \\9 \u003cbackreference\u003e","pattern":"\\9","unicode":false}
+{"dot_all":true,"incompatible":"re2: Invalid \\9 \u003cbackreference\u003e","pattern":"\\9","unicode":true}
+{"dot_all":false,"incompatible":"re2: Invalid \\1 \u003cbackreference\u003e","pattern":"(a)\\1","unicode":false}
+{"dot_all":false,"incompatible":"re2: Invalid \\1 \u003cbackreference\u003e","pattern":"(a)\\1","unicode":true}
+{"dot_all":true,"incompatible":"re2: Invalid \\1 \u003cbackreference\u003e","pattern":"(a)\\1","unicode":false}
+{"dot_all":true,"incompatible":"re2: Invalid \\1 \u003cbackreference\u003e","pattern":"(a)\\1","unicode":true}
+{"dot_all":false,"pattern":"\\12","result":"\\x0a","unicode":false}
+{"dot_all":false,"pattern":"\\12","result":"\\x0a","unicode":true}
+{"dot_all":true,"pattern":"\\12","result":"\\x0a","unicode":false}
+{"dot_all":true,"pattern":"\\12","result":"\\x0a","unicode":true}
+{"dot_all":false,"pattern":"\\u{1d306}","result":"u{1d306}","unicode":false}
+{"dot_all":false,"pattern":"\\u{1d306}","result":"\\x{1d306}","unicode":true}
+{"dot_all":true,"pattern":"\\u{1d306}","result":"u{1d306}","unicode":false}
+{"dot_all":true,"pattern":"\\u{1d306}","result":"\\x{1d306}","unicode":true}
+{"dot_all":false,"pattern":"\\u{1d306","result":"u{1d306","unicode":false}
+{"dot_all":false,"pattern":"\\u{1d306","result":"\\x{1d306","unicode":true}
+{"dot_all":true,"pattern":"\\u{1d306","result":"u{1d306","unicode":false}
+{"dot_all":true,"pattern":"\\u{1d306","result":"\\x{1d306","unicode":true}
+{"dot_all":false,"pattern":"\\u{}","result":"u{}","unicode":false}
+{"dot_all":false,"pattern":"\\u{}","result":"\\x{}","unicode":true}
+{"dot_all":true,"pattern":"\\u{}","result":"u{}","unicode":false}
+{"dot_all":true,"pattern":"\\u{}","result":"\\x{}","unicode":true}
+{"dot_all":false,"pattern":"\\u{zz}","result":"u{zz}","unicode":false}
+{"dot_all":false,"pattern":"\\u{zz}","syntax":"Invalid Unicode escape","unicode":true}
+{"dot_all":true,"pattern":"\\u{zz}","result":"u{zz}","unicode":false}
+{"dot_all":true,"pattern":"\\u{zz}","syntax":"Invalid Unicode escape","unicode":true}
+{"dot_all":false,"pattern":"\\u1234","result":"\\x{1234}","unicode":false}
+{"dot_all":false,"pattern":"\\u1234","result":"\\x{1234}","unicode":true}
+{"dot_all":true,"pattern":"\\u1234","result":"\\x{1234}","unicode":false}
+{"dot_all":true,"pattern":"\\u1234","result":"\\x{1234}","unicode":true}
+{"dot_all":false,"pattern":"\\u12","result":"u12","unicode":false}
+{"dot_all":false,"pattern":"\\u12","result":"u12","unicode":true}
+{"dot_all":true,"pattern":"\\u12","result":"u12","unicode":false}
+{"dot_all":true,"pattern":"\\u12","result":"u12","unicode":true}
+{"dot_all":false,"pattern":"\\u{12345678}","result":"u{12345678}","unicode":false}
+{"dot_all":false,"pattern":"\\u{12345678}","result":"\\x{12345678}","unicode":true}
+{"dot_all":true,"pattern":"\\u{12345678}","result":"u{12345678}","unicode":false}
+{"dot_all":true,"pattern":"\\u{12345678}","result":"\\x{12345678}","unicode":true}
+{"dot_all":false,"pattern":".","result":"[^\r\n\u2028\u2029]","unicode":false}
+{"dot_all":false,"pattern":".","result":"[^\r\n\u2028\u2029]","unicode":true}
+{"dot_all":true,"pattern":".","result":".","unicode":false}
+{"dot_all":true,"pattern":".","result":".","unicode":true}
+{"dot_all":false,"pattern":"a.b","result":"a[^\r\n\u2028\u2029]b","unicode":false}
+{"dot_all":false,"pattern":"a.b","result":"a[^\r\n\u2028\u2029]b","unicode":true}
+{"dot_all":true,"pattern":"a.b","result":"a.b","unicode":false}
+{"dot_all":true,"pattern":"a.b","result":"a.b","unicode":true}
+{"dot_all":false,"pattern":"[.]","result":"[.]","unicode":false}
+{"dot_all":false,"pattern":"[.]","result":"[.]","unicode":true}
+{"dot_all":true,"pattern":"[.]","result":"[.]","unicode":false}
+{"dot_all":true,"pattern":"[.]","result":"[.]","unicode":true}
+{"dot_all":false,"pattern":"(.)","result":"([^\r\n\u2028\u2029])","unicode":false}
+{"dot_all":false,"pattern":"(.)","result":"([^\r\n\u2028\u2029])","unicode":true}
+{"dot_all":true,"pattern":"(.)","result":"(.)","unicode":false}
+{"dot_all":true,"pattern":"(.)","result":"(.)","unicode":true}
+{"dot_all":false,"pattern":"(?:.)","result":"(?:[^\r\n\u2028\u2029])","unicode":false}
+{"dot_all":false,"pattern":"(?:.)","result":"(?:[^\r\n\u2028\u2029])","unicode":true}
+{"dot_all":true,"pattern":"(?:.)","result":"(?:.)","unicode":false}
+{"dot_all":true,"pattern":"(?:.)","result":"(?:.)","unicode":true}
+{"dot_all":false,"pattern":"\\d\\D\\w\\W","result":"\\d\\D\\w\\W","unicode":false}
+{"dot_all":false,"pattern":"\\d\\D\\w\\W","result":"\\d\\D\\w\\W","unicode":true}
+{"dot_all":true,"pattern":"\\d\\D\\w\\W","result":"\\d\\D\\w\\W","unicode":false}
+{"dot_all":true,"pattern":"\\d\\D\\w\\W","result":"\\d\\D\\w\\W","unicode":true}
+{"dot_all":false,"pattern":"\\f\\n\\r\\t\\v","result":"\\f\\n\\r\\t\\v","unicode":false}
+{"dot_all":false,"pattern":"\\f\\n\\r\\t\\v","result":"\\f\\n\\r\\t\\v","unicode":true}
+{"dot_all":true,"pattern":"\\f\\n\\r\\t\\v","result":"\\f\\n\\r\\t\\v","unicode":false}
+{"dot_all":true,"pattern":"\\f\\n\\r\\t\\v","result":"\\f\\n\\r\\t\\v","unicode":true}
+{"dot_all":false,"pattern":"\\/","result":"\\/","unicode":false}
+{"dot_all":false,"pattern":"\\/","result":"\\/","unicode":true}
+{"dot_all":true,"pattern":"\\/","result":"\\/","unicode":false}
+{"dot_all":true,"pattern":"\\/","result":"\\/","unicode":true}
+{"dot_all":false,"pattern":"a/b","result":"a/b","unicode":false}
+{"dot_all":false,"pattern":"a/b","result":"a/b","unicode":true}
+{"dot_all":true,"pattern":"a/b","result":"a/b","unicode":false}
+{"dot_all":true,"pattern":"a/b","result":"a/b","unicode":true}
+{"dot_all":false,"pattern":"[a-z]+@[a-z]+\\.[a-z]{2,}","result":"[a-z]+@[a-z]+\\.[a-z]{2,}","unicode":false}
+{"dot_all":false,"pattern":"[a-z]+@[a-z]+\\.[a-z]{2,}","result":"[a-z]+@[a-z]+\\.[a-z]{2,}","unicode":true}
+{"dot_all":true,"pattern":"[a-z]+@[a-z]+\\.[a-z]{2,}","result":"[a-z]+@[a-z]+\\.[a-z]{2,}","unicode":false}
+{"dot_all":true,"pattern":"[a-z]+@[a-z]+\\.[a-z]{2,}","result":"[a-z]+@[a-z]+\\.[a-z]{2,}","unicode":true}
+{"dot_all":false,"pattern":"^(([^\u003c\u003e()\\[\\]\\\\.,;:\\s@\"]+(\\.[^\u003c\u003e()\\[\\]\\\\.,;:\\s@\"]+)*)|(\".+\"))@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$","result":"^(([^\u003c\u003e()\\[\\]\\\\.,;: \f\n\r\t\u000b             \u2028\u2029  　﻿@\"]+(\\.[^\u003c\u003e()\\[\\]\\\\.,;: \f\n\r\t\u000b             \u2028\u2029  　﻿@\"]+)*)|(\"[^\r\n\u2028\u2029]+\"))@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$","unicode":false}
+{"dot_all":false,"pattern":"^(([^\u003c\u003e()\\[\\]\\\\.,;:\\s@\"]+(\\.[^\u003c\u003e()\\[\\]\\\\.,;:\\s@\"]+)*)|(\".+\"))@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$","result":"^(([^\u003c\u003e()\\[\\]\\\\.,;: \f\n\r\t\u000b             \u2028\u2029  　﻿@\"]+(\\.[^\u003c\u003e()\\[\\]\\\\.,;: \f\n\r\t\u000b             \u2028\u2029  　﻿@\"]+)*)|(\"[^\r\n\u2028\u2029]+\"))@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$","unicode":true}
+{"dot_all":true,"pattern":"^(([^\u003c\u003e()\\[\\]\\\\.,;:\\s@\"]+(\\.[^\u003c\u003e()\\[\\]\\\\.,;:\\s@\"]+)*)|(\".+\"))@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$","result":"^(([^\u003c\u003e()\\[\\]\\\\.,;: \f\n\r\t\u000b             \u2028\u2029  　﻿@\"]+(\\.[^\u003c\u003e()\\[\\]\\\\.,;: \f\n\r\t\u000b             \u2028\u2029  　﻿@\"]+)*)|(\".+\"))@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$","unicode":false}
+{"dot_all":true,"pattern":"^(([^\u003c\u003e()\\[\\]\\\\.,;:\\s@\"]+(\\.[^\u003c\u003e()\\[\\]\\\\.,;:\\s@\"]+)*)|(\".+\"))@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$","result":"^(([^\u003c\u003e()\\[\\]\\\\.,;: \f\n\r\t\u000b             \u2028\u2029  　﻿@\"]+(\\.[^\u003c\u003e()\\[\\]\\\\.,;: \f\n\r\t\u000b             \u2028\u2029  　﻿@\"]+)*)|(\".+\"))@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$","unicode":true}
+{"dot_all":false,"pattern":"\\p{L}","result":"p{L}","unicode":false}
+{"dot_all":false,"pattern":"\\p{L}","result":"p{L}","unicode":true}
+{"dot_all":true,"pattern":"\\p{L}","result":"p{L}","unicode":false}
+{"dot_all":true,"pattern":"\\p{L}","result":"p{L}","unicode":true}
+{"dot_all":false,"pattern":"\\P{L}","result":"P{L}","unicode":false}
+{"dot_all":false,"pattern":"\\P{L}","result":"P{L}","unicode":true}
+{"dot_all":true,"pattern":"\\P{L}","result":"P{L}","unicode":false}
+{"dot_all":true,"pattern":"\\P{L}","result":"P{L}","unicode":true}
+{"dot_all":false,"pattern":"\\q","result":"q","unicode":false}
+{"dot_all":false,"pattern":"\\q","result":"q","unicode":true}
+{"dot_all":true,"pattern":"\\q","result":"q","unicode":false}
+{"dot_all":true,"pattern":"\\q","result":"q","unicode":true}
+{"dot_all":false,"pattern":"\\é","result":"é","unicode":false}
+{"dot_all":false,"pattern":"\\é","result":"é","unicode":true}
+{"dot_all":true,"pattern":"\\é","result":"é","unicode":false}
+{"dot_all":true,"pattern":"\\é","result":"é","unicode":true}
+{"dot_all":false,"pattern":"é","result":"é","unicode":false}
+{"dot_all":false,"pattern":"é","result":"é","unicode":true}
+{"dot_all":true,"pattern":"é","result":"é","unicode":false}
+{"dot_all":true,"pattern":"é","result":"é","unicode":true}
+{"dot_all":false,"pattern":"[é-ü]","result":"[é-ü]","unicode":false}
+{"dot_all":false,"pattern":"[é-ü]","result":"[é-ü]","unicode":true}
+{"dot_all":true,"pattern":"[é-ü]","result":"[é-ü]","unicode":false}
+{"dot_all":true,"pattern":"[é-ü]","result":"[é-ü]","unicode":true}
+{"dot_all":false,"pattern":"\\-","result":"\\-","unicode":false}
+{"dot_all":false,"pattern":"\\-","result":"\\-","unicode":true}
+{"dot_all":true,"pattern":"\\-","result":"\\-","unicode":false}
+{"dot_all":true,"pattern":"\\-","result":"\\-","unicode":true}
+{"dot_all":false,"pattern":"[\\-]","result":"[\\-]","unicode":false}
+{"dot_all":false,"pattern":"[\\-]","result":"[\\-]","unicode":true}
+{"dot_all":true,"pattern":"[\\-]","result":"[\\-]","unicode":false}
+{"dot_all":true,"pattern":"[\\-]","result":"[\\-]","unicode":true}
+{"dot_all":false,"pattern":"\\]","result":"\\]","unicode":false}
+{"dot_all":false,"pattern":"\\]","result":"\\]","unicode":true}
+{"dot_all":true,"pattern":"\\]","result":"\\]","unicode":false}
+{"dot_all":true,"pattern":"\\]","result":"\\]","unicode":true}
+{"dot_all":false,"pattern":"\\}","result":"\\}","unicode":false}
+{"dot_all":false,"pattern":"\\}","result":"\\}","unicode":true}
+{"dot_all":true,"pattern":"\\}","result":"\\}","unicode":false}
+{"dot_all":true,"pattern":"\\}","result":"\\}","unicode":true}
+{"dot_all":false,"pattern":"\\{","result":"\\{","unicode":false}
+{"dot_all":false,"pattern":"\\{","result":"\\{","unicode":true}
+{"dot_all":true,"pattern":"\\{","result":"\\{","unicode":false}
+{"dot_all":true,"pattern":"\\{","result":"\\{","unicode":true}
+{"dot_all":false,"pattern":"a{2,3}","result":"a{2,3}","unicode":false}
+{"dot_all":false,"pattern":"a{2,3}","result":"a{2,3}","unicode":true}
+{"dot_all":true,"pattern":"a{2,3}","result":"a{2,3}","unicode":false}
+{"dot_all":true,"pattern":"a{2,3}","result":"a{2,3}","unicode":true}
+{"dot_all":false,"pattern":"a{,3}","result":"a{,3}","unicode":false}
+{"dot_all":false,"pattern":"a{,3}","result":"a{,3}","unicode":true}
+{"dot_all":true,"pattern":"a{,3}","result":"a{,3}","unicode":false}
+{"dot_all":true,"pattern":"a{,3}","result":"a{,3}","unicode":true}
+{"dot_all":false,"incompatible":"re2: Invalid (?\u003c) \u003clookbehind\u003e","pattern":"(?\u003cname\u003ex)","unicode":false}
+{"dot_all":false,"incompatible":"re2: Invalid (?\u003c) \u003clookbehind\u003e","pattern":"(?\u003cname\u003ex)","unicode":true}
+{"dot_all":true,"incompatible":"re2: Invalid (?\u003c) \u003clookbehind\u003e","pattern":"(?\u003cname\u003ex)","unicode":false}
+{"dot_all":true,"incompatible":"re2: Invalid (?\u003c) \u003clookbehind\u003e","pattern":"(?\u003cname\u003ex)","unicode":true}
+{"dot_all":false,"pattern":"\\k\u003cname\u003e","result":"k\u003cname\u003e","unicode":false}
+{"dot_all":false,"pattern":"\\k\u003cname\u003e","result":"k\u003cname\u003e","unicode":true}
+{"dot_all":true,"pattern":"\\k\u003cname\u003e","result":"k\u003cname\u003e","unicode":false}
+{"dot_all":true,"pattern":"\\k\u003cname\u003e","result":"k\u003cname\u003e","unicode":true}
+{"dot_all":false,"pattern":"(?:a|b)*","result":"(?:a|b)*","unicode":false}
+{"dot_all":false,"pattern":"(?:a|b)*","result":"(?:a|b)*","unicode":true}
+{"dot_all":true,"pattern":"(?:a|b)*","result":"(?:a|b)*","unicode":false}
+{"dot_all":true,"pattern":"(?:a|b)*","result":"(?:a|b)*","unicode":true}
+{"dot_all":false,"pattern":"x*?","result":"x*?","unicode":false}
+{"dot_all":false,"pattern":"x*?","result":"x*?","unicode":true}
+{"dot_all":true,"pattern":"x*?","result":"x*?","unicode":false}
+{"dot_all":true,"pattern":"x*?","result":"x*?","unicode":true}
+{"dot_all":false,"pattern":"\\u{10FFFF}","result":"u{10FFFF}","unicode":false}
+{"dot_all":false,"pattern":"\\u{10FFFF}","result":"\\x{10FFFF}","unicode":true}
+{"dot_all":true,"pattern":"\\u{10FFFF}","result":"u{10FFFF}","unicode":false}
+{"dot_all":true,"pattern":"\\u{10FFFF}","result":"\\x{10FFFF}","unicode":true}
+{"dot_all":false,"pattern":"\\u{110000}","result":"u{110000}","unicode":false}
+{"dot_all":false,"pattern":"\\u{110000}","result":"\\x{110000}","unicode":true}
+{"dot_all":true,"pattern":"\\u{110000}","result":"u{110000}","unicode":false}
+{"dot_all":true,"pattern":"\\u{110000}","result":"\\x{110000}","unicode":true}
+{"dot_all":false,"pattern":"[\\u{1F600}-\\u{1F64F}]","result":"[u{1F600}-u{1F64F}]","unicode":false}
+{"dot_all":false,"pattern":"[\\u{1F600}-\\u{1F64F}]","result":"[\\x{1F600}-\\x{1F64F}]","unicode":true}
+{"dot_all":true,"pattern":"[\\u{1F600}-\\u{1F64F}]","result":"[u{1F600}-u{1F64F}]","unicode":false}
+{"dot_all":true,"pattern":"[\\u{1F600}-\\u{1F64F}]","result":"[\\x{1F600}-\\x{1F64F}]","unicode":true}
+{"dot_all":false,"pattern":"\\cJ\\cM","result":"\\x0a\\x0d","unicode":false}
+{"dot_all":false,"pattern":"\\cJ\\cM","result":"\\x0a\\x0d","unicode":true}
+{"dot_all":true,"pattern":"\\cJ\\cM","result":"\\x0a\\x0d","unicode":false}
+{"dot_all":true,"pattern":"\\cJ\\cM","result":"\\x0a\\x0d","unicode":true}
+{"dot_all":false,"pattern":"a\\","result":"a\\","unicode":false}
+{"dot_all":false,"pattern":"a\\","result":"a\\","unicode":true}
+{"dot_all":true,"pattern":"a\\","result":"a\\","unicode":false}
+{"dot_all":true,"pattern":"a\\","result":"a\\","unicode":true}
+{"dot_all":false,"pattern":"\\","result":"\\","unicode":false}
+{"dot_all":false,"pattern":"\\","result":"\\","unicode":true}
+{"dot_all":true,"pattern":"\\","result":"\\","unicode":false}
+{"dot_all":true,"pattern":"\\","result":"\\","unicode":true}
+{"dot_all":false,"pattern":"[\\","syntax":"Unterminated character class","unicode":false}
+{"dot_all":false,"pattern":"[\\","syntax":"Unterminated character class","unicode":true}
+{"dot_all":true,"pattern":"[\\","syntax":"Unterminated character class","unicode":false}
+{"dot_all":true,"pattern":"[\\","syntax":"Unterminated character class","unicode":true}
+{"dot_all":false,"pattern":"[a\\]]","result":"[a\\]]","unicode":false}
+{"dot_all":false,"pattern":"[a\\]]","result":"[a\\]]","unicode":true}
+{"dot_all":true,"pattern":"[a\\]]","result":"[a\\]]","unicode":false}
+{"dot_all":true,"pattern":"[a\\]]","result":"[a\\]]","unicode":true}
+{"dot_all":false,"pattern":"(?","syntax":"Unterminated group","unicode":false}
+{"dot_all":false,"pattern":"(?","syntax":"Unterminated group","unicode":true}
+{"dot_all":true,"pattern":"(?","syntax":"Unterminated group","unicode":false}
+{"dot_all":true,"pattern":"(?","syntax":"Unterminated group","unicode":true}
+{"dot_all":false,"pattern":"(?:","syntax":"Unterminated group","unicode":false}
+{"dot_all":false,"pattern":"(?:","syntax":"Unterminated group","unicode":true}
+{"dot_all":true,"pattern":"(?:","syntax":"Unterminated group","unicode":false}
+{"dot_all":true,"pattern":"(?:","syntax":"Unterminated group","unicode":true}
+{"dot_all":false,"incompatible":"re2: Invalid (?=) \u003clookahead\u003e","pattern":"(?=","unicode":false}
+{"dot_all":false,"incompatible":"re2: Invalid (?=) \u003clookahead\u003e","pattern":"(?=","unicode":true}
+{"dot_all":true,"incompatible":"re2: Invalid (?=) \u003clookahead\u003e","pattern":"(?=","unicode":false}
+{"dot_all":true,"incompatible":"re2: Invalid (?=) \u003clookahead\u003e","pattern":"(?=","unicode":true}
+{"dot_all":false,"pattern":"(a","syntax":"Unterminated group","unicode":false}
+{"dot_all":false,"pattern":"(a","syntax":"Unterminated group","unicode":true}
+{"dot_all":true,"pattern":"(a","syntax":"Unterminated group","unicode":false}
+{"dot_all":true,"pattern":"(a","syntax":"Unterminated group","unicode":true}
+{"dot_all":false,"pattern":"a)","syntax":"Unmatched ')'","unicode":false}
+{"dot_all":false,"pattern":"a)","syntax":"Unmatched ')'","unicode":true}
+{"dot_all":true,"pattern":"a)","syntax":"Unmatched ')'","unicode":false}
+{"dot_all":true,"pattern":"a)","syntax":"Unmatched ')'","unicode":true}
+{"dot_all":false,"pattern":"a]","result":"a]","unicode":false}
+{"dot_all":false,"pattern":"a]","result":"a]","unicode":true}
+{"dot_all":true,"pattern":"a]","result":"a]","unicode":false}
+{"dot_all":true,"pattern":"a]","result":"a]","unicode":true}
+{"dot_all":false,"pattern":"[a","syntax":"Unterminated character class","unicode":false}
+{"dot_all":false,"pattern":"[a","syntax":"Unterminated character class","unicode":true}
+{"dot_all":true,"pattern":"[a","syntax":"Unterminated character class","unicode":false}
+{"dot_all":true,"pattern":"[a","syntax":"Unterminated character class","unicode":true}
+{"dot_all":false,"pattern":"\\x{41}","result":"x{41}","unicode":false}
+{"dot_all":false,"pattern":"\\x{41}","result":"x{41}","unicode":true}
+{"dot_all":true,"pattern":"\\x{41}","result":"x{41}","unicode":false}
+{"dot_all":true,"pattern":"\\x{41}","result":"x{41}","unicode":true}
