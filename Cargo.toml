@@ -55,6 +55,14 @@ path = "tests/internal/journal_test/main.rs"
 name = "legacy_test"
 path = "tests/internal/legacy_test/main.rs"
 
+[[test]]
+name = "log_test"
+path = "tests/internal/log_test/main.rs"
+
+[[test]]
+name = "golden_ops"
+path = "tests/golden_ops/main.rs"
+
 [profile.release]
 strip = true
 panic = "unwind"

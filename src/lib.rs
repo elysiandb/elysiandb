@@ -5,6 +5,7 @@ pub mod gocompat;
 pub mod hash;
 pub mod journal;
 pub mod legacy;
+pub mod log;
 pub mod memory;
 pub mod pagetree;
 pub mod ptree;
