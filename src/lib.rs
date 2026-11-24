@@ -19,6 +19,7 @@ pub mod query;
 pub mod schema;
 pub mod storage;
 pub mod sync;
+pub mod transport;
 pub mod uuid;
 pub mod wildcard;
 pub mod yaml;

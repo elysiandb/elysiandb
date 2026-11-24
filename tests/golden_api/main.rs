@@ -5,6 +5,7 @@ mod tempdir;
 
 mod cache_keys;
 mod matcher;
+mod query_errors;
 mod scalars;
 mod schema_corpus;
 mod sort;
