@@ -1,6 +1,6 @@
 use crate::array::{
     ARRAY_OBJECT_CLASS, ArrayObject, LengthOwner, array_base_iterate_string_keys,
-    define_array_length, dispatch_set_length,
+    define_array_length, define_idx_own_property, dispatch_set_length,
 };
 use crate::heap::{ObjRef, Tracer};
 use crate::object::{
@@ -447,10 +447,7 @@ impl SparseArrayObject {
             Some(item) if item.idx == idx => item.value.clone(),
             _ => Value::Empty,
         };
-        let name = UStr::from_bytes(idx.to_string().as_bytes());
-        let Some(prop) =
-            BaseObject::_define_own_property(rt, o, &name, Some(&existing), &desc, throw)?
-        else {
+        let Some(prop) = define_idx_own_property(rt, o, idx, &existing, &desc, throw)? else {
             return Ok(false);
         };
         if idx >= SparseArrayObject::data(rt, o).length

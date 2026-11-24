@@ -14,7 +14,7 @@ use crate::object_template::ObjectTemplate;
 use crate::runtime::{
     JsResult, Runtime, Throw, create_data_property_or_throw, is_array, to_length,
 };
-use crate::string::{STRING_EMPTY, ascii_string};
+use crate::string::{JsString, STRING_EMPTY, ascii_string};
 use crate::string_unicode::StringBuilder;
 use crate::value::{MAX_INT, Value, int_to_value, nil_safe, value_prop};
 use crate::vm::{STR_CONSTRUCTOR, STR_LENGTH};
@@ -125,25 +125,38 @@ fn std_data_mut(rt: &mut Runtime, o: ObjRef) -> Option<&mut ArrayObject> {
     }
 }
 
+fn int_digits(i: i64, b: &mut [u8; 20]) -> &[u8] {
+    let mut n = i.unsigned_abs();
+    let mut p = b.len();
+    loop {
+        p -= 1;
+        b[p] = b'0' + (n % 10) as u8;
+        n /= 10;
+        if n == 0 {
+            break;
+        }
+    }
+    if i < 0 {
+        p -= 1;
+        b[p] = b'-';
+    }
+    &b[p..]
+}
+
+fn ascii_sort_key<'a>(v: &'a Value, b: &'a mut [u8; 20]) -> Option<&'a [u8]> {
+    match v {
+        Value::Int(i) => Some(int_digits(*i, b)),
+        Value::String(JsString::Ascii(s)) => Some(s.as_bytes()),
+        _ => None,
+    }
+}
+
 fn write_value_string(rt: &mut Runtime, buf: &mut StringBuilder, v: &Value) -> JsResult<()> {
     match v {
         Value::String(s) => buf.write_string(s),
         Value::Int(i) => {
             let mut b = [0u8; 20];
-            let mut n = i.unsigned_abs();
-            let mut p = b.len();
-            loop {
-                p -= 1;
-                b[p] = b'0' + (n % 10) as u8;
-                n /= 10;
-                if n == 0 {
-                    break;
-                }
-            }
-            if *i < 0 {
-                buf.write_ascii(b"-");
-            }
-            buf.write_ascii(&b[p..]);
+            buf.write_ascii(int_digits(*i, &mut b));
         }
         _ => {
             let s = v.to_string(rt)?;
@@ -2041,6 +2054,14 @@ impl ArraySortCtx {
                 return Ok(-1);
             }
             return Ok(0);
+        }
+        let (mut bx, mut by) = ([0u8; 20], [0u8; 20]);
+        if let (Some(kx), Some(ky)) = (ascii_sort_key(&x, &mut bx), ascii_sort_key(&y, &mut by)) {
+            return Ok(match kx.cmp(ky) {
+                std::cmp::Ordering::Less => -1,
+                std::cmp::Ordering::Equal => 0,
+                std::cmp::Ordering::Greater => 1,
+            });
         }
         let xs = x.to_string(rt)?;
         let ys = y.to_string(rt)?;

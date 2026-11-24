@@ -562,10 +562,7 @@ impl ArrayObject {
             .get(idx as usize)
             .cloned()
             .unwrap_or(Value::Empty);
-        let name = UStr::from_bytes(idx.to_string().as_bytes());
-        let Some(prop) =
-            BaseObject::_define_own_property(rt, o, &name, Some(&existing), &desc, throw)?
-        else {
+        let Some(prop) = define_idx_own_property(rt, o, idx, &existing, &desc, throw)? else {
             return Ok(false);
         };
         if idx >= ArrayObject::data(rt, o).length
@@ -671,6 +668,34 @@ impl ArrayObject {
         self.values = values;
         self.obj_count = items.len();
     }
+}
+
+pub(crate) fn define_idx_own_property(
+    rt: &mut Runtime,
+    o: ObjRef,
+    idx: u32,
+    existing: &Value,
+    desc: &PropertyDescriptor,
+    throw: bool,
+) -> JsResult<Option<Value>> {
+    if desc.writable == Flag::True
+        && desc.enumerable == Flag::True
+        && desc.configurable == Flag::True
+        && desc.getter.is_none()
+        && desc.setter.is_none()
+        && let Some(v) = &desc.value
+    {
+        let plain = match existing {
+            Value::Empty => rt.obj(o).base.extensible,
+            Value::Property(_) => false,
+            _ => true,
+        };
+        if plain {
+            return Ok(Some(v.clone()));
+        }
+    }
+    let name = UStr::from_bytes(idx.to_string().as_bytes());
+    BaseObject::_define_own_property(rt, o, &name, Some(existing), desc, throw)
 }
 
 pub struct ArrayPropIter {
