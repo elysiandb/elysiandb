@@ -7,9 +7,11 @@ use elysiandb::globals;
 use elysiandb::gocompat::errors;
 use elysiandb::gocompat::json::{self, Encode, Map, Value};
 use elysiandb::gocompat::time::{Duration, Time};
+use elysiandb::httpd::{Request, RequestCtx};
 use elysiandb::log::{self, Options};
 use elysiandb::metrics::counters::HOOK_FAILURE;
 use elysiandb::metrics::{self, Moment, Sources};
+use elysiandb::transport::http::monitoring;
 
 use super::common;
 use super::tempdir::TempDir;
@@ -446,6 +448,97 @@ fn metrics_golden_matches_go() {
             .unwrap_or_else(|| panic!("{key} out of order in {overview}"));
         at = pos + key.len();
     }
+
+    metrics::reset();
+}
+
+fn get(h: fn(&mut RequestCtx), uri: &str) -> RequestCtx {
+    let mut req = Request::new();
+    req.set_request_uri(uri);
+    req.header.set_method("GET");
+    let mut ctx = RequestCtx::new();
+    ctx.init(&req, None);
+    h(&mut ctx);
+    ctx
+}
+
+fn json_body(ctx: &RequestCtx) -> String {
+    assert_eq!(ctx.response.status_code(), 200);
+    assert_eq!(ctx.response.header.content_type(), b"application/json");
+    rust_side(&parse(ctx.response.body_bytes()))
+}
+
+#[test]
+fn monitoring_endpoints_serve_the_go_metrics() {
+    let _state = log_state();
+    let _restore = Restore;
+    log::configure(&Options {
+        level: "debug".to_string(),
+        ..Options::default()
+    })
+    .expect("configure");
+    log::set_output(Some(Box::new(std::io::sink())), false);
+
+    let tmp = TempDir::new();
+    run_scenario(tmp.path().join("data").to_string_lossy().into_owned());
+
+    let rows = common::read_jsonl("ops/metrics/series.jsonl");
+    let series_rows: Vec<&Value> = rows
+        .iter()
+        .filter(|row| field(row, "fn").as_str() == Some("Series"))
+        .collect();
+    let mut series_checked = 0;
+    for row in &series_rows {
+        let range = field(row, "range").as_str().expect("range");
+        let since = field(row, "since").as_i64().expect("since");
+        let ctx = get(
+            monitoring::series_controller,
+            &format!("/monitoring/series?range={range}&since={since}"),
+        );
+
+        let effective = if range.is_empty() { "15m" } else { range };
+        let want = series_rows
+            .iter()
+            .find(|r| {
+                field(r, "range").as_str() == Some(effective)
+                    && field(r, "since").as_i64() == Some(since)
+            })
+            .expect("row of the effective range");
+        if field(want, "ok").as_bool() == Some(true) {
+            let body = field(want, "body").as_str().expect("body");
+            assert_eq!(
+                json_body(&ctx),
+                go_side(body),
+                "GET /monitoring/series range {range:?} since {since}"
+            );
+        } else {
+            assert_eq!(ctx.response.status_code(), 400, "range {range:?}");
+            assert_eq!(
+                ctx.response.body_bytes(),
+                b"{\"error\":\"range must be 15m, 1h or 24h\"}",
+                "range {range:?}"
+            );
+        }
+        series_checked += 1;
+    }
+    assert_eq!(series_checked, 15);
+
+    let mut files_checked = 0;
+    for (name, h) in [
+        (
+            "overview",
+            monitoring::overview_controller as fn(&mut RequestCtx),
+        ),
+        ("details", monitoring::details_controller),
+    ] {
+        let golden = String::from_utf8(common::read_golden(&format!("ops/metrics/{name}.json")))
+            .expect("UTF-8 golden");
+        let text = golden.strip_suffix('\n').expect("trailing newline");
+        let ctx = get(h, &format!("/monitoring/{name}"));
+        assert_eq!(json_body(&ctx), go_side(text), "GET /monitoring/{name}");
+        files_checked += 1;
+    }
+    assert_eq!(files_checked, 2);
 
     metrics::reset();
 }

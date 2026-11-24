@@ -3,8 +3,10 @@ use std::io;
 
 use elysiandb::gocompat::json::{self, Value as JsonValue};
 use elysiandb::gocompat::time::{self, Duration, Location, Month, Time};
+use elysiandb::httpd::{Request, RequestCtx};
 use elysiandb::kv;
 use elysiandb::log::{self, Level, Options, Query, ToValue, Value};
+use elysiandb::transport::http::monitoring;
 
 use super::common::{self, str_field};
 use super::{Capture, Restore, log_state};
@@ -165,6 +167,33 @@ fn calls() -> Vec<Call> {
         }),
     ]
 }
+
+const QUERY_URIS: [(&str, &str); 9] = [
+    ("buffer all", "/monitoring/logs?level=info&limit=100"),
+    ("buffer limit 3", "/monitoring/logs?level=info&limit=3"),
+    ("buffer warn+", "/monitoring/logs?level=warn&limit=100"),
+    (
+        "buffer component a",
+        "/monitoring/logs?level=info&component=a&limit=100",
+    ),
+    ("buffer text", "/monitoring/logs?level=info&q=line&limit=2"),
+    (
+        "buffer user",
+        "/monitoring/logs?level=info&user=ann&limit=100",
+    ),
+    (
+        "buffer request id",
+        "/monitoring/logs?level=info&request_id=r-1&limit=100",
+    ),
+    (
+        "buffer before",
+        "/monitoring/logs?level=info&before=10&limit=100",
+    ),
+    (
+        "buffer after",
+        "/monitoring/logs?level=info&after=8&limit=100",
+    ),
+];
 
 fn queries() -> Vec<(&'static str, Query)> {
     let q = |f: &dyn Fn(&mut Query)| {
@@ -361,6 +390,28 @@ fn log_lines_and_buffer_pages_match_go() {
         assert_eq!(mask_page_times(&page), str_field(row, "page"), "{name}");
         checked += 1;
     }
+
+    let mut served = 0;
+    for (offset, (name, uri)) in QUERY_URIS.iter().enumerate() {
+        let row = &rows[calls.len() + offset];
+        assert_eq!(str_field(row, "call"), *name);
+        let mut req = Request::new();
+        req.set_request_uri(uri);
+        req.header.set_method("GET");
+        let mut ctx = RequestCtx::new();
+        ctx.init(&req, None);
+        monitoring::logs_controller(&mut ctx);
+        assert_eq!(ctx.response.status_code(), 200, "{uri}");
+        assert_eq!(
+            ctx.response.header.content_type(),
+            b"application/json",
+            "{uri}"
+        );
+        let page = String::from_utf8(ctx.response.body_bytes().to_vec()).expect("page is UTF-8");
+        assert_eq!(mask_page_times(&page), str_field(row, "page"), "{uri}");
+        served += 1;
+    }
+    assert_eq!(served, queries.len());
 
     assert!(used.iter().all(|u| *u), "every D27 rendering is checked");
     assert_eq!(checked, rows.len());

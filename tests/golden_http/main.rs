@@ -1,8 +1,11 @@
 #[path = "../common/mod.rs"]
 mod common;
+#[path = "../internal/tempdir.rs"]
+mod tempdir;
 
 mod d27;
 mod normalize;
+mod routed;
 
 use std::io::{self, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
@@ -359,4 +362,47 @@ fn test_normalizer_matches_the_generator_rules() {
     );
     assert!(normalize::is_request_id("0a1b2c3d-1z"));
     assert!(!normalize::is_request_id("client-supplied-1"));
+}
+
+fn replayed_count(ids: &[&str]) -> usize {
+    if elysiandb::transport::http::adminui::is_built() {
+        return ids.iter().filter(|id| !id.contains("-admin-")).count();
+    }
+    ids.len()
+}
+
+#[test]
+fn test_routed_off_cases_replay_the_go_corpus() {
+    let replayed = routed::replay("off", &routed::OFF);
+    assert_eq!(replayed, replayed_count(&routed::OFF));
+}
+
+#[test]
+fn test_routed_basic_cases_replay_the_go_corpus() {
+    let replayed = routed::replay("basic", &routed::BASIC);
+    assert_eq!(replayed, routed::BASIC.len());
+}
+
+#[test]
+fn test_routed_token_cases_replay_the_go_corpus() {
+    let replayed = routed::replay("token", &routed::TOKEN);
+    assert_eq!(replayed, routed::TOKEN.len());
+}
+
+#[test]
+fn test_routed_user_cases_replay_the_go_corpus() {
+    let replayed = routed::replay("user", &routed::USER);
+    assert_eq!(replayed, routed::USER.len());
+}
+
+#[test]
+fn test_routed_cors_cases_replay_the_go_corpus() {
+    let replayed = routed::replay("cors", &routed::CORS);
+    assert_eq!(replayed, routed::CORS.len());
+}
+
+#[test]
+fn test_routed_deadline_cases_replay_the_go_corpus() {
+    let replayed = routed::replay("deadline", &routed::DEADLINE);
+    assert_eq!(replayed, routed::DEADLINE.len());
 }
