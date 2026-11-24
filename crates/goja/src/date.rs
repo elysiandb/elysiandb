@@ -5,6 +5,7 @@ use crate::runtime::Runtime;
 use crate::value::{Value, int_to_value};
 use gocompat::time::{Location, Month, Time};
 use std::any::Any;
+use std::sync::LazyLock;
 
 pub const DATE_TIME_LAYOUT: &str = "Mon Jan 02 2006 15:04:05 GMT-0700 (MST)";
 pub const UTC_DATE_TIME_LAYOUT: &str = "Mon, 02 Jan 2006 15:04:05 GMT";
@@ -34,6 +35,26 @@ impl ObjData for DateObject {
     }
 }
 
+const HOURS_BEFORE_UTC: i32 = 12;
+const HOURS_AFTER_UTC: i32 = 14;
+
+static UNNAMED_FIXED_ZONES: LazyLock<Vec<Location>> = LazyLock::new(|| {
+    (-HOURS_BEFORE_UTC..=HOURS_AFTER_UTC)
+        .map(|hour| Location::fixed("", hour * 60 * 60))
+        .collect()
+});
+
+fn fixed_zone(name: &str, offset: i32) -> Location {
+    let hour = offset / 60 / 60;
+    if name.is_empty()
+        && (-HOURS_BEFORE_UTC..=HOURS_AFTER_UTC).contains(&hour)
+        && hour * 60 * 60 == offset
+    {
+        return UNNAMED_FIXED_ZONES[(hour + HOURS_BEFORE_UTC) as usize].clone();
+    }
+    Location::fixed(name, offset)
+}
+
 pub fn date_parse(date: &[u8]) -> (Time, bool) {
     let (mut d, mut ok) = parse_date_iso_string(date);
     if !ok {
@@ -54,7 +75,7 @@ pub fn date_parse(date: &[u8]) -> (Time, bool) {
     let loc = if d.is_local {
         Location::local()
     } else {
-        Location::fixed("", (d.time_zone_offset * 60) as i32)
+        fixed_zone("", (d.time_zone_offset * 60) as i32)
     };
     let t = Time::from_date(
         d.year,
