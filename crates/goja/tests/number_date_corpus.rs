@@ -90,16 +90,25 @@ fn encode(v: &json::Value) -> String {
     String::from_utf8(json::marshal(v).expect("marshal")).expect("utf8")
 }
 
-fn replay(file: &str, labels: &[&str]) {
+fn replay(file: &str, arch_file: &str, labels: &[&str]) {
     let rows = common::read_jsonl(file);
+    let arch_rows = if cfg!(target_arch = "x86_64") {
+        common::read_jsonl(arch_file)
+    } else {
+        Vec::new()
+    };
     for label in labels {
         let row = rows
             .iter()
             .find(|r| common::s(r, "label") == *label)
             .unwrap_or_else(|| panic!("{file}: no case {label}"));
+        let expected = arch_rows
+            .iter()
+            .find(|r| common::s(r, "label") == *label)
+            .unwrap_or(row);
         let script = common::s(row, "script").to_string();
-        let want_error = common::s(row, "error");
-        let output = common::s(row, "output");
+        let want_error = common::s(expected, "error");
+        let output = common::s(expected, "output");
         assert!(row.get("expected_rust").is_none(), "{label}");
         assert_eq!(want_error, "", "{label}");
         let want = json::unmarshal_value(output.as_bytes()).expect("output");
@@ -144,7 +153,11 @@ fn replay(file: &str, labels: &[&str]) {
 #[test]
 fn corpus_utc_number_and_date_cases() {
     run_in_zone("corpus_utc_number_and_date_cases", Zone::Env("UTC"), || {
-        replay("hooks/corpus-utc.jsonl", &READY)
+        replay(
+            "hooks/corpus-utc.jsonl",
+            "hooks/arch-amd64-utc.jsonl",
+            &READY,
+        )
     });
 }
 
@@ -153,7 +166,13 @@ fn corpus_europe_paris_number_and_date_cases() {
     run_in_zone(
         "corpus_europe_paris_number_and_date_cases",
         Zone::Env("Europe/Paris"),
-        || replay("hooks/corpus-europe-paris.jsonl", &READY),
+        || {
+            replay(
+                "hooks/corpus-europe-paris.jsonl",
+                "hooks/arch-amd64-europe-paris.jsonl",
+                &READY,
+            )
+        },
     );
 }
 
@@ -163,7 +182,13 @@ fn corpus_utc_pending_number_and_date_cases() {
     run_in_zone(
         "corpus_utc_pending_number_and_date_cases",
         Zone::Env("UTC"),
-        || replay("hooks/corpus-utc.jsonl", &PENDING),
+        || {
+            replay(
+                "hooks/corpus-utc.jsonl",
+                "hooks/arch-amd64-utc.jsonl",
+                &PENDING,
+            )
+        },
     );
 }
 
@@ -173,6 +198,12 @@ fn corpus_europe_paris_pending_number_and_date_cases() {
     run_in_zone(
         "corpus_europe_paris_pending_number_and_date_cases",
         Zone::Env("Europe/Paris"),
-        || replay("hooks/corpus-europe-paris.jsonl", &PENDING),
+        || {
+            replay(
+                "hooks/corpus-europe-paris.jsonl",
+                "hooks/arch-amd64-europe-paris.jsonl",
+                &PENDING,
+            )
+        },
     );
 }
