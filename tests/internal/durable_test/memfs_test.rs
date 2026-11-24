@@ -16,6 +16,14 @@ pub fn err_crashed() -> FsError {
 pub struct MemNode {
     pub data: Vec<u8>,
     pub synced: Vec<u8>,
+    pub shared: Option<usize>,
+}
+
+impl MemNode {
+    pub fn alias_synced(&mut self) {
+        self.synced = self.data.clone();
+        self.shared = Some(self.data.capacity().max(self.data.len()));
+    }
 }
 
 pub struct MemState {
@@ -136,6 +144,7 @@ impl MemFs {
                 let c = o.add(MemNode {
                     data: n.synced.clone(),
                     synced: n.synced.clone(),
+                    shared: None,
                 });
                 o.names.insert(name.clone(), c);
                 o.durable.insert(name.clone(), c);
@@ -157,6 +166,7 @@ impl MemFs {
                 let c = o.add(MemNode {
                     data: n.data.clone(),
                     synced: n.data.clone(),
+                    shared: None,
                 });
                 o.names.insert(name.clone(), c);
                 o.durable.insert(name.clone(), c);
@@ -220,6 +230,7 @@ impl Fs for MemFs {
             let len = m.nodes[idx].data.len() as i64;
             m.used -= len;
             m.nodes[idx].data = Vec::new();
+            m.nodes[idx].shared = None;
         }
 
         Ok(Arc::new(MemFile {
@@ -380,13 +391,21 @@ impl File for MemFile {
             return (0, Some(FsError::errno(libc::ENOSPC)));
         }
 
+        let node = &mut m.nodes[self.node];
         if grow > 0 {
-            let len = m.nodes[self.node].data.len();
-            m.nodes[self.node].data.resize(len + grow as usize, 0);
-            m.used += grow;
+            let len = node.data.len();
+            if node.shared.is_some_and(|cap| len + grow as usize > cap) {
+                node.shared = None;
+            }
+            node.data.resize(len + grow as usize, 0);
         }
         let off = off as usize;
-        m.nodes[self.node].data[off..off + buf.len()].copy_from_slice(buf);
+        node.data[off..off + buf.len()].copy_from_slice(buf);
+        if node.shared.is_some() && off < node.synced.len() {
+            let end = (off + buf.len()).min(node.synced.len());
+            node.synced[off..end].copy_from_slice(&buf[..end - off]);
+        }
+        m.used += grow;
 
         (buf.len(), None)
     }
@@ -396,6 +415,9 @@ impl File for MemFile {
         m.step(&self.fs.0.down)?;
 
         let node = &mut m.nodes[self.node];
+        if node.shared.is_some_and(|cap| node.data.len() > cap) {
+            node.shared = None;
+        }
         node.synced = node.data.clone();
 
         Ok(())
