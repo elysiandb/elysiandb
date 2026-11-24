@@ -1877,7 +1877,7 @@ pub struct Vm {
     pub interrupt: Arc<crate::runtime::InterruptState>,
     pub arg_bufs: Vec<Vec<Value>>,
     pub cur_async_runner: Option<ObjRef>,
-    pub tagged_template_ids: FxHashMap<ObjRef, usize>,
+    pub tagged_template_ids: FxHashMap<ObjRef, TaggedTemplateId>,
 }
 
 impl Vm {
@@ -3471,14 +3471,14 @@ impl Runtime {
             }
             Instruction::OpStrictEq => {
                 let sp = self.vm.sp as usize;
-                let r = self.vm.stack[sp - 2].strict_equals(&self.vm.stack[sp - 1]);
+                let r = self.vm_strict_equals(&self.vm.stack[sp - 2], &self.vm.stack[sp - 1]);
                 self.vm.stack[sp - 2].set(Value::Bool(r));
                 self.vm.sp -= 1;
                 self.vm.pc += 1;
             }
             Instruction::OpStrictNeq => {
                 let sp = self.vm.sp as usize;
-                let r = self.vm.stack[sp - 2].strict_equals(&self.vm.stack[sp - 1]);
+                let r = self.vm_strict_equals(&self.vm.stack[sp - 2], &self.vm.stack[sp - 1]);
                 self.vm.stack[sp - 2].set(Value::Bool(!r));
                 self.vm.sp -= 1;
                 self.vm.pc += 1;
@@ -5660,9 +5660,14 @@ impl Runtime {
         }
         let _ = raw.prevent_extensions(self, true);
         self.obj_mut(raw).class = &TAGGED_TEMPLATE_ARRAY_CLASS;
-        self.vm
-            .tagged_template_ids
-            .insert(raw, c.raw.as_ptr() as usize);
+        let prg = self.vm.prg.as_ref().map(Arc::downgrade).unwrap_or_default();
+        self.vm.tagged_template_ids.insert(
+            raw,
+            TaggedTemplateId {
+                prg: prg.clone(),
+                id: &c.raw as *const Vec<ValueProperty> as usize,
+            },
+        );
         BaseObject::_put_prop(
             self,
             cooked,
@@ -5674,9 +5679,13 @@ impl Runtime {
         );
         let _ = cooked.prevent_extensions(self, true);
         self.obj_mut(cooked).class = &TAGGED_TEMPLATE_ARRAY_CLASS;
-        self.vm
-            .tagged_template_ids
-            .insert(cooked, c.cooked.as_ptr() as usize);
+        self.vm.tagged_template_ids.insert(
+            cooked,
+            TaggedTemplateId {
+                prg,
+                id: &c.cooked as *const Vec<ValueProperty> as usize,
+            },
+        );
         cooked
     }
 
@@ -6245,17 +6254,32 @@ pub(crate) static TAGGED_TEMPLATE_ARRAY_CLASS: LazyLock<ObjClass> = LazyLock::ne
     ..ARRAY_OBJECT_CLASS
 });
 
+pub struct TaggedTemplateId {
+    pub prg: std::sync::Weak<Program>,
+    pub id: usize,
+}
+
 fn tagged_template_array_equal(rt: &Runtime, o: ObjRef, other: ObjRef) -> bool {
     if std::ptr::eq(rt.obj(other).class, &*TAGGED_TEMPLATE_ARRAY_CLASS) {
         return match (
             rt.vm.tagged_template_ids.get(&o),
             rt.vm.tagged_template_ids.get(&other),
         ) {
-            (Some(a), Some(b)) => a == b,
+            (Some(a), Some(b)) => a.id == b.id && std::sync::Weak::ptr_eq(&a.prg, &b.prg),
             _ => false,
         };
     }
     false
+}
+
+impl Runtime {
+    #[inline]
+    pub fn vm_strict_equals(&self, a: &Value, b: &Value) -> bool {
+        match (a, b) {
+            (Value::Object(x), Value::Object(y)) => x == y || x.equal(self, *y),
+            _ => a.strict_equals(b),
+        }
+    }
 }
 
 fn set_array_values(a: &mut crate::array::ArrayObject, values: Vec<Value>) {

@@ -1,4 +1,5 @@
 mod jsrun;
+mod vm_test_cases;
 
 use goja::file::File;
 use goja::string::ascii_string;
@@ -205,6 +206,62 @@ fn native_frame_stays_visible_in_stack() {
         assert_eq!(
             r.unwrap_err(),
             "TypeError: Cannot read property 'x' of undefined\n\tat f (<eval>:1:21(2))\n\tat call (native)\n\tat g (<eval>:1:46(3))\n\tat <eval>:1:53(4)\n"
+        );
+    });
+}
+
+fn oracle_type_name(v: &Value) -> &'static str {
+    match v {
+        Value::Undefined => "goja.valueUndefined",
+        Value::Null => "goja.valueNull",
+        Value::Bool(_) => "goja.valueBool",
+        Value::Int(_) => "goja.valueInt",
+        Value::Float(_) => "goja.valueFloat",
+        Value::String(goja::JsString::Ascii(_)) => "goja.asciiString",
+        Value::String(goja::JsString::Unicode(_)) => "goja.unicodeString",
+        Value::String(goja::JsString::Imported(_)) => "*goja.importedString",
+        Value::BigInt(_) => "*goja.valueBigInt",
+        Value::Symbol(_) => "*goja.Symbol",
+        Value::Object(_) => "*goja.Object",
+        _ => "other",
+    }
+}
+
+fn oracle_line(rt: &mut goja::Runtime, r: Result<Value, goja::RunError>) -> String {
+    use gocompat::strconv::quote;
+    match r {
+        Ok(v) => {
+            let s = v
+                .go_string(rt)
+                .unwrap_or_else(|_| "<string error>".to_string());
+            format!("RESULT {} {}", oracle_type_name(&v), quote(s.as_bytes()))
+        }
+        Err(goja::RunError::Exception(e)) => format!(
+            "EXCEPTION {}\nERROR {}",
+            quote(e.string().as_bytes()),
+            quote(e.error().as_bytes())
+        ),
+        Err(e) => format!("ERR {}", quote(e.error().as_bytes())),
+    }
+}
+
+#[test]
+fn goja_oracle_cases() {
+    on_big_stack(|| {
+        let mut failures = Vec::new();
+        for (src, expected) in vm_test_cases::ORACLE_CASES {
+            let mut rt = new_runtime();
+            let r = rt.run_script("", src);
+            let got = oracle_line(&mut rt, r);
+            if got != *expected {
+                failures.push(format!("{src}\n  expected: {expected}\n  got: {got}"));
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "{} mismatches:\n{}",
+            failures.len(),
+            failures.join("\n")
         );
     });
 }
