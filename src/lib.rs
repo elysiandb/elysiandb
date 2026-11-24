@@ -13,6 +13,7 @@ pub mod memory;
 pub mod metrics;
 pub mod pagetree;
 pub mod ptree;
+pub mod schema;
 pub mod storage;
 pub mod sync;
 pub mod yaml;
