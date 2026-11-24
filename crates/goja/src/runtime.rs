@@ -1340,7 +1340,7 @@ impl Runtime {
         let r = method.call(self, obj.clone(), &[])?;
         let iter = self.to_object(&r)?;
         let mut next = None;
-        if let Some(Value::Object(o)) = iter.get_str(self, &"next".into(), None)?
+        if let Some(Value::Object(o)) = iter.get_str(self, &crate::vm::STR_NEXT, None)?
             && let Some(call) = o.assert_callable(self)
         {
             next = Some(call);
@@ -1353,8 +1353,8 @@ impl Runtime {
 
     pub fn create_iter_result_object(&mut self, value: Value, done: bool) -> Value {
         let o = self.new_object();
-        let _ = o.set_own_str(self, &"value".into(), value, false);
-        let _ = o.set_own_str(self, &"done".into(), Value::Bool(done), false);
+        let _ = o.set_own_str(self, &crate::vm::STR_VALUE, value, false);
+        let _ = o.set_own_str(self, &crate::vm::STR_DONE, Value::Bool(done), false);
         Value::Object(o)
     }
 
@@ -1746,7 +1746,7 @@ impl IteratorRecord {
         let Some(iterator) = self.iterator else {
             return Ok(());
         };
-        let m = iterator.get_str(r, &"return".into(), None)?;
+        let m = iterator.get_str(r, &crate::vm::STR_RETURN, None)?;
         if let Some(ret_method) = to_method(r, m)? {
             let v = ret_method.call(r, Value::Object(iterator), &[])?;
             r.to_object(&v)?;
@@ -1763,11 +1763,15 @@ impl IteratorRecord {
 }
 
 pub fn iterator_complete(r: &mut Runtime, iter_result: ObjRef) -> JsResult<bool> {
-    Ok(nil_safe(iter_result.get_str(r, &"done".into(), None)?).to_boolean())
+    Ok(nil_safe(iter_result.get_str(r, &crate::vm::STR_DONE, None)?).to_boolean())
 }
 
 pub fn iterator_value(r: &mut Runtime, iter_result: ObjRef) -> JsResult<Value> {
-    Ok(nil_safe(iter_result.get_str(r, &"value".into(), None)?))
+    Ok(nil_safe(iter_result.get_str(
+        r,
+        &crate::vm::STR_VALUE,
+        None,
+    )?))
 }
 
 pub fn compile(name: &str, src: &[u8], strict: bool) -> Result<Arc<Program>, CompilerSyntaxError> {

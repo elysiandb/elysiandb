@@ -2036,13 +2036,16 @@ impl Vm {
         self.args = ctx.args;
     }
 
+    #[inline]
     pub fn pop_ctx(&mut self) {
         if let Some(ctx) = self.call_stack.pop() {
             self.prg = ctx.prg;
             self.stash = ctx.stash;
-            self.priv_env = ctx.priv_env;
-            self.new_target = ctx.new_target;
-            self.result = ctx.result;
+            if self.priv_env.is_some() || ctx.priv_env.is_some() {
+                self.priv_env = ctx.priv_env;
+            }
+            self.new_target.set(ctx.new_target);
+            self.result.set(ctx.result);
             self.pc = ctx.pc;
             self.sb = ctx.sb;
             self.args = ctx.args;
@@ -2547,10 +2550,38 @@ impl Runtime {
                 }
                 return self.exec_numeric_binary(op_sub);
             }
-            Instruction::Mul => return self.exec_numeric_binary(op_mul),
+            Instruction::Mul => {
+                if self.exec_int_binary(|l, r| {
+                    if l == 0 && r == -1 || l == -1 && r == 0 {
+                        return Some(Value::Float(-0.0));
+                    }
+                    let res = l.wrapping_mul(r);
+                    if l == 0 || r == 0 || res.wrapping_div(l) == r {
+                        return Some(int_to_value(res));
+                    }
+                    None
+                }) {
+                    return Ok(());
+                }
+                return self.exec_numeric_binary(op_mul);
+            }
             Instruction::Exp => return self.exec_numeric_binary(op_exp),
             Instruction::Div => return self.exec_numeric_binary(op_div),
-            Instruction::Mod => return self.exec_numeric_binary(op_mod),
+            Instruction::Mod => {
+                if self.exec_int_binary(|l, r| {
+                    if r == 0 {
+                        return Some(Value::Float(f64::NAN));
+                    }
+                    let m = l.wrapping_rem(r);
+                    if m == 0 && l < 0 {
+                        return Some(Value::Float(-0.0));
+                    }
+                    Some(int_to_value(m))
+                }) {
+                    return Ok(());
+                }
+                return self.exec_numeric_binary(op_mod);
+            }
             Instruction::Neg => return self.exec_neg(),
             Instruction::Plus => {
                 let p = self.vm.sp as usize - 1;
@@ -2561,14 +2592,26 @@ impl Runtime {
             Instruction::Inc => return self.exec_inc_dec(true),
             Instruction::Dec => return self.exec_inc_dec(false),
             Instruction::And => {
+                if self.exec_int_binary(|l, r| Some(Value::Int(i64::from((l as i32) & (r as i32)))))
+                {
+                    return Ok(());
+                }
                 return self
                     .exec_numeric_binary(|l, r| op_bitwise(l, r, big::Int::and, |a, b| a & b));
             }
             Instruction::Or => {
+                if self.exec_int_binary(|l, r| Some(Value::Int(i64::from((l as i32) | (r as i32)))))
+                {
+                    return Ok(());
+                }
                 return self
                     .exec_numeric_binary(|l, r| op_bitwise(l, r, big::Int::or, |a, b| a | b));
             }
             Instruction::Xor => {
+                if self.exec_int_binary(|l, r| Some(Value::Int(i64::from((l as i32) ^ (r as i32)))))
+                {
+                    return Ok(());
+                }
                 return self
                     .exec_numeric_binary(|l, r| op_bitwise(l, r, big::Int::xor, |a, b| a ^ b));
             }
@@ -4313,8 +4356,35 @@ impl Runtime {
         Ok(())
     }
 
+    #[inline(always)]
+    fn exec_int_binary(&mut self, f: fn(i64, i64) -> Option<Value>) -> bool {
+        let sp = self.vm.sp as usize;
+        if let (Value::Int(l), Value::Int(r)) = (&self.vm.stack[sp - 2], &self.vm.stack[sp - 1])
+            && let Some(v) = f(*l, *r)
+        {
+            self.vm.stack[sp - 2].set(v);
+            self.vm.sp -= 1;
+            self.vm.pc += 1;
+            return true;
+        }
+        false
+    }
+
     fn exec_numeric_binary(&mut self, op: BinaryOp) -> JsResult<()> {
         let sp = self.vm.sp as usize;
+        if matches!(
+            (&self.vm.stack[sp - 2], &self.vm.stack[sp - 1]),
+            (
+                Value::Int(_) | Value::Float(_),
+                Value::Int(_) | Value::Float(_)
+            )
+        ) {
+            let res = op(&self.vm.stack[sp - 2], &self.vm.stack[sp - 1])?;
+            self.vm.stack[sp - 2].set(res);
+            self.vm.sp -= 1;
+            self.vm.pc += 1;
+            return Ok(());
+        }
         let l = self.vm.stack[sp - 2].clone();
         let left = self.vm_to_numeric(&l)?;
         let r = self.vm.stack[sp - 1].clone();
@@ -6146,6 +6216,20 @@ pub(crate) static STR_PROTOTYPE: LazyLock<unistring::String> =
     LazyLock::new(|| unistring::String::new("prototype"));
 pub(crate) static STR_CONSTRUCTOR: LazyLock<unistring::String> =
     LazyLock::new(|| unistring::String::new("constructor"));
+pub(crate) static STR_LENGTH: LazyLock<unistring::String> =
+    LazyLock::new(|| unistring::String::new("length"));
+pub(crate) static STR_VALUE: LazyLock<unistring::String> =
+    LazyLock::new(|| unistring::String::new("value"));
+pub(crate) static STR_DONE: LazyLock<unistring::String> =
+    LazyLock::new(|| unistring::String::new("done"));
+pub(crate) static STR_NEXT: LazyLock<unistring::String> =
+    LazyLock::new(|| unistring::String::new("next"));
+pub(crate) static STR_RETURN: LazyLock<unistring::String> =
+    LazyLock::new(|| unistring::String::new("return"));
+pub(crate) static STR_THROW: LazyLock<unistring::String> =
+    LazyLock::new(|| unistring::String::new("throw"));
+pub(crate) static STR_CALLEE: LazyLock<unistring::String> =
+    LazyLock::new(|| unistring::String::new("callee"));
 pub(crate) static STR_RAW: LazyLock<unistring::String> =
     LazyLock::new(|| unistring::String::new("raw"));
 pub(crate) static STR_THIS_BINDING: LazyLock<unistring::String> =
@@ -6320,11 +6404,11 @@ pub fn js_func_call_ex(
     rt.vm.stack[rt.vm.sp as usize].set(this);
     rt.vm.sp += 1;
     for arg in args {
-        rt.vm.stack[rt.vm.sp as usize] = if arg.is_empty() {
+        rt.vm.stack[rt.vm.sp as usize].set(if arg.is_empty() {
             Value::Undefined
         } else {
             arg.clone()
-        };
+        });
         rt.vm.sp += 1;
     }
     rt.vm.push_try_frame(TRY_PANIC_MARKER, -1);
@@ -6352,7 +6436,7 @@ pub fn js_func_call_ex(
     rt.vm.prg = prg;
     rt.vm.stash = stash;
     rt.vm.priv_env = priv_env;
-    rt.vm.new_target = new_target;
+    rt.vm.new_target.set(new_target);
     rt.vm.pc = 0;
     match rt.vm_run_try_loop() {
         Ok(Some(ex)) => {

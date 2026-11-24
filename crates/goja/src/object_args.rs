@@ -84,7 +84,7 @@ impl ArgumentsObject {
         BaseObject::_put_prop(
             rt,
             o,
-            &"length".into(),
+            &crate::vm::STR_LENGTH,
             int_to_value(length as i64),
             true,
             false,
@@ -288,7 +288,7 @@ impl Runtime {
             i += 1;
         }
         let callee = self.vm.stack[self.vm.sb as usize - 1].clone();
-        BaseObject::_put_prop(self, v, &"callee".into(), callee, true, false, true);
+        BaseObject::_put_prop(self, v, &crate::vm::STR_CALLEE, callee, true, false, true);
         let av = self.get_array_values();
         BaseObject::_put_sym(
             self,
@@ -310,9 +310,11 @@ impl Runtime {
             self.obj_mut(args).base._put(&idx_name(i), v);
         }
         let len = int_to_value(self.vm.args as i64);
-        BaseObject::_put_prop(self, args, &"length".into(), len, true, false, true);
+        BaseObject::_put_prop(self, args, &crate::vm::STR_LENGTH, len, true, false, true);
         let thrower = self.new_thrower_property(false);
-        self.obj_mut(args).base._put(&"callee".into(), thrower);
+        self.obj_mut(args)
+            .base
+            ._put(&crate::vm::STR_CALLEE, thrower);
         let av = self.get_array_values();
         BaseObject::_put_sym(
             self,

@@ -328,10 +328,10 @@ pub fn base_func_init(rt: &mut Runtime, o: ObjRef, name: &unistring::String, len
     };
     rt.obj_mut(o)
         .base
-        ._put(&"length".into(), Value::Property(Box::new(len_prop)));
+        ._put(&crate::vm::STR_LENGTH, Value::Property(Box::new(len_prop)));
     o._put_prop(
         rt,
-        &"name".into(),
+        &crate::vm::STR_NAME,
         Value::String(string_value_from_raw(name)),
         false,
         false,
@@ -341,7 +341,7 @@ pub fn base_func_init(rt: &mut Runtime, o: ObjRef, name: &unistring::String, len
 
 pub fn has_instance(rt: &mut Runtime, val: ObjRef, v: &Value) -> JsResult<bool> {
     if let Value::Object(v) = v {
-        let o = val.get_str(rt, &"prototype".into(), None)?;
+        let o = val.get_str(rt, &crate::vm::STR_PROTOTYPE, None)?;
         if let Some(Value::Object(o1)) = o {
             let mut v = *v;
             loop {
@@ -482,7 +482,7 @@ impl FuncObject {
         let proto = rt.new_object();
         proto._put_prop(
             rt,
-            &"constructor".into(),
+            &crate::vm::STR_CONSTRUCTOR,
             Value::Object(o),
             true,
             false,
@@ -490,7 +490,7 @@ impl FuncObject {
         );
         o._put_prop(
             rt,
-            &"prototype".into(),
+            &crate::vm::STR_PROTOTYPE,
             Value::Object(proto),
             true,
             false,
@@ -1203,7 +1203,7 @@ pub fn generator_object_throw(rt: &mut Runtime, o: ObjRef, v: Value) -> JsResult
         let (mut res, done) = generator_object_try_call_delegated(rt, o, |rt| {
             let it = gen_obj(rt, o).delegated.and_then(|d| d.iterator);
             let m = match it {
-                Some(it) => it.get_str(rt, &"throw".into(), None)?,
+                Some(it) => it.get_str(rt, &crate::vm::STR_THROW, None)?,
                 None => None,
             };
             let method = to_method(rt, m)?;
@@ -1246,7 +1246,7 @@ pub fn generator_object_return(rt: &mut Runtime, o: ObjRef, v: Value) -> JsResul
         let (res, done) = generator_object_try_call_delegated(rt, o, |rt| {
             let it = gen_obj(rt, o).delegated.and_then(|d| d.iterator);
             let m = match it {
-                Some(it) => it.get_str(rt, &"return".into(), None)?,
+                Some(it) => it.get_str(rt, &crate::vm::STR_RETURN, None)?,
                 None => None,
             };
             let method = to_method(rt, m)?;
