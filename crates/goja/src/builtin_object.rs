@@ -1,3 +1,4 @@
+use crate::array::go_append;
 use crate::builtin_symbol::SYM_TO_STRING_TAG;
 use crate::func::NativeFn;
 use crate::heap::ObjRef;
@@ -425,7 +426,7 @@ impl Runtime {
         let mut it = iterate_enumerable_string_properties(self, obj)?;
         while let Some(item) = it.next(self)? {
             let pair = self.new_array_values(vec![item.name, item.value.unwrap_or_default()]);
-            values.push(Value::Object(pair));
+            go_append(&mut values, Value::Object(pair));
         }
         Ok(Value::Object(self.new_array_values(values)))
     }
@@ -437,7 +438,7 @@ impl Runtime {
         while let Some(item) = it.next(self)? {
             let v = item.value.unwrap_or_default();
             self.root(&v);
-            values.push(v);
+            go_append(&mut values, v);
         }
         Ok(Value::Object(self.new_array_values(values)))
     }

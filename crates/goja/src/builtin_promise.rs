@@ -1,3 +1,4 @@
+use crate::array::go_append;
 use crate::builtin_map::incompatible_receiver;
 use crate::builtin_symbol::SYM_TO_STRING_TAG;
 use crate::func::{NativeCallable, NativeFn};
@@ -522,7 +523,7 @@ fn combinator_state(rt: &mut Runtime, o: ObjRef) -> &mut CombinatorState {
 
 fn push_element(rt: &mut Runtime, state: ObjRef) -> usize {
     let s = combinator_state(rt, state);
-    s.values.push(Value::Undefined);
+    go_append(&mut s.values, Value::Undefined);
     s.values.len() - 1
 }
 

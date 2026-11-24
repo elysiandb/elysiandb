@@ -1,3 +1,4 @@
+use crate::array::go_append;
 use crate::heap::{ObjRef, SymRef, Tracer};
 use crate::object::{
     BaseObject, CallFn, CtorFn, EnumerableIter, IterNextFunc, ObjClass, ObjData, ObjExt,
@@ -360,7 +361,7 @@ impl DestructKeyedSource {
             Box::new(EnumerableIter { o: w, wrapped })
         };
         while let Some(item) = next.next(rt)? {
-            accum.push(item.name);
+            go_append(&mut accum, item.name);
         }
         Ok(accum)
     }

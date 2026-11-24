@@ -1,3 +1,4 @@
+use crate::array::go_append;
 use crate::array::{
     ARRAY_OBJECT_CLASS, ArrayObject, LengthOwner, array_base_iterate_string_keys,
     define_array_length, define_idx_own_property, dispatch_set_length,
@@ -347,7 +348,10 @@ impl SparseArrayObject {
             {
                 continue;
             }
-            accum.push(Value::String(ascii_string(&item.idx.to_string())));
+            go_append(
+                &mut accum,
+                Value::String(ascii_string(&item.idx.to_string())),
+            );
         }
         BaseObject::string_keys(rt, o, all, accum)
     }

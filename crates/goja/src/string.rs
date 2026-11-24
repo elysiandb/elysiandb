@@ -1,3 +1,4 @@
+use crate::array::go_append;
 use crate::heap::{ObjRef, Tracer};
 use crate::object::{
     BASE_CLASS, BaseObject, EnumerableFlag, IterNextFunc, ObjClass, ObjExt, PropIter, PropIterItem,
@@ -532,7 +533,7 @@ impl StringObject {
         mut accum: Vec<Value>,
     ) -> JsResult<Vec<Value>> {
         for i in 0..StringObject::data(rt, o).length {
-            accum.push(Value::String(ascii_string(&i.to_string())));
+            go_append(&mut accum, Value::String(ascii_string(&i.to_string())));
         }
         BaseObject::string_keys(rt, o, all, accum)
     }

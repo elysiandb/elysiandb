@@ -1,3 +1,4 @@
+use crate::array::go_append;
 use crate::heap::{ObjRef, Tracer};
 use crate::object::{
     BASE_CLASS, BaseObject, CLASS_ERROR, CLASS_OBJECT, Flag, FunctionCall, IterNextFunc, ObjClass,
@@ -152,7 +153,7 @@ impl ErrorObject {
         mut accum: Vec<Value>,
     ) -> JsResult<Vec<Value>> {
         if all && !ErrorObject::data(rt, o).stack_prop_added {
-            accum.push(Value::String(ascii_string(PROP_NAME_STACK)));
+            go_append(&mut accum, Value::String(ascii_string(PROP_NAME_STACK)));
         }
         BaseObject::string_keys(rt, o, all, accum)
     }

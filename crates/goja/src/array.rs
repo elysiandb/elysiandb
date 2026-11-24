@@ -476,7 +476,7 @@ impl ArrayObject {
             {
                 continue;
             }
-            accum.push(Value::String(ascii_string(&i.to_string())));
+            go_append(&mut accum, Value::String(ascii_string(&i.to_string())));
         }
         BaseObject::string_keys(rt, o, all, accum)
     }

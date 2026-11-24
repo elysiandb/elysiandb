@@ -1305,10 +1305,10 @@ impl Runtime {
             if limit > 0 && split.len() > limit as usize {
                 split.truncate(limit as usize);
             }
-            let value_array = split
-                .into_iter()
-                .map(|v| Value::String(JsString::Ascii(AsciiString::new(v))))
-                .collect();
+            let mut value_array = Vec::with_capacity(split.len());
+            for v in split {
+                value_array.push(Value::String(JsString::Ascii(AsciiString::new(v))));
+            }
             return Ok(Value::Object(self.new_array_values(value_array)));
         }
         let separator = match &separator_value {
@@ -1320,10 +1320,10 @@ impl Runtime {
         if limit > 0 && split.len() > limit as usize {
             split.truncate(limit as usize);
         }
-        let value_array = split
-            .into_iter()
-            .map(|v| Value::String(new_string_value(v)))
-            .collect();
+        let mut value_array = Vec::with_capacity(split.len());
+        for v in split {
+            value_array.push(Value::String(new_string_value(v)));
+        }
         Ok(Value::Object(self.new_array_values(value_array)))
     }
 

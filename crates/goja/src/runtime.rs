@@ -1426,7 +1426,7 @@ impl Runtime {
         let mut values = Vec::new();
         iter.iterate(self, &mut |rt, item| {
             rt.root(&item);
-            values.push(item);
+            crate::array::go_append(&mut values, item);
             Ok(())
         })?;
         Ok(values)

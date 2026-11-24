@@ -1,4 +1,4 @@
-use crate::array::ARRAY_OBJECT_CLASS;
+use crate::array::{ARRAY_OBJECT_CLASS, go_append};
 use crate::builtin_bigint::string_to_big_int;
 use crate::builtin_math::{go_mod, pow};
 use crate::builtin_symbol::SYM_UNSCOPABLES;
@@ -3862,7 +3862,7 @@ impl Runtime {
                 let mut values = Vec::new();
                 if delta > 0 {
                     let start = (self.vm.sb + n + 1) as usize;
-                    values.extend_from_slice(&self.vm.stack[start..start + delta as usize]);
+                    values = self.vm.stack[start..start + delta as usize].to_vec();
                 }
                 let o = self.new_array_values(values);
                 self.vm.push(Value::Object(o));
@@ -4812,7 +4812,7 @@ impl Runtime {
         let val = self.vm.stack[sp - 1].clone();
         let a = self.array_data_mut(arr);
         let not_nil = !val.is_empty();
-        a.values.push(val);
+        go_append(&mut a.values, val);
         if not_nil {
             a.obj_count += 1;
         }
@@ -4833,7 +4833,7 @@ impl Runtime {
                 return Err(rt.invalid_array_length_error());
             }
             let a = rt.array_data_mut(arr);
-            a.values.push(val);
+            go_append(&mut a.values, val);
             a.obj_count += 1;
             Ok(())
         })?;
@@ -4864,7 +4864,7 @@ impl Runtime {
             let mark = self.extra_roots.len();
             let r = iter.iterate(self, &mut |rt, val| {
                 rt.extra_roots.push(val.clone());
-                values.push(val);
+                go_append(&mut values, val);
                 Ok(())
             });
             self.extra_roots.truncate(mark);

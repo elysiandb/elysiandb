@@ -1,3 +1,4 @@
+use crate::array::go_append;
 use crate::builtin_symbol::{SYM_HAS_INSTANCE, SYM_TO_PRIMITIVE};
 use crate::heap::{FxHashMap, FxHashSet, ObjRef, Object, SymRef, Trace, Tracer};
 use crate::map::OrderedMap;
@@ -1803,7 +1804,7 @@ impl BaseObject {
         base.ensure_prop_order();
         if all {
             for k in &base.prop_names {
-                keys.push(Value::String(string_value_from_raw(k)));
+                go_append(&mut keys, Value::String(string_value_from_raw(k)));
             }
         } else {
             for k in &base.prop_names {
@@ -1812,7 +1813,7 @@ impl BaseObject {
                 {
                     continue;
                 }
-                keys.push(Value::String(string_value_from_raw(k)));
+                go_append(&mut keys, Value::String(string_value_from_raw(k)));
             }
         }
         Ok(keys)
@@ -1832,7 +1833,7 @@ impl BaseObject {
                 {
                     continue;
                 }
-                accum.push(k.clone());
+                go_append(&mut accum, k.clone());
             }
         }
         Ok(accum)

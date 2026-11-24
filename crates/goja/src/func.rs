@@ -1,3 +1,4 @@
+use crate::array::go_append;
 use crate::builtin_promise::{
     JobCallback, Promise, PromiseCapability, PromiseReaction, PromiseReactionType,
 };
@@ -574,7 +575,10 @@ impl FuncObject {
         mut accum: Vec<Value>,
     ) -> JsResult<Vec<Value>> {
         if all && !rt.obj(o).base.values.contains_key(&UStr::from("prototype")) {
-            accum.push(Value::String(crate::string::ascii_string("prototype")));
+            go_append(
+                &mut accum,
+                Value::String(crate::string::ascii_string("prototype")),
+            );
         }
         BaseObject::string_keys(rt, o, all, accum)
     }

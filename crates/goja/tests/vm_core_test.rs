@@ -1,6 +1,8 @@
 mod jsrun;
 
-use jsrun::{new_runtime, on_big_stack};
+use goja::Value;
+use goja::object::ObjExt;
+use jsrun::{new_runtime, on_big_stack, run_error_string};
 
 fn check(cases: &'static [(&'static str, &'static str)]) {
     on_big_stack(move || {
@@ -157,4 +159,171 @@ fn test_big_int_is_not_an_integer_argument() {
             "!TypeError: Cannot convert a BigInt value to a number at <eval>:1:18(10)",
         ),
     ]);
+}
+
+fn representation(v: Option<Value>, rt: &goja::Runtime) -> String {
+    let Some(Value::Object(o)) = v else {
+        return "notobj".to_string();
+    };
+    match &rt.obj(o).ext {
+        ObjExt::Array(a) => format!(
+            "dense(len={},cap={},length={},obj={},pvc={})",
+            a.values.len(),
+            a.values.capacity(),
+            a.length,
+            a.obj_count as i64,
+            a.prop_value_count as i64
+        ),
+        ObjExt::SparseArray(a) => format!(
+            "sparse(items={},length={},pvc={})",
+            a.items.len(),
+            a.length,
+            a.prop_value_count as i64
+        ),
+        _ => "other".to_string(),
+    }
+}
+
+#[test]
+fn test_array_storage_grows_like_go_slices() {
+    const CASES: &[(&str, &str)] = &[
+        (
+            r#"var a = [...Array(5000).keys()];"#,
+            "dense(len=5000,cap=5120,length=5000,obj=5000,pvc=0)",
+        ),
+        (
+            r#"var a = [1, 2, ...[3, 4, 5]];"#,
+            "dense(len=5,cap=8,length=5,obj=5,pvc=0)",
+        ),
+        (
+            r#"var a = [1, 2, 3]; a.push(4);"#,
+            "dense(len=4,cap=6,length=4,obj=4,pvc=0)",
+        ),
+        (
+            r#"var b = [...Array(600).keys()]; var a = [0, ...b, 1, 2];"#,
+            "dense(len=603,cap=1023,length=603,obj=603,pvc=0)",
+        ),
+        (
+            r#"function f(...r) { return r; } var a = f(1, 2, 3, 4, 5);"#,
+            "dense(len=5,cap=5,length=5,obj=5,pvc=0)",
+        ),
+        (
+            r#"function f(x, ...r) { return r; } var a = f(...Array(600).keys());"#,
+            "dense(len=599,cap=599,length=599,obj=599,pvc=0)",
+        ),
+        (
+            r#"function f(x, ...r) { var g = function() { return x; }; return r; } var a = f(...Array(600).keys());"#,
+            "dense(len=599,cap=599,length=599,obj=599,pvc=0)",
+        ),
+        (
+            r#"var [x, ...a] = Array(600).fill(1);"#,
+            "dense(len=599,cap=1023,length=599,obj=599,pvc=0)",
+        ),
+        (
+            r#"var o = {}; for (var i = 0; i < 600; i++) { o["k" + i] = i; } var a = Object.keys(o);"#,
+            "dense(len=600,cap=1023,length=600,obj=600,pvc=0)",
+        ),
+        (
+            r#"var o = {}; for (var i = 0; i < 600; i++) { o["k" + i] = i; } var a = Object.getOwnPropertyNames(o);"#,
+            "dense(len=600,cap=1023,length=600,obj=600,pvc=0)",
+        ),
+        (
+            r#"var o = {}; for (var i = 0; i < 600; i++) { o["k" + i] = i; } var a = Object.values(o);"#,
+            "dense(len=600,cap=1023,length=600,obj=600,pvc=0)",
+        ),
+        (
+            r#"var o = {}; for (var i = 0; i < 600; i++) { o["k" + i] = i; } var a = Object.entries(o);"#,
+            "dense(len=600,cap=1023,length=600,obj=600,pvc=0)",
+        ),
+        (
+            r#"var o = []; for (var i = 0; i < 600; i++) { o[i] = i; } o.x = 1; var a = Object.keys(o);"#,
+            "dense(len=601,cap=1023,length=601,obj=601,pvc=0)",
+        ),
+        (
+            r#"var o = {}; for (var i = 0; i < 600; i++) { o[Symbol()] = i; } var a = Object.getOwnPropertySymbols(o);"#,
+            "dense(len=600,cap=1023,length=600,obj=600,pvc=0)",
+        ),
+        (
+            r#"var a = "x,".repeat(600).split(",");"#,
+            "dense(len=601,cap=601,length=601,obj=601,pvc=0)",
+        ),
+        (
+            r#"var a = "x1".repeat(600).split(/\d/);"#,
+            "dense(len=601,cap=1023,length=601,obj=601,pvc=0)",
+        ),
+        (
+            r#"var a = "x1y".repeat(600).split(/(\d)/);"#,
+            "dense(len=1201,cap=1535,length=1201,obj=1201,pvc=0)",
+        ),
+        (
+            r#"var a = new AggregateError(Array(600).fill(0)).errors;"#,
+            "dense(len=600,cap=1023,length=600,obj=600,pvc=0)",
+        ),
+        (
+            r#"var a; Promise.all(Array(600).fill(0)).then(function(v) { a = v; });"#,
+            "dense(len=600,cap=1023,length=600,obj=600,pvc=0)",
+        ),
+        (
+            r#"var a; Promise.allSettled(Array(300).fill(0)).then(function(v) { a = v; });"#,
+            "dense(len=300,cap=303,length=300,obj=300,pvc=0)",
+        ),
+        (
+            r#"var a; Promise.any(Array(300).fill(0).map(function(){ return Promise.reject(1); })).catch(function(e) { a = e.errors; });"#,
+            "dense(len=300,cap=303,length=300,obj=300,pvc=0)",
+        ),
+        (
+            r#"var a = "x1y".repeat(600).match(/\d/g);"#,
+            "dense(len=600,cap=600,length=600,obj=600,pvc=0)",
+        ),
+        (
+            r#"var a = /(a)(b)?/.exec("ab");"#,
+            "dense(len=3,cap=3,length=3,obj=3,pvc=0)",
+        ),
+        (
+            r#"var a = Array.from(new Set(Array(600).keys()));"#,
+            "dense(len=600,cap=1024,length=600,obj=600,pvc=0)",
+        ),
+        (
+            r#"var a = [...new Map([[1, 2]]).entries()][0];"#,
+            "dense(len=2,cap=2,length=2,obj=2,pvc=0)",
+        ),
+        (
+            r#"var re = /\d/; re[Symbol.split] = RegExp.prototype[Symbol.split]; var C = function() { return /\d/y; }; re.constructor = {}; re.constructor[Symbol.species] = C; var a = re[Symbol.split]("a1".repeat(600));"#,
+            "dense(len=601,cap=1023,length=601,obj=601,pvc=0)",
+        ),
+        (
+            r#"var a = Array.prototype.concat.call([], ...Array(10).fill([1, 2, 3]));"#,
+            "dense(len=30,cap=32,length=30,obj=30,pvc=0)",
+        ),
+        (
+            r#"var a = "x".repeat(300).split("");"#,
+            "dense(len=300,cap=300,length=300,obj=300,pvc=0)",
+        ),
+    ];
+    on_big_stack(|| {
+        let mut failures = Vec::new();
+        for (script, want) in CASES {
+            let mut rt = new_runtime();
+            if let Err(e) = rt.run_string(script) {
+                panic!("{script}: {}", run_error_string(&e));
+            }
+            let v = rt.get("a").expect("get");
+            let got = representation(v, &rt);
+            if got != *want {
+                failures.push(format!(
+                    "{script}
+  got:  {got}
+  want: {want}"
+                ));
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "{}",
+            failures.join(
+                "
+"
+            )
+        );
+    });
 }

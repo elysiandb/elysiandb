@@ -1,3 +1,4 @@
+use crate::array::go_append;
 use crate::builtin_string::{
     StrUnits, get_replace_value, lenient_decode_at, lenient_decode_units, string_replace,
     write_substitution,
@@ -1046,7 +1047,7 @@ impl Runtime {
                 .reg_exp_exec_method(exec_fn, splitter, Value::String(s.clone()))?
                 .is_null()
             {
-                a.push(Value::String(s.clone()));
+                go_append(&mut a, Value::String(s.clone()));
             }
             return Ok(Value::Object(self.new_array_values(a)));
         }
@@ -1065,7 +1066,7 @@ impl Runtime {
                 q = advance_string_index(s, q, unicode_matching);
                 continue;
             }
-            a.push(Value::String(s.substring(p, q)));
+            go_append(&mut a, Value::String(s.substring(p, q)));
             if a.len() as i64 == lim {
                 return Ok(Value::Object(self.new_array_values(a)));
             }
@@ -1073,14 +1074,14 @@ impl Runtime {
             let l = nil_safe(z.get_str(self, &"length".into(), None)?);
             let number_of_captures = (to_length(self, &l)? - 1).max(0);
             for i in 1..=number_of_captures {
-                a.push(nil_safe(z.get_idx(self, i, None)?));
+                go_append(&mut a, nil_safe(z.get_idx(self, i, None)?));
                 if a.len() as i64 == lim {
                     return Ok(Value::Object(self.new_array_values(a)));
                 }
             }
             q = p;
         }
-        a.push(Value::String(s.substring(p, size)));
+        go_append(&mut a, Value::String(s.substring(p, size)));
         Ok(Value::Object(self.new_array_values(a)))
     }
 
@@ -1131,7 +1132,7 @@ impl Runtime {
         'ret: {
             if target_length == 0 {
                 if result.is_none() {
-                    value_array.push(Value::String(s.clone()));
+                    go_append(&mut value_array, Value::String(s.clone()));
                 }
                 break 'ret;
             }
@@ -1140,10 +1141,13 @@ impl Runtime {
                     continue;
                 }
                 if last_index as isize != m[0] {
-                    value_array.push(Value::String(s.substring(last_index, m[0] as usize)));
+                    go_append(
+                        &mut value_array,
+                        Value::String(s.substring(last_index, m[0] as usize)),
+                    );
                     found += 1;
                 } else {
-                    value_array.push(Value::String(STRING_EMPTY.clone()));
+                    go_append(&mut value_array, Value::String(STRING_EMPTY.clone()));
                     found += 1;
                 }
                 last_index = m[1] as usize;
@@ -1158,7 +1162,7 @@ impl Runtime {
                     } else {
                         Value::Undefined
                     };
-                    value_array.push(value);
+                    go_append(&mut value_array, value);
                     found += 1;
                     if found == limit {
                         break 'ret;
@@ -1167,9 +1171,12 @@ impl Runtime {
             }
             if found != limit {
                 if last_index != target_length {
-                    value_array.push(Value::String(s.substring(last_index, target_length)));
+                    go_append(
+                        &mut value_array,
+                        Value::String(s.substring(last_index, target_length)),
+                    );
                 } else {
-                    value_array.push(Value::String(STRING_EMPTY.clone()));
+                    go_append(&mut value_array, Value::String(STRING_EMPTY.clone()));
                 }
             }
         }
