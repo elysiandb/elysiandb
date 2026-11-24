@@ -1713,6 +1713,10 @@ impl Runtime {
         self.global_object
     }
 
+    pub fn set_time_source(&mut self, now: Now) {
+        self.now = Some(now);
+    }
+
     pub fn set(&mut self, name: &str, value: Value) -> JsResult<()> {
         let g = self.global_object;
         g.set_own_str(self, &name.into(), value, true).map(|_| ())

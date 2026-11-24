@@ -90,6 +90,34 @@ fn test_resumed_async_functions_keep_their_callers() {
 }
 
 #[test]
+fn test_time_source_drives_the_current_date() {
+    on_big_stack(|| {
+        let mut rt = new_runtime();
+        rt.set_time_source(Box::new(|| {
+            gocompat::time::Time::from_unix(1_000_000, 500_000_000)
+        }));
+        let v = rt
+            .run_string(
+                "Date.now() + \",\" + new Date().getTime() + \",\" + new Date().getUTCFullYear() + \",\" + typeof Date()",
+            )
+            .unwrap_or_else(|e| panic!("{}", run_error_string(&e)));
+        assert_eq!(
+            v.go_string(&mut rt).expect("go_string"),
+            "1000000500,1000000500,1970,string"
+        );
+        let mut calls = 0i64;
+        rt.set_time_source(Box::new(move || {
+            calls += 1;
+            gocompat::time::Time::from_unix(2_000_000 + calls, 0)
+        }));
+        let v = rt
+            .run_string("var a = Date.now(); var b = Date.now(); b - a")
+            .unwrap_or_else(|e| panic!("{}", run_error_string(&e)));
+        assert_eq!(v.go_string(&mut rt).expect("go_string"), "1000");
+    });
+}
+
+#[test]
 fn test_index_assignment_through_plain_prototypes() {
     check(&[
         (
