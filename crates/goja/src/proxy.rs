@@ -186,8 +186,9 @@ pub enum ProxyHandler {
 
 impl ProxyHandler {
     fn trace(&self, t: &mut Tracer) {
-        if let ProxyHandler::Js(h) = self {
-            t.obj(*h);
+        match self {
+            ProxyHandler::Js(h) => t.obj(*h),
+            ProxyHandler::Native(c) => t.values(&c.data),
         }
     }
 
@@ -299,12 +300,14 @@ impl ProxyHandler {
         match self {
             ProxyHandler::Js(h) => {
                 let d = desc.to_value(rt);
-                ProxyHandler::bool_proxy_call(
-                    rt,
-                    *h,
-                    ProxyTrap::DefineProperty,
-                    &[Value::Object(target), prop.to_value(), d],
-                )
+                with_root(rt, &d, |rt| {
+                    ProxyHandler::bool_proxy_call(
+                        rt,
+                        *h,
+                        ProxyTrap::DefineProperty,
+                        &[Value::Object(target), prop.to_value(), d.clone()],
+                    )
+                })
             }
             ProxyHandler::Native(c) => native::define_property(rt, c, target, prop, desc),
         }
@@ -412,13 +415,15 @@ impl ProxyHandler {
     ) -> JsResult<Option<Value>> {
         match self {
             ProxyHandler::Js(h) => {
-                let a = rt.new_array_values(args.to_vec());
-                ProxyHandler::proxy_call(
-                    rt,
-                    *h,
-                    ProxyTrap::Apply,
-                    &[Value::Object(target), this.clone(), Value::Object(a)],
-                )
+                let a = Value::Object(rt.new_array_values(args.to_vec()));
+                with_root(rt, &a, |rt| {
+                    ProxyHandler::proxy_call(
+                        rt,
+                        *h,
+                        ProxyTrap::Apply,
+                        &[Value::Object(target), this.clone(), a.clone()],
+                    )
+                })
             }
             ProxyHandler::Native(c) => native::apply(rt, c, target, this, args),
         }
@@ -433,17 +438,15 @@ impl ProxyHandler {
     ) -> JsResult<Option<Value>> {
         match self {
             ProxyHandler::Js(h) => {
-                let a = rt.new_array_values(args.to_vec());
-                ProxyHandler::proxy_call(
-                    rt,
-                    *h,
-                    ProxyTrap::Construct,
-                    &[
-                        Value::Object(target),
-                        Value::Object(a),
-                        Value::Object(new_target),
-                    ],
-                )
+                let a = Value::Object(rt.new_array_values(args.to_vec()));
+                with_root(rt, &a, |rt| {
+                    ProxyHandler::proxy_call(
+                        rt,
+                        *h,
+                        ProxyTrap::Construct,
+                        &[Value::Object(target), a.clone(), Value::Object(new_target)],
+                    )
+                })
             }
             ProxyHandler::Native(c) => native::construct(rt, c, target, args, new_target),
         }
@@ -514,6 +517,9 @@ fn with_root<T>(
     v: &Value,
     f: impl FnOnce(&mut Runtime) -> JsResult<T>,
 ) -> JsResult<T> {
+    if !matches!(v, Value::Object(_) | Value::Symbol(_) | Value::Property(_)) {
+        return f(rt);
+    }
     let mark = rt.extra_roots.len();
     rt.extra_roots.push(v.clone());
     let r = f(rt);
@@ -559,16 +565,18 @@ impl ProxyObject {
             if !v.is_null() {
                 handler_proto = Some(rt.to_object(&v)?);
             }
-            if !target.is_extensible(rt)? {
-                let tp = target.proto(rt)?;
-                if !same_obj(rt, handler_proto, tp) {
-                    return type_error(
-                        rt,
-                        "'getPrototypeOf' on proxy: proxy target is non-extensible but the trap did not return its actual prototype",
-                    );
+            return with_root(rt, &v, |rt| {
+                if !target.is_extensible(rt)? {
+                    let tp = target.proto(rt)?;
+                    if !same_obj(rt, handler_proto, tp) {
+                        return type_error(
+                            rt,
+                            "'getPrototypeOf' on proxy: proxy target is non-extensible but the trap did not return its actual prototype",
+                        );
+                    }
                 }
-            }
-            return Ok(handler_proto);
+                Ok(handler_proto)
+            });
         }
         target.proto(rt)
     }
@@ -1271,10 +1279,9 @@ impl ProxyObject {
         };
         let mut key_list: Vec<Value> = Vec::new();
         let mut key_set = PropNameSet::default();
-        let lv = nil_safe(keys.get_str(rt, &"length".into(), None)?);
-        let l = to_length(rt, &lv)?;
         let mark = rt.extra_roots.len();
-        let r = ProxyObject::collect_own_keys(rt, target, keys, l, &mut key_list, &mut key_set);
+        rt.extra_roots.push(Value::Object(keys));
+        let r = ProxyObject::collect_own_keys(rt, target, keys, &mut key_list, &mut key_set);
         rt.extra_roots.truncate(mark);
         r?;
         Ok(Some(key_list))
@@ -1284,17 +1291,16 @@ impl ProxyObject {
         rt: &mut Runtime,
         target: ObjRef,
         keys: ObjRef,
-        l: i64,
         key_list: &mut Vec<Value>,
         key_set: &mut PropNameSet,
     ) -> JsResult<()> {
+        let lv = nil_safe(keys.get_str(rt, &"length".into(), None)?);
+        let l = to_length(rt, &lv)?;
         for k in 0..l {
             let item = keys.get_idx(rt, k, None)?;
             let item = match item {
                 Some(v) if !v.is_empty() => v,
-                _ => panic!(
-                    "the proxy ownKeys trap returned an array-like object without element {k}"
-                ),
+                _ => panic!("internal error"),
             };
             if !matches!(item, Value::String(_) | Value::Symbol(_)) {
                 let s = item.go_string(rt)?;

@@ -24,6 +24,7 @@ pub type ProxyConstructTrap =
 
 #[derive(Default)]
 pub struct ProxyTrapConfig {
+    pub data: Vec<Value>,
     pub get_prototype_of: Option<ProxyTargetTrap<Option<ObjRef>>>,
     pub set_prototype_of: Option<ProxyKeyTrap<Option<ObjRef>, bool>>,
     pub is_extensible: Option<ProxyTargetTrap<bool>>,

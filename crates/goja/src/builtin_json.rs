@@ -1,22 +1,27 @@
+use crate::array::ARRAY_OBJECT_CLASS;
 use crate::builtin_symbol::SYM_TO_STRING_TAG;
 use crate::func::NativeFn;
 use crate::heap::ObjRef;
 use crate::object::{
-    CLASS_JSON, CLASS_NUMBER, CLASS_OBJECT, CLASS_STRING, CallFn, FunctionCall, ObjExt,
+    BASE_OBJECT_CLASS, CLASS_JSON, CLASS_NUMBER, CLASS_OBJECT, CLASS_STRING, CallFn, Flag,
+    FunctionCall, ObjExt, PropertyDescriptor,
 };
 use crate::proxy::proxy_class_name;
 use crate::runtime::{
     JsResult, Runtime, Throw, create_data_property, create_data_property_or_throw, is_array,
     to_length,
 };
-use crate::string::{JsString, STRING_EMPTY, ascii_string, new_string_value};
+use crate::string::{
+    JsString, STRING_EMPTY, ascii_string, new_string_value, string_value_from_raw,
+};
 use crate::string_ascii::AsciiString;
 use crate::string_imported::ImportedString;
 use crate::unistring;
 use crate::value::{Value, float_to_value, go_float_to_int, int_to_ascii, nil_safe, value_prop};
 use gocompat::json::{Decoder, Error as JsonError, Subject, Token};
 use std::collections::HashSet;
-use std::io::Cursor;
+use std::io::{Cursor, Write};
+use std::sync::LazyLock;
 
 const HEX: &[u8; 16] = b"0123456789abcdef";
 
@@ -183,7 +188,7 @@ impl Runtime {
                                 completed = Some(Value::Object(object));
                             }
                             Token::String(k) => {
-                                *key = Some(unistring::String::new(&k));
+                                *key = Some(unistring::new_from_string(k.as_bytes()));
                                 tok = d.token().map_err(JsonResult::Json)?;
                                 break;
                             }
@@ -451,6 +456,54 @@ enum JsonResult {
     Json(JsonError),
 }
 
+static EMPTY_KEY: LazyLock<unistring::String> = LazyLock::new(unistring::String::default);
+static TO_JSON: LazyLock<unistring::String> = LazyLock::new(|| unistring::String::new("toJSON"));
+static LENGTH: LazyLock<unistring::String> = LazyLock::new(|| unistring::String::new("length"));
+static SMALL_INDEXES: LazyLock<Vec<unistring::String>> = LazyLock::new(|| {
+    (0..1024)
+        .map(|i: i64| unistring::String::from_bytes(i.to_string().as_bytes()))
+        .collect()
+});
+
+fn index_key(i: i64) -> unistring::String {
+    match SMALL_INDEXES.get(i as usize) {
+        Some(k) if i >= 0 => k.clone(),
+        _ => unistring::String::from_bytes(i.to_string().as_bytes()),
+    }
+}
+
+#[derive(Clone)]
+enum Key {
+    Value(Value),
+    Str(unistring::String),
+    Idx(i64),
+}
+
+impl Key {
+    fn get(&self, rt: &mut Runtime, holder: ObjRef) -> JsResult<Value> {
+        let v = match self {
+            Key::Value(v) => holder.get(rt, v, None)?,
+            Key::Str(s) => holder.get_str(rt, s, None)?,
+            Key::Idx(i) => {
+                if std::ptr::eq(rt.obj(holder).class, &ARRAY_OBJECT_CLASS) {
+                    holder.get_idx(rt, *i, None)?
+                } else {
+                    holder.get_str(rt, &index_key(*i), None)?
+                }
+            }
+        };
+        Ok(nil_safe(v))
+    }
+
+    fn to_value(&self) -> Value {
+        match self {
+            Key::Value(v) => v.clone(),
+            Key::Str(s) => Value::String(string_value_from_raw(s)),
+            Key::Idx(i) => Value::String(JsString::Ascii(int_to_ascii(*i))),
+        }
+    }
+}
+
 enum Str {
     Done(bool),
     Enter(StringifyFrame),
@@ -462,18 +515,17 @@ enum StringifyFrame {
         stepback: Vec<u8>,
         length: i64,
         i: i64,
-        separator: Vec<u8>,
-        awaiting: bool,
+        separator: Option<Vec<u8>>,
     },
     Object {
         object: ObjRef,
         stepback: Vec<u8>,
         mark: usize,
-        separator: Vec<u8>,
-        props: Vec<Value>,
+        separator: Option<Vec<u8>>,
+        props: Vec<Key>,
         idx: usize,
         empty: bool,
-        awaiting: bool,
+        off: usize,
     },
 }
 
@@ -490,147 +542,106 @@ struct BuiltinJsonStringifyContext {
 impl BuiltinJsonStringifyContext {
     fn r#do(&mut self, rt: &mut Runtime, v: Value) -> JsResult<bool> {
         let holder = rt.new_object();
-        create_data_property_or_throw(rt, holder, &Value::String(STRING_EMPTY.clone()), v)?;
-        self.str(rt, Value::String(STRING_EMPTY.clone()), holder)
+        holder.define_own_property_str(
+            rt,
+            &EMPTY_KEY,
+            PropertyDescriptor {
+                writable: Flag::True,
+                enumerable: Flag::True,
+                configurable: Flag::True,
+                value: Some(v),
+                ..PropertyDescriptor::default()
+            },
+            true,
+        )?;
+        self.str(rt, Key::Str(EMPTY_KEY.clone()), holder)
     }
 
-    fn str(&mut self, rt: &mut Runtime, key: Value, holder: ObjRef) -> JsResult<bool> {
+    fn str(&mut self, rt: &mut Runtime, key: Key, holder: ObjRef) -> JsResult<bool> {
         let mut frames = match self.str_begin(rt, key, holder)? {
             Str::Done(b) => return Ok(b),
             Str::Enter(f) => vec![f],
         };
+        let mut child_done = false;
         loop {
             let Some(top) = frames.last_mut() else {
                 return Ok(true);
             };
-            let step = match top {
+            let next = match top {
                 StringifyFrame::Array {
                     array,
                     length,
                     i,
                     separator,
-                    awaiting,
                     ..
                 } => {
-                    if *awaiting {
-                        *awaiting = false;
+                    if child_done {
+                        child_done = false;
                         if *i < *length - 1 {
-                            self.buf.extend_from_slice(separator);
+                            self.write_separator(separator);
                         }
                         *i += 1;
                     }
                     if *i < *length {
-                        let array = *array;
-                        let k = Value::String(JsString::Ascii(int_to_ascii(*i)));
-                        match self.str_begin(rt, k, array)? {
-                            Str::Done(b) => {
-                                let StringifyFrame::Array {
-                                    length,
-                                    i,
-                                    separator,
-                                    ..
-                                } = frames.last_mut().unwrap_or_else(|| unreachable!())
-                                else {
-                                    unreachable!()
-                                };
-                                if !b {
-                                    self.buf.extend_from_slice(b"null");
-                                }
-                                if *i < *length - 1 {
-                                    self.buf.extend_from_slice(separator);
-                                }
-                                *i += 1;
-                                None
-                            }
-                            Str::Enter(child) => {
-                                if let Some(StringifyFrame::Array { awaiting, .. }) =
-                                    frames.last_mut()
-                                {
-                                    *awaiting = true;
-                                }
-                                Some(child)
+                        Some((Key::Idx(*i), *array))
+                    } else {
+                        None
+                    }
+                }
+                StringifyFrame::Object {
+                    object,
+                    separator,
+                    props,
+                    idx,
+                    empty,
+                    off,
+                    ..
+                } => {
+                    if child_done {
+                        child_done = false;
+                        *empty = false;
+                        *idx += 1;
+                    }
+                    if *idx < props.len() {
+                        *off = self.buf.len();
+                        if !*empty {
+                            self.write_separator(separator);
+                        }
+                        let name = props[*idx].clone();
+                        match &name {
+                            Key::Str(s) => self.quote_raw(s),
+                            k => {
+                                let s = k.to_value().to_string(rt)?;
+                                self.quote(&s);
                             }
                         }
+                        if !self.gap.is_empty() {
+                            self.buf.extend_from_slice(b": ");
+                        } else {
+                            self.buf.push(b':');
+                        }
+                        Some((name, *object))
                     } else {
-                        let Some(StringifyFrame::Array { stepback, .. }) = frames.pop() else {
-                            unreachable!()
-                        };
+                        None
+                    }
+                }
+            };
+            let Some((k, h)) = next else {
+                match frames.pop() {
+                    Some(StringifyFrame::Array { stepback, .. }) => {
                         if !self.gap.is_empty() {
                             self.buf.push(b'\n');
                             self.buf.extend_from_slice(&stepback);
                             self.indent = stepback;
                         }
                         self.buf.push(b']');
-                        self.stack.pop();
-                        None
                     }
-                }
-                StringifyFrame::Object {
-                    object,
-                    props,
-                    idx,
-                    empty,
-                    awaiting,
-                    separator,
-                    ..
-                } => {
-                    if *awaiting {
-                        *awaiting = false;
-                        if *empty {
-                            *empty = false;
-                        }
-                        *idx += 1;
-                    }
-                    if *idx < props.len() {
-                        let object = *object;
-                        let name = props[*idx].clone();
-                        let off = self.buf.len();
-                        if !*empty {
-                            self.buf.extend_from_slice(separator);
-                        }
-                        let n = name.to_string(rt)?;
-                        self.quote(&n);
-                        if !self.gap.is_empty() {
-                            self.buf.extend_from_slice(b": ");
-                        } else {
-                            self.buf.push(b':');
-                        }
-                        match self.str_begin(rt, name, object)? {
-                            Str::Done(b) => {
-                                let Some(StringifyFrame::Object { idx, empty, .. }) =
-                                    frames.last_mut()
-                                else {
-                                    unreachable!()
-                                };
-                                if b {
-                                    if *empty {
-                                        *empty = false;
-                                    }
-                                } else {
-                                    self.buf.truncate(off);
-                                }
-                                *idx += 1;
-                                None
-                            }
-                            Str::Enter(child) => {
-                                if let Some(StringifyFrame::Object { awaiting, .. }) =
-                                    frames.last_mut()
-                                {
-                                    *awaiting = true;
-                                }
-                                Some(child)
-                            }
-                        }
-                    } else {
-                        let Some(StringifyFrame::Object {
-                            stepback,
-                            mark,
-                            empty,
-                            ..
-                        }) = frames.pop()
-                        else {
-                            unreachable!()
-                        };
+                    Some(StringifyFrame::Object {
+                        stepback,
+                        mark,
+                        empty,
+                        ..
+                    }) => {
                         if empty {
                             self.buf.truncate(mark);
                         } else if !self.gap.is_empty() {
@@ -639,29 +650,60 @@ impl BuiltinJsonStringifyContext {
                             self.indent = stepback;
                         }
                         self.buf.push(b'}');
-                        self.stack.pop();
-                        None
                     }
+                    None => unreachable!("empty stringify stack"),
                 }
+                self.stack.pop();
+                child_done = true;
+                continue;
             };
-            if let Some(child) = step {
-                frames.push(child);
+            match self.str_begin(rt, k, h)? {
+                Str::Enter(child) => frames.push(child),
+                Str::Done(b) => match frames.last_mut() {
+                    Some(StringifyFrame::Array {
+                        length,
+                        i,
+                        separator,
+                        ..
+                    }) => {
+                        if !b {
+                            self.buf.extend_from_slice(b"null");
+                        }
+                        if *i < *length - 1 {
+                            self.write_separator(separator);
+                        }
+                        *i += 1;
+                    }
+                    Some(StringifyFrame::Object {
+                        idx, empty, off, ..
+                    }) => {
+                        if b {
+                            if *empty {
+                                *empty = false;
+                            }
+                        } else {
+                            self.buf.truncate(*off);
+                        }
+                        *idx += 1;
+                    }
+                    None => unreachable!("empty stringify stack"),
+                },
             }
         }
     }
 
-    fn str_begin(&mut self, rt: &mut Runtime, key: Value, holder: ObjRef) -> JsResult<Str> {
-        let mut value = nil_safe(holder.get(rt, &key, None)?);
+    fn str_begin(&mut self, rt: &mut Runtime, key: Key, holder: ObjRef) -> JsResult<Str> {
+        let mut value = key.get(rt, holder)?;
 
         if let Value::Object(_) | Value::BigInt(_) = &value
-            && let Some(Value::Object(to_json)) = rt.get_v_str(&value, &"toJSON".into())?
+            && let Some(Value::Object(to_json)) = rt.get_v_str(&value, &TO_JSON)?
             && let Some(c) = to_json.assert_callable(rt)
         {
-            value = c.call(rt, value, std::slice::from_ref(&key))?;
+            value = c.call(rt, value, &[key.to_value()])?;
         }
 
         if let Some(rf) = self.replacer_function {
-            value = rf.call(rt, Value::Object(holder), &[key, value])?;
+            value = rf.call(rt, Value::Object(holder), &[key.to_value(), value])?;
         }
 
         if let Value::Object(o) = &value {
@@ -692,13 +734,12 @@ impl BuiltinJsonStringifyContext {
                 }
             }
             Value::String(s) => self.quote(s),
-            Value::Int(_) => self
-                .buf
-                .extend_from_slice(&value.prim_to_string().go_string()),
+            Value::Int(i) => {
+                let _ = write!(self.buf, "{i}");
+            }
             Value::Float(f) => {
                 if !f.is_nan() && !f.is_infinite() {
-                    self.buf
-                        .extend_from_slice(&value.prim_to_string().go_string());
+                    crate::ftoa::f_to_str(*f, crate::ftoa::MODE_STANDARD, 0, &mut self.buf);
                 } else {
                     self.buf.extend_from_slice(b"null");
                 }
@@ -744,7 +785,7 @@ impl BuiltinJsonStringifyContext {
             stepback = self.indent.clone();
             self.indent.extend_from_slice(&self.gap);
         }
-        let lv = nil_safe(array.get_str(rt, &"length".into(), None)?);
+        let lv = nil_safe(array.get_str(rt, &LENGTH, None)?);
         let length = to_length(rt, &lv)?;
         if length == 0 {
             self.buf.extend_from_slice(b"[]");
@@ -757,9 +798,9 @@ impl BuiltinJsonStringifyContext {
             self.buf.extend_from_slice(&self.indent);
             let mut s = b",\n".to_vec();
             s.extend_from_slice(&self.indent);
-            s
+            Some(s)
         } else {
-            b",".to_vec()
+            None
         };
         Ok(Some(StringifyFrame::Array {
             array,
@@ -767,7 +808,6 @@ impl BuiltinJsonStringifyContext {
             length,
             i: 0,
             separator,
-            awaiting: false,
         }))
     }
 
@@ -785,14 +825,21 @@ impl BuiltinJsonStringifyContext {
             self.buf.extend_from_slice(&self.indent);
             let mut s = b",\n".to_vec();
             s.extend_from_slice(&self.indent);
-            s
+            Some(s)
         } else {
-            b",".to_vec()
+            None
         };
 
         let props = match &self.property_list {
-            None => object.string_keys(rt, false, Vec::new())?,
-            Some(p) => p.clone(),
+            None if std::ptr::eq(rt.obj(object).class, &BASE_OBJECT_CLASS) => {
+                base_object_string_keys(rt, object)
+            }
+            None => object
+                .string_keys(rt, false, Vec::new())?
+                .into_iter()
+                .map(Key::Value)
+                .collect(),
+            Some(p) => p.iter().cloned().map(Key::Value).collect(),
         };
 
         Ok(Some(StringifyFrame::Object {
@@ -803,8 +850,15 @@ impl BuiltinJsonStringifyContext {
             props,
             idx: 0,
             empty: true,
-            awaiting: false,
+            off: 0,
         }))
+    }
+
+    fn write_separator(&mut self, separator: &Option<Vec<u8>>) {
+        match separator {
+            Some(s) => self.buf.extend_from_slice(s),
+            None => self.buf.push(b','),
+        }
     }
 
     fn quote(&mut self, str_: &JsString) {
@@ -825,19 +879,46 @@ impl BuiltinJsonStringifyContext {
                     },
                 };
                 let mut r = i32::from(c);
-                if (0xD800..=0xDBFF).contains(&c) {
-                    match reader.read_char() {
-                        None => {}
-                        Some(second) => {
-                            if (0xDC00..=0xDFFF).contains(&second) {
-                                r = gocompat::utf16::decode_rune(r, i32::from(second));
-                            } else {
-                                prev = Some(second);
-                            }
-                        }
+                if (0xD800..=0xDBFF).contains(&c)
+                    && let Some(second) = reader.read_char()
+                {
+                    if (0xDC00..=0xDFFF).contains(&second) {
+                        r = gocompat::utf16::decode_rune(r, i32::from(second));
+                    } else {
+                        prev = Some(second);
                     }
                 }
                 self.quote_rune(r);
+            }
+        }
+        self.buf.push(b'"');
+    }
+
+    fn quote_raw(&mut self, s: &unistring::String) {
+        if let Some(units) = s.as_utf16() {
+            self.buf.push(b'"');
+            let units = &units[1..];
+            let mut i = 0;
+            while i < units.len() {
+                let c = units[i];
+                i += 1;
+                let mut r = i32::from(c);
+                if (0xD800..=0xDBFF).contains(&c)
+                    && i < units.len()
+                    && (0xDC00..=0xDFFF).contains(&units[i])
+                {
+                    r = gocompat::utf16::decode_rune(r, i32::from(units[i]));
+                    i += 1;
+                }
+                self.quote_rune(r);
+            }
+            self.buf.push(b'"');
+            return;
+        }
+        self.buf.push(b'"');
+        if let Some(bytes) = s.ascii_bytes() {
+            for &c in bytes {
+                self.quote_rune(i32::from(c));
             }
         }
         self.buf.push(b'"');
@@ -865,13 +946,30 @@ impl BuiltinJsonStringifyContext {
                     self.buf.push(HEX[((r >> 8) & 0xF) as usize]);
                     self.buf.push(HEX[((r >> 4) & 0xF) as usize]);
                     self.buf.push(HEX[(r & 0xF) as usize]);
+                } else if r < 0x80 {
+                    self.buf.push(r as u8);
                 } else {
                     gocompat::utf8::append_rune(&mut self.buf, r);
-                    if self.all_ascii && r >= 0x80 {
+                    if self.all_ascii {
                         self.all_ascii = false;
                     }
                 }
             }
         }
     }
+}
+
+fn base_object_string_keys(rt: &mut Runtime, o: ObjRef) -> Vec<Key> {
+    let base = &mut rt.obj_mut(o).base;
+    base.ensure_prop_order();
+    let mut keys = Vec::with_capacity(base.prop_names.len());
+    for k in &base.prop_names {
+        if let Some(Value::Property(p)) = base.values.get(k)
+            && !p.enumerable
+        {
+            continue;
+        }
+        keys.push(Key::Str(k.clone()));
+    }
+    keys
 }
