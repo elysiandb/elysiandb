@@ -127,8 +127,8 @@ fn check_follow_spare(row: &Value) {
     for s in steps {
         assert_eq!(fields(s), set(&["live", "level"]), "{name}: step fields");
         let live = match field(s, "live") {
-            Value::Number(n) => strconv::parse_float(n.as_str().as_bytes(), 64)
-                .unwrap_or_else(|e| panic!("bad float {}: {e}", n.as_str())),
+            Value::Number(n) => *n,
+            Value::Int(i) => *i as f64,
             other => panic!("live is not a number: {other:?}"),
         };
         memory::follow_spare(b, (b as f64 * live) as i64, level_of(field(s, "level")));

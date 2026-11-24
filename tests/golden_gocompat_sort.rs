@@ -14,7 +14,7 @@ fn ints(v: &Value) -> Vec<i64> {
 
 fn text(v: &Value) -> String {
     match v {
-        Value::Number(n) => n.as_str().to_string(),
+        Value::Int(n) => n.to_string(),
         Value::String(s) => s.clone(),
         other => panic!("unexpected {other:?}"),
     }

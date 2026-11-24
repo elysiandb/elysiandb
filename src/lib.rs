@@ -6,3 +6,5 @@ pub mod pagetree;
 pub mod ptree;
 pub mod sync;
 pub mod yaml;
+
+pub use ::gocompat::json_struct;

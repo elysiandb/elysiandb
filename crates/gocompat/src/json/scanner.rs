@@ -76,6 +76,7 @@ pub struct SyntaxError {
     pub byte: Option<u8>,
     pub at_eof: bool,
     character: Option<String>,
+    position: i64,
 }
 
 impl SyntaxError {
@@ -99,6 +100,48 @@ impl SyntaxError {
         }
         self
     }
+
+    pub(crate) fn located(mut self, position: i64, rest: &[u8]) -> SyntaxError {
+        self.position = position;
+        if self.reason == SyntaxReason::UnexpectedCharacter {
+            self.character = display_char(rest);
+        }
+        self
+    }
+
+    pub(crate) fn unexpected(offset: i64, position: i64, rest: &[u8]) -> SyntaxError {
+        SyntaxError {
+            reason: SyntaxReason::UnexpectedCharacter,
+            offset,
+            byte: rest.first().copied(),
+            at_eof: false,
+            character: display_char(rest),
+            position,
+        }
+    }
+
+    pub(crate) fn unexpected_end(offset: i64) -> SyntaxError {
+        SyntaxError {
+            reason: SyntaxReason::UnexpectedEnd,
+            offset,
+            byte: None,
+            at_eof: true,
+            character: None,
+            position: offset,
+        }
+    }
+
+    pub fn position(&self) -> i64 {
+        self.position
+    }
+
+    pub fn without_prefix(&self) -> String {
+        if self.at_eof || self.reason == SyntaxReason::UnexpectedEnd {
+            "unexpected end of input".to_string()
+        } else {
+            format!("byte {}: {}", self.position, self.message())
+        }
+    }
 }
 
 impl fmt::Display for SyntaxError {
@@ -109,7 +152,7 @@ impl fmt::Display for SyntaxError {
             write!(
                 f,
                 "invalid JSON at byte {}: {}",
-                self.offset,
+                self.position,
                 self.message()
             )
         }
@@ -192,13 +235,7 @@ impl Scanner {
             return Scan::End;
         }
         if self.err.is_none() {
-            self.err = Some(SyntaxError {
-                reason: SyntaxReason::UnexpectedEnd,
-                offset: self.bytes,
-                byte: None,
-                at_eof: true,
-                character: None,
-            });
+            self.err = Some(SyntaxError::unexpected_end(self.bytes));
         }
         Scan::Error
     }
@@ -229,6 +266,7 @@ impl Scanner {
             byte: Some(c),
             at_eof: self.at_eof,
             character: None,
+            position: self.bytes,
         });
         Scan::Error
     }
@@ -346,6 +384,10 @@ impl Scanner {
             return Scan::BeginLiteral;
         }
         self.error(c, SyntaxReason::UnexpectedCharacter)
+    }
+
+    pub(crate) fn end_value_space(&mut self) -> Scan {
+        self.state_end_value(b' ')
     }
 
     fn state_end_value(&mut self, c: u8) -> Scan {

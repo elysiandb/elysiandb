@@ -96,7 +96,7 @@ fn flag_parsing_matches_go() {
                 let values = row.get("values").unwrap().as_object().unwrap();
                 assert_eq!(values.len(), names.len(), "{ctx}");
                 for name in names {
-                    let want = values.get(name).unwrap().as_str().unwrap();
+                    let want = values.get(*name).unwrap().as_str().unwrap();
                     assert_eq!(value_text(fs.value(name).unwrap()), want, "{ctx} -{name}");
                 }
                 assert_eq!(fs.args(), hex_list(row.get("rest").unwrap()), "{ctx}");

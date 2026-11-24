@@ -27,14 +27,15 @@ pub fn read_jsonl(rel: &str) -> Vec<Value> {
         .into_iter()
         .enumerate()
         .map(|(i, line)| {
-            json::unmarshal_value(line).unwrap_or_else(|e| panic!("{rel}:{}: {e}", i + 1))
+            json::unmarshal_value_with_integers(line)
+                .unwrap_or_else(|e| panic!("{rel}:{}: {e}", i + 1))
         })
         .collect()
 }
 
 pub fn read_json(rel: &str) -> Value {
     let data = read_golden(rel);
-    json::unmarshal_value(&data).unwrap_or_else(|e| panic!("{rel}: {e}"))
+    json::unmarshal_value_with_integers(&data).unwrap_or_else(|e| panic!("{rel}: {e}"))
 }
 
 pub fn unhex(s: &str) -> Vec<u8> {

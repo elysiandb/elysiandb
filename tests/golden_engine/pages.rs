@@ -178,7 +178,7 @@ fn set(keys: &[&str]) -> BTreeSet<String> {
 
 fn int(v: &Value) -> i64 {
     match v {
-        Value::Number(n) => n.as_str().parse().expect("integer"),
+        Value::Int(i) => *i,
         Value::String(s) => s.parse().expect("integer string"),
         other => panic!("not an integer: {other:?}"),
     }
