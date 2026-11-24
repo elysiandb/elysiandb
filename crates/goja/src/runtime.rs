@@ -1585,7 +1585,7 @@ impl Runtime {
     pub fn run_program(&mut self, p: &Arc<Program>) -> Result<Value, RunError> {
         let recursive = !self.vm.call_stack.is_empty();
         if recursive {
-            if let Err(t) = self.vm_push_ctx() {
+            if let Err(t) = self.vm_push_ctx_for_call() {
                 return Err(self.throw_to_run_error(t));
             }
             self.vm.stash = Some(self.global.stash);

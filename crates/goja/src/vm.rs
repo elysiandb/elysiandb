@@ -2052,6 +2052,7 @@ impl Vm {
         }
     }
 
+    #[inline]
     pub fn push_try_frame(&mut self, catch_pos: i32, finally_pos: i32) {
         self.try_stack.push(TryFrame {
             exception: None,
@@ -2067,6 +2068,7 @@ impl Vm {
         });
     }
 
+    #[inline]
     pub fn pop_try_frame(&mut self) {
         self.try_stack.pop();
     }
@@ -2199,6 +2201,7 @@ impl Runtime {
         )
     }
 
+    #[inline]
     pub fn vm_run(&mut self) -> JsResult<()> {
         let saved_in_native = self.in_native;
         self.in_native = false;
@@ -2428,6 +2431,7 @@ impl Runtime {
         r
     }
 
+    #[inline]
     pub fn vm_run_try_loop(&mut self) -> JsResult<Option<Box<Exception>>> {
         let base = self.handles.len();
         loop {
@@ -2443,6 +2447,7 @@ impl Runtime {
         }
     }
 
+    #[inline]
     pub fn vm_run_try_inner(&mut self) -> JsResult<Option<Box<Exception>>> {
         match self.vm_run() {
             Ok(()) => Ok(None),
@@ -6362,6 +6367,7 @@ impl EvalContext for VmEvalContext {
     }
 }
 
+#[inline]
 pub fn js_func_call(
     rt: &mut Runtime,
     o: ObjRef,
@@ -6376,6 +6382,7 @@ pub fn js_func_call(
     js_func_call_args(rt, o, call.arguments, new_target, this)
 }
 
+#[inline]
 pub fn js_func_call_args(
     rt: &mut Runtime,
     o: ObjRef,
@@ -6414,7 +6421,7 @@ pub fn js_func_call_ex(
     rt.vm.push_try_frame(TRY_PANIC_MARKER, -1);
     let mut need_pop = false;
     if rt.vm.prg.is_some() {
-        if let Err(e) = rt.vm_push_ctx() {
+        if let Err(e) = rt.vm_push_ctx_for_call() {
             rt.vm.pop_try_frame();
             return Err(e);
         }
@@ -6425,7 +6432,7 @@ pub fn js_func_call_ex(
         need_pop = true;
     } else {
         rt.vm.pc = -2;
-        if let Err(e) = rt.vm_push_ctx() {
+        if let Err(e) = rt.vm_push_ctx_for_call() {
             rt.vm.pop_try_frame();
             return Err(e);
         }
@@ -6607,7 +6614,7 @@ pub fn class_func_init_fields(rt: &mut Runtime, o: ObjRef, instance: ObjRef) -> 
         }
     }
     if let Some(init_fields) = init_fields {
-        rt.vm_push_ctx()?;
+        rt.vm_push_ctx_for_call()?;
         rt.vm.prg = Some(init_fields);
         rt.vm.stash = stash;
         rt.vm.priv_env = priv_env;

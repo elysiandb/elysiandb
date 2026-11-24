@@ -883,7 +883,7 @@ pub fn prepare_for_vm_call(rt: &mut Runtime, f: ObjRef, call: FunctionCall<'_>) 
 
 impl Runtime {
     pub fn gen_enter(&mut self, g: &mut Generator) -> JsResult<()> {
-        self.vm_push_ctx()?;
+        self.vm_push_ctx_for_call()?;
         self.vm.push_try_frame(TRY_PANIC_MARKER, -1);
         self.vm.prg = None;
         self.vm.sb = -1;
@@ -916,7 +916,7 @@ impl Runtime {
     }
 
     pub fn gen_enter_next(&mut self, g: &mut Generator) -> JsResult<()> {
-        self.vm_push_ctx()?;
+        self.vm_push_ctx_for_call()?;
         self.vm.push_try_frame(TRY_PANIC_MARKER, -1);
         self.vm.call_stack.push(Context {
             pc: -2,
