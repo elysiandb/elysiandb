@@ -773,15 +773,15 @@ impl Runtime {
         )
     }
 
-    pub fn promise_resolve_internal(&mut self, c: ObjRef, x: &Value) -> JsResult<ObjRef> {
-        if let Value::Object(obj) = x {
+    pub fn promise_resolve(&mut self, c: ObjRef, x: Value) -> JsResult<ObjRef> {
+        if let Value::Object(obj) = &x {
             let x_constructor = nil_safe(obj.get_str(self, &"constructor".into(), None)?);
             if x_constructor.same_as(&Value::Object(c)) {
                 return Ok(*obj);
             }
         }
         let pcap = self.new_promise_capability(c)?;
-        pcap.resolve(self, x.clone())?;
+        pcap.resolve(self, x)?;
         Ok(pcap.promise)
     }
 
@@ -805,7 +805,7 @@ impl Runtime {
                                 f,
                             };
                             let result = on_finally_fn.call(r, Value::Empty, &[])?;
-                            let promise = r.promise_resolve_internal(data_obj(&d[0]), &result)?;
+                            let promise = r.promise_resolve(data_obj(&d[0]), result)?;
                             let value_thunk = r.new_native_func(
                                 NativeFn::closure_with(
                                     vec![value],
@@ -836,7 +836,7 @@ impl Runtime {
                                 f,
                             };
                             let result = on_finally_fn.call(r, Value::Empty, &[])?;
-                            let promise = r.promise_resolve_internal(data_obj(&d[0]), &result)?;
+                            let promise = r.promise_resolve(data_obj(&d[0]), result)?;
                             let thrower = r.new_native_func(
                                 NativeFn::closure_with(
                                     vec![reason],
@@ -1052,11 +1052,9 @@ impl Runtime {
         Ok(Value::Object(pcap.promise))
     }
 
-    pub fn promise_resolve(&mut self, call: FunctionCall<'_>) -> JsResult<Value> {
+    pub fn promise_resolve_builtin(&mut self, call: FunctionCall<'_>) -> JsResult<Value> {
         let c = self.to_object(call.this)?;
-        Ok(Value::Object(
-            self.promise_resolve_internal(c, call.arg(0))?,
-        ))
+        Ok(Value::Object(self.promise_resolve(c, call.argument(0))?))
     }
 
     fn create_promise_proto(&mut self, val: ObjRef) {
@@ -1127,7 +1125,11 @@ impl Runtime {
         o._put_prop(self, &"race".into(), Value::Object(f), true, false, true);
         let f = self.new_native_func(NativeFn::Fn(|r, c| r.promise_reject(c)), "reject", 1);
         o._put_prop(self, &"reject".into(), Value::Object(f), true, false, true);
-        let f = self.new_native_func(NativeFn::Fn(|r, c| r.promise_resolve(c)), "resolve", 1);
+        let f = self.new_native_func(
+            NativeFn::Fn(|r, c| r.promise_resolve_builtin(c)),
+            "resolve",
+            1,
+        );
         o._put_prop(self, &"resolve".into(), Value::Object(f), true, false, true);
 
         self.put_species_return_this(o);
