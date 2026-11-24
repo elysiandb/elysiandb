@@ -2860,7 +2860,6 @@ fn test_empty_switch_no_result() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_get_own_property_names() {
     test_script(
         r#"
@@ -3182,7 +3181,6 @@ fn test_object_literal_proto() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_for_of_array() {
     test_script_with_test_lib(
         r#"
@@ -3269,7 +3267,6 @@ fn test_for_of_return1() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_for_of_let() {
     test_script(
         r#"
@@ -3400,7 +3397,6 @@ fn test_return_from_for_in_loop() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_return_from_for_of_loop() {
     test_script(
         r#"
@@ -3605,7 +3601,6 @@ fn test_falsy_loop_break_with_result() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_object_literal_with_numeric_keys() {
     test_script(
         r#"
@@ -3849,7 +3844,6 @@ fn test_lexical_for_loop_no_closure() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_lexical_for_loop_closure() {
     test_script(
         r#"
@@ -3866,7 +3860,6 @@ fn test_lexical_for_loop_closure() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_lexical_for_loop_closure_in_next() {
     test_script(
         r#"
@@ -3883,7 +3876,6 @@ fn test_lexical_for_loop_closure_in_next() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_var_for_loop() {
     test_script(
         r#"
@@ -3900,7 +3892,6 @@ fn test_var_for_loop() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_lexical_for_of_loop() {
     test_script(
         r#"
@@ -3917,7 +3908,6 @@ fn test_lexical_for_of_loop() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_lexical_for_of_loop_cont_break() {
     test_script(
         r#"
@@ -4124,7 +4114,6 @@ fn test_object_literal_spread() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_array_literal_spread() {
     test_script_with_test_lib(
         r#"
@@ -4352,7 +4341,6 @@ fn test_obj_literal_computed_keys() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_obj_literal_computed_keys_eval_order() {
     test_script(
         r#"
@@ -4382,7 +4370,6 @@ fn test_obj_literal_computed_keys_eval_order() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_array_assign_pattern() {
     test_script(
         r#"
@@ -4395,7 +4382,6 @@ fn test_array_assign_pattern() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_array_assign_pattern1() {
     test_script(
         r#"
@@ -4408,7 +4394,6 @@ fn test_array_assign_pattern1() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_array_assign_pattern_lhs() {
     test_script(
         r#"
@@ -4421,7 +4406,6 @@ fn test_array_assign_pattern_lhs() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_array_assign_pattern_elision() {
     test_script(
         r#"
@@ -4434,7 +4418,6 @@ fn test_array_assign_pattern_elision() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_array_assign_pattern_rest_pattern() {
     test_script(
         r#"
@@ -4447,7 +4430,6 @@ fn test_array_assign_pattern_rest_pattern() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_array_binding_pattern() {
     test_script(
         r#"
@@ -4459,7 +4441,6 @@ fn test_array_binding_pattern() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_object_pattern_shorthand_init() {
     test_script(
         r#"
@@ -4471,7 +4452,6 @@ fn test_object_pattern_shorthand_init() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_array_binding_pattern_rest_pattern() {
     test_script(
         r#"
@@ -4483,7 +4463,6 @@ fn test_array_binding_pattern_rest_pattern() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_for_var_pattern() {
     test_script(
         r#"
@@ -4499,7 +4478,6 @@ fn test_for_var_pattern() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_for_lex_pattern() {
     test_script(
         r#"
@@ -4541,7 +4519,6 @@ fn test_func_param_object_pattern_simple() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_func_param_rest_stack_simple() {
     test_script(
         r#"
@@ -4556,7 +4533,6 @@ fn test_func_param_rest_stack_simple() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_func_param_rest_stash_simple() {
     test_script(
         r#"
@@ -4572,7 +4548,6 @@ fn test_func_param_rest_stash_simple() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_rest_args_not_in_stash() {
     test_script(
         r#"
@@ -4587,7 +4562,6 @@ fn test_rest_args_not_in_stash() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_rest_args_in_stash() {
     test_script(
         r#"
@@ -4603,7 +4577,6 @@ fn test_rest_args_in_stash() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_rest_args_in_stash_fwd_ref() {
     test_script(
         r#"
@@ -4619,7 +4592,6 @@ fn test_rest_args_in_stash_fwd_ref() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_func_param_rest_pattern() {
     test_script(
         r#"
@@ -4757,7 +4729,6 @@ fn test_def_params_stack_ptr() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_nested_variadic_calls() {
     test_script(
         r#"
@@ -4771,7 +4742,6 @@ fn test_nested_variadic_calls() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_variadic_new() {
     test_script(
         r#"
@@ -4786,7 +4756,6 @@ fn test_variadic_new() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_variadic_use_stack_vars() {
     test_script(
         r#"
@@ -5110,7 +5079,6 @@ fn test_super_in_eval() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_super_ref_dot() {
     test_script_with_test_lib(
         r#"
@@ -5202,7 +5170,6 @@ fn test_super_ref_dot() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_private_ref_dot() {
     test_script_with_test_lib(
         r#"
@@ -5259,7 +5226,6 @@ fn test_private_ref_dot() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_private_ref_dot_eval() {
     test_script_with_test_lib(
         r#"
@@ -5329,7 +5295,6 @@ fn test_super_ref_dot_callee() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_super_ref_bracket() {
     test_script_with_test_lib(
         r#"
@@ -5681,7 +5646,6 @@ fn test_this_in_eval() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_static_as_binding_target() {
     test_script(
         r#"
@@ -5847,7 +5811,6 @@ fn test_keywords_as_labels() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_this_resolution_with_arg() {
     test_script(
         r#"
@@ -5866,7 +5829,6 @@ fn test_this_resolution_with_arg() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_this_resolution_arg_in_stash() {
     test_script(
         r#"
@@ -5885,7 +5847,6 @@ fn test_this_resolution_arg_in_stash() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_this_resolution_with_stack_var() {
     test_script(
         r#"
@@ -5905,7 +5866,6 @@ fn test_this_resolution_with_stack_var() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_for_in_loop_continue() {
     test_script(
         r#"
@@ -5932,7 +5892,6 @@ fn test_for_in_loop_continue() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_for_in_loop_continue_outer() {
     test_script(
         r#"
@@ -6087,7 +6046,6 @@ fn test_generator_methods() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_nested_destruct_array() {
     test_script_with_test_lib(
         r#"
@@ -6573,14 +6531,12 @@ fn test_constant_folding() {
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_constant_folding_array_subtests() {
     constant_folding_f("const [x = 1 + 2] = []; x", Value::Int(3));
     constant_folding_f("var a = [3, 3, 3, 1 + 2]; a[3]", Value::Int(3));
 }
 
 #[test]
-#[ignore = "requires the Array builtin"]
 fn test_string_interning() {
     on_big_stack(|| {
         let mut rt = new_runtime();
