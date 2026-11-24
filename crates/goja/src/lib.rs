@@ -1,17 +1,43 @@
+pub mod array;
+pub mod array_sparse;
 pub mod ast;
+pub mod builtin_array;
 pub mod builtin_bigint;
+pub mod builtin_boolean;
+pub mod builtin_date;
+pub mod builtin_error;
+pub mod builtin_function;
+pub mod builtin_global;
+pub mod builtin_json;
+pub mod builtin_map;
 pub mod builtin_math;
+pub mod builtin_number;
+pub mod builtin_object;
+pub mod builtin_promise;
+pub mod builtin_proxy;
+pub mod builtin_reflect;
 pub mod builtin_regexp;
+pub mod builtin_set;
+pub mod builtin_string;
+pub mod builtin_symbol;
+pub mod builtin_typedarrays;
+pub mod builtin_weakmap;
+pub mod builtin_weakset;
 pub mod compiler;
 pub mod compiler_expr;
 pub mod compiler_stmt;
 pub mod deps;
+pub mod destruct;
 pub mod file;
 pub mod ftoa;
 pub mod func;
 pub mod gojadump;
+pub mod heap;
 pub mod ipow;
+pub mod map;
 pub mod object;
+pub mod object_args;
+pub mod object_template;
 pub mod parser;
 pub mod regexp;
 pub mod runtime;
@@ -25,5 +51,11 @@ pub mod value;
 pub mod vm;
 
 pub use compiler::{CompilerSyntaxError, Program};
-pub use runtime::{compile, compile_ast, must_compile, parse};
+pub use heap::{ObjRef, SymRef};
+pub use object::{FunctionCall, PropertyDescriptor};
+pub use runtime::{
+    Exception, InterruptHandle, JsResult, RunError, Runtime, Throw, compile, compile_ast,
+    must_compile, parse,
+};
+pub use string::JsString;
 pub use value::Value;

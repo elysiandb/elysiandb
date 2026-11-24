@@ -1,3 +1,4 @@
+use crate::string::JsString;
 use crate::string_ascii::AsciiString;
 use crate::string_unicode::UnicodeString;
 use crate::unistring;
@@ -69,5 +70,84 @@ impl ImportedString {
             Some(u) => u.strict_equals(other),
             None => AsciiString::new(&self.0.s).strict_equals(other),
         }
+    }
+
+    pub fn to_integer(&self) -> i64 {
+        todo!("importedString.ToInteger")
+    }
+
+    pub fn equals(&self, other: &Value) -> bool {
+        match self.unicode() {
+            Some(u) => u.equals(other),
+            None => AsciiString::new(&self.0.s).equals(other),
+        }
+    }
+
+    pub fn concat(&self, other: &JsString) -> JsString {
+        match self.unicode() {
+            Some(u) => u.concat(other),
+            None => AsciiString::new(&self.0.s).concat(other),
+        }
+    }
+
+    pub fn compare_to(&self, other: &JsString) -> i32 {
+        match self.utf8().cmp(&other.go_string()[..]) {
+            std::cmp::Ordering::Less => -1,
+            std::cmp::Ordering::Equal => 0,
+            std::cmp::Ordering::Greater => 1,
+        }
+    }
+
+    pub fn char_at(&self, idx: usize) -> u16 {
+        match self.unicode() {
+            Some(u) => u.char_at(idx),
+            None => u16::from(self.0.s[idx]),
+        }
+    }
+
+    pub fn length(&self) -> usize {
+        match self.unicode() {
+            Some(u) => u.length(),
+            None => self.0.s.len(),
+        }
+    }
+
+    pub fn substring(&self, start: usize, end: usize) -> JsString {
+        match self.unicode() {
+            Some(u) => u.substring(start, end),
+            None => AsciiString::new(&self.0.s).substring(start, end),
+        }
+    }
+
+    pub fn reader(&self) -> Box<dyn crate::string::RuneReader> {
+        todo!("importedString.Reader")
+    }
+
+    pub fn utf16_reader(&self) -> Box<dyn crate::string::Utf16Reader> {
+        todo!("importedString.utf16Reader")
+    }
+
+    pub fn utf16_rune_reader(&self) -> Box<dyn crate::string::RuneReader> {
+        todo!("importedString.utf16RuneReader")
+    }
+
+    pub fn utf16_runes(&self) -> Vec<i32> {
+        todo!("importedString.utf16Runes")
+    }
+
+    pub fn index(&self, _substr: &JsString, _start: isize) -> isize {
+        todo!("importedString.index")
+    }
+
+    pub fn last_index(&self, _substr: &JsString, _pos: isize) -> isize {
+        todo!("importedString.lastIndex")
+    }
+
+    pub fn to_lower(&self) -> JsString {
+        todo!("importedString.toLower")
+    }
+
+    pub fn to_upper(&self) -> JsString {
+        todo!("importedString.toUpper")
     }
 }

@@ -116,6 +116,7 @@ fn value(v: &Value) -> String {
         }
         Value::Symbol(_) => "&{h:0 desc:<nil>}".to_string(),
         Value::Object(_) => "&{}".to_string(),
+        _ => "<nil>".to_string(),
     }
 }
 

@@ -3304,7 +3304,7 @@ impl Compiler {
         if key_expr.constant(self)?
             && let Ok(v) = self.eval_const(&key_expr)?
         {
-            return Ok((v.string(), false));
+            return Ok((v.prim_string(), false));
         }
         key_expr.emit_getter(self, true)?;
         Ok((unistring::String::default(), true))

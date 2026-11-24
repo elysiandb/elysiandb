@@ -172,7 +172,7 @@ impl AsciiString {
             },
             Value::Float(o) => self.to_float() == *o,
             Value::Bool(_) => match to_float_trimmed(trim_space(&self.0)) {
-                Ok(o1) => o1 == other.to_float(),
+                Ok(o1) => o1 == other.prim_to_float(),
                 Err(_) => false,
             },
             Value::BigInt(o) => match string_to_big_int(&self.to_trimmed_utf8()) {
@@ -210,5 +210,53 @@ impl AsciiString {
             Ordering::Equal => 0,
             Ordering::Greater => 1,
         }
+    }
+
+    pub fn to_integer(&self) -> i64 {
+        todo!("asciiString.ToInteger")
+    }
+
+    pub fn char_at(&self, idx: usize) -> u16 {
+        u16::from(self.0[idx])
+    }
+
+    pub fn length(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn substring(&self, start: usize, end: usize) -> JsString {
+        JsString::Ascii(AsciiString::new(&self.0[start..end]))
+    }
+
+    pub fn reader(&self) -> Box<dyn crate::string::RuneReader> {
+        todo!("asciiString.Reader")
+    }
+
+    pub fn utf16_reader(&self) -> Box<dyn crate::string::Utf16Reader> {
+        todo!("asciiString.utf16Reader")
+    }
+
+    pub fn utf16_rune_reader(&self) -> Box<dyn crate::string::RuneReader> {
+        todo!("asciiString.utf16RuneReader")
+    }
+
+    pub fn utf16_runes(&self) -> Vec<i32> {
+        self.0.iter().map(|&c| i32::from(c)).collect()
+    }
+
+    pub fn index(&self, _substr: &JsString, _start: isize) -> isize {
+        todo!("asciiString.index")
+    }
+
+    pub fn last_index(&self, _substr: &JsString, _pos: isize) -> isize {
+        todo!("asciiString.lastIndex")
+    }
+
+    pub fn to_lower(&self) -> JsString {
+        JsString::Ascii(AsciiString::new(&self.0.to_ascii_lowercase()))
+    }
+
+    pub fn to_upper(&self) -> JsString {
+        JsString::Ascii(AsciiString::new(&self.0.to_ascii_uppercase()))
     }
 }

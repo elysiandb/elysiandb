@@ -1,5 +1,9 @@
+use crate::heap::ObjRef;
 use crate::ipow::ipow;
+use crate::object_template::ObjectTemplate;
+use crate::runtime::Runtime;
 use crate::value::{Value, float_to_value, int_to_value};
+use std::sync::OnceLock;
 
 const SHIFT: u64 = 52;
 const MASK: u64 = 0x7FF;
@@ -195,8 +199,8 @@ pub fn pow(x: &Value, y: &Value) -> Value {
             return int_to_value(ip);
         }
     }
-    let xf = x.to_float();
-    let yf = y.to_float();
+    let xf = x.prim_to_float();
+    let yf = y.prim_to_float();
     if xf.abs() == 1.0 && yf.is_infinite() {
         return Value::Float(f64::NAN);
     }
@@ -204,4 +208,27 @@ pub fn pow(x: &Value, y: &Value) -> Value {
         return Value::Float(f64::NAN);
     }
     float_to_value(go_pow(xf, yf))
+}
+
+fn create_math_template() -> ObjectTemplate {
+    let mut t = ObjectTemplate::new();
+    t.proto_factory = Some(|r| r.global.object_prototype);
+    t
+}
+
+pub fn get_math_template() -> &'static ObjectTemplate {
+    static T: OnceLock<ObjectTemplate> = OnceLock::new();
+    T.get_or_init(create_math_template)
+}
+
+impl Runtime {
+    pub fn get_math(&mut self) -> ObjRef {
+        if let Some(r) = self.global.math {
+            return r;
+        }
+        let ret = self.reserve_object();
+        self.global.math = Some(ret);
+        self.new_templated_object(get_math_template(), Some(ret));
+        ret
+    }
 }

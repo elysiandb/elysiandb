@@ -1,18 +1,28 @@
 use crate::builtin_bigint::string_to_big_int;
 use crate::builtin_math::{go_mod, pow};
+use crate::builtin_symbol::SYM_UNSCOPABLES;
+use crate::compiler::{MASK_CONST, MASK_DELETABLE, MASK_STRICT, MASK_TYP, MASK_VAR};
 use crate::compiler::{Program, ResolvedPrivateName, VarType};
 use crate::compiler_expr::FuncType;
 use crate::deps::big;
+use crate::func::BaseJsFuncObject;
 use crate::func::YieldMarker;
+use crate::heap::{FxHashMap, ObjRef, StashRef, Tracer};
 use crate::object::PrivateId;
+use crate::object::{FunctionCall, IterNextFunc, ObjExt, PrivateEnv, PrivateEnvType};
 use crate::regexp::RegexpPattern;
+use crate::runtime::{
+    Exception, InterruptedError, IteratorRecord, JsResult, Runtime, StackFrame, Throw,
+};
 use crate::string::{JsString, ascii_string, new_string_value};
 use crate::unistring;
+use crate::value::{ERR_ACCESS_BEFORE_INIT, ERR_ASSIGN_TO_CONST, nil_safe};
 use crate::value::{
     ERR_MIX_BIG_INT_TYPE, Value, ValueError, ValueProperty, float_to_value, int_to_value,
     new_big_int, to_int32, to_numeric, to_uint32,
 };
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::Arc;
 
 pub type NamesMap = Option<Arc<HashMap<unistring::String, u32>>>;
@@ -726,7 +736,7 @@ fn range_error(msg: &str) -> ValueError {
 pub(crate) fn value_go_string(v: &Value) -> Vec<u8> {
     match v {
         Value::String(s) => s.go_string(),
-        _ => v.to_string().go_string(),
+        _ => v.prim_to_string().go_string(),
     }
 }
 
@@ -734,15 +744,15 @@ pub(crate) fn op_add(left: &Value, right: &Value) -> Result<Value, ValueError> {
     let is_left_string = matches!(left, Value::String(_));
     let is_right_string = matches!(right, Value::String(_));
     if is_left_string || is_right_string {
-        let l = left.to_string();
-        let r = right.to_string();
+        let l = left.prim_to_string();
+        let r = right.prim_to_string();
         return Ok(Value::String(l.concat(&r)));
     }
     Ok(match left {
         Value::Int(l) => match right {
             Value::Int(r) => int_to_value(l.wrapping_add(*r)),
             Value::BigInt(_) => return Err(mix_big_int()),
-            _ => float_to_value(*l as f64 + right.to_float()),
+            _ => float_to_value(*l as f64 + right.prim_to_float()),
         },
         Value::BigInt(l) => match right {
             Value::BigInt(r) => new_big_int(l.add(r)),
@@ -752,7 +762,7 @@ pub(crate) fn op_add(left: &Value, right: &Value) -> Result<Value, ValueError> {
             if let Value::BigInt(_) = right {
                 return Err(mix_big_int());
             }
-            float_to_value(left.to_float() + right.to_float())
+            float_to_value(left.prim_to_float() + right.prim_to_float())
         }
     })
 }
@@ -769,7 +779,7 @@ pub(crate) fn op_sub(left: &Value, right: &Value) -> Result<Value, ValueError> {
         (Value::BigInt(_), _) => return Err(mix_big_int()),
         _ => {}
     }
-    Ok(float_to_value(left.to_float() - right.to_float()))
+    Ok(float_to_value(left.prim_to_float() - right.prim_to_float()))
 }
 
 pub(crate) fn op_mul(left: &Value, right: &Value) -> Result<Value, ValueError> {
@@ -793,7 +803,7 @@ pub(crate) fn op_mul(left: &Value, right: &Value) -> Result<Value, ValueError> {
         (Value::BigInt(_), _) => return Err(mix_big_int()),
         _ => {}
     }
-    Ok(float_to_value(left.to_float() * right.to_float()))
+    Ok(float_to_value(left.prim_to_float() * right.prim_to_float()))
 }
 
 pub(crate) fn op_exp(x: &Value, y: &Value) -> Result<Value, ValueError> {
@@ -830,7 +840,7 @@ pub(crate) fn op_div(left: &Value, right: &Value) -> Result<Value, ValueError> {
     } else if let Value::BigInt(_) = &right_value {
         return Err(mix_big_int());
     }
-    let (left, right) = (left_value.to_float(), right_value.to_float());
+    let (left, right) = (left_value.prim_to_float(), right_value.prim_to_float());
     if left.is_nan() || right.is_nan() {
         return Ok(Value::Float(f64::NAN));
     }
@@ -896,7 +906,10 @@ pub(crate) fn op_mod(left: &Value, right: &Value) -> Result<Value, ValueError> {
         (Value::BigInt(_), _) => return Err(mix_big_int()),
         _ => {}
     }
-    Ok(float_to_value(go_mod(left.to_float(), right.to_float())))
+    Ok(float_to_value(go_mod(
+        left.prim_to_float(),
+        right.prim_to_float(),
+    )))
 }
 
 pub(crate) fn op_neg(operand: &Value) -> Result<Value, ValueError> {
@@ -910,7 +923,7 @@ pub(crate) fn op_neg(operand: &Value) -> Result<Value, ValueError> {
             }
         }
         _ => {
-            let mut f = operand.to_float();
+            let mut f = operand.prim_to_float();
             if !f.is_nan() {
                 f = -f;
             }
@@ -1027,7 +1040,7 @@ pub(crate) fn cmp(px: &Value, py: &Value) -> Result<Option<bool>, ValueError> {
         (Value::BigInt(x), Value::BigInt(y)) => return Ok(Some(x.cmp(y) < 0)),
         _ => {}
     }
-    let (nx, ny) = (px.to_float(), py.to_float());
+    let (nx, ny) = (px.prim_to_float(), py.prim_to_float());
     if nx.is_nan() || ny.is_nan() {
         return Ok(None);
     }
@@ -1044,6 +1057,7 @@ pub(crate) fn type_of(v: &Value) -> JsString {
         Value::BigInt(_) => "bigint",
         Value::Symbol(_) => "symbol",
         Value::Object(_) => "object",
+        _ => "undefined",
     })
 }
 
@@ -1114,8 +1128,8 @@ pub(crate) fn eval_const_code(code: &[Instruction]) -> Result<Value, ConstThrow>
             Instruction::OpLte => Some(|l, r| Ok(Value::Bool(cmp(r, l)? == Some(false)))),
             Instruction::OpGt => Some(|l, r| Ok(Value::Bool(cmp(r, l)? == Some(true)))),
             Instruction::OpGte => Some(|l, r| Ok(Value::Bool(cmp(l, r)? == Some(false)))),
-            Instruction::OpEq => Some(|l, r| Ok(Value::Bool(l.equals(r)))),
-            Instruction::OpNeq => Some(|l, r| Ok(Value::Bool(!l.equals(r)))),
+            Instruction::OpEq => Some(|l, r| Ok(Value::Bool(l.prim_equals(r)))),
+            Instruction::OpNeq => Some(|l, r| Ok(Value::Bool(!l.prim_equals(r)))),
             Instruction::OpStrictEq => Some(|l, r| Ok(Value::Bool(l.strict_equals(r)))),
             Instruction::OpStrictNeq => Some(|l, r| Ok(Value::Bool(!l.strict_equals(r)))),
             Instruction::OpInstanceof | Instruction::OpIn => Some(|_, r| Err(not_an_object(r))),
@@ -1133,7 +1147,7 @@ pub(crate) fn eval_const_code(code: &[Instruction]) -> Result<Value, ConstThrow>
             Instruction::Bnot => Some(op_bnot),
             Instruction::Typeof => Some(|v| Ok(Value::String(type_of(v)))),
             Instruction::Neg => Some(op_neg),
-            Instruction::Plus => Some(|v| v.to_number()),
+            Instruction::Plus => Some(|v| v.prim_to_number()),
             Instruction::ToNumber => Some(to_numeric),
             _ => None,
         };
@@ -1172,7 +1186,7 @@ pub(crate) fn eval_const_code(code: &[Instruction]) -> Result<Value, ConstThrow>
                 };
                 let message = match args.into_iter().next() {
                     Some(Slot::Val(Value::Undefined)) | None => None,
-                    Some(Slot::Val(v)) => Some(Value::String(v.to_string())),
+                    Some(Slot::Val(v)) => Some(Value::String(v.prim_to_string())),
                     Some(_) => return Err(ConstThrow::Unsupported("object argument")),
                 };
                 stack.push(Slot::Error(ConstException {
@@ -1189,4 +1203,1441 @@ pub(crate) fn eval_const_code(code: &[Instruction]) -> Result<Value, ConstThrow>
         pc += 1;
     }
     val(stack.pop())
+}
+
+pub const TRY_PANIC_MARKER: i32 = -2;
+
+#[derive(Clone, Default)]
+pub struct Stash {
+    pub values: Vec<Value>,
+    pub extra_args: Vec<Value>,
+    pub names: Option<FxHashMap<unistring::String, u32>>,
+    pub obj: Option<ObjRef>,
+    pub outer: Option<StashRef>,
+    pub func_type: FuncType,
+}
+
+impl Stash {
+    pub fn trace(&self, t: &mut Tracer) {
+        t.values(&self.values);
+        t.values(&self.extra_args);
+        t.opt_obj(self.obj);
+        if let Some(o) = self.outer {
+            t.stash(o);
+        }
+    }
+
+    pub fn is_variable(&self) -> bool {
+        self.func_type != FuncType::None
+    }
+
+    pub fn create_binding(&mut self, name: &unistring::String, deletable: bool) {
+        let names = self.names.get_or_insert_with(FxHashMap::default);
+        if !names.contains_key(name) {
+            let mut idx = names.len() as u32 | MASK_VAR;
+            if deletable {
+                idx |= MASK_DELETABLE;
+            }
+            names.insert(name.clone(), idx);
+            self.values.push(Value::Undefined);
+        }
+    }
+
+    pub fn create_lex_binding(&mut self, name: &unistring::String, is_const: bool) {
+        let names = self.names.get_or_insert_with(FxHashMap::default);
+        if !names.contains_key(name) {
+            let mut idx = names.len() as u32;
+            if is_const {
+                idx |= MASK_CONST | MASK_STRICT;
+            }
+            names.insert(name.clone(), idx);
+            self.values.push(Value::Empty);
+        }
+    }
+
+    pub fn delete_binding(&mut self, name: &unistring::String) {
+        if let Some(n) = &mut self.names {
+            n.remove(name);
+        }
+    }
+
+    pub fn init_by_idx(&mut self, idx: u32, v: Value) {
+        if self.obj.is_some() {
+            panic!("Attempt to init by idx into an object scope");
+        }
+        self.values[idx as usize] = v;
+    }
+
+    pub fn get_by_idx(&self, idx: u32) -> Value {
+        self.values[idx as usize].clone()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct Context {
+    pub prg: Option<Arc<Program>>,
+    pub stash: Option<StashRef>,
+    pub priv_env: Option<Rc<PrivateEnv>>,
+    pub new_target: Value,
+    pub result: Value,
+    pub pc: isize,
+    pub sb: isize,
+    pub args: isize,
+}
+
+impl Context {
+    pub fn trace(&self, t: &mut Tracer) {
+        if let Some(s) = self.stash {
+            t.stash(s);
+        }
+        t.value(&self.new_target);
+        t.value(&self.result);
+    }
+}
+
+#[derive(Default)]
+pub struct TryFrame {
+    pub exception: Option<Box<Exception>>,
+    pub call_stack_len: u32,
+    pub iter_len: u32,
+    pub ref_len: u32,
+    pub sp: i32,
+    pub stash: Option<StashRef>,
+    pub priv_env: Option<Rc<PrivateEnv>>,
+    pub catch_pos: i32,
+    pub finally_pos: i32,
+    pub finally_ret: i32,
+}
+
+impl TryFrame {
+    fn trace(&self, t: &mut Tracer) {
+        if let Some(e) = &self.exception {
+            t.value(&e.val);
+        }
+        if let Some(s) = self.stash {
+            t.stash(s);
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct ExecCtx {
+    pub context: Context,
+    pub stack: Vec<Value>,
+    pub try_stack: Vec<TryFrame>,
+    pub iter_stack: Vec<IterStackItem>,
+    pub ref_stack: Vec<Ref>,
+}
+
+impl ExecCtx {
+    pub fn trace(&self, t: &mut Tracer) {
+        self.context.trace(t);
+        t.values(&self.stack);
+        for f in &self.try_stack {
+            f.trace(t);
+        }
+        for i in &self.iter_stack {
+            i.trace(t);
+        }
+        for r in &self.ref_stack {
+            r.trace(t);
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct IterStackItem {
+    pub val: Value,
+    pub f: Option<IterNextFunc>,
+    pub iter: Option<IteratorRecord>,
+}
+
+impl IterStackItem {
+    fn trace(&self, t: &mut Tracer) {
+        t.value(&self.val);
+        if let Some(f) = &self.f {
+            f.trace(t);
+        }
+        if let Some(i) = &self.iter {
+            i.trace(t);
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum Ref {
+    Stash {
+        n: unistring::String,
+        stash: StashRef,
+        idx: usize,
+    },
+    StashLex {
+        n: unistring::String,
+        stash: StashRef,
+        idx: usize,
+    },
+    StashConst {
+        n: unistring::String,
+        stash: StashRef,
+        idx: usize,
+        strict_const: bool,
+    },
+    StackThis {
+        idx: usize,
+    },
+    StashThis {
+        stash: StashRef,
+        idx: usize,
+    },
+    Obj {
+        base: ObjRef,
+        name: Value,
+        this: Option<Value>,
+        strict: bool,
+        name_converted: bool,
+    },
+    ObjStr {
+        base: ObjRef,
+        name: unistring::String,
+        this: Option<Value>,
+        strict: bool,
+        binding: bool,
+    },
+    PrivateRes {
+        base: ObjRef,
+        name: Box<ResolvedPrivateName>,
+    },
+    PrivateId {
+        base: ObjRef,
+        id: Rc<PrivateId>,
+    },
+    Unresolved {
+        name: unistring::String,
+    },
+}
+
+impl Ref {
+    pub fn trace(&self, t: &mut Tracer) {
+        match self {
+            Ref::Stash { stash, .. }
+            | Ref::StashLex { stash, .. }
+            | Ref::StashConst { stash, .. }
+            | Ref::StashThis { stash, .. } => t.stash(*stash),
+            Ref::Obj {
+                base, name, this, ..
+            } => {
+                t.obj(*base);
+                t.value(name);
+                if let Some(v) = this {
+                    t.value(v);
+                }
+            }
+            Ref::ObjStr { base, this, .. } => {
+                t.obj(*base);
+                if let Some(v) = this {
+                    t.value(v);
+                }
+            }
+            Ref::PrivateRes { base, .. } | Ref::PrivateId { base, .. } => t.obj(*base),
+            Ref::StackThis { .. } | Ref::Unresolved { .. } => {}
+        }
+    }
+
+    pub fn get(&mut self, rt: &mut Runtime) -> JsResult<Value> {
+        match self {
+            Ref::Stash { stash, idx, .. } => {
+                Ok(nil_safe(Some(rt.heap.stash(*stash).values[*idx].clone())))
+            }
+            Ref::StashLex { stash, idx, .. } | Ref::StashConst { stash, idx, .. } => {
+                let v = rt.heap.stash(*stash).values[*idx].clone();
+                if v.is_empty() {
+                    return Err(Throw::ReferenceError(ERR_ACCESS_BEFORE_INIT.to_string()));
+                }
+                Ok(v)
+            }
+            Ref::StackThis { idx } => {
+                let v = rt.vm.stack[*idx].clone();
+                if v.is_empty() {
+                    return Err(Throw::ReferenceError(
+                        "Must call super constructor in derived class before accessing 'this'"
+                            .to_string(),
+                    ));
+                }
+                Ok(v)
+            }
+            Ref::StashThis { stash, idx } => {
+                let v = rt.heap.stash(*stash).values[*idx].clone();
+                if v.is_empty() {
+                    return Err(Throw::ReferenceError(
+                        "Must call super constructor in derived class before accessing 'this'"
+                            .to_string(),
+                    ));
+                }
+                Ok(v)
+            }
+            Ref::Obj { .. } => {
+                let key = self.get_key(rt)?;
+                let Ref::Obj { base, this, .. } = self else {
+                    unreachable!()
+                };
+                let (base, this) = (*base, this.clone());
+                Ok(nil_safe(base.get(rt, &key, this.as_ref())?))
+            }
+            Ref::ObjStr {
+                base,
+                name,
+                this,
+                binding,
+                ..
+            } => {
+                let (base, name, this, binding) = (*base, name.clone(), this.clone(), *binding);
+                if let Some(v) = base.get_str(rt, &name, this.as_ref())? {
+                    return Ok(v);
+                }
+                if binding {
+                    return rt.throw_reference_error(&name);
+                }
+                Ok(Value::Undefined)
+            }
+            Ref::PrivateRes { base, name } => {
+                let (base, name) = (*base, name.clone());
+                get_private_prop_res(rt, &name, &Value::Object(base))
+            }
+            Ref::PrivateId { base, id } => {
+                let (base, id) = (*base, id.clone());
+                rt.vm_get_private_prop(
+                    &Value::Object(base),
+                    &id.name,
+                    &id.typ,
+                    id.idx,
+                    id.is_method,
+                )
+            }
+            Ref::Unresolved { name } => {
+                let name = name.clone();
+                rt.throw_reference_error(&name)
+            }
+        }
+    }
+
+    pub fn set(&mut self, rt: &mut Runtime, v: Value) -> JsResult<()> {
+        match self {
+            Ref::Stash { stash, idx, .. } => {
+                rt.heap.stash_mut(*stash).values[*idx] = v;
+                Ok(())
+            }
+            Ref::StashLex { stash, idx, .. } => {
+                let p = &mut rt.heap.stash_mut(*stash).values[*idx];
+                if p.is_empty() {
+                    return Err(Throw::ReferenceError(ERR_ACCESS_BEFORE_INIT.to_string()));
+                }
+                *p = v;
+                Ok(())
+            }
+            Ref::StashConst { strict_const, .. } => {
+                if *strict_const {
+                    return Err(Throw::TypeError(ERR_ASSIGN_TO_CONST.to_string()));
+                }
+                Ok(())
+            }
+            Ref::StackThis { idx } => {
+                let p = &mut rt.vm.stack[*idx];
+                if !p.is_empty() {
+                    return Err(Throw::ReferenceError(
+                        "Super constructor may only be called once".to_string(),
+                    ));
+                }
+                *p = v;
+                Ok(())
+            }
+            Ref::StashThis { stash, idx } => {
+                let p = &mut rt.heap.stash_mut(*stash).values[*idx];
+                if !p.is_empty() {
+                    return Err(Throw::ReferenceError(
+                        "Super constructor may only be called once".to_string(),
+                    ));
+                }
+                *p = v;
+                Ok(())
+            }
+            Ref::Obj { .. } => {
+                let key = self.get_key(rt)?;
+                let Ref::Obj {
+                    base, this, strict, ..
+                } = self
+                else {
+                    unreachable!()
+                };
+                let (base, this, strict) = (*base, this.clone(), *strict);
+                match this {
+                    Some(this) => base.set(rt, &key, v, &this, strict)?,
+                    None => base.set_own(rt, &key, v, strict)?,
+                };
+                Ok(())
+            }
+            Ref::ObjStr {
+                base,
+                name,
+                this,
+                strict,
+                binding,
+            } => {
+                let (base, name, this, strict, binding) =
+                    (*base, name.clone(), this.clone(), *strict, *binding);
+                if strict && binding && !base.has_own_property_str(rt, &name)? {
+                    return Err(Throw::ReferenceError(format!("{name} is not defined")));
+                }
+                match this {
+                    Some(this) => base.set_str(rt, &name, v, &this, strict)?,
+                    None => base.set_own_str(rt, &name, v, strict)?,
+                };
+                Ok(())
+            }
+            Ref::PrivateRes { base, name } => {
+                let (base, name) = (*base, name.clone());
+                set_private_prop_res(rt, &name, &Value::Object(base), v)
+            }
+            Ref::PrivateId { base, id } => {
+                let (base, id) = (*base, id.clone());
+                rt.vm_set_private_prop(
+                    &Value::Object(base),
+                    &id.name,
+                    &id.typ,
+                    id.idx,
+                    id.is_method,
+                    v,
+                )
+            }
+            Ref::Unresolved { name } => {
+                let name = name.clone();
+                rt.throw_reference_error(&name)
+            }
+        }
+    }
+
+    pub fn init(&mut self, rt: &mut Runtime, v: Value) -> JsResult<()> {
+        match self {
+            Ref::StashLex { stash, idx, .. } | Ref::StashConst { stash, idx, .. } => {
+                rt.heap.stash_mut(*stash).values[*idx] = v;
+                Ok(())
+            }
+            Ref::Obj { .. } | Ref::ObjStr { .. } => self.set(rt, v),
+            Ref::PrivateRes { .. } | Ref::PrivateId { .. } => panic!("not supported"),
+            _ => self.set(rt, v),
+        }
+    }
+
+    pub fn refname(&mut self, rt: &mut Runtime) -> JsResult<unistring::String> {
+        Ok(match self {
+            Ref::Stash { n, .. } | Ref::StashLex { n, .. } | Ref::StashConst { n, .. } => n.clone(),
+            Ref::StackThis { .. } | Ref::StashThis { .. } => unistring::String::new("this"),
+            Ref::Obj { .. } => {
+                let k = self.get_key(rt)?;
+                k.string(rt)?
+            }
+            Ref::ObjStr { name, .. } => name.clone(),
+            Ref::PrivateRes { name, .. } => name.string(),
+            Ref::PrivateId { id, .. } => id.string(),
+            Ref::Unresolved { name } => name.clone(),
+        })
+    }
+
+    fn get_key(&mut self, rt: &mut Runtime) -> JsResult<Value> {
+        if let Ref::Obj {
+            name,
+            name_converted,
+            ..
+        } = self
+        {
+            if !*name_converted {
+                let n = name.clone();
+                let k = n.to_property_key(rt)?;
+                if let Ref::Obj {
+                    name,
+                    name_converted,
+                    ..
+                } = self
+                {
+                    *name = k;
+                    *name_converted = true;
+                }
+            }
+            if let Ref::Obj { name, .. } = self {
+                return Ok(name.clone());
+            }
+        }
+        Ok(Value::Undefined)
+    }
+}
+
+pub fn stash_obj_has(rt: &mut Runtime, obj: ObjRef, name: &unistring::String) -> JsResult<bool> {
+    if obj.has_property_str(rt, name)? {
+        if let Some(Value::Object(unscopables)) = obj.get_sym(rt, SYM_UNSCOPABLES, None)?
+            && let Some(b) = unscopables.get_str(rt, name, None)?
+        {
+            return Ok(!b.to_boolean());
+        }
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+pub fn stash_init_by_name(
+    rt: &mut Runtime,
+    s: StashRef,
+    name: &unistring::String,
+    v: Value,
+) -> JsResult<()> {
+    let st = rt.heap.stash_mut(s);
+    if let Some(idx) = st.names.as_ref().and_then(|n| n.get(name)).copied() {
+        st.values[(idx & !MASK_TYP) as usize] = v;
+        return Ok(());
+    }
+    Err(Throw::ReferenceError(format!("{name} is not defined")))
+}
+
+pub fn stash_get_by_name(
+    rt: &mut Runtime,
+    s: StashRef,
+    name: &unistring::String,
+) -> JsResult<Option<Value>> {
+    if let Some(obj) = rt.heap.stash(s).obj {
+        if stash_obj_has(rt, obj, name)? {
+            return Ok(Some(nil_safe(obj.get_str(rt, name, None)?)));
+        }
+        return Ok(None);
+    }
+    let st = rt.heap.stash(s);
+    if let Some(idx) = st.names.as_ref().and_then(|n| n.get(name)).copied() {
+        let v = st.values[(idx & !MASK_TYP) as usize].clone();
+        if v.is_empty() {
+            if idx & MASK_VAR == 0 {
+                return Err(Throw::ReferenceError(ERR_ACCESS_BEFORE_INIT.to_string()));
+            }
+            return Ok(Some(Value::Undefined));
+        }
+        return Ok(Some(v));
+    }
+    Ok(None)
+}
+
+pub fn stash_get_ref_by_name(
+    rt: &mut Runtime,
+    s: StashRef,
+    name: &unistring::String,
+    strict: bool,
+) -> JsResult<Option<Ref>> {
+    if let Some(obj) = rt.heap.stash(s).obj {
+        if stash_obj_has(rt, obj, name)? {
+            return Ok(Some(Ref::ObjStr {
+                base: obj,
+                name: name.clone(),
+                this: None,
+                strict,
+                binding: true,
+            }));
+        }
+        return Ok(None);
+    }
+    let st = rt.heap.stash(s);
+    if let Some(idx) = st.names.as_ref().and_then(|n| n.get(name)).copied() {
+        let i = (idx & !MASK_TYP) as usize;
+        if idx & MASK_VAR == 0 {
+            if idx & MASK_CONST == 0 {
+                return Ok(Some(Ref::StashLex {
+                    n: name.clone(),
+                    stash: s,
+                    idx: i,
+                }));
+            }
+            return Ok(Some(Ref::StashConst {
+                n: name.clone(),
+                stash: s,
+                idx: i,
+                strict_const: strict || (idx & MASK_STRICT != 0),
+            }));
+        }
+        return Ok(Some(Ref::Stash {
+            n: name.clone(),
+            stash: s,
+            idx: i,
+        }));
+    }
+    Ok(None)
+}
+
+pub struct Vm {
+    pub prg: Option<Arc<Program>>,
+    pub pc: isize,
+    pub stack: Vec<Value>,
+    pub sp: isize,
+    pub sb: isize,
+    pub args: isize,
+    pub stash: Option<StashRef>,
+    pub priv_env: Option<Rc<PrivateEnv>>,
+    pub call_stack: Vec<Context>,
+    pub iter_stack: Vec<IterStackItem>,
+    pub ref_stack: Vec<Ref>,
+    pub try_stack: Vec<TryFrame>,
+    pub new_target: Value,
+    pub result: Value,
+    pub max_call_stack_size: usize,
+    pub stash_allocs: usize,
+    pub interrupt: Arc<crate::runtime::InterruptState>,
+    pub arg_bufs: Vec<Vec<Value>>,
+    pub cur_async_runner: Option<ObjRef>,
+}
+
+impl Vm {
+    pub fn new(global_stash: StashRef, interrupt: Arc<crate::runtime::InterruptState>) -> Vm {
+        Vm {
+            prg: None,
+            pc: 0,
+            stack: Vec::new(),
+            sp: 0,
+            sb: -1,
+            args: 0,
+            stash: Some(global_stash),
+            priv_env: None,
+            call_stack: Vec::new(),
+            iter_stack: Vec::new(),
+            ref_stack: Vec::new(),
+            try_stack: Vec::new(),
+            new_target: Value::Empty,
+            result: Value::Empty,
+            max_call_stack_size: i32::MAX as usize,
+            stash_allocs: 0,
+            interrupt,
+            arg_bufs: Vec::new(),
+            cur_async_runner: None,
+        }
+    }
+
+    pub fn init(&mut self) {
+        self.sb = -1;
+        self.max_call_stack_size = i32::MAX as usize;
+    }
+
+    pub fn trace(&self, t: &mut Tracer) {
+        t.values(&self.stack);
+        if let Some(s) = self.stash {
+            t.stash(s);
+        }
+        for c in &self.call_stack {
+            c.trace(t);
+        }
+        for i in &self.iter_stack {
+            i.trace(t);
+        }
+        for r in &self.ref_stack {
+            r.trace(t);
+        }
+        for f in &self.try_stack {
+            f.trace(t);
+        }
+        t.value(&self.new_target);
+        t.value(&self.result);
+        for b in &self.arg_bufs {
+            t.values(b);
+        }
+        t.opt_obj(self.cur_async_runner);
+    }
+
+    pub fn halted(&self) -> bool {
+        let pc = self.pc;
+        match &self.prg {
+            Some(p) => pc < 0 || pc as usize >= p.code.len(),
+            None => true,
+        }
+    }
+
+    pub fn stack_expand(&mut self, idx: isize) {
+        let idx = idx as usize;
+        if idx < self.stack.len() {
+            return;
+        }
+        let idx = idx + 1;
+        if idx > self.stack.capacity() {
+            let new_cap = if idx < 1024 {
+                idx * 2
+            } else {
+                (idx + 1025) & !1023
+            };
+            self.stack.reserve_exact(new_cap - self.stack.len());
+        }
+        self.stack.resize(idx, Value::Empty);
+    }
+
+    #[inline]
+    pub fn push(&mut self, v: Value) {
+        self.stack_expand(self.sp);
+        self.stack[self.sp as usize] = v;
+        self.sp += 1;
+    }
+
+    #[inline]
+    pub fn pop(&mut self) -> Value {
+        self.sp -= 1;
+        self.stack[self.sp as usize].clone()
+    }
+
+    #[inline]
+    pub fn peek(&self) -> Value {
+        self.stack[self.sp as usize - 1].clone()
+    }
+
+    pub fn save_ctx(&self, ctx: &mut Context) {
+        ctx.prg = self.prg.clone();
+        ctx.stash = self.stash;
+        ctx.priv_env = self.priv_env.clone();
+        ctx.new_target = self.new_target.clone();
+        ctx.result = self.result.clone();
+        ctx.pc = self.pc;
+        ctx.sb = self.sb;
+        ctx.args = self.args;
+    }
+
+    pub fn push_ctx_unchecked(&mut self) {
+        let mut ctx = Context::default();
+        self.save_ctx(&mut ctx);
+        self.call_stack.push(ctx);
+    }
+
+    pub fn restore_ctx(&mut self, ctx: &Context) {
+        self.prg = ctx.prg.clone();
+        self.stash = ctx.stash;
+        self.priv_env = ctx.priv_env.clone();
+        self.new_target = ctx.new_target.clone();
+        self.result = ctx.result.clone();
+        self.pc = ctx.pc;
+        self.sb = ctx.sb;
+        self.args = ctx.args;
+    }
+
+    pub fn pop_ctx(&mut self) {
+        if let Some(ctx) = self.call_stack.pop() {
+            self.prg = ctx.prg;
+            self.stash = ctx.stash;
+            self.priv_env = ctx.priv_env;
+            self.new_target = ctx.new_target;
+            self.result = ctx.result;
+            self.pc = ctx.pc;
+            self.sb = ctx.sb;
+            self.args = ctx.args;
+        }
+    }
+
+    pub fn push_try_frame(&mut self, catch_pos: i32, finally_pos: i32) {
+        self.try_stack.push(TryFrame {
+            exception: None,
+            call_stack_len: self.call_stack.len() as u32,
+            iter_len: self.iter_stack.len() as u32,
+            ref_len: self.ref_stack.len() as u32,
+            sp: self.sp as i32,
+            stash: self.stash,
+            priv_env: self.priv_env.clone(),
+            catch_pos,
+            finally_pos,
+            finally_ret: -1,
+        });
+    }
+
+    pub fn pop_try_frame(&mut self) {
+        self.try_stack.pop();
+    }
+
+    pub fn take_arg_buf(&mut self) -> Vec<Value> {
+        self.arg_bufs.pop().unwrap_or_default()
+    }
+
+    pub fn return_arg_buf(&mut self, mut b: Vec<Value>) {
+        b.clear();
+        if self.arg_bufs.len() < 64 {
+            self.arg_bufs.push(b);
+        }
+    }
+
+    pub fn clear_stack(&mut self) {
+        let sp = (self.sp.max(0) as usize).min(self.stack.len());
+        for v in &mut self.stack[sp..] {
+            *v = Value::Empty;
+        }
+    }
+
+    pub fn capture_stack(
+        &self,
+        rt: &Runtime,
+        mut stack: Vec<StackFrame>,
+        ctx_offset: usize,
+    ) -> Vec<StackFrame> {
+        if self.prg.is_some() || self.sb > 0 {
+            let func_name = match &self.prg {
+                Some(p) => p.func_name.clone(),
+                None => get_func_name(rt, &self.stack, self.sb),
+            };
+            stack.push(StackFrame {
+                prg: self.prg.clone(),
+                pc: self.pc,
+                func_name,
+            });
+        }
+        let mut i = self.call_stack.len() as isize - 1;
+        while i > ctx_offset as isize - 1 {
+            let frame = &self.call_stack[i as usize];
+            if frame.prg.is_some() || frame.sb > 0 {
+                let func_name = match &frame.prg {
+                    Some(p) => p.func_name.clone(),
+                    None => get_func_name(rt, &self.stack, frame.sb),
+                };
+                stack.push(StackFrame {
+                    prg: frame.prg.clone(),
+                    pc: frame.pc,
+                    func_name,
+                });
+            }
+            i -= 1;
+        }
+        stack
+    }
+}
+
+pub fn get_func_name(rt: &Runtime, stack: &[Value], sb: isize) -> unistring::String {
+    if sb > 0
+        && let Some(Value::Object(f)) = stack.get(sb as usize - 1)
+    {
+        if rt.is_proxy(*f) {
+            return unistring::String::new("proxy");
+        }
+        if let Some(v) = rt.obj(*f).base.values.get(&unistring::String::new("name")) {
+            let v = match v {
+                Value::Property(p) if p.getter_func.is_none() => p.value.clone(),
+                Value::Property(_) => return unistring::String::default(),
+                v => v.clone(),
+            };
+            return match v {
+                Value::Empty | Value::Undefined => unistring::String::new("undefined"),
+                v => v.prim_string(),
+            };
+        }
+        if let ObjExt::Template(_) = &rt.obj(*f).ext {
+            return unistring::String::default();
+        }
+        return unistring::String::new("undefined");
+    }
+    unistring::String::default()
+}
+
+impl Runtime {
+    pub fn vm_new_stash(&mut self) {
+        let outer = self.vm.stash;
+        let s = self.heap.alloc_stash(Stash {
+            outer,
+            ..Stash::default()
+        });
+        self.vm.stash = Some(s);
+        self.vm.stash_allocs += 1;
+    }
+
+    pub fn vm_push_ctx(&mut self) -> JsResult<()> {
+        self.vm.push_ctx()
+    }
+
+    pub fn vm_capture_stack(&self, ctx_offset: usize) -> Vec<StackFrame> {
+        self.vm.capture_stack(
+            self,
+            Vec::with_capacity(self.vm.call_stack.len() + 1),
+            ctx_offset,
+        )
+    }
+
+    pub fn vm_run(&mut self) -> JsResult<()> {
+        let saved_in_native = self.in_native;
+        self.in_native = false;
+        let handles_base = self.handles.len();
+        let r = self.vm_run_loop(handles_base);
+        self.in_native = saved_in_native;
+        r
+    }
+
+    fn vm_run_loop(&mut self, handles_base: usize) -> JsResult<()> {
+        let mut prg = match &self.vm.prg {
+            Some(p) => p.clone(),
+            None => return Ok(()),
+        };
+        loop {
+            if self.vm.interrupt.is_set() {
+                break;
+            }
+            if self.heap.gc_requested {
+                self.handles.truncate(handles_base);
+                self.collect_garbage();
+            }
+            match &self.vm.prg {
+                Some(p) if Arc::ptr_eq(p, &prg) => {}
+                Some(p) => prg = p.clone(),
+                None => return Ok(()),
+            }
+            let pc = self.vm.pc;
+            if pc < 0 || pc as usize >= prg.code.len() {
+                return Ok(());
+            }
+            self.exec(&prg.code[pc as usize])?;
+        }
+        let (iface, text) = match self.interrupt_state.take_value() {
+            Some((v, t)) => (Some(v), t),
+            None => (None, String::new()),
+        };
+        let stack = self.vm_capture_stack(0);
+        Err(Throw::Interrupted(Box::new(InterruptedError {
+            exception: Exception {
+                val: Value::Empty,
+                stack,
+                val_string: None,
+            },
+            iface,
+            text,
+        })))
+    }
+
+    pub fn exec(&mut self, ins: &Instruction) -> JsResult<()> {
+        let _ = ins;
+        todo!("instruction dispatch")
+    }
+
+    pub fn vm_restore_stacks(&mut self, iter_len: u32, ref_len: u32) -> Option<Box<Exception>> {
+        let mut ex = None;
+        while self.vm.iter_stack.len() > iter_len as usize {
+            let item = self.vm.iter_stack.pop();
+            if let Some(mut item) = item
+                && let Some(iter) = &mut item.iter
+            {
+                self.extra_roots.push(item.val.clone());
+                let r = self.vm_try(|rt| iter.return_iter(rt));
+                self.extra_roots.pop();
+                if let Some(e) = r
+                    && ex.is_none()
+                {
+                    ex = Some(e);
+                }
+            }
+        }
+        self.vm.ref_stack.truncate(ref_len as usize);
+        ex
+    }
+
+    pub fn vm_exception_from_throw(&mut self, x: Throw) -> Exception {
+        let mut ex = match x {
+            Throw::Value(Value::Object(o)) => {
+                let mut ex = Exception::new(Value::Object(o));
+                if let ObjExt::Error(e) = &self.obj(o).ext {
+                    ex.stack = e.stack.clone();
+                }
+                ex
+            }
+            Throw::Value(v) => Exception::new(v),
+            Throw::Exception(e) => *e,
+            Throw::TypeError(m) => Exception::new(self.new_type_error(&m)),
+            Throw::ReferenceError(m) => {
+                let e = self.get_reference_error();
+                Exception::new(self.new_error(e, &m))
+            }
+            Throw::ReferenceErrorName(n) => Exception::new(self.new_reference_error(&n)),
+            Throw::RangeError(m) => {
+                let e = self.get_range_error();
+                Exception::new(self.new_error(e, &m))
+            }
+            Throw::SyntaxError(m) => {
+                let e = self.get_syntax_error();
+                Exception::new(self.new_error(e, &m))
+            }
+            Throw::Interrupted(e) => e.exception,
+            Throw::StackOverflow(e) => e.exception,
+        };
+        if ex.stack.is_empty() {
+            ex.stack = self.vm_capture_stack(0);
+        }
+        ex
+    }
+
+    pub fn vm_handle_throw(&mut self, arg: Throw) -> Result<(), Throw> {
+        let uncatchable = arg.is_uncatchable();
+        let mut ex: Option<Box<Exception>> = None;
+        let mut arg = Some(arg);
+        if !uncatchable {
+            let e =
+                self.vm_exception_from_throw(arg.take().unwrap_or(Throw::Value(Value::Undefined)));
+            ex = Some(Box::new(e));
+        }
+        if let Some(e) = &ex {
+            self.extra_roots.push(e.val.clone());
+        }
+        let result = loop {
+            let Some(tf) = self.vm.try_stack.last_mut() else {
+                break None;
+            };
+            if tf.catch_pos == -1 && tf.finally_pos == -1
+                || ex.is_none() && tf.catch_pos != TRY_PANIC_MARKER
+            {
+                tf.exception = None;
+                self.vm.pop_try_frame();
+                continue;
+            }
+            let call_stack_len = tf.call_stack_len as usize;
+            let (sp, stash, priv_env, iter_len, ref_len, catch_pos, finally_pos) = (
+                tf.sp,
+                tf.stash,
+                tf.priv_env.clone(),
+                tf.iter_len,
+                tf.ref_len,
+                tf.catch_pos,
+                tf.finally_pos,
+            );
+            if call_stack_len < self.vm.call_stack.len() {
+                let ctx = &self.vm.call_stack[call_stack_len];
+                self.vm.prg = ctx.prg.clone();
+                self.vm.new_target = ctx.new_target.clone();
+                self.vm.result = ctx.result.clone();
+                self.vm.pc = ctx.pc;
+                self.vm.sb = ctx.sb;
+                self.vm.args = ctx.args;
+                self.vm.call_stack.truncate(call_stack_len);
+            }
+            self.vm.sp = sp as isize;
+            self.vm.stash = stash;
+            self.vm.priv_env = priv_env;
+            let _ = self.vm_restore_stacks(iter_len, ref_len);
+
+            if catch_pos == TRY_PANIC_MARKER {
+                break Some(());
+            }
+            if catch_pos >= 0 {
+                let v = ex.as_ref().map(|e| e.val.clone()).unwrap_or_default();
+                self.vm.push(v);
+                self.vm.pc = catch_pos as isize;
+                if let Some(tf) = self.vm.try_stack.last_mut() {
+                    tf.catch_pos = -1;
+                }
+                if ex.is_some() {
+                    self.extra_roots.pop();
+                }
+                return Ok(());
+            }
+            if finally_pos >= 0 {
+                if let Some(tf) = self.vm.try_stack.last_mut() {
+                    tf.exception = ex.take();
+                    tf.finally_pos = -1;
+                    tf.finally_ret = -1;
+                }
+                self.vm.pc = finally_pos as isize;
+                self.extra_roots.pop();
+                return Ok(());
+            }
+        };
+        let _ = result;
+        match ex {
+            None => Err(arg.unwrap_or(Throw::Value(Value::Undefined))),
+            Some(e) => {
+                self.extra_roots.pop();
+                Err(Throw::Exception(e))
+            }
+        }
+    }
+
+    pub fn vm_try(
+        &mut self,
+        f: impl FnOnce(&mut Runtime) -> JsResult<()>,
+    ) -> Option<Box<Exception>> {
+        self.vm.push_try_frame(TRY_PANIC_MARKER, -1);
+        let r = f(self);
+        let out = match r {
+            Ok(()) => None,
+            Err(t) => match self.vm_handle_throw(t) {
+                Ok(()) => None,
+                Err(Throw::Exception(e)) => Some(e),
+                Err(other) => {
+                    self.vm.pop_try_frame();
+                    self.pending_uncatchable = Some(other);
+                    return None;
+                }
+            },
+        };
+        self.vm.pop_try_frame();
+        out
+    }
+
+    pub fn vm_try_result(
+        &mut self,
+        f: impl FnOnce(&mut Runtime) -> JsResult<()>,
+    ) -> JsResult<Option<Box<Exception>>> {
+        let r = self.vm_try(f);
+        if let Some(t) = self.pending_uncatchable.take() {
+            return Err(t);
+        }
+        Ok(r)
+    }
+
+    pub fn vm_run_try(&mut self) -> JsResult<Option<Box<Exception>>> {
+        self.vm.push_try_frame(TRY_PANIC_MARKER, -1);
+        let r = loop {
+            match self.vm_run_try_inner() {
+                Ok(Some(ex)) => break Ok(Some(ex)),
+                Ok(None) => {
+                    if self.vm.halted() {
+                        break Ok(None);
+                    }
+                }
+                Err(t) => break Err(t),
+            }
+        };
+        self.vm.pop_try_frame();
+        r
+    }
+
+    pub fn vm_run_try_inner(&mut self) -> JsResult<Option<Box<Exception>>> {
+        match self.vm_run() {
+            Ok(()) => Ok(None),
+            Err(t) => match self.vm_handle_throw(t) {
+                Ok(()) => Ok(None),
+                Err(Throw::Exception(e)) => Ok(Some(e)),
+                Err(other) => Err(other),
+            },
+        }
+    }
+}
+
+impl Vm {
+    pub fn push_ctx(&mut self) -> JsResult<()> {
+        if self.call_stack.len() > self.max_call_stack_size {
+            return Err(Throw::StackOverflow(Box::new(
+                crate::runtime::StackOverflowError {
+                    exception: Exception::new(Value::Empty),
+                },
+            )));
+        }
+        self.push_ctx_unchecked();
+        Ok(())
+    }
+}
+
+pub fn js_func_call(
+    rt: &mut Runtime,
+    o: ObjRef,
+    call: FunctionCall<'_>,
+    new_target: Value,
+) -> JsResult<Value> {
+    let this = if call.this.is_empty() {
+        Value::Undefined
+    } else {
+        call.this.clone()
+    };
+    js_func_call_args(rt, o, call.arguments, new_target, this)
+}
+
+pub fn js_func_call_args(
+    rt: &mut Runtime,
+    o: ObjRef,
+    args: &[Value],
+    new_target: Value,
+    this: Value,
+) -> JsResult<Value> {
+    let (res, ex) = js_func_call_ex(rt, o, args, new_target, this)?;
+    match ex {
+        Some(e) => Err(Throw::Exception(e)),
+        None => Ok(res),
+    }
+}
+
+pub fn js_func_call_ex(
+    rt: &mut Runtime,
+    o: ObjRef,
+    args: &[Value],
+    new_target: Value,
+    this: Value,
+) -> JsResult<(Value, Option<Box<Exception>>)> {
+    let vm_sp = rt.vm.sp;
+    rt.vm.stack_expand(vm_sp + args.len() as isize + 1);
+    rt.vm.stack[rt.vm.sp as usize] = Value::Object(o);
+    rt.vm.sp += 1;
+    rt.vm.stack[rt.vm.sp as usize] = this;
+    rt.vm.sp += 1;
+    for arg in args {
+        rt.vm.stack[rt.vm.sp as usize] = if arg.is_empty() {
+            Value::Undefined
+        } else {
+            arg.clone()
+        };
+        rt.vm.sp += 1;
+    }
+    rt.vm.push_try_frame(TRY_PANIC_MARKER, -1);
+    let mut need_pop = false;
+    if rt.vm.prg.is_some() {
+        if let Err(e) = rt.vm.push_ctx() {
+            rt.vm.pop_try_frame();
+            return Err(e);
+        }
+        rt.vm.call_stack.push(Context {
+            pc: -2,
+            ..Context::default()
+        });
+        need_pop = true;
+    } else {
+        rt.vm.pc = -2;
+        if let Err(e) = rt.vm.push_ctx() {
+            rt.vm.pop_try_frame();
+            return Err(e);
+        }
+    }
+    let f = BaseJsFuncObject::data(rt, o);
+    let (prg, stash, priv_env) = (f.prg.clone(), f.stash, f.priv_env.clone());
+    rt.vm.args = args.len() as isize;
+    rt.vm.prg = prg;
+    rt.vm.stash = stash;
+    rt.vm.priv_env = priv_env;
+    rt.vm.new_target = new_target;
+    rt.vm.pc = 0;
+    loop {
+        match rt.vm_run_try_inner() {
+            Ok(Some(ex)) => {
+                rt.vm.pop_try_frame();
+                return Ok((Value::Undefined, Some(ex)));
+            }
+            Ok(None) => {}
+            Err(t) => {
+                rt.vm.pop_try_frame();
+                return Err(t);
+            }
+        }
+        if rt.vm.halted() {
+            break;
+        }
+    }
+    if need_pop {
+        rt.vm.pop_ctx();
+    }
+    rt.vm.pop_try_frame();
+    let r = rt.vm.pop();
+    rt.root(&r);
+    Ok((r, None))
+}
+
+pub fn js_func_vm_call(rt: &mut Runtime, o: ObjRef, n: usize) -> JsResult<()> {
+    rt.vm.push_ctx()?;
+    let f = BaseJsFuncObject::data(rt, o);
+    let (prg, stash, priv_env) = (f.prg.clone(), f.stash, f.priv_env.clone());
+    rt.vm.args = n as isize;
+    rt.vm.prg = prg;
+    rt.vm.stash = stash;
+    rt.vm.priv_env = priv_env;
+    rt.vm.pc = 0;
+    let sp = rt.vm.sp as usize;
+    rt.vm.stack.swap(sp - n - 1, sp - n - 2);
+    Ok(())
+}
+
+pub fn arrow_func_vm_call(rt: &mut Runtime, o: ObjRef, n: usize) -> JsResult<()> {
+    rt.vm.push_ctx()?;
+    let f = BaseJsFuncObject::data(rt, o);
+    let (prg, stash, priv_env, nt) = (
+        f.prg.clone(),
+        f.stash,
+        f.priv_env.clone(),
+        f.new_target.clone(),
+    );
+    rt.vm.args = n as isize;
+    rt.vm.prg = prg;
+    rt.vm.stash = stash;
+    rt.vm.priv_env = priv_env;
+    rt.vm.pc = 0;
+    let sp = rt.vm.sp as usize;
+    let callee = rt.vm.stack[sp - n - 1].clone();
+    rt.vm.stack[sp - n - 1] = Value::Empty;
+    rt.vm.stack[sp - n - 2] = callee;
+    rt.vm.new_target = nt;
+    Ok(())
+}
+
+pub fn js_func_construct(
+    rt: &mut Runtime,
+    o: ObjRef,
+    args: &[Value],
+    new_target: Option<ObjRef>,
+) -> JsResult<ObjRef> {
+    let new_target = new_target.unwrap_or(o);
+    let proto = new_target.get_str(rt, &"prototype".into(), None)?;
+    let proto_obj = match proto {
+        Some(Value::Object(p)) => Some(p),
+        _ => rt.global.object_prototype,
+    };
+    let obj = rt.new_base_object(proto_obj, crate::object::CLASS_OBJECT);
+    let ret = js_func_call(
+        rt,
+        o,
+        FunctionCall::new(&Value::Object(obj), args),
+        Value::Object(new_target),
+    )?;
+    if let Value::Object(r) = ret {
+        return Ok(r);
+    }
+    Ok(obj)
+}
+
+pub fn class_func_construct(
+    rt: &mut Runtime,
+    o: ObjRef,
+    args: &[Value],
+    new_target: Option<ObjRef>,
+) -> JsResult<ObjRef> {
+    let new_target = new_target.unwrap_or(o);
+    let (has_prg, derived) = {
+        let f = BaseJsFuncObject::data(rt, o);
+        (f.prg.is_some(), f.derived)
+    };
+    if !has_prg {
+        let instance = class_func_create_instance(rt, o, args, new_target)?;
+        class_func_init_fields(rt, o, instance)?;
+        return Ok(instance);
+    }
+    let mut instance = None;
+    let mut this_val = Value::Empty;
+    if !derived {
+        let i = class_func_create_instance(rt, o, args, new_target)?;
+        class_func_init_fields(rt, o, i)?;
+        this_val = Value::Object(i);
+        instance = Some(i);
+    }
+    let ret = js_func_call_args(rt, o, args, Value::Object(new_target), this_val)?;
+    if let Value::Object(r) = ret {
+        return Ok(r);
+    }
+    if derived {
+        if !ret.is_undefined() {
+            return Err(Throw::Value(rt.new_type_error(
+                "Derived constructors may only return object or undefined",
+            )));
+        }
+        let v = rt.vm.stack[rt.vm.sp as usize + 1].clone();
+        if !v.is_empty() {
+            instance = Some(rt.to_object(&v)?);
+        } else {
+            let e = rt.get_reference_error();
+            return Err(Throw::Value(rt.new_error(
+                e,
+                "Must call super constructor in derived class before returning from derived constructor",
+            )));
+        }
+    }
+    Ok(instance.unwrap_or(o))
+}
+
+pub fn class_func_create_instance(
+    rt: &mut Runtime,
+    o: ObjRef,
+    args: &[Value],
+    new_target: ObjRef,
+) -> JsResult<ObjRef> {
+    if BaseJsFuncObject::data(rt, o).derived {
+        let proto = rt.obj(o).base.prototype;
+        match proto.and_then(|p| p.assert_constructor(rt)) {
+            Some(ctor) => ctor.construct(rt, args, Some(new_target)),
+            None => Err(Throw::Value(
+                rt.new_type_error("Super constructor is not a constructor"),
+            )),
+        }
+    } else {
+        crate::func::BaseFuncObject::create_instance(rt, o, Some(new_target))
+    }
+}
+
+pub fn class_func_init_fields(rt: &mut Runtime, o: ObjRef, instance: ObjRef) -> JsResult<()> {
+    let (pet, pm, init_fields, stash, priv_env) = {
+        let f = BaseJsFuncObject::data(rt, o);
+        (
+            f.private_env_type.clone(),
+            f.private_methods.clone(),
+            f.init_fields.clone(),
+            f.stash,
+            f.priv_env.clone(),
+        )
+    };
+    if let Some(pet) = &pet {
+        instance.get_private_env(rt, pet, true)?;
+        let key = crate::object::private_env_key(pet);
+        if let Some(m) = &mut rt.obj_mut(instance).base.private_elements
+            && let Some(e) = m.get_mut(&key)
+        {
+            e.methods = pm;
+        }
+    }
+    if let Some(init_fields) = init_fields {
+        rt.vm.push_ctx()?;
+        rt.vm.prg = Some(init_fields);
+        rt.vm.stash = stash;
+        rt.vm.priv_env = priv_env;
+        rt.vm.new_target = Value::Empty;
+        rt.vm.push(Value::Object(o));
+        rt.vm.sb = rt.vm.sp;
+        rt.vm.push(Value::Object(instance));
+        rt.vm.pc = 0;
+        let ex = rt.vm_run_try()?;
+        rt.vm.pop_ctx();
+        if let Some(ex) = ex {
+            return Err(Throw::Exception(ex));
+        }
+        rt.vm.sp -= 2;
+    }
+    Ok(())
+}
+
+pub fn get_private_prop_res(
+    _rt: &mut Runtime,
+    _name: &ResolvedPrivateName,
+    _base: &Value,
+) -> JsResult<Value> {
+    todo!("getPrivatePropRes._get")
+}
+
+pub fn set_private_prop_res(
+    _rt: &mut Runtime,
+    _name: &ResolvedPrivateName,
+    _base: &Value,
+    _val: Value,
+) -> JsResult<()> {
+    todo!("setPrivatePropRes._set")
+}
+
+impl Runtime {
+    pub fn vm_get_private_prop(
+        &mut self,
+        _base: &Value,
+        _name: &unistring::String,
+        _typ: &Arc<PrivateEnvType>,
+        _idx: u32,
+        _is_method: bool,
+    ) -> JsResult<Value> {
+        todo!("vm.getPrivateProp")
+    }
+
+    pub fn vm_set_private_prop(
+        &mut self,
+        _base: &Value,
+        _name: &unistring::String,
+        _typ: &Arc<PrivateEnvType>,
+        _idx: u32,
+        _is_method: bool,
+        _val: Value,
+    ) -> JsResult<()> {
+        todo!("vm.setPrivateProp")
+    }
+}
+
+pub fn generator_next(_rt: &mut Runtime, _o: ObjRef, _v: Value) -> JsResult<Value> {
+    todo!("generatorObject.next")
+}
+
+pub fn generator_return(_rt: &mut Runtime, _o: ObjRef, _v: Value) -> JsResult<Value> {
+    todo!("generatorObject._return")
+}
+
+pub fn generator_throw(_rt: &mut Runtime, _o: ObjRef, _v: Value) -> JsResult<Value> {
+    todo!("generatorObject.throw")
 }

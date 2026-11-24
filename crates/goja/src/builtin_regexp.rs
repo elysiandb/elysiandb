@@ -1,10 +1,14 @@
 use crate::deps::regexp;
 use crate::deps::regexp::syntax::ErrorCode;
+use crate::heap::ObjRef;
+use crate::object_template::ObjectTemplate;
 use crate::parser::{TransformError, transform_reg_exp};
 use crate::regexp::{RegexpPattern, RegexpWrapper, compile_regexp2};
+use crate::runtime::Runtime;
 use gocompat::utf8;
 use gocompat::utf16;
 use std::sync::Arc;
+use std::sync::OnceLock;
 
 const HEX: &[u8] = b"0123456789abcdef";
 
@@ -208,4 +212,69 @@ pub fn compile_regexp(pattern: &[u8], flags: &[u8]) -> Result<RegexpPattern, Str
         regexp_wrapper: wrapper,
         regexp2_wrapper: wrapper2,
     })
+}
+
+fn create_reg_exp_template() -> ObjectTemplate {
+    let mut t = ObjectTemplate::new();
+    t.proto_factory = Some(|r| Some(r.get_function_prototype()));
+    t
+}
+
+pub fn get_reg_exp_template() -> &'static ObjectTemplate {
+    static T: OnceLock<ObjectTemplate> = OnceLock::new();
+    T.get_or_init(create_reg_exp_template)
+}
+
+fn create_reg_exp_proto_template() -> ObjectTemplate {
+    let mut t = ObjectTemplate::new();
+    t.proto_factory = Some(|r| r.global.object_prototype);
+    t
+}
+
+pub fn get_reg_exp_proto_template() -> &'static ObjectTemplate {
+    static T: OnceLock<ObjectTemplate> = OnceLock::new();
+    T.get_or_init(create_reg_exp_proto_template)
+}
+
+fn create_reg_exp_string_iterator_proto_template() -> ObjectTemplate {
+    let mut t = ObjectTemplate::new();
+    t.proto_factory = Some(|r| r.global.object_prototype);
+    t
+}
+
+pub fn get_reg_exp_string_iterator_proto_template() -> &'static ObjectTemplate {
+    static T: OnceLock<ObjectTemplate> = OnceLock::new();
+    T.get_or_init(create_reg_exp_string_iterator_proto_template)
+}
+
+impl Runtime {
+    pub fn get_reg_exp(&mut self) -> ObjRef {
+        if let Some(r) = self.global.reg_exp {
+            return r;
+        }
+        let ret = self.reserve_object();
+        self.global.reg_exp = Some(ret);
+        self.new_templated_func_object(get_reg_exp_template(), Some(ret), None, None);
+        ret
+    }
+
+    pub fn get_reg_exp_prototype(&mut self) -> ObjRef {
+        if let Some(r) = self.global.reg_exp_prototype {
+            return r;
+        }
+        let ret = self.reserve_object();
+        self.global.reg_exp_prototype = Some(ret);
+        self.new_templated_object(get_reg_exp_proto_template(), Some(ret));
+        ret
+    }
+
+    pub fn get_reg_exp_string_iterator_prototype(&mut self) -> ObjRef {
+        if let Some(r) = self.global.reg_exp_string_iterator_prototype {
+            return r;
+        }
+        let ret = self.reserve_object();
+        self.global.reg_exp_string_iterator_prototype = Some(ret);
+        self.new_templated_object(get_reg_exp_string_iterator_proto_template(), Some(ret));
+        ret
+    }
 }
