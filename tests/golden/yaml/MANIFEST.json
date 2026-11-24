@@ -1,0 +1,39 @@
+{
+  "part": "yaml",
+  "baseline": "1a11e5e",
+  "go_version": "go1.24.7",
+  "goos": "darwin",
+  "goarch": "amd64",
+  "files": [
+    {
+      "path": "config.jsonl",
+      "size": 1007339,
+      "sha256": "5ff51673f7cb79fd45fdb0e3717d532fa71d064c7957b833e4ccb1692fca93fb"
+    },
+    {
+      "path": "config_keys.jsonl",
+      "size": 5675,
+      "sha256": "e53871aec70d633fa239a94f9cd42122a90765924367b83507e97cae26396d25"
+    },
+    {
+      "path": "deep.jsonl",
+      "size": 260775,
+      "sha256": "90ee0fcf5d4b52577d9905fd763ecad53b1bdb44b3cc3b28a9f3403f2ca29e3b"
+    },
+    {
+      "path": "documents.jsonl",
+      "size": 197380,
+      "sha256": "a6e747f0280d06110fd4845b54ae0262f55d1897d53e1ff94b80be2aa92630e7"
+    },
+    {
+      "path": "scalars.jsonl",
+      "size": 427982,
+      "sha256": "699339ba774e16643a1a4fcb52581d26c34c3a0a90338942b184285374bff41f"
+    },
+    {
+      "path": "syntax.jsonl",
+      "size": 38087,
+      "sha256": "b1b57834bbe2f62f11c267a50e6d70c4efad38890415a117eb77248c7b579fcb"
+    }
+  ]
+}
