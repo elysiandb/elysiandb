@@ -7,6 +7,7 @@ mod config;
 mod fmt;
 mod logs;
 mod metrics;
+mod tcp;
 mod yaml;
 
 use elysiandb::log::{self, Options};
