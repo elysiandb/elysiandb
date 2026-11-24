@@ -10,6 +10,7 @@ use crate::object::{
 use crate::runtime::{JsResult, Runtime, str_to_array_idx, to_int_strict};
 use crate::string::ascii_string;
 use crate::value::{Value, ValueProperty, int_to_value, property_get, property_set};
+use crate::vm::STR_LENGTH;
 
 #[derive(Clone)]
 pub struct SparseArrayItem {
@@ -427,7 +428,7 @@ impl SparseArrayObject {
         };
         ar.set_values_from_sparse(&sa.items, new_max_idx);
         obj.base._put(
-            &UStr::from("length"),
+            &STR_LENGTH,
             ArrayObject::length_placeholder(ar.length_prop.writable),
         );
         obj.ext = ObjExt::Array(Box::new(ar));

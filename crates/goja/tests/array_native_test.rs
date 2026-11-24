@@ -249,6 +249,20 @@ fn sort_calls_the_comparator_like_go_sort_stable() {
 }
 
 #[test]
+fn own_key_order_matches_goja() {
+    test_script(
+        r#"
+	[Array, Array.prototype, [].values().__proto__].map(function (o) {
+		return Object.getOwnPropertyNames(o).join(",") + ";" + Object.getOwnPropertySymbols(o).length;
+	}).join("|");
+	"#,
+        str_value(
+            "length,name,prototype,from,isArray,of;1|length,constructor,at,concat,copyWithin,entries,every,fill,filter,find,findIndex,findLast,findLastIndex,flat,flatMap,forEach,includes,indexOf,join,keys,lastIndexOf,map,pop,push,reduce,reduceRight,reverse,shift,slice,some,sort,splice,toLocaleString,toString,unshift,with,toReversed,toSorted,toSpliced,values;2|next;1",
+        ),
+    );
+}
+
+#[test]
 fn length_changes_follow_goja() {
     test_script(
         r#"

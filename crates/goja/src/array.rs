@@ -9,6 +9,7 @@ use crate::object_template::{TemplatedArrayObject, TemplatedObject};
 use crate::runtime::{JsResult, Runtime, grow_cap, str_to_array_idx, to_length};
 use crate::string::ascii_string;
 use crate::value::{Value, ValueProperty, int_to_value, nil_safe, property_get, property_set};
+use crate::vm::STR_LENGTH;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IterationKind {
@@ -543,7 +544,7 @@ impl ArrayObject {
         };
         sa.set_values(&a.values, a.obj_count.wrapping_add(1));
         obj.base._put(
-            &UStr::from("length"),
+            &STR_LENGTH,
             ArrayObject::length_placeholder(sa.length_prop.writable),
         );
         obj.ext = ObjExt::SparseArray(Box::new(sa));
@@ -829,7 +830,7 @@ impl LengthOwner {
         match (self, &rt.obj(o).ext) {
             (LengthOwner::Array, ObjExt::Array(a)) => a.length_prop.value.clone(),
             (LengthOwner::Sparse, ObjExt::SparseArray(a)) => a.length_prop.value.clone(),
-            (LengthOwner::Templated, _) => match rt.obj(o).base.values.get(&UStr::from("length")) {
+            (LengthOwner::Templated, _) => match rt.obj(o).base.values.get(&STR_LENGTH) {
                 Some(Value::Property(p)) => p.value.clone(),
                 _ => Value::Undefined,
             },
@@ -841,7 +842,7 @@ impl LengthOwner {
         match (self, &rt.obj(o).ext) {
             (LengthOwner::Array, ObjExt::Array(a)) => a.length_prop.writable,
             (LengthOwner::Sparse, ObjExt::SparseArray(a)) => a.length_prop.writable,
-            (LengthOwner::Templated, _) => match rt.obj(o).base.values.get(&UStr::from("length")) {
+            (LengthOwner::Templated, _) => match rt.obj(o).base.values.get(&STR_LENGTH) {
                 Some(Value::Property(p)) => p.writable,
                 _ => false,
             },
@@ -855,7 +856,7 @@ impl LengthOwner {
             (LengthOwner::Array, ObjExt::Array(a)) => a.length_prop.writable = w,
             (LengthOwner::Sparse, ObjExt::SparseArray(a)) => a.length_prop.writable = w,
             (LengthOwner::Templated, _) => {
-                if let Some(Value::Property(p)) = obj.base.values.get_mut(&UStr::from("length")) {
+                if let Some(Value::Property(p)) = obj.base.values.get_mut(&STR_LENGTH) {
                     p.writable = w;
                 }
             }
@@ -1027,7 +1028,7 @@ pub fn define_array_length_templated(
     descr: PropertyDescriptor,
     throw: bool,
 ) -> JsResult<bool> {
-    TemplatedObject::get_own_prop_str(rt, o, &UStr::from("length"))?;
+    TemplatedObject::get_own_prop_str(rt, o, &STR_LENGTH)?;
     define_array_length(rt, o, LengthOwner::Templated, &descr, throw)
 }
 
@@ -1096,7 +1097,7 @@ pub fn go_append(values: &mut Vec<Value>, v: Value) {
 impl Runtime {
     pub fn new_array(&mut self, prototype: Option<ObjRef>) -> ObjRef {
         let mut base = BaseObject::new(CLASS_ARRAY, prototype);
-        base._put(&UStr::from("length"), ArrayObject::length_placeholder(true));
+        base._put(&STR_LENGTH, ArrayObject::length_placeholder(true));
         self.alloc_object(
             &ARRAY_OBJECT_CLASS,
             base,
@@ -1154,6 +1155,6 @@ pub fn set_array_values(rt: &mut Runtime, o: ObjRef, values: Vec<Value>) {
 }
 
 pub fn set_array_length(rt: &mut Runtime, o: ObjRef, l: i64) -> JsResult<()> {
-    o.set_own_str(rt, &UStr::from("length"), int_to_value(l), true)?;
+    o.set_own_str(rt, &STR_LENGTH, int_to_value(l), true)?;
     Ok(())
 }
