@@ -1,26 +1,29 @@
-use elysiandb::durable::{self, filepath};
+use std::path::{Path, PathBuf};
+
+use elysiandb::durable::{self, PAGE_HEADER_SIZE, filepath};
 use elysiandb::gocompat::json::Value;
 use elysiandb::journal::{self, Record};
+use elysiandb::pagetree::Ref;
 
 use super::common;
-use super::support::{array, field, string};
+use super::support::{array, copy_tree, field, string, uint};
 use super::tempdir::TempDir;
 
-const CHECKED_HERE: [&str; 4] = [
+const CHECKED_HERE: [&str; 7] = [
     "ReadValue short read",
     "append after close",
     "close with unwritten data",
     "corrupt kv file",
+    "page checksum mismatch",
+    "missing page segment",
+    "short page read",
 ];
 
-const CHECKED_LATER: [&str; 9] = [
+const CHECKED_LATER: [&str; 6] = [
     "second open of a locked folder",
     "MANIFEST and MANIFEST.prev both unreadable",
     "live key 9x in MANIFEST",
     "unknown index name in MANIFEST",
-    "page checksum mismatch",
-    "missing page segment",
-    "short page read",
     "format-1 MANIFEST.prev after upgrade, MANIFEST removed",
     "format-1 MANIFEST.prev after upgrade, MANIFEST unreadable",
 ];
@@ -145,5 +148,104 @@ fn log_and_kv_file_messages_match_go() {
     );
     checked += 1;
 
+    checked += page_messages(rows, tmp.path());
+
     assert_eq!(checked, CHECKED_HERE.len());
+}
+
+const CLEAN: &str = "persistence/folders/clean/before";
+
+fn clean_root() -> (u64, u32) {
+    let m = common::read_json(&format!("{CLEAN}/MANIFEST"));
+    let entities = array(&m, "entities");
+    let slots = field(&entities[0], "slots");
+    (uint(slots, "id"), uint(slots, "size") as u32)
+}
+
+fn clean_pages(root: &Path, name: &str) -> PathBuf {
+    let dir = filepath::join(root, name);
+    copy_tree(&common::golden_path(&format!("{CLEAN}/pages")), &dir);
+    dir
+}
+
+fn segment_files(dir: &Path) -> Vec<PathBuf> {
+    let mut out: Vec<PathBuf> = std::fs::read_dir(dir)
+        .unwrap_or_else(|e| panic!("{e}"))
+        .map(|e| e.unwrap_or_else(|e| panic!("{e}")).path())
+        .filter(|p| p.extension().is_some_and(|x| x == "pgs"))
+        .collect();
+    out.sort();
+    out
+}
+
+fn load_root(dir: &Path, id: u64, size: u32) -> durable::Error {
+    let store = durable::open_page_store(None, dir, 1 << 30, 0).unwrap_or_else(|e| panic!("{e}"));
+    let err = match store.load(&Ref::stored(id, size)) {
+        Ok(_) => panic!("the root page of {} must not load", dir.display()),
+        Err(err) => err,
+    };
+    store.close().unwrap_or_else(|e| panic!("{e}"));
+    err
+}
+
+fn page_messages(rows: &[Value], root: &Path) -> usize {
+    let (id, size) = clean_root();
+    let (seg, off) = durable::split_page_id(id);
+    let mut checked = 0;
+
+    let flip = clean_pages(root, "page-checksum");
+    let path = filepath::join(&flip, format!("{seg:06}.pgs"));
+    let mut raw = std::fs::read(&path).unwrap_or_else(|e| panic!("{e}"));
+    raw[(off + PAGE_HEADER_SIZE + 1) as usize] ^= 0x01;
+    std::fs::write(&path, &raw).unwrap_or_else(|e| panic!("{e}"));
+    let err = load_root(&flip, id, size);
+    assert!(err.is_page_checksum(), "{err}");
+    assert_eq!(
+        message(rows, "page checksum mismatch"),
+        format!("no readable checkpoint: MANIFEST: {err}")
+    );
+    checked += 1;
+
+    let missing = clean_pages(root, "missing-pages");
+    let files = segment_files(&missing);
+    assert_eq!(files.len(), 2);
+    for p in files {
+        std::fs::remove_file(&p).unwrap_or_else(|e| panic!("{e}"));
+    }
+    let err = load_root(&missing, id, size);
+    assert!(
+        matches!(err, durable::Error::PageSegmentMissing(s) if s == seg),
+        "{err}"
+    );
+    assert_eq!(
+        message(rows, "missing page segment"),
+        format!("no readable checkpoint: MANIFEST: {err}")
+    );
+    checked += 1;
+
+    let short = clean_pages(root, "short-pages");
+    let files = segment_files(&short);
+    assert_eq!(files.len(), 2);
+    for p in files {
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&p)
+            .and_then(|f| f.set_len(20))
+            .unwrap_or_else(|e| panic!("{e}"));
+    }
+    let err = load_root(&short, id, size);
+    assert!(err.fs_error().is_some_and(|e| e.is_eof()), "{err}");
+    let (text, kinds) = wrapped(rows, "short page read");
+    assert_eq!(kinds, vec!["end_of_file".to_string()]);
+    assert_eq!(
+        format!("no readable checkpoint: MANIFEST: {err}"),
+        text.replace("<go:end_of_file>", "unexpected end of file")
+    );
+    assert_eq!(
+        err.to_string(),
+        format!("page {id:x}: unexpected end of file")
+    );
+    checked += 1;
+
+    checked
 }

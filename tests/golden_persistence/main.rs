@@ -11,6 +11,7 @@ mod journal_damage;
 mod journal_encode;
 mod kvfile;
 mod messages;
+mod page_store;
 mod pages;
 mod varint;
 mod xxh64;

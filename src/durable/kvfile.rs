@@ -4,6 +4,7 @@ use std::path::Path;
 use super::fs::{Fs, FsError, read_file, write_file_atomic};
 use crate::gocompat::binary;
 use crate::hash::crc32c;
+use crate::pagetree::CorruptPage;
 
 const KV_FILE_MAGIC: &[u8; 8] = b"ELYKVCK1";
 
@@ -11,13 +12,43 @@ const KV_FILE_MAGIC: &[u8; 8] = b"ELYKVCK1";
 pub enum Error {
     Fs(FsError),
     CorruptFile,
+    PageChecksum,
+    PageSegmentMissing(u32),
+    CorruptPage(CorruptPage),
+    Page(u64, Box<Error>),
 }
 
 pub const ERR_CORRUPT_FILE: Error = Error::CorruptFile;
 
+pub const ERR_PAGE_CHECKSUM: Error = Error::PageChecksum;
+
 impl Error {
     pub fn is_corrupt_file(&self) -> bool {
         matches!(self, Error::CorruptFile)
+    }
+
+    pub fn is_page_checksum(&self) -> bool {
+        match self {
+            Error::PageChecksum => true,
+            Error::Page(_, inner) => inner.is_page_checksum(),
+            _ => false,
+        }
+    }
+
+    pub fn is_corrupt_page(&self) -> bool {
+        match self {
+            Error::CorruptPage(_) => true,
+            Error::Page(_, inner) => inner.is_corrupt_page(),
+            _ => false,
+        }
+    }
+
+    pub fn fs_error(&self) -> Option<&FsError> {
+        match self {
+            Error::Fs(e) => Some(e),
+            Error::Page(_, inner) => inner.fs_error(),
+            _ => None,
+        }
     }
 }
 
@@ -26,6 +57,10 @@ impl fmt::Display for Error {
         match self {
             Error::Fs(e) => fmt::Display::fmt(e, f),
             Error::CorruptFile => f.write_str("durable: file is corrupt"),
+            Error::PageChecksum => f.write_str("durable: page checksum mismatch"),
+            Error::PageSegmentMissing(seg) => write!(f, "page segment {seg} is missing"),
+            Error::CorruptPage(e) => fmt::Display::fmt(e, f),
+            Error::Page(id, inner) => write!(f, "page {id:x}: {inner}"),
         }
     }
 }
@@ -34,7 +69,9 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Error::Fs(e) => Some(e),
-            Error::CorruptFile => None,
+            Error::CorruptPage(e) => Some(e),
+            Error::Page(_, inner) => Some(&**inner),
+            Error::CorruptFile | Error::PageChecksum | Error::PageSegmentMissing(_) => None,
         }
     }
 }
