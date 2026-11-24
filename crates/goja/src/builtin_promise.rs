@@ -530,7 +530,7 @@ fn element_done(rt: &mut Runtime, state: ObjRef) -> Option<Vec<Value>> {
     let s = combinator_state(rt, state);
     s.remaining_elements_count -= 1;
     if s.remaining_elements_count == 0 {
-        return Some(s.values.clone());
+        return Some(std::mem::take(&mut s.values));
     }
     None
 }
