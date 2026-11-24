@@ -9,8 +9,10 @@ pub mod journal;
 pub mod legacy;
 pub mod log;
 pub mod memory;
+pub mod metrics;
 pub mod pagetree;
 pub mod ptree;
+pub mod storage;
 pub mod sync;
 pub mod yaml;
 

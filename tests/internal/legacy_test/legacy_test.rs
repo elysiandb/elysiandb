@@ -1,13 +1,19 @@
 use std::collections::BTreeMap;
 use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use elysiandb::configuration::{Config, StoreConfig};
+use elysiandb::datastore;
 use elysiandb::durable::filepath;
+use elysiandb::globals;
 use elysiandb::gocompat::base64::STD_ENCODING;
 use elysiandb::gocompat::json::{self, Base64Bytes, Map, Value};
 use elysiandb::legacy;
+use elysiandb::storage;
+use elysiandb::sync::{Mutex, MutexGuard};
 
 use super::tempdir::TempDir;
 
@@ -242,5 +248,175 @@ fn test_read_replays_the_recovery_logs_like024() {
         .map_or(0, Vec::len);
     if without.replayed != 0 || books != 2 {
         panic!("without crash recovery the logs are ignored, as in 0.2.4: {without:?}");
+    }
+}
+
+static SERIAL: Mutex<()> = Mutex::new(());
+
+fn serial() -> MutexGuard<'static, ()> {
+    SERIAL.lock()
+}
+
+struct CloseStorage;
+
+impl Drop for CloseStorage {
+    fn drop(&mut self) {
+        let _ = storage::close();
+    }
+}
+
+fn set_store(dir: &Path) {
+    globals::set_config(Some(Arc::new(Config {
+        store: StoreConfig {
+            folder: dir.to_string_lossy().into_owned(),
+            shards: 4,
+            ..StoreConfig::default()
+        },
+        ..Config::default()
+    })));
+}
+
+fn open_engine() -> Arc<datastore::Engine> {
+    match storage::engine() {
+        Some(e) => e,
+        None => panic!("the storage is not open"),
+    }
+}
+
+#[test]
+fn test_migration_moves_the_legacy_files_and_keeps_the_data() {
+    let _serial = serial();
+    let dir = TempDir::new();
+    let ttl_expires_at = unix(SystemTime::now()) + 600;
+    let d = legacy::Data {
+        kv: BTreeMap::from([
+            (b"k".to_vec(), Some(b"v".to_vec())),
+            (b"ttl".to_vec(), Some(b"t".to_vec())),
+        ]),
+        expirations: BTreeMap::from([(b"ttl".to_vec(), ttl_expires_at)]),
+        types: vec![b"books".to_vec()],
+        entities: BTreeMap::from([(
+            b"books".to_vec(),
+            vec![
+                legacy::Document {
+                    id: b"b2".to_vec(),
+                    doc: Some(object(vec![("id", text("b2")), ("n", Value::Number(2.0))])),
+                },
+                legacy::Document {
+                    id: b"b1".to_vec(),
+                    doc: Some(object(vec![("id", text("b1"))])),
+                },
+            ],
+        )]),
+        replayed: 0,
+    };
+    if let Err(err) = legacy::write(dir.path(), &d) {
+        panic!("{err}");
+    }
+
+    set_store(dir.path());
+    storage::load_db();
+    let _close = CloseStorage;
+
+    let e = open_engine();
+    match e.migration() {
+        Some(report) if report.documents == 2 && report.kv_keys == 2 && report.entities == 1 => {}
+        other => panic!("unexpected migration report {other:?}"),
+    }
+
+    for name in [
+        legacy::DATA_FILE,
+        legacy::JSON_DATA_FILE,
+        legacy::EXPIRATION_FILE,
+    ] {
+        match std::fs::metadata(filepath::join(dir.path(), name)) {
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            _ => panic!("{name} should be moved aside"),
+        }
+
+        let kept = filepath::join(&filepath::join(dir.path(), datastore::LEGACY_FOLDER), name);
+        match std::fs::metadata(&kept) {
+            Ok(info) if info.permissions().mode() & 0o777 == 0o600 => {}
+            other => panic!(
+                "{name} should be kept in {} with mode 0600: {:?}",
+                datastore::LEGACY_FOLDER,
+                other.err()
+            ),
+        }
+    }
+
+    let snap = e.snapshot(b"books");
+    let first_id = snap.at(0).map(|d| d.id().into_owned());
+    if snap.len() != 2 || first_id.as_deref() != Some(b"b2".as_slice()) {
+        panic!("documents keep their 0.2.4 order");
+    }
+
+    match storage::get_by_key(b"k") {
+        Ok(v) if v == b"v" => {}
+        other => panic!("kv keys are migrated: {other:?}"),
+    }
+
+    if storage::get_key_expiration(b"ttl") != Some(ttl_expires_at) {
+        panic!("expirations are migrated");
+    }
+
+    drop(e);
+    if let Err(err) = storage::close() {
+        panic!("{err}");
+    }
+
+    storage::load_db();
+    let e = open_engine();
+    if e.migration().is_some() {
+        panic!("a migrated folder is not migrated twice");
+    }
+    if e.snapshot(b"books").len() != 2 {
+        panic!("the data survives a restart");
+    }
+}
+
+#[test]
+fn test_export_legacy_writes_a024_folder() {
+    let _serial = serial();
+    let dir = TempDir::new();
+    set_store(dir.path());
+    storage::load_db();
+    let _close = CloseStorage;
+
+    let e = open_engine();
+    if let Err(err) = e.update(|tx| {
+        tx.ensure_type(b"books");
+        let _ = tx.put(
+            b"books",
+            b"b1",
+            &object(vec![("id", text("b1")), ("title", text("Dune"))]),
+        );
+        tx.put(b"books", b"b0", &object(vec![("id", text("b0"))]))
+    }) {
+        panic!("{err}");
+    }
+    if let Err(err) = storage::put_key_value_with_ttl(b"k", b"v", 600) {
+        panic!("{err}");
+    }
+
+    let out = TempDir::new();
+    if let Err(err) = e.export_legacy(out.path()) {
+        panic!("{err}");
+    }
+
+    let back = legacy::read(out.path(), false, SystemTime::now()).unwrap_or_else(|e| panic!("{e}"));
+
+    let books = back.entities.get(b"books".as_slice());
+    if back.types.join(b",".as_slice()) != b"books"
+        || books.map_or(0, Vec::len) != 2
+        || books.and_then(|b| b.first()).map(|d| d.id.as_slice()) != Some(b"b1".as_slice())
+    {
+        panic!("unexpected export {back:?}");
+    }
+
+    let value = back.kv.get(b"k".as_slice()).cloned().flatten();
+    let expires_at = back.expirations.get(b"k".as_slice()).copied().unwrap_or(0);
+    if value.as_deref() != Some(b"v".as_slice()) || expires_at == 0 {
+        panic!("kv keys and expirations are exported");
     }
 }
