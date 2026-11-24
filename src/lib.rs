@@ -1,4 +1,5 @@
 pub mod configuration;
+pub mod crypto;
 pub mod datastore;
 pub mod docpath;
 pub mod durable;
