@@ -17,7 +17,7 @@ const REBACKUPS: [&str; 8] = [
     "valid/manifest-extra-keys.rebackup.tar",
     "valid/raw-documents.rebackup.tar",
 ];
-const GO_TARS: [&str; 9] = [
+const GO_TARS: [&str; 8] = [
     "seed/seed.tar",
     "api/backup.tar",
     "api/hot.tar",
@@ -26,7 +26,6 @@ const GO_TARS: [&str; 9] = [
     "seed-only/hot.tar",
     "large/backup.tar",
     "large/hot-beats.tar",
-    "seed/seed.tar",
 ];
 
 fn int_field(row: &Value, key: &str) -> i64 {
