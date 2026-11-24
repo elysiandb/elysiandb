@@ -1,4 +1,5 @@
 pub mod configuration;
+pub mod datastore;
 pub mod docpath;
 pub mod durable;
 pub mod globals;
