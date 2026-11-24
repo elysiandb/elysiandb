@@ -1,3 +1,6 @@
+use crate::builtin_promise::{
+    JobCallback, Promise, PromiseCapability, PromiseReaction, PromiseReactionType,
+};
 use crate::compiler::Program;
 use crate::heap::{ObjRef, StashRef, Tracer};
 use crate::object::{
@@ -1340,33 +1343,6 @@ fn generator_object_return_inner(rt: &mut Runtime, o: ObjRef, g: &mut Generator)
     Ok(())
 }
 
-#[derive(Clone)]
-pub struct PromiseCapability {
-    pub promise: Value,
-    pub resolve_obj: Value,
-    pub reject_obj: Value,
-}
-
-impl PromiseCapability {
-    pub fn trace(&self, t: &mut Tracer) {
-        t.value(&self.promise);
-        t.value(&self.resolve_obj);
-        t.value(&self.reject_obj);
-    }
-
-    pub fn resolve(&self, rt: &mut Runtime, v: Value) -> JsResult<()> {
-        let f = rt.to_callable(&self.resolve_obj)?;
-        f.call(rt, Value::Undefined, &[v])?;
-        Ok(())
-    }
-
-    pub fn reject(&self, rt: &mut Runtime, v: Value) -> JsResult<()> {
-        let f = rt.to_callable(&self.reject_obj)?;
-        f.call(rt, Value::Undefined, &[v])?;
-        Ok(())
-    }
-}
-
 pub struct AsyncRunner {
     pub gen_: Generator,
     pub promise_cap: Option<PromiseCapability>,
@@ -1473,7 +1449,7 @@ pub fn async_runner_step(
     ex: Option<Box<Exception>>,
 ) -> JsResult<()> {
     if done || ex.is_some() {
-        let cap = async_runner(rt, ar).promise_cap.clone();
+        let cap = async_runner(rt, ar).promise_cap;
         return match (&cap, ex) {
             (Some(cap), None) => cap.resolve(rt, res),
             (Some(cap), Some(ex)) => cap.reject(rt, ex.val),
@@ -1517,7 +1493,7 @@ pub fn async_runner_promise(rt: &Runtime, ar: ObjRef) -> Value {
     async_runner(rt, ar)
         .promise_cap
         .as_ref()
-        .map(|c| c.promise.clone())
+        .map(|c| Value::Object(c.promise))
         .unwrap_or_default()
 }
 
@@ -1542,24 +1518,48 @@ pub fn async_vm_call(rt: &mut Runtime, f: ObjRef, n: usize, vm_call: VmCallFn) -
     Ok(())
 }
 
+fn async_runner_data(d: &[Value]) -> ObjRef {
+    match &d[0] {
+        Value::Object(ar) => *ar,
+        _ => unreachable!("async runner"),
+    }
+}
+
 impl Runtime {
-    pub fn new_promise_capability(&mut self, c: ObjRef) -> JsResult<PromiseCapability> {
-        let _ = c;
-        todo!("newPromiseCapability: Promise is not ported yet")
-    }
-
-    pub fn promise_resolve(&mut self, c: ObjRef, x: Value) -> JsResult<ObjRef> {
-        let _ = (c, x);
-        todo!("promiseResolve: Promise is not ported yet")
-    }
-
     pub fn promise_add_async_runner_reactions(
         &mut self,
         promise: ObjRef,
         ar: ObjRef,
     ) -> JsResult<()> {
-        let _ = (promise, ar);
-        todo!("Promise.addReactions with asyncRunner: Promise is not ported yet")
+        let on_fulfilled = NativeFn::closure_with(
+            vec![Value::Object(ar)],
+            |rt: &mut Runtime, d: &[Value], call: FunctionCall<'_>| {
+                async_runner_on_fulfilled(rt, async_runner_data(d), call)
+            },
+        );
+        let on_rejected = NativeFn::closure_with(
+            vec![Value::Object(ar)],
+            |rt: &mut Runtime, d: &[Value], call: FunctionCall<'_>| {
+                async_runner_on_rejected(rt, async_runner_data(d), call)
+            },
+        );
+        Promise::add_reactions(
+            self,
+            promise,
+            PromiseReaction {
+                capability: None,
+                typ: PromiseReactionType::Fulfill,
+                handler: Some(JobCallback::Native(on_fulfilled)),
+                async_runner: Some(ar),
+            },
+            PromiseReaction {
+                capability: None,
+                typ: PromiseReactionType::Reject,
+                handler: Some(JobCallback::Native(on_rejected)),
+                async_runner: Some(ar),
+            },
+        );
+        Ok(())
     }
 }
 
