@@ -266,7 +266,7 @@ fn retry<F: FnMut() -> libc::c_int>(mut f: F) -> io::Result<libc::c_int> {
 }
 
 #[cfg(target_vendor = "apple")]
-fn fsync_fd(fd: RawFd) -> io::Result<()> {
+pub(crate) fn fsync_fd(fd: RawFd) -> io::Result<()> {
     retry(|| {
         let r = unsafe { libc::fcntl(fd, libc::F_FULLFSYNC, 0) };
         if r < 0 && io::Error::last_os_error().raw_os_error() == Some(libc::ENOTSUP) {
@@ -278,7 +278,7 @@ fn fsync_fd(fd: RawFd) -> io::Result<()> {
 }
 
 #[cfg(not(target_vendor = "apple"))]
-fn fsync_fd(fd: RawFd) -> io::Result<()> {
+pub(crate) fn fsync_fd(fd: RawFd) -> io::Result<()> {
     retry(|| unsafe { libc::fsync(fd) }).map(|_| ())
 }
 

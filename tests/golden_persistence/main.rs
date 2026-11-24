@@ -10,6 +10,7 @@ mod crc32c;
 mod journal_damage;
 mod journal_encode;
 mod kvfile;
+mod legacy;
 mod messages;
 mod page_store;
 mod pages;
