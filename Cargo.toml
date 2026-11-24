@@ -148,6 +148,10 @@ name = "httpd_test"
 path = "tests/internal/httpd_test/main.rs"
 
 [[test]]
+name = "httprouter_test"
+path = "tests/internal/httprouter_test/main.rs"
+
+[[test]]
 name = "golden_http"
 path = "tests/golden_http/main.rs"
 

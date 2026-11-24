@@ -11,6 +11,7 @@ pub mod globals;
 pub mod gocompat;
 pub mod hash;
 pub mod httpd;
+pub mod httprouter;
 pub mod journal;
 pub mod legacy;
 pub mod log;
