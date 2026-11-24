@@ -7,15 +7,9 @@ use crate::object::{
     BASE_OBJECT_CLASS, BaseObject, CLASS_OBJECT, CLASS_SET, CLASS_SET_ITERATOR, FunctionCall,
     ObjData, ObjExt, to_method,
 };
-use crate::runtime::{JsResult, Runtime, Throw};
+use crate::runtime::{IterationKind, JsResult, Runtime, Throw};
 use crate::string::ascii_string;
 use crate::value::{Value, ValueProperty, int_to_value, nil_safe, value_prop};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum IterationKind {
-    Value,
-    KeyValue,
-}
 
 pub struct SetObject {
     pub m: OrderedMap,
@@ -83,44 +77,6 @@ fn set_data_mut(rt: &mut Runtime, o: ObjRef) -> &mut SetObject {
     match rt.ext_dyn_mut::<SetObject>(o) {
         Some(s) => s,
         None => unreachable!("not a Set"),
-    }
-}
-
-pub(crate) fn check_std_array_iter(rt: &mut Runtime, v: &Value) -> JsResult<Option<ObjRef>> {
-    let Value::Object(arr) = v else {
-        return Ok(None);
-    };
-    let arr = *arr;
-    let std = match &rt.obj(arr).ext {
-        ObjExt::Array(a) => {
-            a.prop_value_count == 0
-                && a.length as usize == a.values.len()
-                && a.obj_count as u64 == u64::from(a.length)
-        }
-        _ => false,
-    };
-    if !std {
-        return Ok(None);
-    }
-    let it = arr.get_sym(rt, SYM_ITERATOR, None)?;
-    let values = rt.get_array_values();
-    if matches!(it, Some(Value::Object(f)) if f == values) {
-        return Ok(Some(arr));
-    }
-    Ok(None)
-}
-
-pub(crate) fn std_array_len(rt: &Runtime, arr: ObjRef) -> usize {
-    match &rt.obj(arr).ext {
-        ObjExt::Array(a) => a.values.len(),
-        _ => 0,
-    }
-}
-
-pub(crate) fn std_array_item(rt: &Runtime, arr: ObjRef, i: usize) -> Value {
-    match &rt.obj(arr).ext {
-        ObjExt::Array(a) => nil_safe(a.values.get(i).cloned()),
-        _ => Value::Undefined,
     }
 }
 
@@ -248,11 +204,18 @@ impl Runtime {
             && !matches!(arg, Value::Undefined | Value::Null)
         {
             let adder = o.get_str(self, &"add".into(), None)?;
-            let std_arr = check_std_array_iter(self, arg)?;
+            let std_arr = self.check_std_array_iter(arg)?;
             if matches!(&adder, Some(Value::Object(a)) if Some(*a) == self.global.set_adder) {
                 if let Some(arr) = std_arr {
-                    for i in 0..std_array_len(self, arr) {
-                        let v = std_array_item(self, arr, i);
+                    let n = match &self.obj(arr).ext {
+                        ObjExt::Array(a) => a.values.len(),
+                        _ => 0,
+                    };
+                    for i in 0..n {
+                        let v = match &self.obj(arr).ext {
+                            ObjExt::Array(a) => nil_safe(a.values.get(i).cloned()),
+                            _ => Value::Undefined,
+                        };
                         set_data_mut(self, o).m.set(v, Value::Empty);
                     }
                 } else {
@@ -267,8 +230,15 @@ impl Runtime {
                     return Err(Throw::Value(self.new_type_error("Set.add in missing")));
                 };
                 if let Some(arr) = std_arr {
-                    for i in 0..std_array_len(self, arr) {
-                        let item = std_array_item(self, arr, i);
+                    let n = match &self.obj(arr).ext {
+                        ObjExt::Array(a) => a.values.len(),
+                        _ => 0,
+                    };
+                    for i in 0..n {
+                        let item = match &self.obj(arr).ext {
+                            ObjExt::Array(a) => nil_safe(a.values.get(i).cloned()),
+                            _ => Value::Undefined,
+                        };
                         adder_fn.call(self, Value::Object(o), &[item])?;
                     }
                 } else {

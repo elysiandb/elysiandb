@@ -25,6 +25,13 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IterationKind {
+    Key,
+    Value,
+    KeyValue,
+}
+
 pub type JsResult<T> = Result<T, Throw>;
 
 #[derive(Debug)]
@@ -817,6 +824,48 @@ impl Runtime {
             BaseObject::new(class, proto),
             ObjExt::Primitive(value),
         )
+    }
+
+    pub fn builtin_number(&mut self, call: FunctionCall<'_>) -> JsResult<Value> {
+        if let Some(t) = call.arguments.first() {
+            match t {
+                Value::Object(o) => {
+                    let prim_value = o.to_primitive_number(self)?;
+                    if let Value::BigInt(bigint) = &prim_value {
+                        return Ok(int_to_value(bigint.int64()));
+                    }
+                    prim_value.to_number(self)
+                }
+                Value::BigInt(t) => Ok(int_to_value(t.int64())),
+                t => t.to_number(self),
+            }
+        } else {
+            Ok(Value::Int(0))
+        }
+    }
+
+    pub fn builtin_new_number(
+        &mut self,
+        args: &[Value],
+        proto: Option<ObjRef>,
+    ) -> JsResult<ObjRef> {
+        let v = if let Some(t) = args.first() {
+            match t {
+                Value::Object(o) => {
+                    let prim_value = o.to_primitive_number(self)?;
+                    if let Value::BigInt(bigint) = &prim_value {
+                        int_to_value(bigint.int64())
+                    } else {
+                        prim_value.to_number(self)?
+                    }
+                }
+                Value::BigInt(t) => int_to_value(t.int64()),
+                t => t.to_number(self)?,
+            }
+        } else {
+            int_to_value(0)
+        };
+        Ok(self.new_primitive_object(v, proto, crate::object::CLASS_NUMBER))
     }
 
     pub fn new_func(&mut self, name: &unistring::String, length: isize, strict: bool) -> ObjRef {

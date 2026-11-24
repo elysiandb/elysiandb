@@ -4,8 +4,8 @@ use crate::builtin_symbol::SYM_TO_STRING_TAG;
 use crate::func::{NativeCallable, NativeFn};
 use crate::heap::{ObjRef, Tracer};
 use crate::object::{
-    BASE_OBJECT_CLASS, BaseObject, CLASS_OBJECT, CLASS_PROMISE, CallFn, CtorFn, FunctionCall,
-    ObjData, ObjExt,
+    BASE_OBJECT_CLASS, BaseObject, CLASS_OBJECT, CLASS_PROMISE, CallFn, FunctionCall, ObjData,
+    ObjExt,
 };
 use crate::runtime::{Job, JsResult, Runtime, Throw, assert_callable};
 use crate::string::ascii_string;
@@ -186,16 +186,6 @@ fn data_obj(v: &Value) -> ObjRef {
     match v {
         Value::Object(o) => *o,
         _ => unreachable!("closure data is not an object"),
-    }
-}
-
-fn to_constructor(rt: &mut Runtime, v: &Value) -> JsResult<CtorFn> {
-    let o = rt.to_object(v)?;
-    match o.assert_constructor(rt) {
-        Some(c) => Ok(c),
-        None => Err(Throw::Value(
-            rt.new_type_error("Value is not a constructor"),
-        )),
     }
 }
 
@@ -723,7 +713,7 @@ impl Runtime {
             reject: RefCell::new(None),
         });
         let executor = self.new_native_func(NativeFn::Dyn(state.clone()), "", 2);
-        let ctor = to_constructor(self, &Value::Object(c))?;
+        let ctor = self.to_constructor(&Value::Object(c))?;
         let promise = ctor.construct(self, &[Value::Object(executor)], Some(c))?;
         let resolve = state.resolve.borrow().clone().unwrap_or(Value::Empty);
         let resolve_obj = self.to_object(&resolve)?;

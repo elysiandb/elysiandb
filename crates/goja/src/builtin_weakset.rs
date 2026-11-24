@@ -1,5 +1,4 @@
 use crate::builtin_map::incompatible_receiver;
-use crate::builtin_set::{check_std_array_iter, std_array_item, std_array_len};
 use crate::builtin_symbol::SYM_TO_STRING_TAG;
 use crate::builtin_weakmap::WeakMap;
 use crate::func::NativeFn;
@@ -10,7 +9,7 @@ use crate::object::{
 };
 use crate::runtime::{JsResult, Runtime, Throw};
 use crate::string::ascii_string;
-use crate::value::{Value, value_prop};
+use crate::value::{Value, nil_safe, value_prop};
 
 pub struct WeakSetObject {
     pub s: WeakMap,
@@ -84,11 +83,18 @@ impl Runtime {
             && !matches!(arg, Value::Undefined | Value::Null)
         {
             let adder = o.get_str(self, &"add".into(), None)?;
-            let std_arr = check_std_array_iter(self, arg)?;
+            let std_arr = self.check_std_array_iter(arg)?;
             if matches!(&adder, Some(Value::Object(a)) if Some(*a) == self.global.weak_set_adder) {
                 if let Some(arr) = std_arr {
-                    for i in 0..std_array_len(self, arr) {
-                        let v = std_array_item(self, arr, i);
+                    let n = match &self.obj(arr).ext {
+                        ObjExt::Array(a) => a.values.len(),
+                        _ => 0,
+                    };
+                    for i in 0..n {
+                        let v = match &self.obj(arr).ext {
+                            ObjExt::Array(a) => nil_safe(a.values.get(i).cloned()),
+                            _ => Value::Undefined,
+                        };
                         let key = self.to_object(&v)?;
                         s.set(self, key, Value::Empty);
                     }
@@ -105,8 +111,15 @@ impl Runtime {
                     return Err(Throw::Value(self.new_type_error("WeakSet.add in missing")));
                 };
                 if let Some(arr) = std_arr {
-                    for i in 0..std_array_len(self, arr) {
-                        let item = std_array_item(self, arr, i);
+                    let n = match &self.obj(arr).ext {
+                        ObjExt::Array(a) => a.values.len(),
+                        _ => 0,
+                    };
+                    for i in 0..n {
+                        let item = match &self.obj(arr).ext {
+                            ObjExt::Array(a) => nil_safe(a.values.get(i).cloned()),
+                            _ => Value::Undefined,
+                        };
                         adder_fn.call(self, Value::Object(o), &[item])?;
                     }
                 } else {

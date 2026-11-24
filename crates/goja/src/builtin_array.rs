@@ -1,6 +1,4 @@
-use crate::array::{
-    ArrayIterObject, ArrayObject, IterationKind, go_append, set_array_length, set_array_values,
-};
+use crate::array::{ArrayIterObject, ArrayObject, go_append, set_array_length, set_array_values};
 use crate::builtin_symbol::{
     SYM_IS_CONCAT_SPREADABLE, SYM_ITERATOR, SYM_SPECIES, SYM_TO_STRING_TAG, SYM_UNSCOPABLES,
 };
@@ -12,7 +10,7 @@ use crate::object::{
 };
 use crate::object_template::ObjectTemplate;
 use crate::runtime::{
-    JsResult, Runtime, Throw, create_data_property_or_throw, is_array, to_length,
+    IterationKind, JsResult, Runtime, Throw, create_data_property_or_throw, is_array, to_length,
 };
 use crate::string::{JsString, STRING_EMPTY, ascii_string};
 use crate::string_unicode::StringBuilder;

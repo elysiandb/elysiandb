@@ -7,7 +7,7 @@ use crate::object_template::ObjectTemplate;
 use crate::runtime::{JsResult, Runtime, Throw};
 use crate::string::ascii_string;
 use crate::string_ascii::{ParseErr, string_to_int};
-use crate::value::{Value, float_to_value, int_to_value, new_big_int, value_prop};
+use crate::value::{Value, int_to_value, new_big_int, value_prop};
 use std::sync::{Arc, OnceLock};
 
 pub(crate) fn string_to_big_int(s: &[u8]) -> Option<big::Int> {
@@ -49,23 +49,8 @@ pub fn to_big_int(rt: &mut Runtime, value: &Value) -> JsResult<Arc<big::Int>> {
     }
 }
 
-fn to_numeric(rt: &mut Runtime, value: &Value) -> JsResult<Value> {
-    match value {
-        Value::Int(_) | Value::BigInt(_) => Ok(value.clone()),
-        Value::Float(f) => Ok(float_to_value(*f)),
-        Value::Object(v) => {
-            let prim_value = v.to_primitive_number(rt)?;
-            if let Value::BigInt(_) = prim_value {
-                return Ok(prim_value);
-            }
-            prim_value.to_number(rt)
-        }
-        _ => value.to_number(rt),
-    }
-}
-
 pub fn number_to_big_int(rt: &mut Runtime, v: &Value) -> JsResult<Arc<big::Int>> {
-    match to_numeric(rt, v)? {
+    match rt.vm_to_numeric(v)? {
         Value::BigInt(v) => Ok(v),
         Value::Int(v) => Ok(Arc::new(big::Int::new_int(v))),
         Value::Float(f) => {

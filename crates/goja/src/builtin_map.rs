@@ -6,16 +6,9 @@ use crate::object::{
     BASE_OBJECT_CLASS, BaseObject, CLASS_MAP, CLASS_MAP_ITERATOR, CLASS_OBJECT, FunctionCall,
     ObjData, ObjExt, to_method,
 };
-use crate::runtime::{JsResult, Runtime, Throw};
+use crate::runtime::{IterationKind, JsResult, Runtime, Throw};
 use crate::string::ascii_string;
 use crate::value::{Value, ValueProperty, int_to_value, nil_safe, value_prop};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum IterationKind {
-    Key,
-    Value,
-    KeyValue,
-}
 
 pub struct MapObject {
     pub m: OrderedMap,

@@ -327,3 +327,52 @@ fn test_array_storage_grows_like_go_slices() {
         );
     });
 }
+
+#[test]
+fn test_shared_helpers_keep_builtin_behaviour() {
+    check(&[
+        (r#"var s = new Set([3, 1, 3, 2]); [...s].join()"#, "3,1,2"),
+        (
+            r#"var seen = []; class S extends Set { add(v) { seen.push(v); return super.add(v); } } var arr = [1, 2, 3]; new S(arr); seen.join()"#,
+            "1,2,3",
+        ),
+        (
+            r#"var a = {}, b = {}; var w = new WeakSet([a, b]); w.has(a) && w.has(b)"#,
+            "true",
+        ),
+        (
+            r#"var seen = 0; class W extends WeakSet { add(v) { seen++; return super.add(v); } } new W([{}, {}, {}]); seen"#,
+            "3",
+        ),
+        (
+            r#"new WeakSet([1])"#,
+            "!TypeError: Value is not an object: 1 at <eval>:1:1(4)",
+        ),
+        (
+            r#"Number(Object(12345678901234567890n))"#,
+            "-6101065172474983000",
+        ),
+        (r#"Number(5n) + new Number(7n)"#, "12"),
+        (r#"BigInt(Object(3)) + BigInt("0x10")"#, "19"),
+        (
+            r#"BigInt({valueOf() { return 2.5; }})"#,
+            "!RangeError: Cannot convert 2.5 to a BigInt at BigInt (native)",
+        ),
+        (
+            r#"var C = function(executor) { return new Promise(executor); }; Promise.resolve.call(C, 3) instanceof Promise"#,
+            "true",
+        ),
+        (
+            r#"Promise.resolve.call({}, 1)"#,
+            "!TypeError: Value is not a constructor at call (native)",
+        ),
+        (
+            r#"var it = [1, 2][Symbol.iterator](); [...it].length + Object.prototype.toString.call([].entries())"#,
+            "2[object Array Iterator]",
+        ),
+        (
+            r#"[...new Map([[1, "a"]]).keys(), ...new Map([[1, "a"]]).values(), ...new Set([5]).entries()].join("|")"#,
+            "1|a|5,5",
+        ),
+    ]);
+}

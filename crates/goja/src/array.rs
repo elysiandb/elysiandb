@@ -6,17 +6,10 @@ use crate::object::{
     to_idx,
 };
 use crate::object_template::{TemplatedArrayObject, TemplatedObject};
-use crate::runtime::{JsResult, Runtime, grow_cap, str_to_array_idx, to_length};
+use crate::runtime::{IterationKind, JsResult, Runtime, grow_cap, str_to_array_idx, to_length};
 use crate::string::ascii_string;
 use crate::value::{Value, ValueProperty, int_to_value, nil_safe, property_get, property_set};
 use crate::vm::STR_LENGTH;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum IterationKind {
-    Key,
-    Value,
-    KeyValue,
-}
 
 pub struct ArrayIterObject {
     pub obj: Option<ObjRef>,
