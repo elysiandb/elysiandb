@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::globals;
 use crate::gocompat::json::{Map, Value};
 use crate::schema::{self, ValidationError};
 
 use super::relationship::{extract_sub_entities, merge_with_existing};
+use super::storage::{schema_enabled, schema_strict};
 
 pub type SchemaLoader<'a> = Box<dyn Fn(&[u8]) -> Option<Map> + 'a>;
 pub type EntityLoader<'a> = Box<dyn Fn(&[u8], &[u8]) -> Option<Map> + 'a>;
@@ -114,7 +114,7 @@ impl<'a> WriteSimulation<'a> {
         }
 
         let current = self.schema(entity);
-        if globals::config().is_some_and(|c| c.api.schema.strict)
+        if schema_strict()
             && current.is_some()
             && schema::is_manual_schema(entity, current.as_ref())
         {
@@ -158,8 +158,7 @@ impl<'a> WriteSimulation<'a> {
 }
 
 fn schema_applies(entity: &[u8]) -> bool {
-    globals::config().is_some_and(|c| c.api.schema.enabled)
-        && entity != schema::SCHEMA_ENTITY.as_bytes()
+    schema_enabled() && entity != schema::SCHEMA_ENTITY.as_bytes()
 }
 
 fn simulation_key(entity: &[u8], id: &[u8]) -> Vec<u8> {

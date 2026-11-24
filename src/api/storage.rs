@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
+use crate::configuration::Config;
 use crate::datastore::{Engine, Tx};
 use crate::globals;
 use crate::gocompat::errors::{self, BoxError};
@@ -276,12 +277,19 @@ impl fmt::Display for ValidationFailed {
 
 impl std::error::Error for ValidationFailed {}
 
-fn schema_enabled() -> bool {
-    globals::config().is_some_and(|c| c.api.schema.enabled)
+pub(crate) fn current_config() -> Arc<Config> {
+    match globals::config() {
+        Some(cfg) => cfg,
+        None => panic!("the configuration is not set"),
+    }
 }
 
-fn schema_strict() -> bool {
-    globals::config().is_some_and(|c| c.api.schema.strict)
+pub(crate) fn schema_enabled() -> bool {
+    current_config().api.schema.enabled
+}
+
+pub(crate) fn schema_strict() -> bool {
+    current_config().api.schema.strict
 }
 
 fn schema_entity() -> &'static [u8] {

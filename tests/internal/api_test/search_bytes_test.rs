@@ -120,7 +120,12 @@ pub enum Gen {
     Obj(BTreeMap<Vec<u8>, Gen>),
 }
 
-pub fn marshal_gen(g: &Gen, out: &mut Vec<u8>) {
+enum GenFrame<'a> {
+    Arr(std::slice::Iter<'a, Gen>, bool),
+    Obj(std::collections::btree_map::Iter<'a, Vec<u8>, Gen>, bool),
+}
+
+fn open_gen<'a>(g: &'a Gen, out: &mut Vec<u8>, stack: &mut Vec<GenFrame<'a>>) {
     match g {
         Gen::Str(s) => json::append_string(out, s, true),
         Gen::Num(f) => out.extend_from_slice(&json::marshal(&Value::Number(*f)).expect("number")),
@@ -128,25 +133,54 @@ pub fn marshal_gen(g: &Gen, out: &mut Vec<u8>) {
         Gen::Nil => out.extend_from_slice(b"null"),
         Gen::Arr(items) => {
             out.push(b'[');
-            for (i, item) in items.iter().enumerate() {
-                if i > 0 {
-                    out.push(b',');
-                }
-                marshal_gen(item, out);
-            }
-            out.push(b']');
+            stack.push(GenFrame::Arr(items.iter(), true));
         }
         Gen::Obj(m) => {
             out.push(b'{');
-            for (i, (k, v)) in m.iter().enumerate() {
-                if i > 0 {
-                    out.push(b',');
+            stack.push(GenFrame::Obj(m.iter(), true));
+        }
+    }
+}
+
+pub fn marshal_gen(g: &Gen, out: &mut Vec<u8>) {
+    let mut stack: Vec<GenFrame<'_>> = Vec::new();
+    open_gen(g, out, &mut stack);
+    while let Some(top) = stack.last_mut() {
+        let next = match top {
+            GenFrame::Arr(it, first) => match it.next() {
+                Some(item) => {
+                    if !*first {
+                        out.push(b',');
+                    }
+                    *first = false;
+                    Some(item)
                 }
-                json::append_string(out, k, true);
-                out.push(b':');
-                marshal_gen(v, out);
+                None => {
+                    out.push(b']');
+                    None
+                }
+            },
+            GenFrame::Obj(it, first) => match it.next() {
+                Some((k, v)) => {
+                    if !*first {
+                        out.push(b',');
+                    }
+                    *first = false;
+                    json::append_string(out, k, true);
+                    out.push(b':');
+                    Some(v)
+                }
+                None => {
+                    out.push(b'}');
+                    None
+                }
+            },
+        };
+        match next {
+            Some(item) => open_gen(item, out, &mut stack),
+            None => {
+                stack.pop();
             }
-            out.push(b'}');
         }
     }
 }
