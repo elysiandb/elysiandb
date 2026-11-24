@@ -761,6 +761,137 @@ fn test_proxy_proxy_get() {
 }
 
 #[test]
+fn test_proxy_proxy_get_json_stringify() {
+    test_script_with_test_lib(
+        r#"
+	var obj = {};
+	var propValue = "321tset";
+	var _handler, _target, _prop, _receiver;
+	var proxy = new Proxy(obj, {
+		ownKeys: function() {
+			return ["foo"];
+		},
+		getOwnPropertyDescriptor: function(target, prop) {
+			if (prop === "foo") {
+				return {
+					value: propValue,
+					enumerable: true,
+					configurable: true
+				}
+			}
+		},
+		get: function(target, prop, receiver) {
+			if (prop === "foo") {
+				_prop = prop;
+				_receiver = receiver;
+				return propValue;
+			}
+			return obj[prop];
+		}
+	});
+	var res = JSON.stringify(proxy);
+	assert.sameValue(res, '{"foo":"321tset"}');
+	assert.sameValue(_prop, "foo");
+	assert.sameValue(_receiver, proxy);
+	"#,
+        Value::Undefined,
+    );
+}
+
+#[test]
+fn test_proxy_native_proxy_get() {
+    on_big_stack(|| {
+        let mut vm = new_runtime();
+        let prop_value_str = s("321tset");
+        let prop_value_idx = s("idx");
+        let prop_value_sym = s("sym");
+        let sym = vm.new_symbol(Some(ascii_string("test")));
+        let obj = vm.new_object();
+        let (pvs, pvs2, pvi, pvi2, pvy) = (
+            prop_value_str.clone(),
+            prop_value_str.clone(),
+            prop_value_idx.clone(),
+            prop_value_idx.clone(),
+            prop_value_sym.clone(),
+        );
+        let proxy = vm
+            .new_proxy(
+                obj,
+                ProxyTrapConfig {
+                    own_keys: Some(Box::new(|r, _t| {
+                        Ok(r.new_array_values(vec![s("0"), s("foo")]))
+                    })),
+                    get_own_property_descriptor: Some(Box::new(move |r, _t, prop| {
+                        if prop == "foo" {
+                            return Ok(PropertyDescriptor {
+                                value: Some(pvs.clone()),
+                                enumerable: Flag::True,
+                                configurable: Flag::True,
+                                ..PropertyDescriptor::default()
+                            });
+                        }
+                        if prop == "0" {
+                            return type_error(r, "GetOwnPropertyDescriptor(0) was called");
+                        }
+                        Ok(PropertyDescriptor::default())
+                    })),
+                    get_own_property_descriptor_idx: Some(Box::new(move |_r, _t, prop| {
+                        if prop == 0 {
+                            return Ok(PropertyDescriptor {
+                                value: Some(pvi.clone()),
+                                enumerable: Flag::True,
+                                configurable: Flag::True,
+                                ..PropertyDescriptor::default()
+                            });
+                        }
+                        Ok(PropertyDescriptor::default())
+                    })),
+                    get: Some(Box::new(move |r, _t, property, _recv| {
+                        if property == "foo" {
+                            return Ok(pvs2.clone());
+                        }
+                        if property == "0" {
+                            return type_error(r, "Get(0) was called");
+                        }
+                        Ok(get(r, obj, property))
+                    })),
+                    get_idx: Some(Box::new(move |r, _t, property, _recv| {
+                        if property == 0 {
+                            return Ok(pvi2.clone());
+                        }
+                        Ok(get(r, obj, &property.to_string()))
+                    })),
+                    get_sym: Some(Box::new(move |r, _t, property, _recv| {
+                        if property == sym {
+                            return Ok(pvy.clone());
+                        }
+                        Ok(obj.get_sym(r, property, None)?.unwrap_or_default())
+                    })),
+                    ..ProxyTrapConfig::default()
+                },
+            )
+            .expect("proxy");
+        set_global(&mut vm, "proxy", proxy.to_value());
+        let res = run(&mut vm, "JSON.stringify(proxy)");
+        assert!(
+            res.same_as(&s(r#"{"0":"idx","foo":"321tset"}"#)),
+            "res: {res:?}"
+        );
+        let res = run(&mut vm, "proxy[Symbol.toPrimitive]");
+        assert!(res.is_undefined(), "res: {res:?}");
+        let res = run(&mut vm, "proxy.hasOwnProperty(Symbol.toPrimitive)");
+        assert!(res.same_as(&Value::Bool(false)), "res: {res:?}");
+        let val = proxy.proxy.get_sym(&mut vm, sym, None).expect("get");
+        assert!(
+            matches!(&val, Some(v) if v.same_as(&prop_value_sym)),
+            "Get(symbol): {val:?}"
+        );
+        let res = run(&mut vm, "proxy.toString()");
+        assert!(res.same_as(&s("[object Object]")), "res: {res:?}");
+    });
+}
+
+#[test]
 fn test_proxy_native_proxy_set() {
     on_big_stack(|| {
         let mut vm = new_runtime();
