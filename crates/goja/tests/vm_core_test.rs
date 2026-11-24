@@ -40,3 +40,45 @@ fn test_native_constructor_frames_are_named() {
         ),
     ]);
 }
+
+#[test]
+fn test_big_int_is_not_an_integer_argument() {
+    check(&[
+        (
+            "(5).toExponential(1n)",
+            "!TypeError: Cannot convert a BigInt value to a number at toExponential (native)",
+        ),
+        (
+            "(5).toFixed(1n)",
+            "!TypeError: Cannot convert a BigInt value to a number at toFixed (native)",
+        ),
+        (
+            "(5).toPrecision(1n)",
+            "!TypeError: Cannot convert a BigInt value to a number at toPrecision (native)",
+        ),
+        (
+            "(5).toString(2n)",
+            "!TypeError: Cannot convert a BigInt value to a number at toString (native)",
+        ),
+        (
+            "(5).toExponential(Object(1n))",
+            "!TypeError: Cannot convert a BigInt value to a number at toExponential (native)",
+        ),
+        (
+            "\"abc\".charAt(1n)",
+            "!TypeError: Cannot convert a BigInt value to a number at charAt (native)",
+        ),
+        (
+            "\"abc\".substring(1n)",
+            "!TypeError: Cannot convert a BigInt value to a number at substring (native)",
+        ),
+        (
+            "[1,2,3].slice(1n)",
+            "!TypeError: Cannot convert a BigInt value to a number at slice (native)",
+        ),
+        (
+            "var a = [1,2]; a.length = 1n",
+            "!TypeError: Cannot convert a BigInt value to a number at <eval>:1:18(10)",
+        ),
+    ]);
+}

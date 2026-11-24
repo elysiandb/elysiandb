@@ -64,7 +64,6 @@ fn constructor_errors_name_the_native_frame() {
 }
 
 #[test]
-#[ignore = "requires ToInteger to reject BigInt values"]
 fn big_int_precision_arguments_are_rejected() {
     check_cases(BIG_INT_TO_INTEGER_CASES.to_string());
 }

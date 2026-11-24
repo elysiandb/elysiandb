@@ -559,6 +559,9 @@ impl Value {
             Value::Symbol(_) => Err(Throw::TypeError(
                 "Cannot convert a Symbol value to a number".to_string(),
             )),
+            Value::BigInt(_) => Err(Throw::TypeError(
+                "Cannot convert a BigInt value to a number".to_string(),
+            )),
             Value::Unresolved(_) => Err(self.unresolved_throw()),
             _ => Ok(self.prim_to_integer()),
         }
@@ -614,6 +617,9 @@ impl Value {
             Value::Object(o) => o.to_primitive_number(rt)?.to_float(rt),
             Value::Symbol(_) => Err(Throw::TypeError(
                 "Cannot convert a Symbol value to a number".to_string(),
+            )),
+            Value::BigInt(_) => Err(Throw::TypeError(
+                "Cannot convert a BigInt value to a number".to_string(),
             )),
             Value::Unresolved(_) => Err(self.unresolved_throw()),
             _ => Ok(self.prim_to_float()),
