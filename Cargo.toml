@@ -143,6 +143,14 @@ path = "tests/archive/gzip_test/main.rs"
 name = "tar_test"
 path = "tests/archive/tar_test/main.rs"
 
+[[test]]
+name = "httpd_test"
+path = "tests/internal/httpd_test/main.rs"
+
+[[test]]
+name = "golden_http"
+path = "tests/golden_http/main.rs"
+
 [profile.release]
 strip = true
 panic = "unwind"
