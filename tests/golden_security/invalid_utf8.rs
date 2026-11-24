@@ -5,14 +5,14 @@ use std::time::Duration;
 
 use crate::tempdir::TempDir;
 use elysiandb::acl::{self, Permission};
-use elysiandb::api;
+use elysiandb::api::{self, ByteFields};
 use elysiandb::configuration::Config;
 use elysiandb::crypto::{bcrypt, sha256};
 use elysiandb::globals;
 use elysiandb::gocompat::base64::STD_ENCODING;
 use elysiandb::gocompat::json::{self, Map, Value};
 use elysiandb::httpd::{Request, RequestCtx};
-use elysiandb::security::{self, LoginSource, Role};
+use elysiandb::security::{self, BasicUser, LoginSource, Role};
 use elysiandb::storage;
 
 const R: &[u8] = b"\xff";
@@ -305,4 +305,93 @@ fn invalid_utf8_usernames_behave_as_in_go() {
 
     let err = acl::reset_acl_entity_to_default(b"doc", R).expect_err("raw user");
     assert_eq!(err.message(), b"user \xff not found");
+}
+
+const ESCAPED: &str = "\\ufffd";
+const ADMIN_PERMISSIONS: &str = r#"{"create":true,"delete":true,"owning_delete":true,"owning_read":true,"owning_update":true,"owning_write":true,"read":true,"update":true}"#;
+const USER_PERMISSIONS: &str = r#"{"create":false,"delete":false,"owning_delete":true,"owning_read":true,"owning_update":true,"owning_write":true,"read":false,"update":false}"#;
+
+fn acl_documents() -> Vec<(Vec<u8>, String)> {
+    let mut out = Vec::new();
+    let engine = storage::engine().expect("engine");
+    engine
+        .snapshot(acl::ACL_ENTITY.as_bytes())
+        .ascend(0, |doc| {
+            let bytes = doc.bytes().expect("bytes");
+            out.push((
+                doc.id().to_vec(),
+                String::from_utf8(bytes.to_vec()).expect("utf8 document"),
+            ));
+            true
+        });
+    out.sort();
+    out
+}
+
+fn acl_document(id: &[u8], entity: &str, username: &str, permissions: &str) -> (Vec<u8>, String) {
+    (
+        id.to_vec(),
+        format!(
+            r#"{{"entity":"{entity}","id":"{username}::{entity}","permissions":{permissions},"username":"{username}"}}"#
+        ),
+    )
+}
+
+#[test]
+fn invalid_utf8_names_are_written_as_in_go() {
+    let _store = open_store();
+    for (name, password) in [(R, "password-1"), (S, "password-2")] {
+        security::create_basic_user(&BasicUser {
+            username: name.to_vec(),
+            password: password.as_bytes().to_vec(),
+            role: Role::user(),
+        })
+        .expect("create");
+    }
+
+    assert_eq!(user_keys(), [b"admin".to_vec(), S.to_vec(), R.to_vec()]);
+    for name in [R, S] {
+        let text = String::from_utf8(stored(security::USER_ENTITY, name).expect("raw document"))
+            .expect("utf8 document");
+        assert!(text.starts_with(&format!(r#"{{"id":"{ESCAPED}","password":"$2a$10$"#)));
+        assert!(text.ends_with(&format!(r#"","role":"user","username":"{ESCAPED}"}}"#)));
+    }
+    assert!(auth(R, "password-1"));
+    assert!(!auth(F, "password-1"));
+
+    let mut d1 = Map::from([("id".to_string(), Value::String("d1".to_string()))]);
+    assert!(api::write_entity(b"doc", &mut d1).is_empty());
+    assert!(
+        api::write_entity_bytes(RAW_ENTITY, &mut Map::new(), &ByteFields::id(b"x\xfb")).is_empty()
+    );
+    assert_eq!(stored("e\u{fffd}", b"x\xfb"), None);
+    assert_eq!(
+        api::read_entity_bytes_by_id(RAW_ENTITY, b"x\xfb").map(|b| b.to_vec()),
+        Some(format!(r#"{{"id":"x{ESCAPED}"}}"#).into_bytes())
+    );
+
+    acl::init_acl().expect("init acl");
+    let raw_entity = format!("e{ESCAPED}");
+    let expected = [
+        acl_document(b"admin::doc", "doc", "admin", ADMIN_PERMISSIONS),
+        acl_document(b"admin::e\xfc", &raw_entity, "admin", ADMIN_PERMISSIONS),
+        acl_document(
+            "\u{fffd}::doc".as_bytes(),
+            "doc",
+            "\u{fffd}",
+            USER_PERMISSIONS,
+        ),
+        acl_document(
+            b"\xef\xbf\xbd::e\xfc",
+            &raw_entity,
+            "\u{fffd}",
+            USER_PERMISSIONS,
+        ),
+    ];
+    assert_eq!(acl_documents(), expected);
+    assert!(acl::get_acl_entity_for_username(RAW_ENTITY, b"admin").is_some());
+    assert!(acl::can_create_entity(b"admin", RAW_ENTITY));
+
+    acl::init_acl().expect("init acl again");
+    assert_eq!(acl_documents(), expected);
 }

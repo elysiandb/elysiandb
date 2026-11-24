@@ -95,7 +95,7 @@ fn session_rows_match_go() {
 
     let store = security_store("user");
     BasicHashedUser {
-        username: "admin".to_string(),
+        username: b"admin".to_vec(),
         password: go_admin_hash(GO_COUNTER),
         role: Role::admin(),
     }

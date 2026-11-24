@@ -4,6 +4,7 @@ use std::fmt;
 use crate::crypto::sha256;
 use crate::gocompat::json::{self, Decode, DecodeState, Error, Expected, Map, RawMessage, Value};
 use crate::gocompat::strconv;
+use crate::gocompat::utf8;
 use crate::json_struct;
 use crate::query::{FilterNode, Filters, Ops, Query};
 
@@ -76,7 +77,7 @@ fn object_keys_in_order(raw: &[u8]) -> Vec<String> {
 
     let mut keys = Vec::new();
     let _ = d.object_members(|d, key| {
-        keys.push(String::from_utf8_lossy(key).into_owned());
+        keys.push(utf8::decode_string(key));
         d.skip();
         Ok(())
     });

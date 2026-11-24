@@ -104,7 +104,7 @@ fn basic_hashed_user_to_data_map() {
     let _store = setup();
 
     let u = BasicHashedUser {
-        username: "bob".to_string(),
+        username: b"bob".to_vec(),
         password: "hash".to_string(),
         role: Role::admin(),
     };
@@ -125,7 +125,7 @@ fn basic_hashed_user_save() {
     let _store = setup();
 
     let u = BasicHashedUser {
-        username: "saveuser".to_string(),
+        username: b"saveuser".to_vec(),
         password: "hash".to_string(),
         role: Role::user(),
     };
@@ -146,7 +146,7 @@ fn basic_user_to_hased_user() {
 
     let hu = u.to_hased_user().expect("hash");
 
-    assert_eq!(hu.username.as_bytes(), u.username.as_slice(), "mismatch");
+    assert_eq!(hu.username, u.username, "mismatch");
     assert!(!hu.password.is_empty(), "empty hash");
     assert_eq!(hu.role, u.role, "role mismatch");
 }

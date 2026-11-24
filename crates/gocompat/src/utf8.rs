@@ -295,3 +295,17 @@ pub fn valid(p: &[u8]) -> bool {
 pub fn valid_rune(r: Rune) -> bool {
     (0..SURROGATE_MIN as Rune).contains(&r) || (SURROGATE_MAX as Rune + 1..=MAX_RUNE).contains(&r)
 }
+
+pub fn decode_string(p: &[u8]) -> String {
+    if let Ok(s) = std::str::from_utf8(p) {
+        return s.to_string();
+    }
+    let mut out = String::with_capacity(p.len() + 2);
+    let mut i = 0;
+    while i < p.len() {
+        let (r, width) = decode_rune(&p[i..]);
+        out.push(char::from_u32(r as u32).unwrap_or(char::REPLACEMENT_CHARACTER));
+        i += width;
+    }
+    out
+}

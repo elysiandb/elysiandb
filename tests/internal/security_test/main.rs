@@ -93,7 +93,7 @@ pub fn seed_user(username: &str, role: Role) {
     security::init_basic_users_storage().expect("init users storage");
 
     let user = BasicHashedUser {
-        username: username.to_string(),
+        username: username.as_bytes().to_vec(),
         password: format!("hash-of-{username}"),
         role,
     };

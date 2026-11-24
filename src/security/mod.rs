@@ -70,15 +70,5 @@ fn config() -> Arc<Config> {
 }
 
 pub(crate) fn text(b: &[u8]) -> String {
-    if let Ok(s) = std::str::from_utf8(b) {
-        return s.to_string();
-    }
-    let mut out = String::with_capacity(b.len());
-    let mut i = 0;
-    while i < b.len() {
-        let (r, width) = utf8::decode_rune(&b[i..]);
-        out.push(char::from_u32(r as u32).unwrap_or(char::REPLACEMENT_CHARACTER));
-        i += width;
-    }
-    out
+    utf8::decode_string(b)
 }

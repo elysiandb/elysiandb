@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::gocompat::json::{Map, Value};
+use crate::gocompat::utf8;
 use crate::schema::{self, ValidationError};
 
 use super::relationship::{extract_sub_entities, merge_with_existing};
@@ -46,7 +47,11 @@ impl<'a> WriteSimulation<'a> {
 
         let mut doc = deep_copy_map(data);
         self.write_sub_entities(entity, &mut doc);
-        self.store(entity, doc);
+        let id = match doc.get("id") {
+            Some(Value::String(id)) => id.as_bytes().to_vec(),
+            _ => Vec::new(),
+        };
+        self.store(entity, &id, doc);
 
         Vec::new()
     }
@@ -58,13 +63,10 @@ impl<'a> WriteSimulation<'a> {
 
         let mut merged = deep_copy_map(&existing);
         merged.extend(deep_copy_map(updates));
-        merged.insert(
-            "id".to_string(),
-            Value::String(String::from_utf8_lossy(id).into_owned()),
-        );
+        merged.insert("id".to_string(), Value::String(utf8::decode_string(id)));
 
         self.write_sub_entities(entity, &mut merged);
-        self.store(entity, merged);
+        self.store(entity, id, merged);
 
         true
     }
@@ -101,12 +103,10 @@ impl<'a> WriteSimulation<'a> {
         }
     }
 
-    fn store(&mut self, entity: &[u8], doc: Map) {
-        if let Some(Value::String(id)) = doc.get("id")
-            && !id.is_empty()
-        {
+    fn store(&mut self, entity: &[u8], id: &[u8], doc: Map) {
+        if !id.is_empty() {
             self.entities
-                .insert(simulation_key(entity, id.as_bytes()), Some(doc.clone()));
+                .insert(simulation_key(entity, id), Some(doc.clone()));
         }
 
         if !schema_applies(entity) {

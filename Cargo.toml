@@ -140,6 +140,10 @@ name = "http_adminui_test"
 path = "tests/internal/transport_test/http_test/adminui_test/main.rs"
 
 [[test]]
+name = "byte_ids_test"
+path = "tests/byte_ids/main.rs"
+
+[[test]]
 name = "golden_security"
 path = "tests/golden_security/main.rs"
 

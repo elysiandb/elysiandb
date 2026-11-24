@@ -8,7 +8,7 @@ use std::sync::{Arc, OnceLock};
 
 use crate::crypto::{bcrypt, rand, sha256};
 use crate::durable::{self, Fs, FsError};
-use crate::engine;
+use crate::engine::{self, ByteFields};
 use crate::gocompat::base64::STD_ENCODING;
 use crate::gocompat::fmt::{ScanError, fscanf_word};
 use crate::gocompat::json::{
@@ -212,7 +212,7 @@ pub struct BasicUser {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct BasicHashedUser {
-    pub username: String,
+    pub username: Vec<u8>,
     pub password: String,
     pub role: Role,
 }
@@ -242,7 +242,7 @@ impl BasicUser {
         };
 
         Ok(BasicHashedUser {
-            username: text(&self.username),
+            username: self.username.clone(),
             password,
             role,
         })
@@ -259,8 +259,8 @@ fn string_of<'a>(data: &'a Map, key: &str) -> Option<&'a str> {
 impl BasicHashedUser {
     pub fn to_data_map(&self) -> Map {
         let mut m = Map::new();
-        m.insert("id".to_string(), Value::String(self.username.clone()));
-        m.insert("username".to_string(), Value::String(self.username.clone()));
+        m.insert("id".to_string(), Value::String(text(&self.username)));
+        m.insert("username".to_string(), Value::String(text(&self.username)));
         m.insert("password".to_string(), Value::String(self.password.clone()));
         m.insert("role".to_string(), Value::String(self.role.0.clone()));
         m
@@ -278,14 +278,16 @@ impl BasicHashedUser {
         };
 
         Ok(BasicHashedUser {
-            username: username.to_string(),
+            username: username.as_bytes().to_vec(),
             password: password.to_string(),
             role: Role::new(role),
         })
     }
 
     pub fn save(&self) -> Result<(), SecurityError> {
-        let errors = engine::write_entity(USER_ENTITY.as_bytes(), &mut self.to_data_map());
+        let fields = ByteFields::id(&self.username).with("username", &self.username);
+        let errors =
+            engine::write_entity_bytes(USER_ENTITY.as_bytes(), &mut self.to_data_map(), &fields);
         if errors.is_empty() {
             return Ok(());
         }

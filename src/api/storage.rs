@@ -3,10 +3,11 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::configuration::Config;
-use crate::datastore::{Engine, Tx};
+use crate::datastore::{Engine, Tx, decode_map};
 use crate::globals;
 use crate::gocompat::errors::{self, BoxError};
-use crate::gocompat::json::{self, Map, Value};
+use crate::gocompat::json::{self, Encode, EncodeState, Map, Value};
+use crate::gocompat::utf8;
 use crate::json_struct;
 use crate::kv;
 use crate::log::{self, Logger};
@@ -22,6 +23,78 @@ use super::plan::{ListQuery, plan};
 use super::relationship::{extract_sub_entities, merge_with_existing};
 
 pub const CORE_ENTITY_TYPE_PREFIX: &str = "_elysiandb_core_";
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ByteFields(BTreeMap<String, Vec<u8>>);
+
+impl ByteFields {
+    pub fn new() -> ByteFields {
+        ByteFields::default()
+    }
+
+    pub fn id(id: &[u8]) -> ByteFields {
+        ByteFields::new().with("id", id)
+    }
+
+    pub fn with(mut self, key: &str, value: &[u8]) -> ByteFields {
+        self.0.insert(key.to_string(), value.to_vec());
+        self
+    }
+
+    pub fn get(&self, key: &str) -> Option<&[u8]> {
+        self.0.get(key).map(Vec::as_slice)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn apply(&self, data: &mut Map) {
+        for (key, value) in &self.0 {
+            data.insert(key.clone(), Value::String(utf8::decode_string(value)));
+        }
+    }
+
+    fn value_in<'a>(&'a self, data: &Map, key: &str) -> Option<&'a [u8]> {
+        let raw = self.get(key)?;
+        match data.get(key) {
+            Some(Value::String(text)) if *text == utf8::decode_string(raw) => Some(raw),
+            _ => None,
+        }
+    }
+}
+
+struct Document<'a> {
+    data: &'a Map,
+    fields: &'a ByteFields,
+}
+
+impl Encode for Document<'_> {
+    fn encode(&self, e: &mut EncodeState) -> Result<(), json::Error> {
+        e.write_byte(b'{');
+        for (i, (k, v)) in self.data.iter().enumerate() {
+            if i > 0 {
+                e.write_byte(b',');
+            }
+            e.write_string(k.as_bytes());
+            e.write_byte(b':');
+            match self.fields.value_in(self.data, k) {
+                Some(raw) => e.write_string(raw),
+                None => v.encode(e)?,
+            }
+        }
+        e.write_byte(b'}');
+        Ok(())
+    }
+}
+
+pub fn encode_document(data: &Map, fields: &ByteFields) -> Result<Vec<u8>, json::Error> {
+    if fields.is_empty() {
+        return json::marshal(data);
+    }
+
+    json::marshal(&Document { data, fields })
+}
 
 pub(crate) const API_LOG: Logger = log::for_component("api");
 
@@ -216,7 +289,7 @@ pub fn get_list_of_ids(
         if sort_field.is_empty() {
             return Err(errors::new(format!(
                 "key not found: {}",
-                globals::api_entity_index_id_key(&String::from_utf8_lossy(entity))
+                globals::api_entity_index_id_key(&text_of(entity))
             )));
         }
 
@@ -297,7 +370,7 @@ fn schema_entity() -> &'static [u8] {
 }
 
 fn text_of(b: &[u8]) -> String {
-    String::from_utf8_lossy(b).into_owned()
+    utf8::decode_string(b)
 }
 
 fn string_field<'a>(data: &'a Map, key: &str) -> &'a [u8] {
@@ -312,13 +385,22 @@ fn replace_contents(dst: &mut Map, src: Map) {
 }
 
 pub fn write_entity(entity: &[u8], data: &mut Map) -> Vec<ValidationError> {
+    write_entity_bytes(entity, data, &ByteFields::new())
+}
+
+pub fn write_entity_bytes(
+    entity: &[u8],
+    data: &mut Map,
+    fields: &ByteFields,
+) -> Vec<ValidationError> {
     let mut errs: Vec<ValidationError> = Vec::new();
     let mut result: Option<Map> = None;
 
+    fields.apply(data);
     let source: &Map = data;
     let err = update(|tx| {
         let mut attempt = deep_copy_document(source);
-        errs = write_entity_tx(tx, entity, &mut attempt, true);
+        errs = write_entity_tx(tx, entity, &mut attempt, true, fields);
         if !errs.is_empty() {
             return Err(Box::new(ValidationFailed));
         }
@@ -347,6 +429,7 @@ fn write_entity_tx(
     entity: &[u8],
     data: &mut Map,
     check_inferred_schema: bool,
+    fields: &ByteFields,
 ) -> Vec<ValidationError> {
     if schema_enabled() && entity != schema_entity() {
         let current = tx.read_shared(schema_entity(), entity);
@@ -367,7 +450,7 @@ fn write_entity_tx(
 
     write_sub_entities(tx, entity, data);
 
-    persist_entity(tx, entity, data);
+    persist_entity(tx, entity, data, fields);
     update_schema_if_needed(tx, entity, data);
 
     Vec::new()
@@ -383,7 +466,13 @@ fn write_sub_entities(tx: &mut Tx<'_>, entity: &[u8], data: &mut Map) {
         let id = string_field(&sub, "id").to_vec();
         let existing = tx.read(sub_entity.as_bytes(), &id);
         let mut merged = merge_with_existing(sub, existing);
-        write_entity_tx(tx, sub_entity.as_bytes(), &mut merged, false);
+        write_entity_tx(
+            tx,
+            sub_entity.as_bytes(),
+            &mut merged,
+            false,
+            &ByteFields::new(),
+        );
     }
 }
 
@@ -398,7 +487,7 @@ pub fn update_entity_schema(entity: &[u8], fields_raw: &Map) -> Map {
     let mut storable = schema::schema_entity_to_storable_structure(&entity_schema);
     storable.insert("_manual".to_string(), Value::Bool(true));
 
-    write_entity(schema_entity(), &mut storable);
+    write_entity_bytes(schema_entity(), &mut storable, &ByteFields::id(entity));
 
     storable
 }
@@ -429,9 +518,27 @@ pub fn delete_entity_type(entity: &[u8]) -> Result<(), BoxError> {
     Ok(())
 }
 
-fn persist_entity(tx: &mut Tx<'_>, entity: &[u8], data: &Map) {
-    let id = string_field(data, "id");
-    if let Err(err) = tx.put(entity, id, data) {
+fn put_document(
+    tx: &mut Tx<'_>,
+    entity: &[u8],
+    id: &[u8],
+    data: &Map,
+    fields: &ByteFields,
+) -> Result<(), BoxError> {
+    if fields.is_empty() {
+        return tx.put(entity, id, data);
+    }
+
+    let value = encode_document(data, fields)?;
+    let decoded = decode_map(&value).ok().flatten();
+    tx.put_bytes(entity, id, value, decoded)
+}
+
+fn persist_entity(tx: &mut Tx<'_>, entity: &[u8], data: &Map, fields: &ByteFields) {
+    let id = fields
+        .value_in(data, "id")
+        .unwrap_or_else(|| string_field(data, "id"));
+    if let Err(err) = put_document(tx, entity, id, data, fields) {
         API_LOG.error(
             "cannot encode a document",
             kv!["entity" => entity, "id" => id, "err" => log::display(&err)],
@@ -455,13 +562,14 @@ fn update_schema_if_needed(tx: &mut Tx<'_>, entity: &[u8], data: &Map) {
         return;
     }
 
+    let schema_fields = ByteFields::id(entity);
     let mut merged = schema::merge_analyzed_schema(entity, current.as_deref(), data);
     if let Some(current) = &current {
         if merged == **current {
             return;
         }
 
-        if let Ok(encoded) = json::marshal(&merged)
+        if let Ok(encoded) = encode_document(&merged, &schema_fields)
             && let Some(stored) = tx.read_bytes(schema_entity(), entity)
             && encoded.as_slice() == &*stored
         {
@@ -469,7 +577,7 @@ fn update_schema_if_needed(tx: &mut Tx<'_>, entity: &[u8], data: &Map) {
         }
     }
 
-    write_entity_tx(tx, schema_entity(), &mut merged, true);
+    write_entity_tx(tx, schema_entity(), &mut merged, true, &schema_fields);
 }
 
 pub fn write_list_of_entities(entity: &[u8], list: &mut [Map]) -> Vec<Vec<ValidationError>> {
@@ -482,7 +590,7 @@ pub fn write_list_of_entities(entity: &[u8], list: &mut [Map]) -> Vec<Vec<Valida
         results = vec![None; source.len()];
         for (i, data) in source.iter().enumerate() {
             let mut attempt = deep_copy_document(data);
-            let errs = write_entity_tx(tx, entity, &mut attempt, true);
+            let errs = write_entity_tx(tx, entity, &mut attempt, true, &ByteFields::new());
             let valid = errs.is_empty();
             errors.push(errs);
             if valid {
@@ -561,7 +669,7 @@ fn update_entity_by_id_tx(tx: &mut Tx<'_>, entity: &[u8], id: &[u8], updated: &M
 
     write_sub_entities(tx, entity, &mut existing);
 
-    persist_entity(tx, entity, &existing);
+    persist_entity(tx, entity, &existing, &ByteFields::id(id));
     update_schema_if_needed(tx, entity, &existing);
 
     Some(existing)
@@ -689,7 +797,7 @@ pub fn import_all(data: &mut ImportData) -> Vec<ImportRejection> {
                 batch = Vec::new();
                 for (index, item) in items.iter_mut().enumerate().take(end).skip(start) {
                     let mut attempt = deep_copy_document(item);
-                    let errs = write_entity_tx(tx, entity, &mut attempt, false);
+                    let errs = write_entity_tx(tx, entity, &mut attempt, false, &ByteFields::new());
                     if !errs.is_empty() {
                         batch.push(new_import_rejection(entity, index, item, errs));
                         continue;
@@ -746,7 +854,9 @@ pub fn commit_batch(ops: &[BatchOperation]) -> Result<(), BoxError> {
             match op.kind.as_str() {
                 "write" => {
                     let mut data = deep_copy_document(&op.data);
-                    if !write_entity_tx(tx, &op.entity, &mut data, true).is_empty() {
+                    if !write_entity_tx(tx, &op.entity, &mut data, true, &ByteFields::new())
+                        .is_empty()
+                    {
                         return Err(Box::new(BatchError::Validation));
                     }
                 }

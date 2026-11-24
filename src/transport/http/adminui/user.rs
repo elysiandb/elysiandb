@@ -58,24 +58,21 @@ pub fn login_controller(ctx: &mut RequestCtx) {
         }
     };
 
-    let session = match security::create_session(
-        user.username.as_bytes(),
-        user.role.clone(),
-        security::SESSION_TTL,
-    ) {
-        Ok(session) => session,
-        Err(err) => {
-            observe::set_error(ctx, &err);
-            ctx.set_status_code(STATUS_INTERNAL_SERVER_ERROR);
-            return;
-        }
-    };
+    let session =
+        match security::create_session(&user.username, user.role.clone(), security::SESSION_TTL) {
+            Ok(session) => session,
+            Err(err) => {
+                observe::set_error(ctx, &err);
+                ctx.set_status_code(STATUS_INTERNAL_SERVER_ERROR);
+                return;
+            }
+        };
 
     security::set_session_cookie(ctx, &session);
-    security::log_login(user.username.as_bytes(), source);
+    security::log_login(&user.username, source);
 
     let resp = UserResponse {
-        username: ByteString::from(user.username.as_str()),
+        username: ByteString(user.username),
         role: user.role,
     };
 

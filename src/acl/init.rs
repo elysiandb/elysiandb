@@ -1,7 +1,7 @@
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 
-use crate::engine;
+use crate::engine::{self, ByteFields};
 use crate::gocompat::json::{self, Encode, EncodeState, Map, Value};
 use crate::kv;
 use crate::log;
@@ -266,7 +266,11 @@ fn save_acl_list(acls: &[Acl]) -> Result<(), AclError> {
 }
 
 fn write_acl(a: &Acl) -> Result<(), AclError> {
-    let validation_errors = engine::write_entity(ACL_ENTITY.as_bytes(), &mut a.to_data_map());
+    let fields = ByteFields::id(&get_acl_entity_id(&a.username, &a.entity))
+        .with("username", &a.username)
+        .with("entity", &a.entity);
+    let validation_errors =
+        engine::write_entity_bytes(ACL_ENTITY.as_bytes(), &mut a.to_data_map(), &fields);
     if validation_errors.is_empty() {
         return Ok(());
     }
