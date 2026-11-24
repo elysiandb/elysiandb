@@ -130,7 +130,33 @@ impl ValueProperty {
     }
 }
 
+#[inline]
+fn plain_js_func(rt: &Runtime, f: ObjRef) -> bool {
+    matches!(
+        &rt.obj(f).ext,
+        crate::object::ObjExt::JsFunc(d)
+            if matches!(d.kind, crate::func::FuncKind::Func | crate::func::FuncKind::Method)
+    )
+}
+
+fn plain_js_call(rt: &mut Runtime, f: ObjRef, this: &Value, args: &[Value]) -> JsResult<Value> {
+    let this = if this.is_empty() {
+        Value::Undefined
+    } else {
+        this.clone()
+    };
+    match crate::vm::js_func_call_ex(rt, f, args, Value::Empty, this)? {
+        (_, Some(ex)) => Err(Throw::Exception(ex)),
+        (r, None) => Ok(r),
+    }
+}
+
 pub fn property_get(rt: &mut Runtime, getter: ObjRef, this: &Value) -> JsResult<Value> {
+    if plain_js_func(rt, getter) {
+        let ret = plain_js_call(rt, getter, this, &[])?;
+        rt.root(&ret);
+        return Ok(ret);
+    }
     let Some(call) = getter.assert_callable(rt) else {
         return Ok(Value::Undefined);
     };
@@ -140,6 +166,10 @@ pub fn property_get(rt: &mut Runtime, getter: ObjRef, this: &Value) -> JsResult<
 }
 
 pub fn property_set(rt: &mut Runtime, setter: ObjRef, this: &Value, v: Value) -> JsResult<()> {
+    if plain_js_func(rt, setter) {
+        plain_js_call(rt, setter, this, std::slice::from_ref(&v))?;
+        return Ok(());
+    }
     if let Some(call) = setter.assert_callable(rt) {
         call.call(rt, this.clone(), &[v])?;
     }
@@ -599,7 +629,16 @@ impl Value {
         }
     }
 
+    #[inline]
     pub fn to_object(&self, rt: &mut Runtime) -> JsResult<ObjRef> {
+        if let Value::Object(o) = self {
+            return Ok(*o);
+        }
+        self.to_object_slow(rt)
+    }
+
+    #[inline(never)]
+    fn to_object_slow(&self, rt: &mut Runtime) -> JsResult<ObjRef> {
         match self {
             Value::Object(o) => Ok(*o),
             Value::Undefined | Value::Null | Value::Empty => Err(Throw::Value(
@@ -629,7 +668,16 @@ impl Value {
         }
     }
 
+    #[inline]
     pub fn base_object(&self, rt: &mut Runtime) -> JsResult<Option<ObjRef>> {
+        if let Value::Object(o) = self {
+            return Ok(Some(*o));
+        }
+        self.base_object_slow(rt)
+    }
+
+    #[inline(never)]
+    fn base_object_slow(&self, rt: &mut Runtime) -> JsResult<Option<ObjRef>> {
         match self {
             Value::Object(o) => Ok(Some(*o)),
             Value::Bool(_) => Ok(Some(rt.get_boolean_prototype())),

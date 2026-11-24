@@ -2220,10 +2220,8 @@ impl Runtime {
             if self.vm.interrupt.is_set() {
                 break;
             }
-            if self.handles.len() > handles_base {
-                self.handles.truncate(handles_base);
-            }
             if self.heap.gc_requested {
+                self.handles.truncate(handles_base);
                 self.collect_garbage();
             }
             match &self.vm.prg {
@@ -4101,6 +4099,7 @@ impl Runtime {
         }
     }
 
+    #[inline]
     pub fn vm_value_to_object(&mut self, v: &Value) -> JsResult<ObjRef> {
         if let Value::Object(o) = v {
             return Ok(*o);
@@ -4110,7 +4109,11 @@ impl Runtime {
         Ok(o)
     }
 
+    #[inline]
     pub fn vm_base_object(&mut self, v: &Value) -> JsResult<Option<ObjRef>> {
+        if let Value::Object(o) = v {
+            return Ok(Some(*o));
+        }
         let r = v.base_object(self)?;
         if let (Value::Symbol(_), Some(o)) = (v, r) {
             self.handles.push(o);
