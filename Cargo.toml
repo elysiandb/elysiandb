@@ -63,6 +63,14 @@ path = "tests/internal/log_test/main.rs"
 name = "golden_ops"
 path = "tests/golden_ops/main.rs"
 
+[[test]]
+name = "configuration_test"
+path = "tests/internal/configuration_test/main.rs"
+
+[[test]]
+name = "globals_test"
+path = "tests/internal/globals_test/main.rs"
+
 [profile.release]
 strip = true
 panic = "unwind"

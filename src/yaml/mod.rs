@@ -1,5 +1,6 @@
 mod apic;
 mod decode;
+mod list;
 mod node;
 mod parserc;
 mod readerc;
@@ -12,6 +13,7 @@ mod yamlh;
 mod yamlprivateh;
 
 pub use decode::{Decoder, Fields, Outcome, Scalar, Target};
+pub use list::StringList;
 pub use node::{Document, Node, NodeKind, parse};
 pub use resolve::Resolved;
 pub use value::Value;

@@ -1,8 +1,12 @@
 #[path = "../common/mod.rs"]
 mod common;
+#[path = "../internal/tempdir.rs"]
+mod tempdir;
 
+mod config;
 mod fmt;
 mod logs;
+mod yaml;
 
 use elysiandb::log::{self, Options};
 use elysiandb::sync::{Mutex, MutexGuard};
