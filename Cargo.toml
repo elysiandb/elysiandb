@@ -128,6 +128,18 @@ name = "acl_test"
 path = "tests/internal/acl_test/main.rs"
 
 [[test]]
+name = "http_security_test"
+path = "tests/internal/transport_test/http_test/api_test/security_test/main.rs"
+
+[[test]]
+name = "http_acl_test"
+path = "tests/internal/transport_test/http_test/acl_test/main.rs"
+
+[[test]]
+name = "http_adminui_test"
+path = "tests/internal/transport_test/http_test/adminui_test/main.rs"
+
+[[test]]
 name = "golden_security"
 path = "tests/golden_security/main.rs"
 
