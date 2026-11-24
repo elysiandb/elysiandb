@@ -96,7 +96,7 @@ impl AsciiString {
     }
 
     pub fn string(&self) -> unistring::String {
-        unistring::String::from_bytes(&self.0)
+        unistring::String::from_shared_bytes(&self.0)
     }
 
     pub fn go_string(&self) -> Vec<u8> {
@@ -198,12 +198,16 @@ impl AsciiString {
     }
 
     pub fn compare_to(&self, other: &JsString) -> i32 {
-        let o = match other {
-            JsString::Ascii(o) => o.0.to_vec(),
-            JsString::Unicode(o) => o.go_string(),
-            JsString::Imported(o) => o.utf8().to_vec(),
+        let unicode;
+        let o: &[u8] = match other {
+            JsString::Ascii(o) => &o.0,
+            JsString::Unicode(o) => {
+                unicode = o.go_string();
+                &unicode
+            }
+            JsString::Imported(o) => o.utf8(),
         };
-        match self.0[..].cmp(&o[..]) {
+        match self.0[..].cmp(o) {
             Ordering::Less => -1,
             Ordering::Equal => 0,
             Ordering::Greater => 1,

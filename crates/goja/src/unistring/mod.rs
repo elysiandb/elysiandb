@@ -144,6 +144,14 @@ impl String {
         String::from_bytes(s.as_bytes())
     }
 
+    pub fn from_shared_bytes(b: &Arc<[u8]>) -> String {
+        if is_utf16_bytes(b) {
+            String::from_bytes(b)
+        } else {
+            String(Repr::Bytes(b.clone()))
+        }
+    }
+
     pub fn as_utf16(&self) -> Option<&[u16]> {
         match &self.0 {
             Repr::Utf16(u) => Some(u),

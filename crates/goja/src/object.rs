@@ -826,7 +826,22 @@ impl Trace for BaseObject {
 }
 
 pub fn idx_string(idx: i64) -> unistring::String {
-    unistring::String::from_bytes(idx.to_string().as_bytes())
+    let mut buf = [0u8; 20];
+    let mut i = buf.len();
+    let mut n = idx.unsigned_abs();
+    loop {
+        i -= 1;
+        buf[i] = b'0' + (n % 10) as u8;
+        n /= 10;
+        if n == 0 {
+            break;
+        }
+    }
+    if idx < 0 {
+        i -= 1;
+        buf[i] = b'-';
+    }
+    unistring::String::from_bytes(&buf[i..])
 }
 
 pub fn to_idx(v: i64) -> u32 {

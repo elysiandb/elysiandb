@@ -376,3 +376,41 @@ fn test_shared_helpers_keep_builtin_behaviour() {
         ),
     ]);
 }
+
+#[test]
+fn test_string_keys_and_lengths_on_hot_paths() {
+    check(&[
+        (
+            r#""x".length + "," + "abcdef".length + "," + "abc".charCodeAt(1) + "," + "été".length"#,
+            "1,6,98,3",
+        ),
+        (
+            r#"var s = "abc"; s.length = 7; s.length + "," + "zz".length"#,
+            "3,2",
+        ),
+        (
+            r#"({a: 1}).hasOwnProperty("a") + "," + ({a: 1}).hasOwnProperty("b") + "," + ({"é": 1}).hasOwnProperty("é")"#,
+            "true,false,true",
+        ),
+        (
+            r#"("b" < "a") + "," + ("a" < "é") + "," + ("é" < "a") + "," + ["b", "a", "é", "aa", "A"].sort().join()"#,
+            "false,true,false,A,a,aa,b,é",
+        ),
+        (
+            r#"var a = []; a[0] = 1; a[3] = 2; a[-1] = 3; a[4294967294] = 4; a[4294967295] = 5; Object.keys(a).join() + "|" + a.length"#,
+            "0,3,4294967294,-1,4294967295|4294967295",
+        ),
+        (
+            r#"var a = []; for (var i = 0; i < 12; i++) { a[i] = i * 2; } a.join() + "|" + a.length"#,
+            "0,2,4,6,8,10,12,14,16,18,20,22|12",
+        ),
+        (
+            r#"var o = Object.create(Array.prototype); o[2] = 1; o[-7] = 2; Object.keys(o).join()"#,
+            "2,-7",
+        ),
+        (
+            r#"var called = []; Object.defineProperty(Object.prototype, "5", {set: function(v) { called.push(v); }, configurable: true}); var a = []; a[5] = 9; called.join() + "|" + a.hasOwnProperty(5) + "|" + a.length"#,
+            "9|false|0",
+        ),
+    ]);
+}

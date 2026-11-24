@@ -356,8 +356,12 @@ impl StringObject {
             value: int_to_value(len as i64),
             ..ValueProperty::default()
         };
+        if let Some(Value::Property(p)) = obj.base.values.get_mut(&*crate::vm::STR_LENGTH) {
+            **p = lp;
+            return;
+        }
         obj.base
-            ._put(&"length".into(), Value::Property(Box::new(lp)));
+            ._put(&crate::vm::STR_LENGTH, Value::Property(Box::new(lp)));
     }
 
     fn len(rt: &Runtime, o: ObjRef) -> i64 {
