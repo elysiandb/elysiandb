@@ -21,6 +21,7 @@ pub mod pagetree;
 pub mod ptree;
 pub mod query;
 pub mod schema;
+pub mod security;
 pub mod stat;
 pub mod storage;
 pub mod sync;

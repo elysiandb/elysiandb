@@ -10,5 +10,6 @@ pub mod strconv;
 pub mod strings;
 pub mod time;
 pub mod unicode;
+pub mod url;
 pub mod utf16;
 pub mod utf8;

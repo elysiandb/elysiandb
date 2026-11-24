@@ -1,7 +1,9 @@
 mod format;
 mod print;
+mod scan;
 
 pub use print::{append, appendf, appendln, sprint, sprintf, sprintln};
+pub use scan::{ScanError, fscanf_word, fscanln_int, fscanln_word};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Arg<'a> {

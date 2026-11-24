@@ -120,6 +120,10 @@ name = "tcp_routing_test"
 path = "tests/internal/transport_test/tcp_test/tcp_routing_test/main.rs"
 
 [[test]]
+name = "security_test"
+path = "tests/internal/security_test/main.rs"
+
+[[test]]
 name = "golden_security"
 path = "tests/golden_security/main.rs"
 

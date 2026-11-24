@@ -6,10 +6,10 @@ use std::time::Duration;
 use elysiandb::configuration::Config;
 use elysiandb::globals;
 use elysiandb::gocompat::json::Value;
-use elysiandb::gocompat::strings;
 use elysiandb::log::{self, Options};
+use elysiandb::security::{self, BasicUser, Role};
 use elysiandb::storage;
-use elysiandb::transport::tcp::tcp_routing::{self, Conn, Security};
+use elysiandb::transport::tcp::tcp_routing::{self, Conn};
 
 use super::common;
 use super::tempdir::TempDir;
@@ -17,28 +17,10 @@ use super::{Capture, Restore, log_state};
 
 const LINE_LIMIT: usize = 131_072;
 
-const SKIPPED: [(&str, &str, &str); 13] = [
+const SKIPPED: [(&str, &str, &str); 3] = [
     ("off", "line 131073", "line longer than the listener buffer"),
     ("off", "line 200000", "line longer than the listener buffer"),
     ("token", "unauthenticated timeout", "listener read deadline"),
-    ("basic", "auth wrong", "user store of the security module"),
-    ("basic", "auth one arg", "user store of the security module"),
-    ("basic", "auth admin", "user store of the security module"),
-    ("basic", "auth trimmed", "user store of the security module"),
-    (
-        "basic",
-        "auth non-admin user",
-        "user store of the security module",
-    ),
-    ("user", "auth wrong", "user store of the security module"),
-    ("user", "auth one arg", "user store of the security module"),
-    ("user", "auth admin", "user store of the security module"),
-    ("user", "auth trimmed", "user store of the security module"),
-    (
-        "user",
-        "auth non-admin user",
-        "user store of the security module",
-    ),
 ];
 
 const PARTIAL: [(&str, &str, usize, &str); 2] = [
@@ -78,37 +60,6 @@ impl Conn for FakeConn {
     }
 }
 
-fn config() -> Arc<Config> {
-    match globals::config() {
-        Some(cfg) => cfg,
-        None => panic!("the configuration is not set"),
-    }
-}
-
-fn token_mode() -> bool {
-    let cfg = config();
-    cfg.security.authentication.enabled && cfg.security.authentication.mode == "token"
-}
-
-fn config_security() -> Security {
-    Security {
-        credentials_are_required: Some(Arc::new(|| config().security.authentication.enabled)),
-        token_authentication_is_enabled: Some(Arc::new(token_mode)),
-        authenticate_credentials: Some(Arc::new(|credentials, _source| {
-            let cfg = config();
-            if !cfg.security.authentication.enabled {
-                return true;
-            }
-            let credentials = strings::trim_space(credentials);
-            if token_mode() {
-                let expected = cfg.security.authentication.token.as_bytes();
-                return !expected.is_empty() && credentials == expected;
-            }
-            false
-        })),
-    }
-}
-
 fn start_mode(mode: &str) -> TempDir {
     let _ = storage::close();
     let dir = TempDir::new();
@@ -134,9 +85,33 @@ fn start_mode(mode: &str) -> TempDir {
 
     storage::load_db();
     tcp_routing::reset_throttles();
-    tcp_routing::set_security(config_security());
+    security::reset_failed_login_throttle();
+    security::reset_login_attempts();
+    security::register();
+    seed_users(mode);
 
     dir
+}
+
+fn seed_users(mode: &str) {
+    match mode {
+        "basic" => {
+            unsafe { std::env::set_var(security::ADMIN_PASSWORD_ENV_VAR, "ad min") };
+            let created = security::init_admin_user_if_not_exists();
+            unsafe { std::env::remove_var(security::ADMIN_PASSWORD_ENV_VAR) };
+            created.expect("basic mode admin");
+        }
+        "user" => {
+            security::init_admin_user_if_not_exists().expect("user mode admin");
+            security::create_basic_user(&BasicUser {
+                username: b"ann".to_vec(),
+                password: b"secret-1".to_vec(),
+                role: Role::user(),
+            })
+            .expect("user mode ann");
+        }
+        _ => {}
+    }
 }
 
 fn str_of<'a>(v: &'a Value, key: &str) -> Option<&'a str> {
@@ -325,5 +300,5 @@ fn tcp_golden_matches_go() {
     assert_eq!(partial.len(), PARTIAL.len(), "partial cases {partial:?}");
     assert_eq!(full + partial.len() + skipped.len(), rows.len());
     assert_eq!(rows.len(), 46);
-    assert_eq!(full, 31);
+    assert_eq!(full, 41);
 }
