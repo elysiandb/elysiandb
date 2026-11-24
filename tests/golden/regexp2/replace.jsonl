@@ -1,0 +1,32 @@
+{"count":-1,"func_output":"this is a \u003c10,4,1\u003e","input":"this is a test","options":0,"output":"this is a unit","pattern":"test","replacement":"unit","start_at":-1}
+{"count":-1,"func_output":"x\u003c1,1,3\u003e\u003c2,2,3\u003e","input":"xaab","options":256,"output":"x[a||a|$|x|ab||xaab][a|b|ab|$|xa||b|xaab]","pattern":"(a)(b)?","replacement":"[$1|$2|$\u0026|$$|$`|$'|$+|$_]","start_at":-1}
+{"count":-1,"func_output":"x\u003c1,1,3\u003e\u003c2,2,3\u003e","input":"xaab","options":0,"output":"x[a||a|$|x|ab||xaab][a|b|ab|$|xa||b|xaab]","pattern":"(a)(b)?","replacement":"[$1|$2|$\u0026|$$|$`|$'|$+|$_]","start_at":-1}
+{"count":-1,"func_output":"\u003c0,1,2\u003e\u003c1,1,2\u003e","input":"aa","options":256,"output":"a-$\u003cx\u003e-a-a-${2}-$2a-$\u003cx\u003e-a-a-${2}-$2","pattern":"(?\u003cx\u003ea)","replacement":"${x}-$\u003cx\u003e-${1}-$1-${2}-$2","start_at":-1}
+{"count":-1,"func_output":"\u003c0,1,2\u003e\u003c1,1,2\u003e","input":"aa","options":256,"output":"a0aa$a0aa$","pattern":"(a)","replacement":"$10$01$1$","start_at":-1}
+{"count":-1,"func_output":"\u003c0,11,12\u003e","input":"abcdefghijk","options":256,"output":"k-k0-aa-a2","pattern":"(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)(k)","replacement":"$11-$110-$1a-$012","start_at":-1}
+{"count":-1,"func_output":"\u003c0,11,12\u003e","input":"abcdefghijk","options":0,"output":"k-$110-aa-$012-k","pattern":"(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)(k)","replacement":"$11-$110-$1a-$012-${11}","start_at":-1}
+{"count":7,"func_output":"0123456789foo\u003c13,1,1\u003e\u003c14,1,1\u003e\u003c15,1,1\u003e\u003c16,1,1\u003e\u003c17,1,1\u003e\u003c18,1,1\u003e\u003c19,1,1\u003efoo","input":"0123456789foo4567890foo","options":64,"output":"0123456789foo#######foo","pattern":"\\d","replacement":"#","start_at":-1}
+{"count":3,"func_output":"012345678\u003c9,1,1\u003efoo\u003c13,1,1\u003e\u003c14,1,1\u003e67890foo","input":"0123456789foo4567890foo","options":64,"output":"012345678\u003e0123456789\u003cfoo\u003e0123456789foo4\u003c\u003e0123456789foo45\u003c67890foo","pattern":"\\d","replacement":"\u003c$\u0026$`\u003e","start_at":15}
+{"count":-1,"func_output":"a\u003c1,1,2\u003eb\u003c3,1,2\u003ec\u003c5,1,2\u003e","input":"a1b2c3","options":64,"output":"a]a1b2c311[b]a1b2c322[c]a1b2c333[","pattern":"(?\u003cx\u003e\\d)","replacement":"[${x}$+$_]","start_at":-1}
+{"count":2,"func_output":"aaa\u003c3,1,1\u003e\u003c4,1,1\u003e","input":"aaaaa","options":0,"output":"aaabb","pattern":"a","replacement":"b","start_at":3}
+{"count":0,"func_output":"","input":"aaaaa","options":0,"output":"","pattern":"a","replacement":"b","start_at":0}
+{"count":-2,"error":{"code":"CountTooSmall"},"func_error":{"code":"CountTooSmall"},"input":"aaaaa","options":0,"pattern":"a","replacement":"b","start_at":0}
+{"count":-1,"error":{"code":"StartAtTooLarge"},"func_error":{"code":"StartAtTooLarge"},"input":"aaaaa","options":0,"pattern":"a","replacement":"b","start_at":6}
+{"count":-1,"func_output":"\u003c0,0,1\u003ea\u003c1,0,1\u003eb\u003c2,0,1\u003ec\u003c3,0,1\u003e","input":"abc","options":0,"output":"-a-b-c-","pattern":"x*","replacement":"-","start_at":-1}
+{"count":-1,"func_output":"abc\u003c3,0,1\u003e","input":"abc","options":64,"output":"abc-","pattern":"x*","replacement":"-","start_at":-1}
+{"count":-1,"func_output":"a\u003c1,1,1\u003eb\u003c3,1,1\u003e","input":"aébé","options":0,"output":"aEbE","pattern":"é","replacement":"E","start_at":1}
+{"count":-1,"error":{"code":"StartAtNotAligned"},"func_error":{"code":"StartAtNotAligned"},"input":"aébé","options":0,"pattern":"é","replacement":"E","start_at":2}
+{"count":-1,"error":{"args":[],"code":"CaptureGroupOutOfRange"},"func_output":"this is \u003c8,1,1\u003e test","input":"this is a test","options":0,"pattern":"a","replacement":"$5000000000","start_at":-1}
+{"count":-1,"error":{"args":[],"code":"CaptureGroupOutOfRange"},"func_output":"\u003c0,1,2\u003e","input":"a","options":0,"pattern":"(a)","replacement":"${5000000000}","start_at":-1}
+{"count":-1,"error":{"args":[],"code":"CaptureGroupOutOfRange"},"func_output":"\u003c0,1,2\u003e","input":"a","options":256,"pattern":"(a)","replacement":"$5000000000","start_at":-1}
+{"count":-1,"func_output":"\u003c0,1,3\u003e\u003c1,1,3\u003e","input":"ab","options":0,"output":"aa${3}bb${3}","pattern":"(?\u003cn\u003ea)|(?\u003cm\u003eb)","replacement":"${n}${m}$1$2${3}","start_at":-1}
+{"count":-1,"func_output":"\u003c0,2,3\u003e","input":"ab","options":0,"output":"b|a|$3|a","pattern":"(?\u003c2\u003ea)(b)","replacement":"$1|$2|$3|${2}","start_at":-1}
+{"count":-1,"func_output":"\u003c0,2,3\u003e","input":"ab","options":0,"output":"b|$2|a|$6|a","pattern":"(?\u003c5\u003ea)(b)","replacement":"$1|$2|$5|$6|$+","start_at":-1}
+{"count":-1,"func_output":"\u003c0,5,1\u003e \u003c6,5,1\u003e","input":"Hello World","options":1,"output":"\u003cHello\u003e \u003cWorld\u003e","pattern":"\\w+","replacement":"\u003c$0\u003e","start_at":-1}
+{"count":-1,"func_output":"\u003c0,1,2\u003e\u003c1,1,2\u003e\u003c2,1,2\u003e","input":"a😀b","options":1280,"output":"[a][😀][b]","pattern":"(.)","replacement":"[$1]","start_at":-1}
+{"count":-1,"func_output":"abc\u003c3,0,1\u003e\n\u003c4,0,1\u003e","input":"abc\n","options":0,"output":"abc!\n!","pattern":"$","replacement":"!","start_at":-1}
+{"count":-1,"func_output":"\u003c0,0,1\u003ea\n\u003c2,0,1\u003eb\n\u003c4,0,1\u003ec","input":"a\nb\nc","options":2,"output":"\u003ea\n\u003eb\n\u003ec","pattern":"^","replacement":"\u003e","start_at":-1}
+{"count":-1,"func_output":"a\u003c1,1,1\u003ec","input":"abc","options":0,"output":"a$c","pattern":"b","replacement":"$","start_at":-1}
+{"count":-1,"func_output":"a\u003c1,1,1\u003ec","input":"abc","options":0,"output":"a${c","pattern":"b","replacement":"${","start_at":-1}
+{"count":-1,"func_output":"a\u003c1,1,1\u003ec","input":"abc","options":0,"output":"a${0c","pattern":"b","replacement":"${0","start_at":-1}
+{"count":-1,"func_output":"a\u003c1,1,1\u003ec","input":"abc","options":0,"output":"ab${x}c","pattern":"b","replacement":"${0}${x}","start_at":-1}

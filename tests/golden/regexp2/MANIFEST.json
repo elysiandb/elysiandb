@@ -1,0 +1,34 @@
+{
+  "part": "regexp2",
+  "baseline": "1a11e5e",
+  "go_version": "go1.24.7",
+  "goos": "darwin",
+  "goarch": "amd64",
+  "files": [
+    {
+      "path": "corpus.jsonl",
+      "size": 3697131,
+      "sha256": "3214a883008027a747b5ae6dfdcf7f4d40b16a084481a5036ab90ff565368720"
+    },
+    {
+      "path": "escape.jsonl",
+      "size": 50533,
+      "sha256": "ee257fd420e7ad5d15799897213022f01e87fa60023cad7f1fe9a104be6da72c"
+    },
+    {
+      "path": "goja.jsonl",
+      "size": 234272,
+      "sha256": "882430918177c33e956521fb0aaf7cc882539861992a3d625d9c5d29ab7a086c"
+    },
+    {
+      "path": "replace.jsonl",
+      "size": 6011,
+      "sha256": "a53271e37d507ae891e0e2af8501c76ec0f85a89689d82a638e55e64fc429647"
+    },
+    {
+      "path": "strings.jsonl",
+      "size": 4716,
+      "sha256": "f26faa7719e4883a1916b8b84131aaf660eb18cd5a322dea7bf07d32b76d56d8"
+    }
+  ]
+}
