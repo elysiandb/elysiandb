@@ -7,13 +7,13 @@
   "files": [
     {
       "path": "amd64.cases",
-      "size": 623353,
-      "sha256": "f18161c8e7c1a4e2a9fee7b988fcff9967f34f5aaf3f79c8b013891164a0bc0c"
+      "size": 2610984,
+      "sha256": "2ec130d7b31a1da4888088dbf822198920ec601e67f0f9b73ee95765c5387efa"
     },
     {
       "path": "arm64.cases",
-      "size": 623353,
-      "sha256": "cc28a8fa1c04d43924841f4b56835611cda6e1a2f1e238866a9d587193767aa4"
+      "size": 2610984,
+      "sha256": "6de46e0de36ad28d1a8b203c94dc55415423daa9b7166d9b290a040f270e4786"
     }
   ]
 }

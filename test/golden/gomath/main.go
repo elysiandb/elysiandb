@@ -53,7 +53,119 @@ func cases() string {
 	for _, p := range pairs {
 		fmt.Fprintf(&b, "pow %s %s %s\n", hex(p[0]), hex(p[1]), hex(math.Pow(p[0], p[1])))
 	}
+	mathCases(&b)
 	return b.String()
+}
+
+var unary = []struct {
+	name string
+	f    func(float64) float64
+}{
+	{"sin", math.Sin},
+	{"cos", math.Cos},
+	{"tan", math.Tan},
+	{"asin", math.Asin},
+	{"acos", math.Acos},
+	{"atan", math.Atan},
+	{"sinh", math.Sinh},
+	{"cosh", math.Cosh},
+	{"tanh", math.Tanh},
+	{"asinh", math.Asinh},
+	{"acosh", math.Acosh},
+	{"atanh", math.Atanh},
+	{"cbrt", math.Cbrt},
+	{"expm1", math.Expm1},
+	{"log1p", math.Log1p},
+	{"log2", math.Log2},
+	{"log10", math.Log10},
+	{"trunc", math.Trunc},
+	{"ceil", math.Ceil},
+	{"floor", math.Floor},
+	{"sqrt", math.Sqrt},
+}
+
+var binary = []struct {
+	name string
+	f    func(float64, float64) float64
+}{
+	{"atan2", math.Atan2},
+	{"max", math.Max},
+	{"min", math.Min},
+}
+
+func mathCases(b *strings.Builder) {
+	rng := rand.New(rand.NewSource(seed + 1))
+	specials := []float64{0, 1, 0.5, 2, 3, math.Inf(1), math.NaN(), 1e-300, 5e-324, 2.2250738585072014e-308, 1e300, math.MaxFloat64,
+		math.Pi, math.Pi / 2, math.Pi / 4, 3 * math.Pi / 4, 1e-9, 0.7, 0.66, 2.414213562373095, 0.625, 44.014845965556525, 44.02,
+		21, 21.000001, 0.5000001, 0.3465735902799726, 1.0397207708399179, 38.816242111356935, 709.78, 709.79,
+		1 << 28, 1<<28 + 1, 1.0 / (1 << 28), 1 << 29, 1<<29 - 1, 1 << 53, 0.41421356237309503, 0.2928932188134524,
+		1.0 / (1 << 29), 1.0 / (1 << 54), 1e16, 1e22, 1e100, 1e200, 0.9999999999999999, 1.0000000000000002, 1e-20}
+	var xs []float64
+	for _, s := range specials {
+		xs = append(xs, s, -s)
+	}
+	for i := 0; i < 200; i++ {
+		xs = append(xs, (rng.Float64()-0.5)*100)
+		xs = append(xs, rng.Float64()*2-1)
+		xs = append(xs, (rng.Float64()-0.5)*8)
+		m := math.Ldexp(0.5+rng.Float64()/2, rng.Intn(2100)-1075)
+		if rng.Intn(2) == 0 {
+			m = -m
+		}
+		xs = append(xs, m)
+		xs = append(xs, (rng.Float64()-0.5)*1e10)
+	}
+	for _, u := range unary {
+		for _, x := range xs {
+			fmt.Fprintf(b, "%s %s %s\n", u.name, hex(x), hex(u.f(x)))
+		}
+	}
+	pairs := [][2]float64{}
+	edges := []float64{0, math.Copysign(0, -1), 1, -1, math.Inf(1), math.Inf(-1), math.NaN(), 2.5, -2.5}
+	for _, y := range edges {
+		for _, x := range edges {
+			pairs = append(pairs, [2]float64{y, x})
+		}
+	}
+	for i := 0; i < 1500; i++ {
+		y := (rng.Float64() - 0.5) * 20
+		x := (rng.Float64() - 0.5) * 20
+		if i%7 == 0 {
+			x = math.Ldexp(0.5+rng.Float64()/2, rng.Intn(200)-100)
+		}
+		pairs = append(pairs, [2]float64{y, x})
+	}
+	for _, f := range binary {
+		for _, p := range pairs {
+			fmt.Fprintf(b, "%s %s %s %s\n", f.name, hex(p[0]), hex(p[1]), hex(f.f(p[0], p[1])))
+		}
+	}
+	targeted := []struct {
+		name   string
+		f      func(float64) float64
+		lo, hi float64
+	}{
+		{"sin", math.Sin, -10, 10},
+		{"cos", math.Cos, -10, 10},
+		{"tan", math.Tan, -10, 10},
+		{"asin", math.Asin, -1, 1},
+		{"acos", math.Acos, -1, 1},
+		{"atan", math.Atan, -5, 5},
+		{"sinh", math.Sinh, -0.75, 0.75},
+		{"tanh", math.Tanh, -0.75, 0.75},
+		{"asinh", math.Asinh, -4, 4},
+		{"acosh", math.Acosh, 1, 4},
+		{"cbrt", math.Cbrt, -1000, 1000},
+		{"expm1", math.Expm1, -40, 40},
+		{"log1p", math.Log1p, -0.99, 3},
+		{"log2", math.Log2, 0, 100},
+	}
+	for _, t := range targeted {
+		for i := 0; i < 1500; i++ {
+			x := t.lo + float64(rng.Float64()*(t.hi-t.lo))
+			fmt.Fprintf(b, "%s %s %s\n", t.name, hex(x), hex(t.f(x)))
+		}
+	}
 }
 
 func inputs(line string) string {
