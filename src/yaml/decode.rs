@@ -504,7 +504,8 @@ impl Target for i64 {
 
 #[cfg(target_arch = "x86_64")]
 fn go_float_to_int(f: f64) -> i64 {
-    if f.is_nan() || !(-9.223_372_036_854_775_808e18..9.223_372_036_854_775_808e18).contains(&f) {
+    let min = i64::MIN as f64;
+    if f.is_nan() || !(min..-min).contains(&f) {
         i64::MIN
     } else {
         f as i64
