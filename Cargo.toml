@@ -87,6 +87,10 @@ path = "tests/internal/schema_test/main.rs"
 name = "cache_test"
 path = "tests/internal/cache_test/main.rs"
 
+[[test]]
+name = "golden_api"
+path = "tests/golden_api/main.rs"
+
 [profile.release]
 strip = true
 panic = "unwind"
