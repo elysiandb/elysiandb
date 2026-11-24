@@ -5,16 +5,20 @@ use std::sync::Arc;
 use crate::datastore::{Engine, Tx};
 use crate::globals;
 use crate::gocompat::errors::{self, BoxError};
-use crate::gocompat::json::Map;
+use crate::gocompat::json::{self, Map, Value};
+use crate::json_struct;
 use crate::kv;
 use crate::log::{self, Logger};
 use crate::query::Filters;
-use crate::storage;
+use crate::schema::{self, ValidationError};
+use crate::storage::{self, deep_copy_document};
+use crate::uuid;
 
 use super::filter::filters_match_entity;
 use super::guard::{self, Guard, GuardError};
 use super::include::{apply_includes_with, extract_auto_includes, merge_includes};
 use super::plan::{ListQuery, plan};
+use super::relationship::{extract_sub_entities, merge_with_existing};
 
 pub const CORE_ENTITY_TYPE_PREFIX: &str = "_elysiandb_core_";
 
@@ -47,7 +51,9 @@ where
 }
 
 pub(crate) fn log_write_error(op: &str, entity: &[u8], err: Result<(), BoxError>) {
-    if let Err(err) = err {
+    if let Err(err) = err
+        && err.downcast_ref::<ValidationFailed>().is_none()
+    {
         API_LOG.error(
             "write failed",
             kv!["op" => op, "entity" => entity, "err" => log::display(&err)],
@@ -257,4 +263,495 @@ pub fn delete_entity_documents(entity: &[u8]) {
             Ok(())
         }),
     );
+}
+
+#[derive(Debug)]
+struct ValidationFailed;
+
+impl fmt::Display for ValidationFailed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("validation failed")
+    }
+}
+
+impl std::error::Error for ValidationFailed {}
+
+fn schema_enabled() -> bool {
+    globals::config().is_some_and(|c| c.api.schema.enabled)
+}
+
+fn schema_strict() -> bool {
+    globals::config().is_some_and(|c| c.api.schema.strict)
+}
+
+fn schema_entity() -> &'static [u8] {
+    schema::SCHEMA_ENTITY.as_bytes()
+}
+
+fn text_of(b: &[u8]) -> String {
+    String::from_utf8_lossy(b).into_owned()
+}
+
+fn string_field<'a>(data: &'a Map, key: &str) -> &'a [u8] {
+    match data.get(key) {
+        Some(Value::String(s)) => s.as_bytes(),
+        _ => b"",
+    }
+}
+
+fn replace_contents(dst: &mut Map, src: Map) {
+    *dst = src;
+}
+
+pub fn write_entity(entity: &[u8], data: &mut Map) -> Vec<ValidationError> {
+    let mut errs: Vec<ValidationError> = Vec::new();
+    let mut result: Option<Map> = None;
+
+    let source: &Map = data;
+    let err = update(|tx| {
+        let mut attempt = deep_copy_document(source);
+        errs = write_entity_tx(tx, entity, &mut attempt, true);
+        if !errs.is_empty() {
+            return Err(Box::new(ValidationFailed));
+        }
+
+        result = Some(attempt);
+
+        Ok(())
+    });
+
+    if let Err(e) = &err
+        && e.downcast_ref::<ValidationFailed>().is_some()
+    {
+        return errs;
+    }
+
+    log_write_error("write", entity, err);
+    if let Some(result) = result {
+        replace_contents(data, result);
+    }
+
+    Vec::new()
+}
+
+fn write_entity_tx(
+    tx: &mut Tx<'_>,
+    entity: &[u8],
+    data: &mut Map,
+    check_inferred_schema: bool,
+) -> Vec<ValidationError> {
+    if schema_enabled() && entity != schema_entity() {
+        let current = tx.read_shared(schema_entity(), entity);
+        if let Some(current) = &current
+            && (check_inferred_schema || schema::is_manual_schema(entity, Some(current)))
+        {
+            let errors = schema::validate_entity(entity, data, Some(current));
+            if !errors.is_empty() {
+                return errors;
+            }
+        }
+    }
+
+    let has_id = matches!(data.get("id"), Some(Value::String(s)) if !s.is_empty());
+    if !has_id {
+        data.insert("id".to_string(), Value::String(uuid::new_v4()));
+    }
+
+    write_sub_entities(tx, entity, data);
+
+    persist_entity(tx, entity, data);
+    update_schema_if_needed(tx, entity, data);
+
+    Vec::new()
+}
+
+fn write_sub_entities(tx: &mut Tx<'_>, entity: &[u8], data: &mut Map) {
+    let subs = extract_sub_entities(entity, data);
+    for mut sub in subs {
+        let sub_entity = match sub.remove("@entity").as_ref() {
+            Some(Value::String(s)) => s.clone(),
+            _ => String::new(),
+        };
+        let id = string_field(&sub, "id").to_vec();
+        let existing = tx.read(sub_entity.as_bytes(), &id);
+        let mut merged = merge_with_existing(sub, existing);
+        write_entity_tx(tx, sub_entity.as_bytes(), &mut merged, false);
+    }
+}
+
+pub fn update_entity_schema(entity: &[u8], fields_raw: &Map) -> Map {
+    let fields = schema::map_to_fields(fields_raw);
+
+    let entity_schema = schema::Entity {
+        id: entity.to_vec(),
+        fields,
+    };
+
+    let mut storable = schema::schema_entity_to_storable_structure(&entity_schema);
+    storable.insert("_manual".to_string(), Value::Bool(true));
+
+    write_entity(schema_entity(), &mut storable);
+
+    storable
+}
+
+pub fn create_entity_type(entity: &[u8]) -> Result<(), BoxError> {
+    if entity_type_exists(entity) {
+        return Err(errors::new(format!(
+            "entity type '{}' already exists",
+            text_of(entity)
+        )));
+    }
+
+    add_entity_type(entity);
+
+    Ok(())
+}
+
+pub fn delete_entity_type(entity: &[u8]) -> Result<(), BoxError> {
+    if !entity_type_exists(entity) {
+        return Err(errors::new(format!(
+            "entity type '{}' does not exist",
+            text_of(entity)
+        )));
+    }
+
+    delete_all_entities(entity);
+
+    Ok(())
+}
+
+fn persist_entity(tx: &mut Tx<'_>, entity: &[u8], data: &Map) {
+    let id = string_field(data, "id");
+    if let Err(err) = tx.put(entity, id, data) {
+        API_LOG.error(
+            "cannot encode a document",
+            kv!["entity" => entity, "id" => id, "err" => log::display(&err)],
+        );
+        return;
+    }
+
+    tx.ensure_type(entity);
+}
+
+fn update_schema_if_needed(tx: &mut Tx<'_>, entity: &[u8], data: &Map) {
+    if !schema_enabled() || entity == schema_entity() {
+        return;
+    }
+
+    let current = tx.read_shared(schema_entity(), entity);
+    if schema_strict()
+        && let Some(current) = &current
+        && schema::is_manual_schema(entity, Some(current))
+    {
+        return;
+    }
+
+    let mut merged = schema::merge_analyzed_schema(entity, current.as_deref(), data);
+    if let Some(current) = &current {
+        if merged == **current {
+            return;
+        }
+
+        if let Ok(encoded) = json::marshal(&merged)
+            && let Some(stored) = tx.read_bytes(schema_entity(), entity)
+            && encoded.as_slice() == &*stored
+        {
+            return;
+        }
+    }
+
+    write_entity_tx(tx, schema_entity(), &mut merged, true);
+}
+
+pub fn write_list_of_entities(entity: &[u8], list: &mut [Map]) -> Vec<Vec<ValidationError>> {
+    let mut errors: Vec<Vec<ValidationError>> = Vec::new();
+    let mut results: Vec<Option<Map>> = Vec::new();
+
+    let source: &[Map] = list;
+    let err = update(|tx| {
+        errors = Vec::with_capacity(source.len());
+        results = vec![None; source.len()];
+        for (i, data) in source.iter().enumerate() {
+            let mut attempt = deep_copy_document(data);
+            let errs = write_entity_tx(tx, entity, &mut attempt, true);
+            let valid = errs.is_empty();
+            errors.push(errs);
+            if valid {
+                results[i] = Some(attempt);
+            }
+        }
+
+        Ok(())
+    });
+
+    log_write_error("write_list", entity, err);
+    for (i, result) in results.into_iter().enumerate() {
+        if let Some(result) = result {
+            replace_contents(&mut list[i], result);
+        }
+    }
+
+    errors
+}
+
+pub fn get_entity_schema(entity: &[u8]) -> Option<Map> {
+    read_entity_by_id(schema_entity(), entity)
+}
+
+fn delete_all_entities_tx(tx: &mut Tx<'_>, entity: &[u8]) {
+    let current = tx.read(schema_entity(), entity);
+    if !schema::is_manual_schema(entity, current.as_ref()) {
+        tx.delete(schema_entity(), entity);
+    }
+
+    tx.reset_entity(entity);
+    tx.drop_type(entity);
+}
+
+pub fn delete_all_entities(entity: &[u8]) {
+    log_write_error(
+        "delete_all",
+        entity,
+        update(|tx| {
+            delete_all_entities_tx(tx, entity);
+            Ok(())
+        }),
+    );
+}
+
+pub fn delete_all() {
+    log_write_error(
+        "delete_all",
+        b"*",
+        update(|tx| {
+            for entity in list_entity_types() {
+                delete_all_entities_tx(tx, &entity);
+            }
+            Ok(())
+        }),
+    );
+}
+
+pub fn update_entity_by_id(entity: &[u8], id: &[u8], updated: &Map) -> Option<Map> {
+    let mut result = None;
+    let err = update(|tx| {
+        result = update_entity_by_id_tx(tx, entity, id, updated);
+        Ok(())
+    });
+
+    log_write_error("update", entity, err);
+
+    result
+}
+
+fn update_entity_by_id_tx(tx: &mut Tx<'_>, entity: &[u8], id: &[u8], updated: &Map) -> Option<Map> {
+    let mut existing = tx.read(entity, id)?;
+
+    existing.extend(deep_copy_document(updated));
+    existing.insert("id".to_string(), Value::String(text_of(id)));
+
+    write_sub_entities(tx, entity, &mut existing);
+
+    persist_entity(tx, entity, &existing);
+    update_schema_if_needed(tx, entity, &existing);
+
+    Some(existing)
+}
+
+pub fn update_list_of_entities(entity: &[u8], updates: &[Map]) -> Option<Vec<Map>> {
+    let mut results: Option<Vec<Map>> = None;
+    let err = update(|tx| {
+        let mut out = Vec::with_capacity(updates.len());
+        for upd in updates {
+            let id = string_field(upd, "id");
+            if id.is_empty() {
+                continue;
+            }
+
+            if let Some(res) = update_entity_by_id_tx(tx, entity, id, upd) {
+                out.push(res);
+            }
+        }
+        results = Some(out);
+
+        Ok(())
+    });
+
+    log_write_error("update_list", entity, err);
+
+    results
+}
+
+pub fn dump_all() -> BTreeMap<Vec<u8>, Vec<Map>> {
+    let mut result = BTreeMap::new();
+    for entity in list_entity_types() {
+        if entity == schema_entity() {
+            continue;
+        }
+
+        let docs = list_entities(&entity, 0, 0, b"", true, None, b"", b"");
+        result.insert(entity, docs);
+    }
+
+    result
+}
+
+pub fn count_all_entities() -> usize {
+    let mut counter = 0;
+    for entity in list_entity_types() {
+        if entity == schema_entity() {
+            continue;
+        }
+
+        counter += count_entities(&entity);
+    }
+
+    counter
+}
+
+json_struct! {
+    #[derive(Clone, Debug, Default, PartialEq, Eq)]
+    pub struct ImportRejection {
+        pub entity: Vec<u8> => "entity",
+        pub index: i64 => "index",
+        pub id: String => "id" [omitempty],
+        pub errors: Vec<ValidationError> => "errors",
+    }
+}
+
+pub type ImportData = BTreeMap<Vec<u8>, Vec<Map>>;
+
+pub fn validate_import(
+    data: &ImportData,
+    schema_for: &dyn Fn(&[u8]) -> Option<Map>,
+) -> Vec<ImportRejection> {
+    let mut rejections = Vec::new();
+    if !schema_enabled() {
+        return rejections;
+    }
+
+    for (entity, items) in data {
+        if entity.as_slice() == schema_entity() {
+            continue;
+        }
+
+        let schema_data = schema_for(entity);
+        if !schema::is_manual_schema(entity, schema_data.as_ref()) {
+            continue;
+        }
+
+        for (index, item) in items.iter().enumerate() {
+            let errs = schema::validate_entity(entity, item, schema_data.as_ref());
+            if !errs.is_empty() {
+                rejections.push(new_import_rejection(entity, index, item, errs));
+            }
+        }
+    }
+
+    rejections
+}
+
+pub fn new_import_rejection(
+    entity: &[u8],
+    index: usize,
+    item: &Map,
+    errs: Vec<ValidationError>,
+) -> ImportRejection {
+    ImportRejection {
+        entity: entity.to_vec(),
+        index: index as i64,
+        id: text_of(string_field(item, "id")),
+        errors: errs,
+    }
+}
+
+const IMPORT_BATCH: usize = 1000;
+
+pub fn import_all(data: &mut ImportData) -> Vec<ImportRejection> {
+    let mut rejections = Vec::new();
+    for (entity, items) in data.iter_mut() {
+        delete_entity_documents(entity);
+
+        let mut start = 0;
+        while start < items.len() {
+            let end = (start + IMPORT_BATCH).min(items.len());
+            let mut batch: Vec<ImportRejection> = Vec::new();
+            let err = update(|tx| {
+                batch = Vec::new();
+                for (index, item) in items.iter_mut().enumerate().take(end).skip(start) {
+                    let mut attempt = deep_copy_document(item);
+                    let errs = write_entity_tx(tx, entity, &mut attempt, false);
+                    if !errs.is_empty() {
+                        batch.push(new_import_rejection(entity, index, item, errs));
+                        continue;
+                    }
+                    replace_contents(item, attempt);
+                }
+                Ok(())
+            });
+            log_write_error("import", entity, err);
+            rejections.append(&mut batch);
+            start += IMPORT_BATCH;
+        }
+
+        log::debug(
+            "entity type imported",
+            kv!["component" => "api", "entity" => entity.as_slice(), "documents" => items.len() as i64],
+        );
+    }
+
+    rejections
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct BatchOperation {
+    pub kind: String,
+    pub entity: Vec<u8>,
+    pub id: Vec<u8>,
+    pub data: Map,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BatchError {
+    Validation,
+    Update,
+}
+
+impl fmt::Display for BatchError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            BatchError::Validation => "validation error",
+            BatchError::Update => "update failed",
+        })
+    }
+}
+
+impl std::error::Error for BatchError {}
+
+pub const ERR_BATCH_VALIDATION: BatchError = BatchError::Validation;
+pub const ERR_BATCH_UPDATE: BatchError = BatchError::Update;
+
+pub fn commit_batch(ops: &[BatchOperation]) -> Result<(), BoxError> {
+    update(|tx| {
+        for op in ops {
+            match op.kind.as_str() {
+                "write" => {
+                    let mut data = deep_copy_document(&op.data);
+                    if !write_entity_tx(tx, &op.entity, &mut data, true).is_empty() {
+                        return Err(Box::new(BatchError::Validation));
+                    }
+                }
+                "update" => {
+                    if update_entity_by_id_tx(tx, &op.entity, &op.id, &op.data).is_none() {
+                        return Err(Box::new(BatchError::Update));
+                    }
+                }
+                "delete" => tx.delete(&op.entity, &op.id),
+                _ => {}
+            }
+        }
+
+        Ok(())
+    })
 }

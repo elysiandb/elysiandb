@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
 
 use elysiandb::api;
-use elysiandb::gocompat::json::{self, Subject, Value};
+use elysiandb::gocompat::json::{self, Map, Subject, Value};
 use elysiandb::query::Query;
 use elysiandb::transport::http::api::{decode_query_payload, parse_filter_node};
 
 use super::common::{read_jsonl, str_field, unhex};
+use super::open_store;
 
 const G3: [(&str, &str); 14] = [
     (
@@ -199,15 +200,20 @@ pub fn check_row(row: &Value) {
 }
 
 #[test]
-fn query_payload_errors_without_store() {
+fn query_payload_errors() {
     let rows = read_jsonl("api/query_payload_errors.jsonl");
+    let _store = open_store(false, false, false);
+    let mut seed = Map::new();
+    seed.insert("id".to_string(), Value::String("x".to_string()));
+    seed.insert("t".to_string(), Value::String("v".to_string()));
+    api::write_entity(b"b", &mut seed);
+
     let mut checked = 0;
     for row in &rows {
-        let status = row.get("status").and_then(Value::as_i64).unwrap_or(0);
-        if status == 400 {
-            check_row(row);
-            checked += 1;
-        }
+        check_row(row);
+        checked += 1;
     }
-    assert_eq!(checked, 64);
+
+    assert_eq!(checked, 94);
+    assert_eq!(checked, rows.len());
 }

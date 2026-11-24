@@ -4,17 +4,67 @@ mod common;
 mod tempdir;
 
 mod cache_keys;
+mod include;
 mod matcher;
+mod planner;
 mod query_errors;
 mod scalars;
 mod schema_corpus;
 mod sort;
+mod write;
 
+use std::sync::{Arc, Once};
+
+use elysiandb::api;
+use elysiandb::cache;
+use elysiandb::configuration::Config;
+use elysiandb::globals;
 use elysiandb::gocompat::json::{self, Map, Value};
+use elysiandb::gocompat::time::Duration;
 use elysiandb::query::Filters;
+use elysiandb::storage;
 use elysiandb::sync::{Mutex, MutexGuard};
 
+use tempdir::TempDir;
+
 static SERIAL: Mutex<()> = Mutex::new(());
+static INIT: Once = Once::new();
+
+pub struct GoldenStore {
+    _dir: TempDir,
+    _serial: MutexGuard<'static, ()>,
+}
+
+impl Drop for GoldenStore {
+    fn drop(&mut self) {
+        let _ = storage::close();
+    }
+}
+
+pub fn open_store(schema_on: bool, strict: bool, cache_on: bool) -> GoldenStore {
+    let serial = SERIAL.lock();
+    INIT.call_once(api::index::register);
+    let dir = TempDir::new();
+    let mut cfg = Config::default();
+    cfg.store.folder = dir.path().to_string_lossy().into_owned();
+    cfg.store.shards = 4;
+    cfg.api.cache.enabled = cache_on;
+    cfg.api.schema.enabled = schema_on;
+    cfg.api.schema.strict = strict;
+    cfg.api.hooks.enabled = false;
+    cfg.security.authentication.enabled = false;
+    cfg.log.level = "error".to_string();
+    globals::set_config(Some(Arc::new(cfg)));
+    storage::load_db();
+    storage::load_json_db();
+    cache::init_cache(Duration(30 * Duration::SECOND.0));
+    api::delete_all();
+
+    GoldenStore {
+        _dir: dir,
+        _serial: serial,
+    }
+}
 
 pub fn serial() -> MutexGuard<'static, ()> {
     SERIAL.lock()

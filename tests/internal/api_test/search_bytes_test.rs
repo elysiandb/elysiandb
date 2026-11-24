@@ -5,7 +5,90 @@ use elysiandb::gocompat::json::{self, Map, Value};
 use elysiandb::gocompat::rand::{self, Rand};
 use elysiandb::gocompat::strings;
 
-use super::setup;
+use super::evaluate_test::wait_for_indexes;
+use super::{filters, ids, init_test_store, setup};
+
+#[test]
+fn test_searches_and_search_counts_match_the_scan() {
+    let _s = setup();
+    let _db = init_test_store();
+
+    let mut r = Rand::new(rand::new_source(5));
+    let mut all: Vec<Map> = Vec::new();
+    for i in 0..4000 {
+        let mut d = random_search_doc(&mut r, 1);
+        d.insert(b"id".to_vec(), Gen::Str(format!("s{i:04}").into_bytes()));
+        d.insert(
+            b"kind".to_vec(),
+            Gen::Str(["film", "serie"][i % 2].as_bytes().to_vec()),
+        );
+        let mut raw = Vec::new();
+        marshal_gen(&Gen::Obj(d), &mut raw);
+        all.push(decode(&raw));
+    }
+    api::write_list_of_entities(b"searched", &mut all);
+    let reference = api::list_entities(b"searched", 0, 0, b"", true, None, b"", b"");
+    api::list_entities(b"searched", 1, 0, b"", true, None, b"alpha", b"");
+    let kind = filters(&[("kind", &[("eq", "film")])]);
+    api::list_entities(b"searched", 1, 0, b"", true, Some(&kind), b"", b"");
+    wait_for_indexes();
+
+    for search in [
+        "alpha",
+        "été",
+        "ÉTÉ",
+        "<b>",
+        "a&b",
+        "smile",
+        "dune",
+        "nnn42",
+        "*",
+        "zzz",
+        "back\\\\slash",
+    ] {
+        for f in [None, Some(&kind)] {
+            let want: Vec<String> = ids(&reference
+                .iter()
+                .filter(|d| {
+                    api::search_matches_entity(d, search.as_bytes())
+                        && f.is_none_or(|f| api::filters_match_entity(d, f))
+                })
+                .cloned()
+                .collect::<Vec<_>>());
+            let got = ids(&api::list_entities(
+                b"searched",
+                0,
+                0,
+                b"",
+                true,
+                f,
+                search.as_bytes(),
+                b"",
+            ));
+            if got != want {
+                panic!(
+                    "search {search:?} filters {f:?}: planner {} documents, scan {}",
+                    got.len(),
+                    want.len()
+                );
+            }
+            let res = api::plan(api::ListQuery {
+                entity: b"searched",
+                search: search.as_bytes(),
+                filters: f,
+                count_only: true,
+                ..api::ListQuery::default()
+            });
+            if res.total != want.len() {
+                panic!(
+                    "search {search:?} filters {f:?}: count {}, scan {}",
+                    res.total,
+                    want.len()
+                );
+            }
+        }
+    }
+}
 
 pub const SEARCH_FRAGMENTS: [&[u8]; 18] = [
     b"alpha",

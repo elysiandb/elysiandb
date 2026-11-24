@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, VecDeque};
 use std::sync::Arc;
 
+use crate::cache;
 use crate::datastore::{Engine, INDEX_SORT, IndexSpec, parse_index_name};
 use crate::globals;
 use crate::gocompat::strconv;
@@ -13,6 +14,7 @@ pub fn register() {
     let mut hooks = storage::hooks();
     hooks.api_key_resolver = Some(Arc::new(resolve_api_key));
     storage::set_hooks(hooks);
+    cache::set_version_of(Some(entity_version));
 }
 
 pub fn entity_version(entity: &[u8]) -> String {

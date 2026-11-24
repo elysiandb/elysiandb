@@ -95,6 +95,10 @@ path = "tests/internal/api_test/main.rs"
 name = "golden_api"
 path = "tests/golden_api/main.rs"
 
+[[test]]
+name = "transaction_test"
+path = "tests/internal/transaction_test/main.rs"
+
 [profile.release]
 strip = true
 panic = "unwind"
