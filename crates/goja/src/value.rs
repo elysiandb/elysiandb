@@ -1,9 +1,9 @@
 use crate::builtin_bigint::string_to_big_int;
 use crate::deps::big;
+use crate::ftoa::{self, FToStrMode};
 use crate::string::{JsString, ascii_string};
 use crate::string_ascii::AsciiString;
 use crate::unistring;
-use gocompat::strconv;
 use std::sync::Arc;
 
 pub const MAX_INT: i64 = 1 << 53;
@@ -85,54 +85,10 @@ pub fn new_big_int(i: big::Int) -> Value {
     Value::BigInt(Arc::new(i))
 }
 
-fn f_to_str(num: f64) -> Vec<u8> {
-    if num.is_nan() {
-        return b"NaN".to_vec();
-    }
-    if num.is_infinite() {
-        return if num < 0.0 {
-            b"-Infinity".to_vec()
-        } else {
-            b"Infinity".to_vec()
-        };
-    }
-    if num == 0.0 {
-        return b"0".to_vec();
-    }
-    let e = strconv::format_float(num.abs(), b'e', -1, 64);
-    let (mant, exp) = e.split_once('e').unwrap_or((&e, "0"));
-    let digits: Vec<u8> = mant.bytes().filter(|c| *c != b'.').collect();
-    let exp: i64 = exp.parse().unwrap_or(0);
-    let dec_pt = exp + 1;
-    let n = digits.len() as i64;
-    let mut out = Vec::new();
-    if num < 0.0 {
-        out.push(b'-');
-    }
-    if !(-5..=21).contains(&dec_pt) {
-        out.push(digits[0]);
-        if n != 1 {
-            out.push(b'.');
-            out.extend_from_slice(&digits[1..]);
-        }
-        out.push(b'e');
-        if dec_pt > 0 {
-            out.push(b'+');
-        }
-        out.extend_from_slice((dec_pt - 1).to_string().as_bytes());
-    } else if n <= dec_pt {
-        out.extend_from_slice(&digits);
-        out.resize(out.len() + (dec_pt - n) as usize, b'0');
-    } else if dec_pt > 0 {
-        out.extend_from_slice(&digits[..dec_pt as usize]);
-        out.push(b'.');
-        out.extend_from_slice(&digits[dec_pt as usize..]);
-    } else {
-        out.extend_from_slice(b"0.");
-        out.resize(out.len() + (-dec_pt) as usize, b'0');
-        out.extend_from_slice(&digits);
-    }
-    out
+pub fn f_to_str(num: f64, mode: FToStrMode, prec: i64) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(128);
+    ftoa::f_to_str(num, mode, prec, &mut buf);
+    buf
 }
 
 impl Value {
@@ -222,7 +178,9 @@ impl Value {
             Value::Bool(true) => ascii_string("true"),
             Value::Bool(false) => ascii_string("false"),
             Value::Int(i) => JsString::Ascii(AsciiString::new(i.to_string().as_bytes())),
-            Value::Float(f) => JsString::Ascii(AsciiString::new(&f_to_str(*f))),
+            Value::Float(f) => {
+                JsString::Ascii(AsciiString::new(&f_to_str(*f, ftoa::MODE_STANDARD, 0)))
+            }
             Value::String(s) => s.clone(),
             Value::BigInt(b) => JsString::Ascii(AsciiString::new(b.string().as_bytes())),
             Value::Symbol(_) | Value::Object(_) => ascii_string(""),
