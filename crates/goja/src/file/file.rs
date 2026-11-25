@@ -158,25 +158,30 @@ impl File {
             .clone()
     }
 
-    pub fn position(&self, offset: i64) -> Position {
-        let line: i64;
-        let line_offsets: Vec<i64>;
-        {
-            let mut lines = self.lines.lock().unwrap_or_else(PoisonError::into_inner);
-            if offset > lines.last_scanned_offset {
-                line = self.scan_to(&mut lines, offset);
-                line_offsets = lines.line_offsets.clone();
-            } else {
-                line_offsets = lines.line_offsets.clone();
-                line = search(line_offsets.len(), |x| line_offsets[x] > offset) as i64 - 1;
-            }
-        }
+    pub fn has_source_map(&self) -> bool {
+        self.source_map
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .is_some()
+    }
+
+    pub fn line_column(&self, offset: i64) -> (i64, i64) {
+        let mut lines = self.lines.lock().unwrap_or_else(PoisonError::into_inner);
+        let line = if offset > lines.last_scanned_offset {
+            self.scan_to(&mut lines, offset)
+        } else {
+            let offs = &lines.line_offsets;
+            search(offs.len(), |x| offs[x] > offset) as i64 - 1
+        };
         let mut line_start = 0;
         if line >= 0 {
-            line_start = line_offsets[line as usize];
+            line_start = lines.line_offsets[line as usize];
         }
-        let row = line + 2;
-        let col = offset - line_start + 1;
+        (line + 2, offset - line_start + 1)
+    }
+
+    pub fn position(&self, offset: i64) -> Position {
+        let (row, col) = self.line_column(offset);
         if let Some(sm) = self.source_map() {
             let (source, _, row, col, ok) = sm.source(row, col);
             if ok {

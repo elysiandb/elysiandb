@@ -4,7 +4,7 @@ use crate::object::{
     BASE_CLASS, BaseObject, CLASS_ERROR, CLASS_OBJECT, Flag, FunctionCall, IterNextFunc, ObjClass,
     ObjExt, PropertyDescriptor, UStr,
 };
-use crate::runtime::{JsResult, Runtime, StackFrame};
+use crate::runtime::{JsResult, Runtime, StackTrace};
 use crate::string::{
     JsString, STRING_AGGREGATE_ERROR, STRING_EMPTY, STRING_ERROR, STRING_EVAL_ERROR,
     STRING_RANGE_ERROR, STRING_REFERENCE_ERROR, STRING_SYNTAX_ERROR, STRING_TYPE_ERROR,
@@ -14,8 +14,15 @@ use crate::value::Value;
 
 pub const PROP_NAME_STACK: &str = "stack";
 
+static STR_MESSAGE: std::sync::LazyLock<crate::unistring::String> =
+    std::sync::LazyLock::new(|| crate::unistring::String::new("message"));
+static STR_CAUSE: std::sync::LazyLock<crate::unistring::String> =
+    std::sync::LazyLock::new(|| crate::unistring::String::new("cause"));
+static STR_STACK: std::sync::LazyLock<crate::unistring::String> =
+    std::sync::LazyLock::new(|| crate::unistring::String::new(PROP_NAME_STACK));
+
 pub struct ErrorObject {
-    pub stack: Vec<StackFrame>,
+    pub stack: StackTrace,
     pub stack_prop_added: bool,
 }
 
@@ -42,8 +49,7 @@ impl ErrorObject {
             b.write_string(&val);
         }
         b.write_rune('\n' as i32);
-        let stack = ErrorObject::data(rt, o).stack.clone();
-        for frame in &stack {
+        for frame in ErrorObject::data(rt, o).stack.iter() {
             b.write_ascii(b"\tat ");
             frame.write_to_value_builder(&mut b);
             b.write_rune('\n' as i32);
@@ -54,15 +60,7 @@ impl ErrorObject {
     pub fn add_stack_prop(rt: &mut Runtime, o: ObjRef) -> JsResult<Option<Value>> {
         if !ErrorObject::data(rt, o).stack_prop_added {
             let s = ErrorObject::format_stack(rt, o)?;
-            let res = BaseObject::_put_prop(
-                rt,
-                o,
-                &PROP_NAME_STACK.into(),
-                Value::String(s),
-                true,
-                false,
-                true,
-            );
+            let res = BaseObject::_put_prop(rt, o, &STR_STACK, Value::String(s), true, false, true);
             let names = &mut rt.obj_mut(o).base.prop_names;
             if names.len() > 1 {
                 let last = names.pop();
@@ -182,12 +180,12 @@ pub fn write_error_string(
     sb: &mut StringBuilder,
     obj: ObjRef,
 ) -> JsResult<Option<JsString>> {
-    let name = obj.get_str(rt, &"name".into(), None)?;
+    let name = obj.get_str(rt, &crate::vm::STR_NAME, None)?;
     let name_str = match name {
         None | Some(Value::Undefined) => ascii_string("Error"),
         Some(n) => n.to_string(rt)?,
     };
-    let msg = obj.get_str(rt, &"message".into(), None)?;
+    let msg = obj.get_str(rt, &STR_MESSAGE, None)?;
     let msg_str = match msg {
         None | Some(Value::Undefined) => STRING_EMPTY.clone(),
         Some(m) => m.to_string(rt)?,
@@ -211,7 +209,7 @@ impl Runtime {
             &ERROR_OBJECT_CLASS,
             BaseObject::new(class, proto),
             ObjExt::Error(Box::new(ErrorObject {
-                stack,
+                stack: stack.into(),
                 stack_prop_added: false,
             })),
         )
@@ -221,10 +219,10 @@ impl Runtime {
         if let Value::Object(options) = options {
             let options = *options;
             if options.has_property(self, &Value::String(ascii_string("cause")))? {
-                let cause = options.get_str(self, &"cause".into(), None)?;
+                let cause = options.get_str(self, &STR_CAUSE, None)?;
                 obj.define_own_property_str(
                     self,
-                    &"cause".into(),
+                    &STR_CAUSE,
                     PropertyDescriptor {
                         writable: Flag::True,
                         enumerable: Flag::False,
@@ -245,7 +243,7 @@ impl Runtime {
             && !a0.is_undefined()
         {
             let m = a0.to_string_value(self)?;
-            BaseObject::_put_prop(self, obj, &"message".into(), m, true, false, true);
+            BaseObject::_put_prop(self, obj, &STR_MESSAGE, m, true, false, true);
         }
         if let Some(a1) = args.get(1)
             && !a1.is_undefined()
@@ -266,15 +264,7 @@ impl Runtime {
             && !a1.is_undefined()
         {
             let m = a1.to_string(self)?;
-            BaseObject::_put_prop(
-                self,
-                obj,
-                &"message".into(),
-                Value::String(m),
-                true,
-                false,
-                true,
-            );
+            BaseObject::_put_prop(self, obj, &STR_MESSAGE, Value::String(m), true, false, true);
         }
         let mut errors = Vec::new();
         if let Some(a0) = args.first() {
@@ -313,7 +303,7 @@ impl Runtime {
         BaseObject::_put_prop(
             self,
             o,
-            &"message".into(),
+            &STR_MESSAGE,
             Value::String(STRING_EMPTY.clone()),
             true,
             false,
@@ -322,7 +312,7 @@ impl Runtime {
         BaseObject::_put_prop(
             self,
             o,
-            &"name".into(),
+            &crate::vm::STR_NAME,
             Value::String(name),
             true,
             false,
@@ -348,7 +338,7 @@ impl Runtime {
         self.global.error_prototype = Some(ret);
         ret._put_prop(
             self,
-            &"message".into(),
+            &STR_MESSAGE,
             Value::String(STRING_EMPTY.clone()),
             true,
             false,
@@ -356,7 +346,7 @@ impl Runtime {
         );
         ret._put_prop(
             self,
-            &"name".into(),
+            &crate::vm::STR_NAME,
             Value::String(STRING_ERROR.clone()),
             true,
             false,

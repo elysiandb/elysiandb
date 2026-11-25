@@ -485,3 +485,56 @@ fn test_native_calls_keep_the_caller_state() {
         (r#""z"; [1].forEach(function() {}); 3"#, "3"),
     ]);
 }
+
+#[test]
+fn test_error_stacks_and_thrown_values() {
+    check_out(&[
+        (
+            r##"var out; var e1 = new Error("made"); function thrower() { throw e1 } try { thrower() } catch (e) { out = e.stack + "|" + (e === e1) }"##,
+            "Error: made\n\tat <eval>:1:19(5)\n|true",
+        ),
+        (
+            r##"var out; var s = []; var e1 = new TypeError("t"); for (var i = 0; i < 2; i++) { try { throw e1 } catch (e) { s.push(e.stack) } } out = s.join("#")"##,
+            "TypeError: t\n\tat <eval>:1:31(7)\n#TypeError: t\n\tat <eval>:1:31(7)\n",
+        ),
+        (
+            r##"var out; function a() { b() } function b() { throw new RangeError("deep") } try { a() } catch (e) { out = e.stack }"##,
+            "RangeError: deep\n\tat b (<eval>:1:52(3))\n\tat a (<eval>:1:26(2))\n\tat <eval>:1:84(6)\n",
+        ),
+        (
+            r##"var out; try { throw 5 } catch (e) { out = String(e) }"##,
+            "5",
+        ),
+        (
+            r##"var out; var o = {}; o.f = function () { return new Error("in method").stack }; out = o.f()"##,
+            "Error: in method\n\tat <eval>:1:49(3)\n\tat <eval>:1:90(10)\n",
+        ),
+        (
+            r##"var out; function outer() { try { null.x } catch (e) { return e.stack } } out = outer()"##,
+            "TypeError: Cannot read property 'x' of undefined\n\tat outer (<eval>:1:40(3))\n\tat <eval>:1:86(4)\n",
+        ),
+        (
+            r##"var out; var e2; try { [3].forEach(function inner() { e2 = new Error("cb") }) } catch (e) {} out = e2.stack"##,
+            "Error: cb\n\tat inner (<eval>:1:60(8))\n\tat forEach (native)\n\tat <eval>:1:35(7)\n",
+        ),
+        (
+            r##"var out; var err = new Error("x"); err.name = "Custom"; out = err.stack + "|" + Object.keys(err).join() + "|" + Object.getOwnPropertyNames(err).join()"##,
+            "Custom: x\n\tat <eval>:1:20(4)\n|name|stack,message,name",
+        ),
+        (
+            r##"var out; var err = new Error("x"); var st = err.stack; err.message = "changed"; out = st + "|" + err.stack"##,
+            "Error: x\n\tat <eval>:1:20(4)\n|Error: x\n\tat <eval>:1:20(4)\n",
+        ),
+    ]);
+    check(&[
+        (
+            r##"function f() { throw new Error("boom") } f()"##,
+            "!Error: boom at f (<eval>:1:22(3))",
+        ),
+        (r##"throw 7"##, "!7 at <eval>:1:1(1)"),
+        (
+            r##"null.x"##,
+            "!TypeError: Cannot read property 'x' of undefined at <eval>:1:6(1)",
+        ),
+    ]);
+}

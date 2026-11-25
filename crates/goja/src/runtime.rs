@@ -79,6 +79,25 @@ pub fn syntax_error<T>(msg: impl Into<String>) -> JsResult<T> {
     Err(Throw::SyntaxError(msg.into()))
 }
 
+fn write_decimal(b: &mut StringBuilder, v: i64) {
+    let mut buf = [0u8; 20];
+    let mut i = buf.len();
+    let mut n = v.unsigned_abs();
+    loop {
+        i -= 1;
+        buf[i] = b'0' + (n % 10) as u8;
+        n /= 10;
+        if n == 0 {
+            break;
+        }
+    }
+    if v < 0 {
+        i -= 1;
+        buf[i] = b'-';
+    }
+    b.write_ascii(&buf[i..]);
+}
+
 #[derive(Clone, Debug)]
 pub struct StackFrame {
     pub prg: Option<Arc<Program>>,
@@ -124,18 +143,34 @@ impl StackFrame {
                 b.write_string(&string_value_from_raw(n));
                 b.write_ascii(b" (");
             }
-            let p = self.position();
-            if !p.filename.is_empty() {
-                b.write_utf8_string(p.filename.as_bytes());
-            } else {
-                b.write_ascii(b"<eval>");
+            match &prg.src {
+                Some(src) if !src.has_source_map() => {
+                    let (line, column) = src.line_column(prg.source_offset(self.pc) as i64);
+                    if !src.name().is_empty() {
+                        b.write_utf8_string(src.name().as_bytes());
+                    } else {
+                        b.write_ascii(b"<eval>");
+                    }
+                    b.write_rune(':' as i32);
+                    write_decimal(b, line);
+                    b.write_rune(':' as i32);
+                    write_decimal(b, column);
+                }
+                _ => {
+                    let p = self.position();
+                    if !p.filename.is_empty() {
+                        b.write_utf8_string(p.filename.as_bytes());
+                    } else {
+                        b.write_ascii(b"<eval>");
+                    }
+                    b.write_rune(':' as i32);
+                    write_decimal(b, p.line);
+                    b.write_rune(':' as i32);
+                    write_decimal(b, p.column);
+                }
             }
-            b.write_rune(':' as i32);
-            b.write_ascii(p.line.to_string().as_bytes());
-            b.write_rune(':' as i32);
-            b.write_ascii(p.column.to_string().as_bytes());
             b.write_rune('(' as i32);
-            b.write_ascii(self.pc.to_string().as_bytes());
+            write_decimal(b, self.pc as i64);
             b.write_rune(')' as i32);
             if !n.is_empty() {
                 b.write_rune(')' as i32);
@@ -191,15 +226,57 @@ impl StackFrame {
 #[derive(Clone, Debug)]
 pub struct Exception {
     pub val: Value,
-    pub stack: Vec<StackFrame>,
+    pub stack: StackTrace,
     pub val_string: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub enum StackTrace {
+    Owned(Vec<StackFrame>),
+    Shared(Arc<[StackFrame]>),
+}
+
+impl Default for StackTrace {
+    fn default() -> StackTrace {
+        StackTrace::Owned(Vec::new())
+    }
+}
+
+impl From<Vec<StackFrame>> for StackTrace {
+    fn from(v: Vec<StackFrame>) -> StackTrace {
+        StackTrace::Owned(v)
+    }
+}
+
+impl std::ops::Deref for StackTrace {
+    type Target = [StackFrame];
+
+    fn deref(&self) -> &[StackFrame] {
+        match self {
+            StackTrace::Owned(v) => v,
+            StackTrace::Shared(a) => a,
+        }
+    }
+}
+
+impl StackTrace {
+    pub fn share(&mut self) -> StackTrace {
+        if let StackTrace::Owned(v) = self {
+            let a: Arc<[StackFrame]> = std::mem::take(v).into();
+            *self = StackTrace::Shared(a);
+        }
+        match self {
+            StackTrace::Shared(a) => StackTrace::Shared(a.clone()),
+            StackTrace::Owned(_) => StackTrace::default(),
+        }
+    }
 }
 
 impl Exception {
     pub fn new(val: Value) -> Exception {
         Exception {
             val,
-            stack: Vec::new(),
+            stack: StackTrace::default(),
             val_string: None,
         }
     }
@@ -213,7 +290,7 @@ impl Exception {
     }
 
     pub fn write_full_stack(&self, b: &mut String) {
-        for frame in &self.stack {
+        for frame in self.stack.iter() {
             b.push_str("\tat ");
             frame.write(b);
             b.push('\n');

@@ -70,7 +70,10 @@ pub fn new_string_value(s: &[u8]) -> JsString {
 pub fn string_value_from_raw(raw: &unistring::String) -> JsString {
     match raw.as_utf16() {
         Some(b) => JsString::Unicode(UnicodeString::from_raw(b.to_vec())),
-        None => JsString::Ascii(AsciiString::new(raw.ascii_bytes().unwrap_or_default())),
+        None => match raw.shared_ascii_bytes() {
+            Some(b) => JsString::Ascii(AsciiString::from_shared(b.clone())),
+            None => JsString::Ascii(AsciiString::new(&[])),
+        },
     }
 }
 

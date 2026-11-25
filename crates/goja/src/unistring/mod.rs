@@ -159,6 +159,13 @@ impl String {
         }
     }
 
+    pub fn shared_ascii_bytes(&self) -> Option<&Arc<[u8]>> {
+        match &self.0 {
+            Repr::Bytes(b) => Some(b),
+            Repr::Utf16(_) => None,
+        }
+    }
+
     pub fn ascii_bytes(&self) -> Option<&[u8]> {
         match &self.0 {
             Repr::Bytes(b) => Some(b),

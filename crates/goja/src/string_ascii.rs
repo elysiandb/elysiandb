@@ -83,6 +83,10 @@ impl AsciiString {
         AsciiString(Arc::from(s))
     }
 
+    pub fn from_shared(s: Arc<[u8]>) -> AsciiString {
+        AsciiString(s)
+    }
+
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }

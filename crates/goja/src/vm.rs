@@ -2283,7 +2283,7 @@ impl Runtime {
         let t = if t.is_uncatchable() {
             t
         } else {
-            Throw::Exception(Box::new(self.vm_exception_from_throw(t)))
+            Throw::Exception(self.vm_boxed_exception_from_throw(t))
         };
         self.vm.pop_native_ctx();
         t
@@ -2304,7 +2304,7 @@ impl Runtime {
         Throw::StackOverflow(Box::new(StackOverflowError {
             exception: Exception {
                 val: Value::Empty,
-                stack,
+                stack: stack.into(),
                 val_string: None,
             },
         }))
@@ -2387,7 +2387,7 @@ impl Runtime {
         Err(Throw::Interrupted(Box::new(InterruptedError {
             exception: Exception {
                 val: Value::Empty,
-                stack,
+                stack: stack.into(),
                 val_string: None,
             },
             iface,
@@ -2423,8 +2423,8 @@ impl Runtime {
         let mut ex = match x {
             Throw::Value(Value::Object(o)) => {
                 let mut ex = Exception::new(Value::Object(o));
-                if let ObjExt::Error(e) = &self.obj(o).ext {
-                    ex.stack = e.stack.clone();
+                if let ObjExt::Error(e) = &mut self.obj_mut(o).ext {
+                    ex.stack = e.stack.share();
                 }
                 ex
             }
@@ -2448,9 +2448,21 @@ impl Runtime {
             Throw::StackOverflow(e) => e.exception,
         };
         if ex.stack.is_empty() {
-            ex.stack = self.vm_capture_stack(0);
+            ex.stack = self.vm_capture_stack(0).into();
         }
         ex
+    }
+
+    pub fn vm_boxed_exception_from_throw(&mut self, x: Throw) -> Box<Exception> {
+        match x {
+            Throw::Exception(mut e) => {
+                if e.stack.is_empty() {
+                    e.stack = self.vm_capture_stack(0).into();
+                }
+                e
+            }
+            x => Box::new(self.vm_exception_from_throw(x)),
+        }
     }
 
     pub fn vm_handle_throw(&mut self, arg: Throw) -> Result<(), Throw> {
@@ -2458,9 +2470,10 @@ impl Runtime {
         let mut ex: Option<Box<Exception>> = None;
         let mut arg = Some(arg);
         if !uncatchable {
-            let e =
-                self.vm_exception_from_throw(arg.take().unwrap_or(Throw::Value(Value::Undefined)));
-            ex = Some(Box::new(e));
+            let e = self.vm_boxed_exception_from_throw(
+                arg.take().unwrap_or(Throw::Value(Value::Undefined)),
+            );
+            ex = Some(e);
         }
         let roots_mark = self.extra_roots.len();
         if let Some(e) = &ex {
@@ -3696,13 +3709,13 @@ impl Runtime {
                 let v = self.vm.stack[self.vm.sp as usize - 1].clone();
                 let mut ex = Exception::new(v);
                 if let Value::Object(o) = &ex.val
-                    && let ObjExt::Error(e) = &self.obj(*o).ext
+                    && let ObjExt::Error(e) = &mut self.obj_mut(*o).ext
                     && !e.stack.is_empty()
                 {
-                    ex.stack = e.stack.clone();
+                    ex.stack = e.stack.share();
                 }
                 if ex.stack.is_empty() {
-                    ex.stack = self.vm_capture_stack(0);
+                    ex.stack = self.vm_capture_stack(0).into();
                 }
                 return Err(Throw::Exception(Box::new(ex)));
             }
