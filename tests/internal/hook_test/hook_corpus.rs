@@ -31,18 +31,6 @@ const BATCH_TWO: [&str; 6] = [
     "group-ops",
 ];
 
-const PENDING: [(&str, &str); 9] = [
-    ("proto-methods-rows", "JSON.stringify"),
-    ("count-sum-types", "JSON.stringify"),
-    ("group-ops", "JSON.stringify"),
-    ("reflect-row", "JSON.stringify"),
-    ("rows-json", "JSON.stringify"),
-    ("group-json", "JSON.stringify"),
-    ("query-core", "JSON.stringify"),
-    ("group-undef-sum", "JSON.stringify"),
-    ("row-keys", "JSON.stringify"),
-];
-
 pub fn golden_path(rel: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/golden")
@@ -186,7 +174,7 @@ fn expected(row: &Value, arch: &[Value]) -> (String, String) {
     )
 }
 
-fn replay(file: &str, arch_file: &str, with_pending: bool) {
+fn replay(file: &str, arch_file: &str) {
     let rows = read_jsonl(file);
     let arch = if cfg!(target_arch = "x86_64") {
         read_jsonl(arch_file)
@@ -203,12 +191,11 @@ fn replay(file: &str, arch_file: &str, with_pending: bool) {
         let label = field(row, "label");
         let want = expected(row, &arch);
         let got = run_case(row);
-        let pending = PENDING.iter().any(|(l, _)| *l == label);
         if got == want {
             passed += 1;
             continue;
         }
-        if with_pending || !pending {
+        {
             failures.push(format!(
                 "{label}:\n want error {:?} output {}\n  got error {:?} output {}",
                 want.0, want.1, got.0, got.1
@@ -217,9 +204,7 @@ fn replay(file: &str, arch_file: &str, with_pending: bool) {
     }
 
     assert!(failures.is_empty(), "{}", failures.join("\n"));
-    if !with_pending {
-        assert_eq!(passed, cases.len() - PENDING.len(), "{file}: passing cases");
-    }
+    assert_eq!(passed, cases.len(), "{file}: passing cases");
 }
 
 pub const ZONE_VAR: &str = "ELYSIANDB_HOOK_TZ_CHILD";
@@ -272,13 +257,7 @@ fn on_big_stack(f: impl FnOnce() + Send + 'static) {
 #[test]
 fn hook_corpus_utc() {
     run_in_zone("hook_corpus::hook_corpus_utc", "UTC", || {
-        on_big_stack(|| {
-            replay(
-                "hooks/corpus-utc.jsonl",
-                "hooks/arch-amd64-utc.jsonl",
-                false,
-            )
-        })
+        on_big_stack(|| replay("hooks/corpus-utc.jsonl", "hooks/arch-amd64-utc.jsonl"))
     });
 }
 
@@ -292,33 +271,6 @@ fn hook_corpus_europe_paris() {
                 replay(
                     "hooks/corpus-europe-paris.jsonl",
                     "hooks/arch-amd64-europe-paris.jsonl",
-                    false,
-                )
-            })
-        },
-    );
-}
-
-#[test]
-#[ignore = "requires the JSON, Math, Proxy and Reflect builtins, ported on another branch"]
-fn hook_corpus_pending_utc() {
-    run_in_zone("hook_corpus::hook_corpus_pending_utc", "UTC", || {
-        on_big_stack(|| replay("hooks/corpus-utc.jsonl", "hooks/arch-amd64-utc.jsonl", true))
-    });
-}
-
-#[test]
-#[ignore = "requires the JSON, Math, Proxy and Reflect builtins, ported on another branch"]
-fn hook_corpus_pending_europe_paris() {
-    run_in_zone(
-        "hook_corpus::hook_corpus_pending_europe_paris",
-        "Europe/Paris",
-        || {
-            on_big_stack(|| {
-                replay(
-                    "hooks/corpus-europe-paris.jsonl",
-                    "hooks/arch-amd64-europe-paris.jsonl",
-                    true,
                 )
             })
         },

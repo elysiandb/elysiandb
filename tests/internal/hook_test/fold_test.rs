@@ -181,7 +181,6 @@ pub fn compare_budget(months: i64, label: &str) {
 }
 
 #[test]
-#[ignore = "requires the Math builtin (Math.round), ported on another branch"]
 fn test_budget_fold_answers_like_the_script() {
     let _s = setup(true);
     api::create_entity_type(b"purchase").expect("create purchase");
@@ -375,7 +374,6 @@ fn test_kept_results_do_not_survive_their_engine() {
 }
 
 #[test]
-#[ignore = "requires the Math builtin (Math.round), ported on another branch"]
 fn test_fold_stays_exact_under_concurrent_writes() {
     let _s = setup(true);
     api::create_entity_type(b"purchase").expect("create purchase");
@@ -575,7 +573,6 @@ fn test_equality_keys_cover_every_kind_of_value() {
 }
 
 #[test]
-#[ignore = "requires the Math builtin (Math.round), ported on another branch"]
 fn test_views_follow_writes_before_any_read() {
     let _s = setup(true);
     storage::open(storage::MODE_SERVER).expect("open");

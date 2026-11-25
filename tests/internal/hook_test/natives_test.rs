@@ -6,7 +6,6 @@ use goja::host::DocValue;
 use crate::{entity, field, obj, s, setup, write};
 
 #[test]
-#[ignore = "requires the JSON builtin (JSON.stringify), ported on another branch"]
 fn test_native_aggregates_match_their_java_script_equivalent() {
     let _s = setup(true);
     api::create_entity_type(b"buy").expect("create buy");

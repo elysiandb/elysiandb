@@ -40,7 +40,6 @@ fn run(script: &str, text: &str) -> MapRef {
 }
 
 #[test]
-#[ignore = "requires the JSON builtin (JSON.stringify), ported on another branch"]
 fn test_query_results_behave_like_plain_arrays() {
     let _s = setup(true);
     seed_orders(6);
@@ -241,7 +240,6 @@ function postRead(ctx) {
 }
 
 #[test]
-#[ignore = "requires the Math builtin (Math.random), ported on another branch"]
 fn test_non_deterministic_scripts_are_never_reused() {
     let _s = setup(true);
     seed_orders(1);
