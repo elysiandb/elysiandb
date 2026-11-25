@@ -233,7 +233,7 @@ pub struct Exception {
 #[derive(Clone, Debug)]
 pub enum StackTrace {
     Owned(Vec<StackFrame>),
-    Shared(Arc<[StackFrame]>),
+    Shared(Arc<Vec<StackFrame>>),
 }
 
 impl Default for StackTrace {
@@ -262,7 +262,7 @@ impl std::ops::Deref for StackTrace {
 impl StackTrace {
     pub fn share(&mut self) -> StackTrace {
         if let StackTrace::Owned(v) = self {
-            let a: Arc<[StackFrame]> = std::mem::take(v).into();
+            let a = Arc::new(std::mem::take(v));
             *self = StackTrace::Shared(a);
         }
         match self {

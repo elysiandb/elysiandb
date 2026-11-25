@@ -80,8 +80,11 @@ impl ErrorObject {
         p: &UStr,
         receiver: Option<&Value>,
     ) -> JsResult<Option<Value>> {
-        let prop = ErrorObject::get_own_prop_str(rt, o, p)?;
-        BaseObject::get_str_with_own_prop(rt, o, prop, p, receiver)
+        if p == PROP_NAME_STACK && rt.obj(o).base.values.get(p).is_none_or(|v| v.is_empty()) {
+            let prop = ErrorObject::add_stack_prop(rt, o)?;
+            return BaseObject::get_str_with_own_prop(rt, o, prop, p, receiver);
+        }
+        BaseObject::get_str(rt, o, p, receiver)
     }
 
     pub fn get_own_prop_str(rt: &mut Runtime, o: ObjRef, name: &UStr) -> JsResult<Option<Value>> {
