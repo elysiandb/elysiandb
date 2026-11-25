@@ -2025,6 +2025,40 @@ impl Vm {
         self.call_stack.push(ctx);
     }
 
+    #[inline(always)]
+    pub fn push_native_ctx(&mut self) {
+        let ctx = Context {
+            prg: self.prg.take(),
+            stash: None,
+            priv_env: None,
+            new_target: Value::Empty,
+            result: Value::Empty,
+            pc: self.pc,
+            sb: self.sb,
+            args: 0,
+        };
+        self.call_stack.push(ctx);
+    }
+
+    #[inline(always)]
+    pub fn pop_native_ctx(&mut self) {
+        if let Some(Context {
+            prg,
+            pc,
+            sb,
+            new_target,
+            result,
+            ..
+        }) = self.call_stack.pop()
+        {
+            self.prg = prg;
+            self.pc = pc;
+            self.sb = sb;
+            new_target.release();
+            result.release();
+        }
+    }
+
     pub fn restore_ctx(&mut self, ctx: &Context) {
         self.prg = ctx.prg.clone();
         self.stash = ctx.stash;
@@ -2038,17 +2072,27 @@ impl Vm {
 
     #[inline]
     pub fn pop_ctx(&mut self) {
-        if let Some(ctx) = self.call_stack.pop() {
-            self.prg = ctx.prg;
-            self.stash = ctx.stash;
-            if self.priv_env.is_some() || ctx.priv_env.is_some() {
-                self.priv_env = ctx.priv_env;
+        if let Some(Context {
+            prg,
+            stash,
+            priv_env,
+            new_target,
+            result,
+            pc,
+            sb,
+            args,
+        }) = self.call_stack.pop()
+        {
+            self.prg = prg;
+            self.stash = stash;
+            if self.priv_env.is_some() || priv_env.is_some() {
+                self.priv_env = priv_env;
             }
-            self.new_target.set(ctx.new_target);
-            self.result.set(ctx.result);
-            self.pc = ctx.pc;
-            self.sb = ctx.sb;
-            self.args = ctx.args;
+            self.new_target.set(new_target);
+            self.result.set(result);
+            self.pc = pc;
+            self.sb = sb;
+            self.args = args;
         }
     }
 
@@ -2068,9 +2112,21 @@ impl Vm {
         });
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn pop_try_frame(&mut self) {
-        self.try_stack.pop();
+        if let Some(TryFrame {
+            exception,
+            priv_env,
+            ..
+        }) = self.try_stack.pop()
+        {
+            if exception.is_some() {
+                drop(exception);
+            }
+            if priv_env.is_some() {
+                drop(priv_env);
+            }
+        }
     }
 
     pub fn take_arg_buf(&mut self) -> Vec<Value> {
@@ -2211,6 +2267,26 @@ impl Runtime {
         }
         self.vm.push_ctx_unchecked();
         Ok(())
+    }
+
+    #[inline(always)]
+    pub fn vm_push_native_ctx_for_call(&mut self) -> JsResult<()> {
+        if self.vm.call_stack.len() > self.vm.max_call_stack_size {
+            return Err(self.vm_stack_overflow());
+        }
+        self.vm.push_native_ctx();
+        Ok(())
+    }
+
+    #[cold]
+    pub fn vm_native_call_failed(&mut self, t: Throw) -> Throw {
+        let t = if t.is_uncatchable() {
+            t
+        } else {
+            Throw::Exception(Box::new(self.vm_exception_from_throw(t)))
+        };
+        self.vm.pop_native_ctx();
+        t
     }
 
     #[inline]

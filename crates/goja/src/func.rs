@@ -274,8 +274,7 @@ pub fn native_vm_call(rt: &mut Runtime, f: Option<NativeFn>, n: usize) -> JsResu
     let sp = rt.vm.sp as usize;
     match f {
         Some(f) => {
-            rt.vm_push_ctx_for_call()?;
-            rt.vm.prg = None;
+            rt.vm_push_native_ctx_for_call()?;
             rt.vm.sb = (sp - n) as isize;
             let this = rt.vm.stack[sp - n - 2].clone();
             let mut buf = rt.vm.take_arg_buf();
@@ -287,13 +286,17 @@ pub fn native_vm_call(rt: &mut Runtime, f: Option<NativeFn>, n: usize) -> JsResu
             rt.in_native = saved;
             rt.handles.truncate(mark);
             rt.vm.return_arg_buf(buf);
-            let ret = ret?;
-            rt.vm.stack[sp - n - 2] = if ret.is_empty() {
+            this.release();
+            let ret = match ret {
+                Ok(r) => r,
+                Err(t) => return Err(rt.vm_native_call_failed(t)),
+            };
+            rt.vm.stack[sp - n - 2].set(if ret.is_empty() {
                 Value::Undefined
             } else {
                 ret
-            };
-            rt.vm.pop_ctx();
+            });
+            rt.vm.pop_native_ctx();
         }
         None => {
             rt.vm.stack[sp - n - 2] = Value::Undefined;

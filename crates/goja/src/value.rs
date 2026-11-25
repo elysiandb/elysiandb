@@ -286,6 +286,15 @@ impl Value {
     }
 
     #[inline(always)]
+    pub fn release(self) {
+        if self.is_pod() {
+            std::mem::forget(self);
+        } else {
+            drop(self);
+        }
+    }
+
+    #[inline(always)]
     pub fn set(&mut self, v: Value) {
         let old = std::mem::replace(self, v);
         if old.is_pod() {

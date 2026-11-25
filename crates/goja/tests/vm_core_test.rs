@@ -442,3 +442,46 @@ fn test_string_keys_and_lengths_on_hot_paths() {
         ),
     ]);
 }
+
+#[test]
+fn test_native_calls_keep_the_caller_state() {
+    check_out(&[
+        (
+            r#"var out; var r; function F() { [1].forEach(function() {}); "a".charCodeAt(0); r = (new.target === F); } new F(); out = String(r);"#,
+            "true",
+        ),
+        (
+            r#"var out; function f(o) { var k = 3; try { return o.valueOf.call(null) } catch (e) { return k + e.name } } out = String(f({}));"#,
+            "3TypeError",
+        ),
+        (
+            r#"var out; function g() { return Number.prototype.toFixed.call("x") } var s; try { g() } catch (e) { s = e.stack } out = String(s);"#,
+            "TypeError: Value is not a number: x\n\tat call (native)\n\tat g (<eval>:1:61(6))\n\tat <eval>:1:83(4)\n",
+        ),
+        (
+            r#"var out; var s; try { [1].map(function cb() { throw new Error("cb") }) } catch (e) { s = e.stack } out = String(s);"#,
+            "Error: cb\n\tat cb (<eval>:1:53(7))\n\tat map (native)\n\tat <eval>:1:30(7)\n",
+        ),
+        (
+            r#"var out; var s = 0; for (var i = 0; i < 3; i++) { try { (1).toFixed(200) } catch (e) { s += i } } out = String(s);"#,
+            "3",
+        ),
+        (
+            r#"var out; function h() { var t = 0; try { t = 1; [1].forEach(function() { null.x }) } catch (e) { t += 10 } finally { t += 100 } return t } out = String(h());"#,
+            "111",
+        ),
+        (
+            r#"var out; var s; function outer() { try { return inner() } catch (e) { s = e.stack; return 1 } } function inner() { return "x".localeCompare.call(undefined) } var r = outer(); out = r + "|" + s;"#,
+            "1|TypeError: Value is not object coercible\n\tat call (native)\n\tat inner (<eval>:1:145(5))\n\tat outer (<eval>:1:54(3))\n\tat <eval>:1:172(5)\n",
+        ),
+        (
+            r#"var out; var o = {get x() { return (1).toFixed(-1) }}; var s; try { o.x } catch (e) { s = e.stack } out = String(s);"#,
+            "RangeError: toFixed() precision must be between 0 and 100\n\tat toFixed (native)\n\tat x (<eval>:1:47(5))\n\tat <eval>:1:71(8)\n",
+        ),
+    ]);
+    check(&[
+        (r#"7; "ab".charCodeAt(1)"#, "98"),
+        (r#""z"; [1].forEach(function() {})"#, "undefined"),
+        (r#""z"; [1].forEach(function() {}); 3"#, "3"),
+    ]);
+}
