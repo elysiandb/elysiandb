@@ -1,6 +1,7 @@
 #[path = "../tempdir.rs"]
 mod tempdir;
 
+mod deep_test;
 mod fold_fuzz_test;
 mod fold_test;
 mod hook_corpus;

@@ -1,4 +1,5 @@
 pub mod acl;
+pub mod hook;
 pub mod query;
 pub mod security;
 
