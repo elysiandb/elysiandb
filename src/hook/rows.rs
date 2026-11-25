@@ -210,7 +210,7 @@ struct RowState {
 
 pub(crate) struct RowView {
     row: Row,
-    runtime: u64,
+    runtime: std::cell::Cell<u64>,
     st: RefCell<RowState>,
 }
 
@@ -218,15 +218,22 @@ impl RowView {
     pub(crate) fn new(rt: &Runtime, row: Row) -> RowView {
         RowView {
             row,
-            runtime: rt.host.id(),
+            runtime: std::cell::Cell::new(rt.host.id()),
             st: RefCell::new(RowState::default()),
         }
     }
 
-    fn over(&self, rt: &Runtime, key: &str) -> Option<Value> {
-        if rt.host.id() != self.runtime {
-            return None;
+    fn bind(&self, rt: &Runtime) {
+        if self.runtime.get() == rt.host.id() {
+            return;
         }
+        self.runtime.set(rt.host.id());
+        let mut st = self.st.borrow_mut();
+        st.over.clear();
+        st.added.clear();
+    }
+
+    fn over(&self, key: &str) -> Option<Value> {
         self.st.borrow().over.get(key).cloned()
     }
 
@@ -238,12 +245,10 @@ impl RowView {
         if let Cell::Nested(v) = &self.row.vals[i] {
             let copied = doc_from_json(v);
             let val = rt.to_value(&copied)?;
-            if rt.host.id() == self.runtime {
-                self.st
-                    .borrow_mut()
-                    .over
-                    .insert(key.to_string(), val.clone());
-            }
+            self.st
+                .borrow_mut()
+                .over
+                .insert(key.to_string(), val.clone());
             return Ok(Some(val));
         }
 
@@ -251,7 +256,8 @@ impl RowView {
     }
 
     fn get_key(&self, rt: &mut Runtime, key: &str) -> JsResult<Option<Value>> {
-        if let Some(v) = self.over(rt, key) {
+        self.bind(rt);
+        if let Some(v) = self.over(key) {
             return Ok(Some(v));
         }
 
@@ -318,19 +324,23 @@ impl DynamicObject for RowView {
         self.get_key(rt, key)
     }
 
-    fn set(&self, _rt: &mut Runtime, key: &str, val: Value) -> JsResult<bool> {
+    fn set(&self, rt: &mut Runtime, key: &str, val: Value) -> JsResult<bool> {
+        self.bind(rt);
         Ok(self.set_key(key, val))
     }
 
-    fn has(&self, _rt: &mut Runtime, key: &str) -> JsResult<bool> {
+    fn has(&self, rt: &mut Runtime, key: &str) -> JsResult<bool> {
+        self.bind(rt);
         Ok(self.has_key(key))
     }
 
-    fn delete(&self, _rt: &mut Runtime, key: &str) -> JsResult<bool> {
+    fn delete(&self, rt: &mut Runtime, key: &str) -> JsResult<bool> {
+        self.bind(rt);
         Ok(self.delete_key(key))
     }
 
-    fn keys(&self, _rt: &mut Runtime) -> JsResult<Vec<String>> {
+    fn keys(&self, rt: &mut Runtime) -> JsResult<Vec<String>> {
+        self.bind(rt);
         Ok(self.key_list())
     }
 
@@ -386,6 +396,7 @@ impl GoMethods for RowView {
     }
 
     fn call(&self, rt: &mut Runtime, idx: usize, call: FunctionCall<'_>) -> JsResult<Value> {
+        self.bind(rt);
         match idx {
             0 => {
                 let k = arg_string(rt, &call, 0)?;
@@ -430,6 +441,7 @@ struct ArrayState {
     items: Vec<Option<Value>>,
     base: usize,
     length: usize,
+    runtime: u64,
 }
 
 pub(crate) struct ArrayView {
@@ -445,6 +457,7 @@ pub(crate) fn new_array_view(rt: &mut Runtime, res: Option<Arc<QueryResult>>) ->
             items: Vec::new(),
             base: n,
             length: n,
+            runtime: rt.host.id(),
         }),
     };
     Value::Object(rt.new_dynamic_array(Rc::new(a)))
@@ -459,7 +472,16 @@ impl ArrayState {
 }
 
 impl ArrayView {
+    fn bind(&self, rt: &Runtime) {
+        let mut st = self.st.borrow_mut();
+        if st.runtime != rt.host.id() {
+            st.runtime = rt.host.id();
+            st.items.clear();
+        }
+    }
+
     fn get_at(&self, rt: &mut Runtime, i: i64) -> Option<Value> {
+        self.bind(rt);
         let row = {
             let st = self.st.borrow();
             if i < 0 || i as usize >= st.length {
@@ -533,11 +555,13 @@ impl DynamicArray for ArrayView {
         Ok(self.get_at(rt, idx))
     }
 
-    fn set(&self, _rt: &mut Runtime, idx: i64, val: Value) -> JsResult<bool> {
+    fn set(&self, rt: &mut Runtime, idx: i64, val: Value) -> JsResult<bool> {
+        self.bind(rt);
         Ok(self.set_at(idx, val))
     }
 
-    fn set_length(&self, _rt: &mut Runtime, len: i64) -> JsResult<bool> {
+    fn set_length(&self, rt: &mut Runtime, len: i64) -> JsResult<bool> {
+        self.bind(rt);
         Ok(self.set_len(len))
     }
 
@@ -585,10 +609,12 @@ impl GoMethods for ArrayView {
             1 => Ok(int_to_value(self.st.borrow().length as i64)),
             2 => {
                 let i = goja::host::goreflect::arg_int(rt, &call, 0)?;
+                self.bind(rt);
                 Ok(Value::Bool(self.set_at(i, call.argument(1))))
             }
             _ => {
                 let n = goja::host::goreflect::arg_int(rt, &call, 0)?;
+                self.bind(rt);
                 Ok(Value::Bool(self.set_len(n)))
             }
         }

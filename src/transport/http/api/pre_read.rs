@@ -6,6 +6,7 @@ use goja::host::{DocValue, MapRef};
 use crate::globals;
 use crate::gocompat::json::Map;
 use crate::hook::{self, Request};
+use crate::sync::Mutex;
 
 const HOOK_HELPER_STACK: usize = 8 << 20;
 
@@ -66,9 +67,7 @@ where
     T: Send,
     F: Fn(&MapRef) -> T + Sync,
 {
-    let slots: Vec<std::sync::Mutex<Option<T>>> = (0..data.len())
-        .map(|_| std::sync::Mutex::new(None))
-        .collect();
+    let slots: Vec<Mutex<Option<T>>> = (0..data.len()).map(|_| Mutex::new(None)).collect();
     let next = AtomicUsize::new(0);
 
     let run = || {
@@ -81,9 +80,7 @@ where
             let doc = hooks.post_read(entity, &doc);
             let out = finish(&doc);
             DocValue::Map(doc).release_graph();
-            if let Ok(mut slot) = slots[i].lock() {
-                *slot = Some(out);
-            }
+            *slots[i].lock() = Some(out);
         }
     };
 
@@ -123,8 +120,5 @@ where
         });
     }
 
-    slots
-        .into_iter()
-        .map(|m| m.into_inner().ok().flatten())
-        .collect()
+    slots.into_iter().map(|m| m.into_inner()).collect()
 }

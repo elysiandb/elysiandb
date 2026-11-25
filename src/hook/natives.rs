@@ -172,7 +172,7 @@ struct GroupState {
 pub(crate) struct GroupView {
     g: Arc<Groups>,
     with_sum: bool,
-    runtime: u64,
+    runtime: std::cell::Cell<u64>,
     st: RefCell<GroupState>,
 }
 
@@ -180,17 +180,26 @@ pub(crate) fn group_object(rt: &mut Runtime, g: Arc<Groups>, with_sum: bool) -> 
     let v = GroupView {
         g,
         with_sum,
-        runtime: rt.host.id(),
+        runtime: std::cell::Cell::new(rt.host.id()),
         st: RefCell::new(GroupState::default()),
     };
     Value::Object(rt.new_dynamic_object(Rc::new(v)))
 }
 
 impl GroupView {
+    fn bind(&self, rt: &Runtime) {
+        if self.runtime.get() == rt.host.id() {
+            return;
+        }
+        self.runtime.set(rt.host.id());
+        let mut st = self.st.borrow_mut();
+        st.over.clear();
+        st.added.clear();
+    }
+
     fn get_key(&self, rt: &mut Runtime, key: &str) -> JsResult<Option<Value>> {
-        if rt.host.id() == self.runtime
-            && let Some(v) = self.st.borrow().over.get(key)
-        {
+        self.bind(rt);
+        if let Some(v) = self.st.borrow().over.get(key) {
             return Ok(Some(v.clone()));
         }
 
@@ -208,9 +217,7 @@ impl GroupView {
         }
 
         let v = Value::Object(entry);
-        if rt.host.id() == self.runtime {
-            self.st.borrow_mut().over.insert(key.to_string(), v.clone());
-        }
+        self.st.borrow_mut().over.insert(key.to_string(), v.clone());
 
         Ok(Some(v))
     }
@@ -270,19 +277,23 @@ impl DynamicObject for GroupView {
         self.get_key(rt, key)
     }
 
-    fn set(&self, _rt: &mut Runtime, key: &str, val: Value) -> JsResult<bool> {
+    fn set(&self, rt: &mut Runtime, key: &str, val: Value) -> JsResult<bool> {
+        self.bind(rt);
         Ok(self.set_key(key, val))
     }
 
-    fn has(&self, _rt: &mut Runtime, key: &str) -> JsResult<bool> {
+    fn has(&self, rt: &mut Runtime, key: &str) -> JsResult<bool> {
+        self.bind(rt);
         Ok(self.has_key(key))
     }
 
-    fn delete(&self, _rt: &mut Runtime, key: &str) -> JsResult<bool> {
+    fn delete(&self, rt: &mut Runtime, key: &str) -> JsResult<bool> {
+        self.bind(rt);
         Ok(self.delete_key(key))
     }
 
-    fn keys(&self, _rt: &mut Runtime) -> JsResult<Vec<String>> {
+    fn keys(&self, rt: &mut Runtime) -> JsResult<Vec<String>> {
+        self.bind(rt);
         Ok(self.key_list())
     }
 
@@ -303,6 +314,7 @@ impl GoMethods for GroupView {
     }
 
     fn call(&self, rt: &mut Runtime, idx: usize, call: FunctionCall<'_>) -> JsResult<Value> {
+        self.bind(rt);
         match idx {
             0 => {
                 let k = arg_string(rt, &call, 0)?;
