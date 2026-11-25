@@ -57,3 +57,41 @@ fn query_views_stored_by_one_hook_are_read_again_by_the_next() {
     assert_eq!(fmt_field(&out, "first"), "o0");
     assert_eq!(fmt_field(&out, "second"), "o0:o1:3:3");
 }
+
+#[test]
+fn dotted_filters_reach_plain_nested_objects() {
+    let _s = setup(true);
+    api::create_entity_type(b"deep").expect("create deep");
+    write(
+        "deep",
+        obj(vec![
+            ("id", s("d1")),
+            (
+                "meta",
+                elysiandb::gocompat::json::Value::Object(obj(vec![("name", s("a"))])),
+            ),
+        ]),
+    );
+    write(
+        "deep",
+        obj(vec![
+            ("id", s("d2")),
+            (
+                "meta",
+                elysiandb::gocompat::json::Value::Object(obj(vec![("name", s("b"))])),
+            ),
+        ]),
+    );
+
+    let e = entity(r#"{"id":"x"}"#);
+    let script = r#"function postRead(ctx) {
+  var rows = ctx.query("deep", { "meta.name": { eq: "a" } })
+  ctx.entity.ids = rows.map(function (r) { return r.id }).join(",")
+  ctx.entity.n = ctx.count("deep", { "meta.name": { eq: "a" } })
+}"#;
+    if let Err(err) = hook::apply_post_read_script("", script, &e, true) {
+        panic!("{err}");
+    }
+    assert_eq!(fmt_field(&e, "ids"), "d1");
+    assert_eq!(fmt_field(&e, "n"), "1");
+}
