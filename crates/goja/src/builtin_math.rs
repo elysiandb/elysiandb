@@ -3,7 +3,7 @@ use crate::heap::ObjRef;
 use crate::ipow::ipow;
 use crate::object::{CLASS_MATH, FunctionCall};
 use crate::object_template::ObjectTemplate;
-use crate::runtime::{JsResult, Runtime, Throw, to_uint32};
+use crate::runtime::{JsResult, Runtime, to_uint32};
 use crate::string::ascii_string;
 use crate::value::{Value, float_to_value, int_to_value, nil_safe, value_prop};
 use gocompat::math as gomath;
@@ -55,16 +55,7 @@ fn default_rand() -> f64 {
 }
 
 fn to_float(r: &mut Runtime, v: &Value) -> JsResult<f64> {
-    match v {
-        Value::BigInt(_) => Err(Throw::Value(
-            r.new_type_error("Cannot convert a BigInt value to a number"),
-        )),
-        Value::Object(o) => {
-            let p = o.to_primitive_number(r)?;
-            to_float(r, &p)
-        }
-        _ => v.to_float(r),
-    }
+    v.to_float(r)
 }
 
 fn arg_float(r: &mut Runtime, call: &FunctionCall<'_>, i: usize) -> JsResult<f64> {
