@@ -9,6 +9,7 @@ use std::sync::{Arc, Once};
 use std::time::{Duration, Instant};
 
 use goja::export::string_from_go;
+use goja::heap::FxHashMap;
 use goja::host::{DocMap, DocValue, FuncRef, HostFn, MapRef};
 use goja::object::FunctionCall;
 use goja::runtime::{InterruptHandle, JsResult, RunError, Throw};
@@ -17,6 +18,7 @@ use goja::{Program, Runtime};
 
 use crate::acl;
 use crate::api::{self, Guard, GuardError};
+use crate::crypto::sha256;
 use crate::engine;
 use crate::globals;
 use crate::gocompat::strconv;
@@ -51,9 +53,14 @@ fn script_timeout() -> Duration {
     DEFAULT_SCRIPT_TIMEOUT
 }
 
-static COMPILED: Mutex<Option<HashMap<String, Arc<Program>>>> = Mutex::new(None);
+pub(crate) struct CompiledScript {
+    pub(crate) program: Arc<Program>,
+    pub(crate) prefix: sha256::Digest,
+}
 
-fn compile(script: &str) -> Result<Arc<Program>, HookError> {
+static COMPILED: Mutex<Option<FxHashMap<String, Arc<CompiledScript>>>> = Mutex::new(None);
+
+fn compile(script: &str) -> Result<Arc<CompiledScript>, HookError> {
     if let Some(p) = COMPILED
         .lock()
         .as_ref()
@@ -62,11 +69,15 @@ fn compile(script: &str) -> Result<Arc<Program>, HookError> {
         return Ok(p);
     }
 
-    let p =
+    let program =
         goja::compile("", script.as_bytes(), false).map_err(|e| HookError::new(e.to_string()))?;
+    let mut prefix = sha256::Digest::new();
+    prefix.write(script.as_bytes());
+    prefix.write(&[0]);
+    let p = Arc::new(CompiledScript { program, prefix });
 
     let mut g = COMPILED.lock();
-    let m = g.get_or_insert_with(HashMap::new);
+    let m = g.get_or_insert_with(FxHashMap::default);
     if m.len() >= MAX_COMPILED_SCRIPTS {
         m.clear();
     }
@@ -868,7 +879,8 @@ impl Request {
         fn_name: &str,
         entity: &MapRef,
     ) -> Result<(), HookError> {
-        let mut program = compile(&h.script)?;
+        let compiled = compile(&h.script)?;
+        let mut program = compiled.program.clone();
 
         let plan = plan_for(&h.script, fn_name);
         if let Some(p) = &plan {
@@ -880,7 +892,7 @@ impl Request {
         let mut _leader = None;
         if let Some(mut input) = canonical(entity) {
             input.push(bool_byte(h.bypass_acl));
-            let k = memo_key(&h.script, fn_name, &input);
+            let k = memo_key(&compiled.prefix, fn_name, &input);
             if let Some(o) = OUTPUTS.find(&k, |o| self.still_valid(o)) {
                 o.apply(entity);
                 return Ok(());

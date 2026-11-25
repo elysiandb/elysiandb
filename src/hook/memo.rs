@@ -1,8 +1,9 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, LazyLock};
 
 use goja::Runtime;
+use goja::heap::FxHashMap;
 use goja::host::{DocValue, MapRef, json as host_json};
 
 use crate::crypto::sha256;
@@ -46,16 +47,34 @@ struct OutputFlight {
 
 #[derive(Default)]
 struct MemoState {
-    items: HashMap<[u8; 32], OutputItem>,
-    lru: BTreeMap<u64, [u8; 32]>,
+    items: FxHashMap<[u8; 32], OutputItem>,
+    lru: VecDeque<(u64, [u8; 32])>,
     next_tick: u64,
-    flights: HashMap<[u8; 32], Arc<OutputFlight>>,
+    flights: FxHashMap<[u8; 32], Arc<OutputFlight>>,
 }
 
 impl MemoState {
     fn tick(&mut self) -> u64 {
         self.next_tick += 1;
         self.next_tick
+    }
+
+    fn touch(&mut self, key: &[u8; 32], t: u64) {
+        self.lru.push_back((t, *key));
+        if self.lru.len() > 2 * self.items.len() + 64 {
+            let items = &self.items;
+            self.lru
+                .retain(|(t, k)| items.get(k).is_some_and(|it| it.tick == *t));
+        }
+    }
+
+    fn pop_oldest(&mut self) -> Option<[u8; 32]> {
+        while let Some((t, k)) = self.lru.pop_front() {
+            if self.items.get(&k).is_some_and(|it| it.tick == t) {
+                return Some(k);
+            }
+        }
+        None
     }
 }
 
@@ -73,10 +92,8 @@ pub(crate) static OUTPUTS: LazyLock<OutputMemo> = LazyLock::new(|| OutputMemo {
     misses: AtomicI64::new(0),
 });
 
-pub(crate) fn memo_key(script: &str, fn_name: &str, input: &[u8]) -> [u8; 32] {
-    let mut h = sha256::Digest::new();
-    h.write(script.as_bytes());
-    h.write(&[0]);
+pub(crate) fn memo_key(prefix: &sha256::Digest, fn_name: &str, input: &[u8]) -> [u8; 32] {
+    let mut h = prefix.clone();
     h.write(fn_name.as_bytes());
     h.write(&[0]);
     h.write(input);
@@ -93,47 +110,106 @@ pub(crate) fn canonical(entity: &MapRef) -> Option<Vec<u8>> {
     host_json::marshal(&v).ok()
 }
 
+const SMALL_PATH: usize = 32;
+
+struct Path {
+    small: Vec<usize>,
+    big: Option<HashSet<usize>>,
+}
+
+impl Path {
+    fn enter(&mut self, id: usize) -> bool {
+        if let Some(big) = &mut self.big {
+            if !big.insert(id) {
+                return false;
+            }
+        } else {
+            if self.small.contains(&id) {
+                return false;
+            }
+            if self.small.len() >= SMALL_PATH {
+                let mut big: HashSet<usize> = self.small.iter().copied().collect();
+                big.insert(id);
+                self.big = Some(big);
+            }
+        }
+        self.small.push(id);
+
+        true
+    }
+
+    fn leave(&mut self, id: usize) {
+        self.small.pop();
+        if let Some(big) = &mut self.big {
+            big.remove(&id);
+        }
+    }
+}
+
+fn scalar_safe(v: &DocValue) -> Option<bool> {
+    match v {
+        DocValue::Nil
+        | DocValue::Bool(_)
+        | DocValue::String(_)
+        | DocValue::Float64(_)
+        | DocValue::Int64(_) => Some(true),
+        DocValue::Map(_) | DocValue::Slice(_) => None,
+        _ => Some(false),
+    }
+}
+
 pub(crate) fn json_safe(v: &DocValue) -> bool {
     enum Step {
         Enter(DocValue),
         Leave(usize),
     }
 
-    let mut path: HashSet<usize> = HashSet::new();
+    if let Some(ok) = scalar_safe(v) {
+        return ok;
+    }
+
+    let mut path = Path {
+        small: Vec::new(),
+        big: None,
+    };
     let mut stack: Vec<Step> = vec![Step::Enter(v.clone())];
     while let Some(step) = stack.pop() {
         let v = match step {
             Step::Leave(id) => {
-                path.remove(&id);
+                path.leave(id);
                 continue;
             }
             Step::Enter(v) => v,
         };
 
         match &v {
-            DocValue::Nil
-            | DocValue::Bool(_)
-            | DocValue::String(_)
-            | DocValue::Float64(_)
-            | DocValue::Int64(_) => {}
             DocValue::Map(m) => {
                 let id = std::rc::Rc::as_ptr(m) as *const () as usize;
-                if !path.insert(id) {
+                if !path.enter(id) {
                     return false;
                 }
                 stack.push(Step::Leave(id));
                 for x in m.borrow().values() {
-                    stack.push(Step::Enter(x.clone()));
+                    match scalar_safe(x) {
+                        Some(true) => {}
+                        Some(false) => return false,
+                        None => stack.push(Step::Enter(x.clone())),
+                    }
                 }
             }
             DocValue::Slice(h) => {
                 let id = std::rc::Rc::as_ptr(&h.backing) as *const () as usize | 1;
-                if !path.insert(id) {
+                if !path.enter(id) {
                     return false;
                 }
                 stack.push(Step::Leave(id));
-                for x in h.to_vec() {
-                    stack.push(Step::Enter(x));
+                let items = h.backing.borrow();
+                for x in items.iter().take(h.len) {
+                    match scalar_safe(x) {
+                        Some(true) => {}
+                        Some(false) => return false,
+                        None => stack.push(Step::Enter(x.clone())),
+                    }
                 }
             }
             _ => return false,
@@ -248,24 +324,21 @@ impl OutputMemo {
         key: &[u8; 32],
         valid: impl Fn(&Output) -> bool,
     ) -> Option<Arc<Output>> {
-        let candidates: Vec<Arc<Output>> = {
+        let mut candidates: [Option<Arc<Output>>; MAX_OUTPUTS_PER_INPUT] = Default::default();
+        {
             let mut st = self.st.lock();
             let t = st.tick();
-            match st.items.get_mut(key) {
-                Some(it) => {
-                    let old = it.tick;
-                    it.tick = t;
-                    it.used = unix_now();
-                    let c = it.out.clone();
-                    st.lru.remove(&old);
-                    st.lru.insert(t, *key);
-                    c
+            if let Some(it) = st.items.get_mut(key) {
+                it.tick = t;
+                it.used = unix_now();
+                for (slot, o) in candidates.iter_mut().zip(it.out.iter()) {
+                    *slot = Some(o.clone());
                 }
-                None => Vec::new(),
+                st.touch(key, t);
             }
-        };
+        }
 
-        for o in candidates {
+        for o in candidates.into_iter().flatten() {
             if valid(&o) {
                 self.hits.fetch_add(1, Ordering::SeqCst);
                 return Some(o);
@@ -302,23 +375,12 @@ impl OutputMemo {
         let mut st = self.st.lock();
         let t = st.tick();
         let now = unix_now();
-        let old_tick = st.items.get(key).map(|it| it.tick);
-        match old_tick {
-            None => {
-                st.items.insert(
-                    *key,
-                    OutputItem {
-                        out: Vec::new(),
-                        tick: t,
-                        used: now,
-                    },
-                );
-            }
-            Some(old) => {
-                st.lru.remove(&old);
-            }
-        }
-        st.lru.insert(t, *key);
+        st.items.entry(*key).or_insert(OutputItem {
+            out: Vec::new(),
+            tick: t,
+            used: now,
+        });
+        st.touch(key, t);
         let it = st.items.get_mut(key).expect("output item");
         it.tick = t;
         it.used = now;
@@ -331,8 +393,8 @@ impl OutputMemo {
         it.out.push(o);
 
         let limit = memory::HOOK_RESULTS.effective();
-        while limit > 0 && memory::HOOK_RESULTS.used() > limit && st.lru.len() > 1 {
-            let Some((_, k)) = st.lru.pop_first() else {
+        while limit > 0 && memory::HOOK_RESULTS.used() > limit && st.items.len() > 1 {
+            let Some(k) = st.pop_oldest() else {
                 break;
             };
             if let Some(old) = st.items.remove(&k) {
@@ -346,14 +408,13 @@ impl OutputMemo {
     pub(crate) fn sweep(&self, cutoff: i64) -> i64 {
         let mut st = self.st.lock();
         let mut freed: i64 = 0;
-        let stale: Vec<([u8; 32], u64)> = st
+        let stale: Vec<[u8; 32]> = st
             .items
             .iter()
             .filter(|(_, it)| it.used < cutoff)
-            .map(|(k, it)| (*k, it.tick))
+            .map(|(k, _)| *k)
             .collect();
-        for (k, tick) in stale {
-            st.lru.remove(&tick);
+        for k in stale {
             if let Some(it) = st.items.remove(&k) {
                 for o in &it.out {
                     memory::HOOK_RESULTS.release(o.bytes);
@@ -372,8 +433,8 @@ impl OutputMemo {
                 memory::HOOK_RESULTS.release(o.bytes);
             }
         }
-        st.items = HashMap::new();
-        st.lru = BTreeMap::new();
+        st.items = FxHashMap::default();
+        st.lru = VecDeque::new();
     }
 }
 

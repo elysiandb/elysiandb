@@ -7,6 +7,7 @@ use goja::ast::{
     FunctionLiteral, IfStatement, Node, NumberValue, Property, Statement, VariableStatement,
     walk_nodes,
 };
+use goja::heap::FxHashMap;
 use goja::token;
 
 use crate::crypto::sha256;
@@ -78,25 +79,36 @@ pub(crate) struct ScriptPlan {
     pub(crate) folds: Vec<Arc<FoldDef>>,
 }
 
-type PlanCache = HashMap<(String, String), Option<Arc<ScriptPlan>>>;
+#[derive(Default)]
+struct PlanCache {
+    by_fn: HashMap<String, FxHashMap<String, Option<Arc<ScriptPlan>>>>,
+    len: usize,
+}
 
 static PLANS: Mutex<Option<PlanCache>> = Mutex::new(None);
 
 pub(crate) fn plan_for(script: &str, fn_name: &str) -> Option<Arc<ScriptPlan>> {
-    let key = (script.to_string(), fn_name.to_string());
-
-    if let Some(p) = PLANS.lock().as_ref().and_then(|m| m.get(&key).cloned()) {
+    if let Some(p) = PLANS
+        .lock()
+        .as_ref()
+        .and_then(|m| m.by_fn.get(fn_name))
+        .and_then(|m| m.get(script).cloned())
+    {
         return p;
     }
 
     let p = build_plan(script, fn_name).map(Arc::new);
 
     let mut g = PLANS.lock();
-    let m = g.get_or_insert_with(HashMap::new);
-    if m.len() >= MAX_SCRIPT_PLANS {
-        m.clear();
+    let m = g.get_or_insert_with(PlanCache::default);
+    if m.len >= MAX_SCRIPT_PLANS {
+        m.by_fn.clear();
+        m.len = 0;
     }
-    m.insert(key, p.clone());
+    let scripts = m.by_fn.entry(fn_name.to_string()).or_default();
+    if scripts.insert(script.to_string(), p.clone()).is_none() {
+        m.len += 1;
+    }
 
     p
 }
