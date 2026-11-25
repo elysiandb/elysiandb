@@ -24,6 +24,7 @@ version = "0.0.0"
 dependencies = [
  "arc-swap",
  "gocompat",
+ "goja",
  "libc",
  "mimalloc",
 ]

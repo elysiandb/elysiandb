@@ -20,6 +20,7 @@ path = "src/main.rs"
 [dependencies]
 arc-swap = "=1.7.1"
 gocompat = { path = "crates/gocompat" }
+goja = { path = "crates/goja" }
 libc = "=0.2.191"
 mimalloc = "=0.1.52"
 
@@ -197,3 +198,7 @@ panic = "unwind"
 
 [profile.dev]
 panic = "unwind"
+
+[[test]]
+name = "hook_test"
+path = "tests/internal/hook_test/main.rs"

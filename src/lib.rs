@@ -12,6 +12,7 @@ pub mod engine;
 pub mod globals;
 pub mod gocompat;
 pub mod hash;
+pub mod hook;
 pub mod httpd;
 pub mod httprouter;
 pub mod journal;
