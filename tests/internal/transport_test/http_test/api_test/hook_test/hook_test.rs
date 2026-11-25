@@ -407,3 +407,37 @@ fn create_hook_decodes_the_body_like_go() {
         "{body}"
     );
 }
+
+#[test]
+fn apply_post_read_hooks_keeps_the_order_of_the_documents() {
+    let _s = setup_hook_test();
+
+    let mut h = Hook {
+        entity: "doc".to_string(),
+        name: "mark".to_string(),
+        event: hook::HOOK_EVENT_POST_READ.to_string(),
+        language: "javascript".to_string(),
+        enabled: true,
+        script: "function postRead(ctx) { ctx.entity.seen = ctx.entity.id + '!' }".to_string(),
+        ..Hook::default()
+    };
+    hook::create_hook(&mut h).expect("create hook");
+
+    let docs: Vec<Map> = (0..50)
+        .map(|i| object(vec![("id", s(&format!("d{i:02}")))]))
+        .collect();
+    let req = hook::Request::new("");
+    let out =
+        elysiandb::transport::http::api::pre_read::apply_post_read_hooks(&req, "doc", &docs, |d| {
+            let v = goja::host::DocValue::Map(d.clone());
+            String::from_utf8(goja::host::json::marshal(&v).expect("encode")).expect("utf-8")
+        });
+
+    assert_eq!(out.len(), 50);
+    for (i, o) in out.iter().enumerate() {
+        assert_eq!(
+            o.as_deref(),
+            Some(format!(r#"{{"id":"d{i:02}","seen":"d{i:02}!"}}"#).as_str())
+        );
+    }
+}

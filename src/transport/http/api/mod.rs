@@ -1,5 +1,6 @@
 pub mod acl;
 pub mod hook;
+pub mod pre_read;
 pub mod query;
 pub mod security;
 

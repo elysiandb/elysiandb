@@ -43,6 +43,25 @@ use super::view::{PinnedViews, ViewToken, fold_output};
 const DEFAULT_SCRIPT_TIMEOUT: Duration = Duration::from_secs(2);
 const MAX_COMPILED_SCRIPTS: usize = 1024;
 
+static REASON: Mutex<Option<(Duration, Arc<str>)>> = Mutex::new(None);
+
+fn timeout_reason(timeout: Duration) -> Arc<str> {
+    let mut g = REASON.lock();
+    if let Some((d, r)) = g.as_ref()
+        && *d == timeout
+    {
+        return r.clone();
+    }
+
+    let r: Arc<str> = Arc::from(format!(
+        "hook script stopped after {}",
+        GoDuration(timeout.as_nanos() as i64)
+    ));
+    *g = Some((timeout, r.clone()));
+
+    r
+}
+
 fn script_timeout() -> Duration {
     if let Some(cfg) = globals::config()
         && cfg.api.hooks.timeout_ms > 0
@@ -370,18 +389,15 @@ impl Request {
         true
     }
 
-    fn run_deadline(&self, timeout: Duration) -> (Instant, String) {
+    fn run_deadline(&self, timeout: Duration) -> (Instant, Arc<str>) {
         let mut stop_at = Instant::now() + timeout;
-        let mut reason = format!(
-            "hook script stopped after {}",
-            GoDuration(timeout.as_nanos() as i64)
-        );
+        let mut reason = timeout_reason(timeout);
         if let Some(g) = self.guard()
             && let Some(d) = g.deadline
             && d < stop_at
         {
             stop_at = d;
-            reason = GuardError::Deadline.to_string();
+            reason = Arc::from(GuardError::Deadline.to_string());
         }
 
         (stop_at, reason)
@@ -408,8 +424,10 @@ struct TimerEntry {
 
 struct TimerState {
     heap: BinaryHeap<Reverse<(Instant, u64, u64)>>,
-    live: HashMap<u64, TimerEntry>,
+    live: FxHashMap<u64, TimerEntry>,
     next: u64,
+    waiting: Option<Instant>,
+    idle: bool,
 }
 
 struct TimerService {
@@ -424,29 +442,51 @@ static TIMER: TimerService = TimerService {
 
 static TIMER_THREAD: Once = Once::new();
 
+impl TimerState {
+    fn compact(&mut self) {
+        if self.heap.len() <= 2 * self.live.len() + 64 {
+            return;
+        }
+        let live = &self.live;
+        let kept: Vec<Reverse<(Instant, u64, u64)>> = self
+            .heap
+            .drain()
+            .filter(|Reverse((_, id, generation))| {
+                live.get(id).is_some_and(|e| e.generation == *generation)
+            })
+            .collect();
+        self.heap = BinaryHeap::from(kept);
+    }
+
+    fn wakes(&self, at: Instant) -> bool {
+        self.idle || self.waiting.is_some_and(|w| at < w)
+    }
+}
+
 impl TimerService {
     fn run(&self) {
         let mut g = self.st.lock();
         loop {
             let now = Instant::now();
             let mut next: Option<Instant> = None;
-            if let Some(st) = g.as_mut() {
-                while let Some(Reverse((at, id, generation))) = st.heap.peek().copied() {
-                    if st.live.get(&id).is_none_or(|e| e.generation != generation) {
-                        st.heap.pop();
-                        continue;
-                    }
-                    if at <= now {
-                        st.heap.pop();
-                        if let Some(e) = st.live.remove(&id) {
-                            e.handle.interrupt(e.reason.to_string());
-                        }
-                        continue;
-                    }
-                    next = Some(at);
-                    break;
+            let st = TimerService::state(&mut g);
+            while let Some(Reverse((at, id, generation))) = st.heap.peek().copied() {
+                if st.live.get(&id).is_none_or(|e| e.generation != generation) {
+                    st.heap.pop();
+                    continue;
                 }
+                if at <= now {
+                    st.heap.pop();
+                    if let Some(e) = st.live.remove(&id) {
+                        e.handle.interrupt(e.reason.to_string());
+                    }
+                    continue;
+                }
+                next = Some(at);
+                break;
             }
+            st.waiting = next;
+            st.idle = next.is_none();
             g = match next {
                 Some(at) => self.cv.wait_until(g, at).0,
                 None => self.cv.wait(g),
@@ -457,8 +497,10 @@ impl TimerService {
     fn state(g: &mut Option<TimerState>) -> &mut TimerState {
         g.get_or_insert_with(|| TimerState {
             heap: BinaryHeap::new(),
-            live: HashMap::new(),
+            live: FxHashMap::default(),
             next: 0,
+            waiting: None,
+            idle: true,
         })
     }
 
@@ -480,15 +522,25 @@ impl TimerService {
             },
         );
         st.heap.push(Reverse((at, id, 0)));
+        let wake = st.wakes(at);
+        if wake {
+            st.waiting = Some(at);
+            st.idle = false;
+        }
         drop(g);
-        self.cv.notify_one();
+        if wake {
+            self.cv.notify_one();
+        }
 
         id
     }
 
     fn stop(&self, id: u64) -> bool {
         let mut g = self.st.lock();
-        TimerService::state(&mut g).live.remove(&id).is_some()
+        let st = TimerService::state(&mut g);
+        let was = st.live.remove(&id).is_some();
+        st.compact();
+        was
     }
 
     fn reset(&self, id: u64, at: Instant, handle: InterruptHandle, reason: Arc<str>) {
@@ -505,8 +557,15 @@ impl TimerService {
             },
         );
         st.heap.push(Reverse((at, id, generation)));
+        let wake = st.wakes(at);
+        if wake {
+            st.waiting = Some(at);
+            st.idle = false;
+        }
         drop(g);
-        self.cv.notify_one();
+        if wake {
+            self.cv.notify_one();
+        }
     }
 }
 
@@ -514,7 +573,7 @@ pub(crate) struct RunCtx {
     pub(crate) req: Request,
     pub(crate) hook: Arc<Hook>,
     pub(crate) run: Arc<Guard>,
-    pub(crate) reason: String,
+    pub(crate) reason: Arc<str>,
     outside: Cell<i64>,
     deps: RefCell<Vec<QueryDep>>,
     pub(crate) plan: Option<Arc<ScriptPlan>>,
@@ -557,7 +616,7 @@ impl RunCtx {
             self.timer,
             stop_at,
             self.interrupt.clone(),
-            Arc::from(self.reason.as_str()),
+            self.reason.clone(),
         );
     }
 
@@ -927,7 +986,7 @@ impl Request {
 
         let mut holder = ManuallyDrop::new(Runtime::new());
         let interrupt = holder.interrupt_handle();
-        let timer = TIMER.start(stop_at, interrupt.clone(), Arc::from(reason.as_str()));
+        let timer = TIMER.start(stop_at, interrupt.clone(), reason.clone());
 
         let c = Rc::new(RunCtx {
             req: self.clone(),
@@ -1031,7 +1090,7 @@ const HEAVY_HOOK_AFTER: i64 = 5_000_000;
 const MILLISECOND: i64 = 1_000_000;
 
 struct CostTable {
-    m: Mutex<Option<HashMap<String, i64>>>,
+    m: Mutex<Option<FxHashMap<String, i64>>>,
 }
 
 static COSTS: CostTable = CostTable {
@@ -1049,7 +1108,7 @@ impl CostTable {
 
     fn observe(&self, script: &str, d: i64) {
         let mut g = self.m.lock();
-        let m = g.get_or_insert_with(HashMap::new);
+        let m = g.get_or_insert_with(FxHashMap::default);
         match m.get_mut(script) {
             None => {
                 m.insert(script.to_string(), d);

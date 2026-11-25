@@ -94,3 +94,37 @@ fn deep_query_rows_are_copied_without_recursion() {
         assert_eq!(fmt_field(&e, "s"), "0");
     });
 }
+
+#[test]
+fn deep_rows_built_on_the_calling_thread_do_not_recurse() {
+    let _s = setup(true);
+    let _ = api::create_entity_type(b"author");
+    let _ = api::create_entity_type(b"book");
+    write("author", obj(vec![("id", s("a1")), ("name", s("first"))]));
+    write(
+        "book",
+        obj(vec![
+            ("id", s("b1")),
+            (
+                "author",
+                Value::Object(obj(vec![("@entity", s("author")), ("id", s("a1"))])),
+            ),
+            ("deep", deep_json(DEPTH)),
+        ]),
+    );
+
+    on_small_stack(|| {
+        let script = r#"function postRead(ctx) {
+  var rows = ctx.query("book", { "author.name": { eq: "first" } })
+  var v = rows[0].deep
+  var n = 0
+  while (typeof v === "object") { v = v.k; n++ }
+  ctx.entity.n = n
+}"#;
+        let e = crate::entity(r#"{"id":"x"}"#);
+        if let Err(err) = hook::apply_post_read_script("", script, &e, true) {
+            panic!("{err}");
+        }
+        assert_eq!(fmt_field(&e, "n"), DEPTH.to_string());
+    });
+}
