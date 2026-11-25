@@ -22,6 +22,7 @@ pub struct Digest {
     x: [u8; BLOCK_SIZE],
     nx: usize,
     len: u64,
+    software: bool,
 }
 
 impl Default for Digest {
@@ -37,11 +38,29 @@ impl Digest {
             x: [0; BLOCK_SIZE],
             nx: 0,
             len: 0,
+            software: false,
+        }
+    }
+
+    pub fn new_software() -> Digest {
+        Digest {
+            software: true,
+            ..Digest::new()
         }
     }
 
     pub fn reset(&mut self) {
+        let software = self.software;
         *self = Digest::new();
+        self.software = software;
+    }
+
+    fn compress(&mut self, p: &[u8]) {
+        if self.software {
+            block_generic(&mut self.h, p);
+        } else {
+            block(&mut self.h, p);
+        }
     }
 
     pub fn size(&self) -> usize {
@@ -60,14 +79,14 @@ impl Digest {
             self.nx += n;
             if self.nx == BLOCK_SIZE {
                 let x = self.x;
-                block(&mut self.h, &x);
+                self.compress(&x);
                 self.nx = 0;
             }
             p = &p[n..];
         }
         if p.len() >= BLOCK_SIZE {
             let n = p.len() & !(BLOCK_SIZE - 1);
-            block(&mut self.h, &p[..n]);
+            self.compress(&p[..n]);
             p = &p[n..];
         }
         if !p.is_empty() {
@@ -107,7 +126,218 @@ pub fn sum256(data: &[u8]) -> [u8; SIZE] {
     d.check_sum()
 }
 
-fn block(dig: &mut [u32; 8], mut p: &[u8]) {
+pub fn sum256_software(data: &[u8]) -> [u8; SIZE] {
+    let mut d = Digest::new_software();
+    d.write(data);
+    d.check_sum()
+}
+
+pub fn hardware() -> bool {
+    hardware_detected()
+}
+
+#[cfg(target_arch = "aarch64")]
+fn hardware_detected() -> bool {
+    std::arch::is_aarch64_feature_detected!("sha2")
+}
+
+#[cfg(target_arch = "x86_64")]
+fn hardware_detected() -> bool {
+    std::arch::is_x86_feature_detected!("sha")
+        && std::arch::is_x86_feature_detected!("sse4.1")
+        && std::arch::is_x86_feature_detected!("ssse3")
+}
+
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
+fn hardware_detected() -> bool {
+    false
+}
+
+fn block(dig: &mut [u32; 8], p: &[u8]) {
+    if hardware_detected() {
+        block_hardware(dig, p);
+        return;
+    }
+
+    block_generic(dig, p);
+}
+
+#[cfg(target_arch = "aarch64")]
+fn block_hardware(dig: &mut [u32; 8], p: &[u8]) {
+    unsafe { block_arm64(dig, p) }
+}
+
+#[cfg(target_arch = "x86_64")]
+fn block_hardware(dig: &mut [u32; 8], p: &[u8]) {
+    unsafe { block_shani(dig, p) }
+}
+
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
+fn block_hardware(dig: &mut [u32; 8], p: &[u8]) {
+    block_generic(dig, p);
+}
+
+#[cfg(target_arch = "aarch64")]
+#[target_feature(enable = "sha2")]
+fn block_arm64(dig: &mut [u32; 8], p: &[u8]) {
+    use core::arch::aarch64::{
+        uint32x4_t, vaddq_u32, vld1q_u8, vld1q_u32, vreinterpretq_u32_u8, vrev32q_u8,
+        vsha256h2q_u32, vsha256hq_u32, vsha256su0q_u32, vsha256su1q_u32, vst1q_u32,
+    };
+
+    let k = |i: usize| -> uint32x4_t { unsafe { vld1q_u32(K[i..i + 4].as_ptr()) } };
+    let mut abcd = unsafe { vld1q_u32(dig[0..4].as_ptr()) };
+    let mut efgh = unsafe { vld1q_u32(dig[4..8].as_ptr()) };
+
+    for chunk in p.chunks_exact(BLOCK_SIZE) {
+        let abcd_save = abcd;
+        let efgh_save = efgh;
+
+        let load = |i: usize| -> uint32x4_t {
+            let bytes = unsafe { vld1q_u8(chunk[i..i + 16].as_ptr()) };
+            vreinterpretq_u32_u8(vrev32q_u8(bytes))
+        };
+        let mut s0 = load(0);
+        let mut s1 = load(16);
+        let mut s2 = load(32);
+        let mut s3 = load(48);
+
+        let rounds = |abcd: &mut uint32x4_t, efgh: &mut uint32x4_t, w: uint32x4_t, i: usize| {
+            let t = vaddq_u32(w, k(i));
+            let prev = *abcd;
+            *abcd = vsha256hq_u32(prev, *efgh, t);
+            *efgh = vsha256h2q_u32(*efgh, prev, t);
+        };
+
+        rounds(&mut abcd, &mut efgh, s0, 0);
+        rounds(&mut abcd, &mut efgh, s1, 4);
+        rounds(&mut abcd, &mut efgh, s2, 8);
+        rounds(&mut abcd, &mut efgh, s3, 12);
+
+        let mut t = 16;
+        while t < 64 {
+            s0 = vsha256su1q_u32(vsha256su0q_u32(s0, s1), s2, s3);
+            rounds(&mut abcd, &mut efgh, s0, t);
+            s1 = vsha256su1q_u32(vsha256su0q_u32(s1, s2), s3, s0);
+            rounds(&mut abcd, &mut efgh, s1, t + 4);
+            s2 = vsha256su1q_u32(vsha256su0q_u32(s2, s3), s0, s1);
+            rounds(&mut abcd, &mut efgh, s2, t + 8);
+            s3 = vsha256su1q_u32(vsha256su0q_u32(s3, s0), s1, s2);
+            rounds(&mut abcd, &mut efgh, s3, t + 12);
+            t += 16;
+        }
+
+        abcd = vaddq_u32(abcd, abcd_save);
+        efgh = vaddq_u32(efgh, efgh_save);
+    }
+
+    unsafe {
+        vst1q_u32(dig[0..4].as_mut_ptr(), abcd);
+        vst1q_u32(dig[4..8].as_mut_ptr(), efgh);
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "sha,sse2,ssse3,sse4.1")]
+fn block_shani(dig: &mut [u32; 8], p: &[u8]) {
+    use core::arch::x86_64::{
+        __m128i, _mm_add_epi32, _mm_alignr_epi8, _mm_blend_epi16, _mm_loadu_si128, _mm_set_epi32,
+        _mm_set_epi64x, _mm_sha256msg1_epu32, _mm_sha256msg2_epu32, _mm_sha256rnds2_epu32,
+        _mm_shuffle_epi8, _mm_shuffle_epi32, _mm_storeu_si128,
+    };
+
+    let mask = _mm_set_epi64x(
+        0x0C0D_0E0F_0809_0A0Bu64 as i64,
+        0x0405_0607_0001_0203u64 as i64,
+    );
+    let k = |i: usize| -> __m128i {
+        _mm_set_epi32(
+            K[4 * i + 3] as i32,
+            K[4 * i + 2] as i32,
+            K[4 * i + 1] as i32,
+            K[4 * i] as i32,
+        )
+    };
+    let schedule = |v0: __m128i, v1: __m128i, v2: __m128i, v3: __m128i| -> __m128i {
+        let t1 = _mm_sha256msg1_epu32(v0, v1);
+        let t2 = _mm_alignr_epi8(v3, v2, 4);
+        let t3 = _mm_add_epi32(t1, t2);
+        _mm_sha256msg2_epu32(t3, v3)
+    };
+
+    let state = dig.as_ptr() as *const __m128i;
+    let dcba = unsafe { _mm_loadu_si128(state) };
+    let efgh = unsafe { _mm_loadu_si128(state.add(1)) };
+
+    let cdab = _mm_shuffle_epi32(dcba, 0xB1);
+    let efgh = _mm_shuffle_epi32(efgh, 0x1B);
+    let mut abef = _mm_alignr_epi8(cdab, efgh, 8);
+    let mut cdgh = _mm_blend_epi16(efgh, cdab, 0xF0);
+
+    for chunk in p.chunks_exact(BLOCK_SIZE) {
+        let abef_save = abef;
+        let cdgh_save = cdgh;
+
+        let data = chunk.as_ptr() as *const __m128i;
+        let mut w0 = _mm_shuffle_epi8(unsafe { _mm_loadu_si128(data) }, mask);
+        let mut w1 = _mm_shuffle_epi8(unsafe { _mm_loadu_si128(data.add(1)) }, mask);
+        let mut w2 = _mm_shuffle_epi8(unsafe { _mm_loadu_si128(data.add(2)) }, mask);
+        let mut w3 = _mm_shuffle_epi8(unsafe { _mm_loadu_si128(data.add(3)) }, mask);
+        let mut w4;
+
+        let rounds = |abef: &mut __m128i, cdgh: &mut __m128i, w: __m128i, i: usize| {
+            let t1 = _mm_add_epi32(w, k(i));
+            *cdgh = _mm_sha256rnds2_epu32(*cdgh, *abef, t1);
+            let t2 = _mm_shuffle_epi32(t1, 0x0E);
+            *abef = _mm_sha256rnds2_epu32(*abef, *cdgh, t2);
+        };
+
+        rounds(&mut abef, &mut cdgh, w0, 0);
+        rounds(&mut abef, &mut cdgh, w1, 1);
+        rounds(&mut abef, &mut cdgh, w2, 2);
+        rounds(&mut abef, &mut cdgh, w3, 3);
+        w4 = schedule(w0, w1, w2, w3);
+        rounds(&mut abef, &mut cdgh, w4, 4);
+        w0 = schedule(w1, w2, w3, w4);
+        rounds(&mut abef, &mut cdgh, w0, 5);
+        w1 = schedule(w2, w3, w4, w0);
+        rounds(&mut abef, &mut cdgh, w1, 6);
+        w2 = schedule(w3, w4, w0, w1);
+        rounds(&mut abef, &mut cdgh, w2, 7);
+        w3 = schedule(w4, w0, w1, w2);
+        rounds(&mut abef, &mut cdgh, w3, 8);
+        w4 = schedule(w0, w1, w2, w3);
+        rounds(&mut abef, &mut cdgh, w4, 9);
+        w0 = schedule(w1, w2, w3, w4);
+        rounds(&mut abef, &mut cdgh, w0, 10);
+        w1 = schedule(w2, w3, w4, w0);
+        rounds(&mut abef, &mut cdgh, w1, 11);
+        w2 = schedule(w3, w4, w0, w1);
+        rounds(&mut abef, &mut cdgh, w2, 12);
+        w3 = schedule(w4, w0, w1, w2);
+        rounds(&mut abef, &mut cdgh, w3, 13);
+        w4 = schedule(w0, w1, w2, w3);
+        rounds(&mut abef, &mut cdgh, w4, 14);
+        w0 = schedule(w1, w2, w3, w4);
+        rounds(&mut abef, &mut cdgh, w0, 15);
+
+        abef = _mm_add_epi32(abef, abef_save);
+        cdgh = _mm_add_epi32(cdgh, cdgh_save);
+    }
+
+    let feba = _mm_shuffle_epi32(abef, 0x1B);
+    let dchg = _mm_shuffle_epi32(cdgh, 0xB1);
+    let dcba = _mm_blend_epi16(feba, dchg, 0xF0);
+    let hgef = _mm_alignr_epi8(dchg, feba, 8);
+
+    let out = dig.as_mut_ptr() as *mut __m128i;
+    unsafe {
+        _mm_storeu_si128(out, dcba);
+        _mm_storeu_si128(out.add(1), hgef);
+    }
+}
+
+fn block_generic(dig: &mut [u32; 8], mut p: &[u8]) {
     let mut w = [0u32; 64];
     while p.len() >= BLOCK_SIZE {
         for (wi, chunk) in w.iter_mut().zip(p[..BLOCK_SIZE].chunks_exact(4)) {

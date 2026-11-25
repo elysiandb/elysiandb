@@ -50,3 +50,32 @@ fn sha256_sums_match_go() {
     }
     assert_eq!(checked, ROWS);
 }
+
+#[test]
+fn sha256_hardware_and_software_paths_agree() {
+    let mut r =
+        elysiandb::gocompat::rand::Rand::new(elysiandb::gocompat::rand::new_source(20261125));
+    let mut data = vec![0u8; 4096 + 129];
+    for b in data.iter_mut() {
+        *b = r.intn(256) as u8;
+    }
+
+    for len in (0..=1100).chain([2047, 2048, 2049, 4096, 4096 + 129]) {
+        let input = &data[..len];
+        let want = sha256::sum256_software(input);
+        assert_eq!(sha256::sum256(input), want, "length {len}");
+
+        let mut d = sha256::Digest::new();
+        let mut rest = input;
+        let mut step = 1;
+        while !rest.is_empty() {
+            let n = step.min(rest.len());
+            d.write(&rest[..n]);
+            rest = &rest[n..];
+            step = step * 3 % 97 + 1;
+        }
+        assert_eq!(d.sum(), want, "streamed length {len}");
+    }
+
+    println!("hardware path: {}", sha256::hardware());
+}
