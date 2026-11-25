@@ -3,6 +3,7 @@ mod jsrun;
 use goja::builtin_proxy::ProxyTrapConfig;
 use goja::builtin_symbol::SYM_ITERATOR;
 use goja::func::NativeFn;
+use goja::host::{DocValue, HandleKind, JsHandle};
 use goja::object::{Flag, PropertyDescriptor};
 use goja::runtime::Throw;
 use goja::string::{ascii_string, new_string_value};
@@ -2224,5 +2225,24 @@ fn proxy_and_reflect_builtins_match_goja() {
             }
         }
         assert!(failures.is_empty(), "{}", failures.join("\n"));
+    });
+}
+
+#[test]
+fn test_proxy_export() {
+    on_big_stack(|| {
+        let mut vm = new_runtime();
+        let v = run(&mut vm, "\n\tnew Proxy({}, {});\n\t");
+        let v1 = vm.export(&v).expect("export");
+        assert!(
+            matches!(
+                &v1,
+                DocValue::Object(JsHandle {
+                    kind: HandleKind::Proxy,
+                    ..
+                })
+            ),
+            "Export returned an unexpected value"
+        );
     });
 }

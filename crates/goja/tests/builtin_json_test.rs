@@ -1,6 +1,8 @@
 mod jsrun;
 
+use gocompat::time::Time;
 use goja::Value;
+use goja::host::DocValue;
 use jsrun::*;
 
 #[test]
@@ -697,4 +699,57 @@ fn json_stringify_space_follows_the_go_float_conversion() {
         "escape(JSON.stringify({a:1}, null, Infinity))",
         want,
     )]);
+}
+
+#[test]
+fn test_json_marshal_object() {
+    on_big_stack(|| {
+        let mut vm = new_runtime();
+        let o = vm.new_object();
+        o.set_own_str(&mut vm, &"test".into(), int(42), true)
+            .expect("set");
+        let e = vm.get("Error").expect("get").expect("Error");
+        o.set_own_str(&mut vm, &"testfunc".into(), e, true)
+            .expect("set");
+        let b = vm.object_marshal_json(o).expect("marshal");
+        let s = String::from_utf8(b).expect("utf8");
+        assert_eq!(s, r#"{"test":42}"#, "Unexpected value: {s}");
+    });
+}
+
+#[test]
+fn test_json_marshal_go_date() {
+    on_big_stack(|| {
+        let mut vm = new_runtime();
+        let o = vm.new_object();
+        let t = vm
+            .to_value(&DocValue::Time(Time::from_unix(86400, 0).utc()))
+            .expect("to_value");
+        o.set_own_str(&mut vm, &"test".into(), t, true)
+            .expect("set");
+        let b = vm.object_marshal_json(o).expect("marshal");
+        let s = String::from_utf8(b).expect("utf8");
+        assert_eq!(
+            s, r#"{"test":"1970-01-02T00:00:00Z"}"#,
+            "Unexpected value: {s}"
+        );
+    });
+}
+
+#[test]
+fn test_json_marshal_object_circular() {
+    on_big_stack(|| {
+        let mut vm = new_runtime();
+        let o = vm.new_object();
+        o.set_own_str(&mut vm, &"o".into(), Value::Object(o), true)
+            .expect("set");
+        let err = match vm.object_marshal_json(o) {
+            Ok(_) => panic!("Expected error"),
+            Err(e) => e.error(),
+        };
+        assert!(
+            err.ends_with("Converting circular structure to JSON"),
+            "Unexpected error: {err}"
+        );
+    });
 }

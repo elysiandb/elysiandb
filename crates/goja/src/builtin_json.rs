@@ -9,8 +9,8 @@ use crate::object::{
 };
 use crate::proxy::proxy_class_name;
 use crate::runtime::{
-    JsResult, Runtime, Throw, create_data_property, create_data_property_or_throw, is_array,
-    to_length,
+    JsResult, RunError, Runtime, Throw, create_data_property, create_data_property_or_throw,
+    is_array, to_length,
 };
 use crate::string::{
     JsString, STRING_EMPTY, ascii_string, new_string_value, string_value_from_raw,
@@ -419,6 +419,27 @@ impl Runtime {
             ))));
         }
         Ok(Value::Undefined)
+    }
+
+    pub fn object_marshal_json(&mut self, o: ObjRef) -> Result<Vec<u8>, RunError> {
+        let mut ctx = BuiltinJsonStringifyContext {
+            stack: Vec::new(),
+            property_list: None,
+            replacer_function: None,
+            gap: Vec::new(),
+            indent: Vec::new(),
+            buf: Vec::new(),
+            all_ascii: false,
+        };
+        match ctx.r#do(self, Value::Object(o)) {
+            Ok(written) => {
+                if !written {
+                    ctx.buf.extend_from_slice(b"null");
+                }
+                Ok(ctx.buf)
+            }
+            Err(t) => Err(self.throw_to_run_error(t)),
+        }
     }
 
     pub fn get_json(&mut self) -> ObjRef {
