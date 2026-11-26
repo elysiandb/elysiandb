@@ -212,6 +212,10 @@ name = "http_hook_test"
 path = "tests/internal/transport_test/http_test/api_test/hook_test/main.rs"
 
 [[test]]
+name = "routing_test"
+path = "tests/internal/routing_test/main.rs"
+
+[[test]]
 name = "http_api_test"
 path = "tests/internal/transport_test/http_test/api_test/main.rs"
 

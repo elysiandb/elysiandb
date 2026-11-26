@@ -18,19 +18,6 @@ use elysiandb::httpd::{RequestCtx, Server, ServerConfig, bind_tcp4, handler};
 use elysiandb::log;
 use elysiandb::sync::Mutex;
 
-const SERVER_LEVEL_CASES: [(&str, &str); 10] = [
-    ("off", "098-garbage-request-line"),
-    ("off", "099-garbage-bytes"),
-    ("off", "100-duplicate-content-length"),
-    ("off", "102-body-4mib-plus-one"),
-    ("off", "104-body-4mib-plus-one-chunked"),
-    ("off", "106-head-70kib"),
-    ("timeouts", "001-header-read-timeout"),
-    ("timeouts", "002-body-read-timeout"),
-    ("timeouts", "004-silent-connection"),
-    ("limit", "002-concurrency-503"),
-];
-
 #[derive(Clone, Default)]
 struct LogBuffer(Arc<Mutex<Vec<u8>>>);
 
@@ -277,24 +264,28 @@ fn check(case: &Case, raw: &[u8], closed: bool, logs: &str) {
     }
 
     if case.compare == "d27" {
-        let msg = d27::message_for(&case.scenario, &case.id)
-            .unwrap_or_else(|| panic!("{}/{}: no D27 message", case.scenario, case.id));
-        let body = body_of(raw);
-        assert_eq!(
-            String::from_utf8_lossy(&body),
-            msg,
-            "{}/{}: D27 body",
-            case.scenario,
-            case.id
-        );
-        assert_eq!(
-            content_length(raw),
-            Some(msg.len()),
-            "{}/{}: Content-Length",
-            case.scenario,
-            case.id
-        );
+        check_d27(case, raw);
     }
+}
+
+fn check_d27(case: &Case, raw: &[u8]) {
+    let msg = d27::message_for(&case.scenario, &case.id)
+        .unwrap_or_else(|| panic!("{}/{}: no D27 message", case.scenario, case.id));
+    let body = body_of(raw);
+    assert_eq!(
+        String::from_utf8_lossy(&body),
+        msg,
+        "{}/{}: D27 body",
+        case.scenario,
+        case.id
+    );
+    assert_eq!(
+        content_length(raw),
+        Some(msg.len()),
+        "{}/{}: Content-Length",
+        case.scenario,
+        case.id
+    );
 }
 
 #[test]
@@ -317,8 +308,13 @@ fn test_server_level_cases_replay_the_go_corpus() {
     let (held_conn, _, held_closed) = exchange(&hold, limited.addr);
     assert!(!held_closed);
 
+    let cases: Vec<(&str, &str)> = routed::SERVER_LEVEL
+        .iter()
+        .copied()
+        .filter(|(_, id)| *id != "001-hold-connection")
+        .collect();
     let mut replayed = 0;
-    for (scenario, id) in SERVER_LEVEL_CASES {
+    for &(scenario, id) in &cases {
         if id == "004-silent-connection" {
             continue;
         }
@@ -343,7 +339,7 @@ fn test_server_level_cases_replay_the_go_corpus() {
     replayed += 1;
 
     log::set_output(None, false);
-    assert_eq!(replayed, SERVER_LEVEL_CASES.len());
+    assert_eq!(replayed + 1, routed::SERVER_LEVEL.len());
 }
 
 #[test]
@@ -364,45 +360,84 @@ fn test_normalizer_matches_the_generator_rules() {
     assert!(!normalize::is_request_id("client-supplied-1"));
 }
 
-fn replayed_count(ids: &[&str]) -> usize {
-    if elysiandb::transport::http::adminui::is_built() {
-        return ids.iter().filter(|id| !id.contains("-admin-")).count();
+const SCENARIOS: [&str; 10] = [
+    "off",
+    "user",
+    "basic",
+    "token",
+    "strict",
+    "cors",
+    "disk-full",
+    "deadline",
+    "limit",
+    "timeouts",
+];
+
+fn run_routed(scenario: &str) {
+    let r = routed::replay(scenario);
+    assert_eq!(r.replayed + r.skipped, r.total, "{scenario}");
+    assert!(r.replayed > 0, "{scenario}: nothing replayed");
+}
+
+#[test]
+fn test_every_case_is_replayed_or_listed() {
+    let mut total = 0;
+    let mut listed = 0;
+    for scenario in SCENARIOS {
+        let ids = routed::case_ids(scenario);
+        total += ids.len();
+        for id in &ids {
+            if routed::excluded(scenario, id) || routed::server_level(scenario, id) {
+                listed += 1;
+            }
+        }
     }
-    ids.len()
+    for (scenario, id, _) in routed::EXCLUDED {
+        assert!(
+            routed::case_ids(scenario).iter().any(|i| i == id),
+            "{scenario}/{id}: excluded case does not exist"
+        );
+    }
+    assert_eq!(total, 268);
+    assert_eq!(listed, routed::EXCLUDED.len() + routed::SERVER_LEVEL.len());
 }
 
 #[test]
 fn test_routed_off_cases_replay_the_go_corpus() {
-    let replayed = routed::replay("off", &routed::OFF);
-    assert_eq!(replayed, replayed_count(&routed::OFF));
+    run_routed("off");
 }
 
 #[test]
 fn test_routed_basic_cases_replay_the_go_corpus() {
-    let replayed = routed::replay("basic", &routed::BASIC);
-    assert_eq!(replayed, routed::BASIC.len());
+    run_routed("basic");
 }
 
 #[test]
 fn test_routed_token_cases_replay_the_go_corpus() {
-    let replayed = routed::replay("token", &routed::TOKEN);
-    assert_eq!(replayed, routed::TOKEN.len());
+    run_routed("token");
 }
 
 #[test]
 fn test_routed_user_cases_replay_the_go_corpus() {
-    let replayed = routed::replay("user", &routed::USER);
-    assert_eq!(replayed, routed::USER.len());
+    run_routed("user");
 }
 
 #[test]
 fn test_routed_cors_cases_replay_the_go_corpus() {
-    let replayed = routed::replay("cors", &routed::CORS);
-    assert_eq!(replayed, routed::CORS.len());
+    run_routed("cors");
 }
 
 #[test]
 fn test_routed_deadline_cases_replay_the_go_corpus() {
-    let replayed = routed::replay("deadline", &routed::DEADLINE);
-    assert_eq!(replayed, routed::DEADLINE.len());
+    run_routed("deadline");
+}
+
+#[test]
+fn test_routed_strict_cases_replay_the_go_corpus() {
+    run_routed("strict");
+}
+
+#[test]
+fn test_routed_timeouts_cases_replay_the_go_corpus() {
+    run_routed("timeouts");
 }

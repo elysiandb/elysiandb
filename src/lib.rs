@@ -24,6 +24,7 @@ pub mod metrics;
 pub mod pagetree;
 pub mod ptree;
 pub mod query;
+pub mod routing;
 pub mod schema;
 pub mod security;
 pub mod stat;

@@ -9,6 +9,12 @@ pub fn message_for(scenario: &str, id: &str) -> Option<&'static str> {
         ("timeouts", "001-header-read-timeout") => "bad request",
         ("timeouts", "002-body-read-timeout") => "request timeout",
         ("limit", "002-concurrency-503") => "too many connections",
+        ("off", "033-query-decode-error") | ("basic", "037-query-decode-error") => {
+            r#"{"error":"invalid JSON: \"limit\" must be an integer, got a string"}"#
+        }
+        ("off", "034-query-syntax-error") | ("basic", "038-query-syntax-error") => {
+            r#"{"error":"invalid JSON at byte 2: unexpected character 'o'"}"#
+        }
         _ => return None,
     };
     Some(msg)
