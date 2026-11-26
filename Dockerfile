@@ -69,6 +69,8 @@ COPY --from=builder /out/elysiandb /usr/local/bin/elysiandb
 
 COPY docker/elysian.yaml /app/elysian.yaml
 
+COPY THIRD_PARTY_NOTICES /usr/share/licenses/elysiandb/THIRD_PARTY_NOTICES
+
 USER app
 EXPOSE 8089
 
