@@ -4,6 +4,8 @@ mod common;
 mod tempdir;
 
 mod archives;
+mod backup_archives;
+mod backup_ops;
 mod config;
 mod fmt;
 mod logs;

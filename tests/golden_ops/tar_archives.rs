@@ -210,7 +210,7 @@ fn place(outcome: &Outcome) -> Option<String> {
 const GO_GZIP: &str = "\u{27e8}go:gzip\u{27e9}";
 const GO_TAR: &str = "\u{27e8}go:tar\u{27e9}";
 
-fn expected_detail(row: &Value, data: &[u8], reason: &str) -> String {
+pub(super) fn expected_detail(row: &Value, data: &[u8], reason: &str) -> String {
     if let Some(offset) = row
         .get("go_values")
         .and_then(|v| v.get("flate_offset"))
