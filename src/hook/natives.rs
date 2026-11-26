@@ -4,11 +4,11 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use goja::heap::Tracer;
-use goja::host::{DocValue, DynamicObject, GoMethod, GoMethods};
-use goja::object::FunctionCall;
-use goja::runtime::{JsResult, Runtime};
-use goja::value::{Value, float_to_value, int_to_value};
+use talos::heap::Tracer;
+use talos::host::{DocValue, DynamicObject, GoMethod, GoMethods};
+use talos::object::FunctionCall;
+use talos::runtime::{JsResult, Runtime};
+use talos::value::{Value, float_to_value, int_to_value};
 
 use crate::docpath;
 use crate::gocompat::json;

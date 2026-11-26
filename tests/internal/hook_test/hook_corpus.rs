@@ -3,7 +3,7 @@ use std::process::Command;
 
 use elysiandb::gocompat::json::{self, Value};
 use elysiandb::hook;
-use goja::host::{DocValue, json as host_json};
+use talos::host::{DocValue, json as host_json};
 
 use crate::{obj, s, setup_with, write};
 
@@ -289,7 +289,7 @@ fn go_lossy(b: &[u8]) -> String {
 }
 
 #[test]
-fn hook_plan_bytecode_matches_goja() {
+fn hook_plan_bytecode_matches_the_baseline() {
     let scripts: std::collections::HashMap<String, String> = read_jsonl("hooks/corpus-utc.jsonl")
         .iter()
         .map(|r| {
@@ -314,13 +314,17 @@ fn hook_plan_bytecode_matches_goja() {
         let want = matches!(row.get("planned"), Some(Value::Bool(true)));
         match (info, want) {
             (None, false) => {}
-            (Some(_), false) => failures.push(format!("{label}: planned, goja did not plan it")),
+            (Some(_), false) => {
+                failures.push(format!("{label}: planned, the baseline did not plan it"))
+            }
             (None, true) => failures.push(format!("{label}: not planned")),
             (Some(info), true) => {
                 planned += 1;
                 let file = field(row, "file");
-                let dump = std::fs::read_to_string(golden_path(&format!("hooks/{file}")))
-                    .expect("plan dump");
+                let dump = reference_dump(
+                    &std::fs::read_to_string(golden_path(&format!("hooks/{file}")))
+                        .expect("plan dump"),
+                );
                 if info.dump != dump {
                     failures.push(format!("{label}: the plan dump differs"));
                 }
@@ -344,7 +348,7 @@ fn hook_plan_bytecode_matches_goja() {
                 };
                 let got: Vec<String> = info.fold_ids.iter().map(|b| go_lossy(b)).collect();
                 if got != ids {
-                    failures.push(format!("{label}: fold ids {got:?}, goja {ids:?}"));
+                    failures.push(format!("{label}: fold ids {got:?}, baseline {ids:?}"));
                 }
                 if !dump.contains(&format!(
                     "source:{}",
@@ -360,4 +364,30 @@ fn hook_plan_bytecode_matches_goja() {
     assert_eq!(checked, rows.len());
     assert_eq!(checked, 230);
     assert_eq!(planned, 1);
+}
+
+pub fn reference_dump(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for line in text.split_inclusive('\n') {
+        let Some(i) = line.find('\t') else {
+            out.push_str(line);
+            continue;
+        };
+        let (head, rest) = line.split_at(i + 1);
+        let end = rest.find('\t').unwrap_or(rest.len());
+        let (field, tail) = rest.split_at(end);
+        let star = if field.starts_with('*') { "*" } else { "" };
+        let body = &field[star.len()..];
+        match body.find('.') {
+            Some(d) if d > 0 && body[..d].bytes().all(|c| c.is_ascii_lowercase()) => {
+                out.push_str(head);
+                out.push_str(star);
+                out.push_str("talos");
+                out.push_str(&body[d..]);
+                out.push_str(tail);
+            }
+            _ => out.push_str(line),
+        }
+    }
+    out
 }

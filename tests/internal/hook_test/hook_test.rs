@@ -1,7 +1,7 @@
 use elysiandb::api;
 use elysiandb::gocompat::json::Value;
 use elysiandb::hook::{self, Hook};
-use goja::host::DocValue;
+use talos::host::DocValue;
 
 use crate::{doc, entity, entity_of, field, setup, text};
 
@@ -102,7 +102,7 @@ fn test_create_hook_entity() {
 }
 
 fn missing_entry_is_noop(
-    fn_apply: fn(&str, &str, &goja::host::MapRef, bool) -> Result<(), hook::HookError>,
+    fn_apply: fn(&str, &str, &talos::host::MapRef, bool) -> Result<(), hook::HookError>,
 ) {
     let _s = setup(true);
 
@@ -121,7 +121,7 @@ fn missing_entry_is_noop(
 }
 
 fn syntax_error(
-    fn_apply: fn(&str, &str, &goja::host::MapRef, bool) -> Result<(), hook::HookError>,
+    fn_apply: fn(&str, &str, &talos::host::MapRef, bool) -> Result<(), hook::HookError>,
     script: &str,
 ) {
     let _s = setup(true);
@@ -131,7 +131,7 @@ fn syntax_error(
 }
 
 fn query_works(
-    fn_apply: fn(&str, &str, &goja::host::MapRef, bool) -> Result<(), hook::HookError>,
+    fn_apply: fn(&str, &str, &talos::host::MapRef, bool) -> Result<(), hook::HookError>,
     script: &str,
 ) {
     let _s = setup(true);
@@ -347,7 +347,7 @@ fn test_get_post_read_hooks_for_entity_filters_event() {
 fn priority_enabled_and_error_tolerance(
     event: &str,
     fn_name: &str,
-    apply: fn(&str, &str, &goja::host::MapRef) -> goja::host::MapRef,
+    apply: fn(&str, &str, &talos::host::MapRef) -> talos::host::MapRef,
 ) {
     let _s = setup(true);
 

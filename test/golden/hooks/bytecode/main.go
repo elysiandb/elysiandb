@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/dop251/goja"
-	"github.com/taymour/elysiandb/test/golden/gojadump"
+	"github.com/taymour/elysiandb/test/golden/talosdump"
 	"github.com/taymour/elysiandb/test/golden/goldenio"
 )
 
@@ -50,7 +50,7 @@ func run(out, casesPath string) error {
 			index.Add(map[string]any{"label": r.Label, "compiled": false})
 			continue
 		}
-		if err := goldenio.WriteFile(out, "bytecode/"+r.Label+".code", []byte(gojadump.Program(prog))); err != nil {
+		if err := goldenio.WriteFile(out, "bytecode/"+r.Label+".code", []byte(talosdump.Program(prog))); err != nil {
 			return err
 		}
 		index.Add(map[string]any{"label": r.Label, "compiled": true, "file": "bytecode/" + r.Label + ".code"})

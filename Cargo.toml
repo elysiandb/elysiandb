@@ -8,7 +8,7 @@ publish = false
 build = "build.rs"
 
 [workspace]
-members = ["crates/gocompat", "crates/goja"]
+members = ["crates/gocompat", "crates/talos"]
 
 [lib]
 path = "src/lib.rs"
@@ -20,7 +20,7 @@ path = "src/main.rs"
 [dependencies]
 arc-swap = "=1.7.1"
 gocompat = { path = "crates/gocompat" }
-goja = { path = "crates/goja" }
+talos = { path = "crates/talos" }
 libc = "=0.2.191"
 mimalloc = "=0.1.52"
 

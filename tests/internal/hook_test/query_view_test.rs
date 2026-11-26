@@ -6,7 +6,7 @@ use elysiandb::gocompat::json::{self, Map, Value};
 use elysiandb::hook::{self, Hook};
 use elysiandb::memory;
 use elysiandb::query::{Filters, Ops};
-use goja::host::{DocValue, MapRef};
+use talos::host::{DocValue, MapRef};
 
 use crate::{entity, field, fmt_field, obj, rng, run_post_read, s, setup, sprint_json, write};
 

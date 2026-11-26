@@ -1,7 +1,7 @@
 use elysiandb::api;
 use elysiandb::gocompat::json::Value;
 use elysiandb::hook;
-use goja::host::DocValue;
+use talos::host::DocValue;
 
 use crate::{entity, field, obj, s, setup, write};
 

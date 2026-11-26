@@ -525,8 +525,8 @@ func genGoja(out string) error {
 		}
 		lines.Add(rec)
 	}
-	fmt.Fprintf(os.Stderr, "goja.jsonl: %d lines\n", lines.Len())
-	return lines.Write(out, "goja.jsonl")
+	fmt.Fprintf(os.Stderr, "talos.jsonl: %d lines\n", lines.Len())
+	return lines.Write(out, "talos.jsonl")
 }
 
 var corpusOptions = []regexp2.RegexOptions{

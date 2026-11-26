@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::{Arc, Weak};
 
-use goja::ast::{Expression, Node, Property, walk_nodes};
+use talos::ast::{Expression, Node, Property, walk_nodes};
 
 use crate::datastore::{Engine, INDEX_BITMAP, INDEX_FILTER, IndexSpec, ORIGIN_HOOK};
 use crate::engine;
@@ -19,7 +19,7 @@ pub(crate) struct IndexNeed {
 }
 
 pub(crate) fn script_needs(script: &str) -> Vec<IndexNeed> {
-    let Ok(program) = goja::parse("", script.as_bytes(), &[]) else {
+    let Ok(program) = talos::parse("", script.as_bytes(), &[]) else {
         return Vec::new();
     };
 

@@ -8,7 +8,7 @@ use elysiandb::gocompat::rand::Rand;
 use elysiandb::hook::{self, Hook};
 use elysiandb::query::{Filters, Ops};
 use elysiandb::storage;
-use goja::host::MapRef;
+use talos::host::MapRef;
 
 use crate::{entity, fmt_field, obj, rng, s, setup, sprint, write};
 

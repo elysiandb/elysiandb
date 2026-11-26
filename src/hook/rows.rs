@@ -4,12 +4,14 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use goja::export::string_from_go_shared;
-use goja::heap::Tracer;
-use goja::host::{DocMap, DocValue, DynamicArray, DynamicObject, GoMethod, GoMethods, SliceHeader};
-use goja::object::FunctionCall;
-use goja::runtime::{JsResult, Runtime};
-use goja::value::{Value, float_to_value, int_to_value};
+use talos::export::string_from_go_shared;
+use talos::heap::Tracer;
+use talos::host::{
+    DocMap, DocValue, DynamicArray, DynamicObject, GoMethod, GoMethods, SliceHeader,
+};
+use talos::object::FunctionCall;
+use talos::runtime::{JsResult, Runtime};
+use talos::value::{Value, float_to_value, int_to_value};
 
 use crate::gocompat::json::{self, Map};
 
@@ -381,13 +383,13 @@ pub(crate) static KEYED_METHODS: [GoMethod; 5] = [
 pub(crate) fn string_list(rt: &mut Runtime, keys: Vec<String>) -> Value {
     let items: Vec<Value> = keys
         .iter()
-        .map(|k| Value::String(goja::export::string_from_go(k.as_bytes())))
+        .map(|k| Value::String(talos::export::string_from_go(k.as_bytes())))
         .collect();
     Value::Object(rt.new_array_values(items))
 }
 
 pub(crate) fn arg_string(rt: &mut Runtime, call: &FunctionCall<'_>, i: usize) -> JsResult<String> {
-    goja::host::goreflect::arg_string(rt, call, i)
+    talos::host::goreflect::arg_string(rt, call, i)
 }
 
 impl GoMethods for RowView {
@@ -603,17 +605,17 @@ impl GoMethods for ArrayView {
     fn call(&self, rt: &mut Runtime, idx: usize, call: FunctionCall<'_>) -> JsResult<Value> {
         match idx {
             0 => {
-                let i = goja::host::goreflect::arg_int(rt, &call, 0)?;
+                let i = talos::host::goreflect::arg_int(rt, &call, 0)?;
                 Ok(self.get_at(rt, i).unwrap_or(Value::Undefined))
             }
             1 => Ok(int_to_value(self.st.borrow().length as i64)),
             2 => {
-                let i = goja::host::goreflect::arg_int(rt, &call, 0)?;
+                let i = talos::host::goreflect::arg_int(rt, &call, 0)?;
                 self.bind(rt);
                 Ok(Value::Bool(self.set_at(i, call.argument(1))))
             }
             _ => {
-                let n = goja::host::goreflect::arg_int(rt, &call, 0)?;
+                let n = talos::host::goreflect::arg_int(rt, &call, 0)?;
                 self.bind(rt);
                 Ok(Value::Bool(self.set_len(n)))
             }

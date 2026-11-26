@@ -2138,7 +2138,7 @@ Hooks do **not** persist changes back to storage. They only affect query process
 
 ### Hook Execution Model
 
-Hooks are executed using an embedded JavaScript runtime (Goja).
+Hooks are executed by talos, the JavaScript engine embedded in ElysianDB.
 Each hook must define a function matching the event name.
 
 #### `pre_read`

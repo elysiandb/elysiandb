@@ -29,7 +29,7 @@ use elysiandb::gocompat::strconv;
 use elysiandb::hook;
 use elysiandb::storage;
 use elysiandb::sync::{Mutex, MutexGuard};
-use goja::host::{DocMap, DocValue, MapRef};
+use talos::host::{DocMap, DocValue, MapRef};
 
 use tempdir::TempDir;
 
@@ -143,7 +143,7 @@ pub fn text(e: &MapRef, key: &str) -> Option<String> {
 }
 
 pub fn sprint(v: &DocValue) -> String {
-    goja::host::json::format_v(v)
+    talos::host::json::format_v(v)
 }
 
 pub fn fmt_field(e: &MapRef, key: &str) -> String {
@@ -186,6 +186,6 @@ pub fn sprint_json(v: Option<&Value>) -> String {
         Some(Value::Number(f)) => go_float(*f),
         Some(Value::Int(i)) => i.to_string(),
         Some(Value::Bool(b)) => b.to_string(),
-        Some(other) => sprint(&goja::host::json::from_json(other)),
+        Some(other) => sprint(&talos::host::json::from_json(other)),
     }
 }

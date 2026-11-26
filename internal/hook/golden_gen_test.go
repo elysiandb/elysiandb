@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/taymour/elysiandb/test/golden/gojadump"
+	"github.com/taymour/elysiandb/test/golden/talosdump"
 	"github.com/taymour/elysiandb/test/golden/goldenio"
 )
 
@@ -43,7 +43,7 @@ func TestGenerateHooksPlanBytecode(t *testing.T) {
 			ids = append(ids, f.id)
 		}
 		name := "bytecode/" + r.Label + ".plan.code"
-		if err := goldenio.WriteFile(out, name, []byte(gojadump.Program(plan.program))); err != nil {
+		if err := goldenio.WriteFile(out, name, []byte(talosdump.Program(plan.program))); err != nil {
 			t.Fatal(err)
 		}
 		index.Add(map[string]any{"label": r.Label, "planned": true, "folds": len(plan.folds), "fold_ids": ids, "file": name})

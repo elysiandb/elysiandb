@@ -33,9 +33,9 @@ pub use storage::{
 };
 pub use view::{FoldStats, folds, set_folds_enabled, views_ready};
 
-pub fn document_from_json(doc: &crate::gocompat::json::Map) -> goja::host::MapRef {
-    match &goja::host::json::from_json(&crate::gocompat::json::Value::Object(doc.clone())) {
-        goja::host::DocValue::Map(m) => m.clone(),
-        _ => goja::host::MapRef::default(),
+pub fn document_from_json(doc: &crate::gocompat::json::Map) -> talos::host::MapRef {
+    match &talos::host::json::from_json(&crate::gocompat::json::Value::Object(doc.clone())) {
+        talos::host::DocValue::Map(m) => m.clone(),
+        _ => talos::host::MapRef::default(),
     }
 }

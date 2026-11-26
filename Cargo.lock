@@ -24,9 +24,9 @@ version = "0.0.0"
 dependencies = [
  "arc-swap",
  "gocompat",
- "goja",
  "libc",
  "mimalloc",
+ "talos",
 ]
 
 [[package]]
@@ -38,13 +38,6 @@ checksum = "1c66915cc5391097de7a2b0b972e8505aa33c0df401fd3a6811dbdb32881ba48"
 [[package]]
 name = "gocompat"
 version = "0.0.0"
-
-[[package]]
-name = "goja"
-version = "0.0.0"
-dependencies = [
- "gocompat",
-]
 
 [[package]]
 name = "libc"
@@ -75,3 +68,10 @@ name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
+
+[[package]]
+name = "talos"
+version = "0.0.0"
+dependencies = [
+ "gocompat",
+]

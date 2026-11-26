@@ -1,0 +1,29 @@
+{
+  "part": "talos-ftoa",
+  "baseline": "1a11e5e",
+  "go_version": "go1.24.7",
+  "goos": "darwin",
+  "goarch": "arm64",
+  "files": [
+    {
+      "path": "arch-arm64-ftobasestr.jsonl",
+      "size": 4270,
+      "sha256": "3395ecdf9bf541c4bbd783978c9c36073d342ac431aa87e8130308e50e59c5ba"
+    },
+    {
+      "path": "ftobasestr.jsonl",
+      "size": 5400192,
+      "sha256": "f8103785970a1459d702dccd20f50e1a6ec83f9160693fd13a1858170532fe4e"
+    },
+    {
+      "path": "ftostr.jsonl",
+      "size": 13699012,
+      "sha256": "6f6b6cb4da1d8b5aae38117716f6973e150d99bccaa40af16ff447460fba08e5"
+    },
+    {
+      "path": "paths.jsonl",
+      "size": 11939698,
+      "sha256": "4a2785b2cea3906f516d9debd73b8bf03eba362ec64b42f72a0c57baa95cbfaf"
+    }
+  ]
+}

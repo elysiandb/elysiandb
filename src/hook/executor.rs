@@ -8,13 +8,13 @@ use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Once};
 use std::time::{Duration, Instant};
 
-use goja::export::string_from_go;
-use goja::heap::FxHashMap;
-use goja::host::{DocMap, DocValue, FuncRef, HostFn, MapRef};
-use goja::object::FunctionCall;
-use goja::runtime::{InterruptHandle, JsResult, RunError, Throw};
-use goja::value::{Value, float_to_value, int_to_value};
-use goja::{Program, Runtime};
+use talos::export::string_from_go;
+use talos::heap::FxHashMap;
+use talos::host::{DocMap, DocValue, FuncRef, HostFn, MapRef};
+use talos::object::FunctionCall;
+use talos::runtime::{InterruptHandle, JsResult, RunError, Throw};
+use talos::value::{Value, float_to_value, int_to_value};
+use talos::{Program, Runtime};
 
 use crate::acl;
 use crate::api::{self, Guard, GuardError};
@@ -89,7 +89,7 @@ fn compile(script: &str) -> Result<Arc<CompiledScript>, HookError> {
     }
 
     let program =
-        goja::compile("", script.as_bytes(), false).map_err(|e| HookError::new(e.to_string()))?;
+        talos::compile("", script.as_bytes(), false).map_err(|e| HookError::new(e.to_string()))?;
     let mut prefix = sha256::Digest::new();
     prefix.write(script.as_bytes());
     prefix.write(&[0]);
@@ -708,7 +708,7 @@ pub(crate) fn parse_args(
             for (op, val) in typed.borrow().iter() {
                 ops.insert(
                     op.as_bytes().to_vec(),
-                    goja::host::json::format_v(val).into_bytes(),
+                    talos::host::json::format_v(val).into_bytes(),
                 );
             }
 
@@ -781,7 +781,7 @@ fn helper_view(c: &RunCtx, rt: &mut Runtime, call: FunctionCall<'_>) -> JsResult
     rt.to_value(&DocValue::Host(Rc::new(tok)))
 }
 
-fn token(rt: &mut Runtime, v: &Value) -> JsResult<Option<Rc<dyn goja::host::GoMethods>>> {
+fn token(rt: &mut Runtime, v: &Value) -> JsResult<Option<Rc<dyn talos::host::GoMethods>>> {
     match &rt.export(v)? {
         DocValue::Host(h) if h.as_any().is::<ViewToken>() => Ok(Some(h.clone())),
         _ => Ok(None),
@@ -910,7 +910,7 @@ fn run_js(
             Ok(None) => return Ok(()),
             Err(t) => return Err(throw_error(rt, t)),
         };
-        if goja::runtime::assert_callable(rt, &f).is_none() {
+        if talos::runtime::assert_callable(rt, &f).is_none() {
             return Ok(());
         }
 

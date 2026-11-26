@@ -6,11 +6,11 @@ use std::sync::{Arc, OnceLock, Weak};
 use std::time::{Duration, Instant};
 
 use arc_swap::{ArcSwap, ArcSwapOption};
-use goja::Runtime;
-use goja::host::{GoMethod, GoMethods};
-use goja::object::FunctionCall;
-use goja::runtime::JsResult;
-use goja::value::{Value, float_to_value};
+use talos::Runtime;
+use talos::host::{GoMethod, GoMethods};
+use talos::object::FunctionCall;
+use talos::runtime::JsResult;
+use talos::value::{Value, float_to_value};
 
 use crate::acl::{self, ReadMode};
 use crate::api::{self, Guard, GuardError};
@@ -892,10 +892,10 @@ impl View {
         }
 
         Ok(match &rt.export(x)? {
-            goja::host::DocValue::Bool(b) => Some(bool_val(*b)),
-            goja::host::DocValue::Int64(i) => Some(num_val(*i as f64)),
-            goja::host::DocValue::Float64(f) => Some(num_val(*f)),
-            goja::host::DocValue::String(s) => Some(View::str_val(table, fr, s)),
+            talos::host::DocValue::Bool(b) => Some(bool_val(*b)),
+            talos::host::DocValue::Int64(i) => Some(num_val(*i as f64)),
+            talos::host::DocValue::Float64(f) => Some(num_val(*f)),
+            talos::host::DocValue::String(s) => Some(View::str_val(table, fr, s)),
             _ => None,
         })
     }
@@ -1726,7 +1726,9 @@ pub(crate) fn fold_output(vals: &[Val], names: &[String]) -> Vec<Value> {
         .map(|(v, name)| match v.k {
             VKind::Num => float_to_value(v.n),
             VKind::Bool => Value::Bool(v.n != 0.0),
-            VKind::Str | VKind::Tmp => Value::String(goja::export::string_from_go(name.as_bytes())),
+            VKind::Str | VKind::Tmp => {
+                Value::String(talos::export::string_from_go(name.as_bytes()))
+            }
             VKind::Null => Value::Null,
             _ => Value::Undefined,
         })

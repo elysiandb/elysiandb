@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use elysiandb::api;
 use elysiandb::gocompat::json::Value;
 use elysiandb::hook;
-use goja::host::MapRef;
+use talos::host::MapRef;
 
 use crate::fold_test::{BUDGET_SCRIPT, random_purchase};
 use crate::hook_corpus::{field, read_jsonl};
@@ -77,21 +77,21 @@ fn hook_bench_parts() {
     let e = entity(
         r#"{"id":"x","price":12,"ratio":0.5,"tags":["a","b"],"meta":{"k":"v","n":1},"nul":null,"s":"str","b":true,"big":12345678901234567890}"#,
     );
-    let d = goja::host::DocValue::Map(e);
+    let d = talos::host::DocValue::Map(e);
     let t0 = Instant::now();
     for _ in 0..n {
-        acc ^= goja::host::json::marshal(&d).expect("marshal")[0];
+        acc ^= talos::host::json::marshal(&d).expect("marshal")[0];
     }
     println!("marshal entity: {} ns ({acc})", t0.elapsed().as_nanos() / n);
 
     let t0 = Instant::now();
     for _ in 0..n {
-        let rt = goja::Runtime::new();
+        let rt = talos::Runtime::new();
         drop(rt);
     }
     println!("runtime new: {} ns", t0.elapsed().as_nanos() / n);
 
-    let p = goja::compile(
+    let p = talos::compile(
         "",
         b"function postRead(ctx) {\nctx.partial = 1; throw new Error(\"boom\")\n}",
         false,
@@ -100,15 +100,15 @@ fn hook_bench_parts() {
     let n = 20_000;
     let t0 = Instant::now();
     for _ in 0..n {
-        let mut rt = goja::Runtime::new();
+        let mut rt = talos::Runtime::new();
         let _ = rt.run_program(&p);
         let f = rt.get_var("postRead").ok().flatten().expect("fn");
-        let ctx = goja::Value::Object(rt.new_object());
-        let e = rt.call_function(&f, goja::Value::Undefined, &[ctx]);
+        let ctx = talos::Value::Object(rt.new_object());
+        let e = rt.call_function(&f, talos::Value::Undefined, &[ctx]);
         acc ^= e.err().map_or(0, |e| e.error().len() as u8);
     }
     println!(
-        "bare goja throw: {} ns ({acc})",
+        "bare baseline throw: {} ns ({acc})",
         t0.elapsed().as_nanos() / n
     );
 
@@ -124,7 +124,7 @@ fn hook_bench_parts() {
         let e = entity(r#"{"id":"x"}"#);
         e.borrow_mut().insert(
             "b".to_string(),
-            goja::host::DocValue::Bytes(goja::host::TypedSlice::new(vec![1u8])),
+            talos::host::DocValue::Bytes(talos::host::TypedSlice::new(vec![1u8])),
         );
         e
     };

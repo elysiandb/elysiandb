@@ -1,14 +1,14 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
-use goja::Program;
-use goja::ast::{
+use talos::Program;
+use talos::ast::{
     BindingTarget, BlockStatement, CallExpression, Expression, ForLoopInitializer, ForStatement,
     FunctionLiteral, IfStatement, Node, NumberValue, Property, Statement, VariableStatement,
     walk_nodes,
 };
-use goja::heap::FxHashMap;
-use goja::token;
+use talos::heap::FxHashMap;
+use talos::token;
 
 use crate::crypto::sha256;
 use crate::gocompat::strconv;
@@ -125,7 +125,7 @@ pub fn plan_info(script: &str, fn_name: &str) -> Option<PlanInfo> {
 
     Some(PlanInfo {
         source,
-        dump: goja::gojadump::program(&plan.program),
+        dump: talos::talosdump::program(&plan.program),
         fold_ids: plan.folds.iter().map(|f| f.id.clone()).collect(),
     })
 }
@@ -142,7 +142,7 @@ fn build_plan_with(script: &str, fn_name: &str, source: &mut Vec<u8>) -> Option<
         }
     }
 
-    let program = goja::parse("", script.as_bytes(), &[]).ok()?;
+    let program = talos::parse("", script.as_bytes(), &[]).ok()?;
 
     let mut helpers: HashMap<String, &FunctionLiteral> = HashMap::new();
     let mut entry: Option<&FunctionLiteral> = None;
@@ -331,7 +331,7 @@ impl<'a> Analysis<'a> {
             src = next;
         }
 
-        let program = goja::compile("", &src, false).ok()?;
+        let program = talos::compile("", &src, false).ok()?;
         *source = src;
 
         Some(ScriptPlan {
@@ -760,7 +760,7 @@ fn root_identifier(mut e: &Expression) -> String {
     }
 }
 
-fn binding_names(list: &[Arc<goja::ast::Binding>], into: &mut HashSet<String>) {
+fn binding_names(list: &[Arc<talos::ast::Binding>], into: &mut HashSet<String>) {
     for b in list {
         if let BindingTarget::Identifier(id) = &b.target {
             into.insert(id.name.string());
@@ -1179,7 +1179,7 @@ impl FoldCompiler<'_> {
         Err(NotFoldable)
     }
 
-    fn assignment(&mut self, t: &goja::ast::AssignExpression) -> Compiled<Stmt> {
+    fn assignment(&mut self, t: &talos::ast::AssignExpression) -> Compiled<Stmt> {
         let Expression::Identifier(id) = &t.left else {
             return Err(NotFoldable);
         };
@@ -1341,7 +1341,7 @@ impl FoldCompiler<'_> {
         Ok(Expr::Length(Box::new(e)))
     }
 
-    fn bracket(&mut self, t: &goja::ast::BracketExpression) -> Compiled<Expr> {
+    fn bracket(&mut self, t: &talos::ast::BracketExpression) -> Compiled<Expr> {
         if let Expression::StringLiteral(s) = &t.member {
             return self.member(&t.left, &s.value.string());
         }
@@ -1359,7 +1359,7 @@ impl FoldCompiler<'_> {
         Ok(Expr::Element(Box::new(e), idx))
     }
 
-    fn unary(&mut self, t: &goja::ast::UnaryExpression) -> Compiled<Expr> {
+    fn unary(&mut self, t: &talos::ast::UnaryExpression) -> Compiled<Expr> {
         if t.operator == token::INCREMENT || t.operator == token::DECREMENT {
             return Err(NotFoldable);
         }
@@ -1382,7 +1382,7 @@ impl FoldCompiler<'_> {
         Err(NotFoldable)
     }
 
-    fn binary(&mut self, t: &goja::ast::BinaryExpression) -> Compiled<Expr> {
+    fn binary(&mut self, t: &talos::ast::BinaryExpression) -> Compiled<Expr> {
         if t.operator == token::LOGICAL_AND || t.operator == token::LOGICAL_OR {
             return self.logical(t);
         }
@@ -1422,7 +1422,7 @@ impl FoldCompiler<'_> {
         })
     }
 
-    fn logical(&mut self, t: &goja::ast::BinaryExpression) -> Compiled<Expr> {
+    fn logical(&mut self, t: &talos::ast::BinaryExpression) -> Compiled<Expr> {
         let l = Box::new(self.expression(&t.left)?);
 
         let before = self.scope_ref().set.clone();

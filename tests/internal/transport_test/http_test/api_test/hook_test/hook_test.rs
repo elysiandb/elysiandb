@@ -429,8 +429,8 @@ fn apply_post_read_hooks_keeps_the_order_of_the_documents() {
     let req = hook::Request::new("");
     let out =
         elysiandb::transport::http::api::pre_read::apply_post_read_hooks(&req, "doc", &docs, |d| {
-            let v = goja::host::DocValue::Map(d.clone());
-            String::from_utf8(goja::host::json::marshal(&v).expect("encode")).expect("utf-8")
+            let v = talos::host::DocValue::Map(d.clone());
+            String::from_utf8(talos::host::json::marshal(&v).expect("encode")).expect("utf-8")
         });
 
     assert_eq!(out.len(), 50);

@@ -1,7 +1,7 @@
 use elysiandb::api;
 use elysiandb::gocompat::json::{Map, Value};
 use elysiandb::hook;
-use goja::host::{DocMap, DocValue, MapRef};
+use talos::host::{DocMap, DocValue, MapRef};
 
 use crate::{fmt_field, obj, s, setup, write};
 

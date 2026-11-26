@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use goja::host::{DocValue, MapRef};
+use talos::host::{DocValue, MapRef};
 
 use crate::globals;
 use crate::gocompat::json::Map;

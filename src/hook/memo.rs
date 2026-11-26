@@ -2,9 +2,9 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, LazyLock};
 
-use goja::Runtime;
-use goja::heap::FxHashMap;
-use goja::host::{DocValue, MapRef, json as host_json};
+use talos::Runtime;
+use talos::heap::FxHashMap;
+use talos::host::{DocValue, MapRef, json as host_json};
 
 use crate::crypto::sha256;
 use crate::gocompat::json::{self, Map};

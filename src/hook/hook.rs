@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use goja::host::MapRef;
+use talos::host::MapRef;
 
 use crate::api::GuardError;
 use crate::engine;
@@ -175,7 +175,7 @@ impl Hook {
 
         match data.get("priority") {
             Some(Value::Int(n)) => self.priority = *n,
-            Some(Value::Number(n)) => self.priority = goja::value::go_float_to_int(*n),
+            Some(Value::Number(n)) => self.priority = talos::value::go_float_to_int(*n),
             _ => {}
         }
 
