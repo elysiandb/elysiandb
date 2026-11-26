@@ -17,15 +17,15 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use elysiandb::gocompat::json::{self, Value};
 use elysiandb::gocompat::rand::{Rand, new_source};
 use elysiandb::security;
 
 use fixture::{
-    FixtureRequest, fixture_load_requests, hook_requests, kv_requests, ownership_requests,
-    read_requests, transaction_requests, write_requests,
+    FixtureRequest, HOOK_QUERY_FIELDS, fixture_load_requests, hook_requests, kv_requests,
+    ownership_requests, read_requests, transaction_requests, write_requests,
 };
 use golden::{
     Corpus, GoldenEntry, LEGACY_FIXTURES_DIR, differs, expected_body, golden_full, normalize_body,
@@ -275,6 +275,48 @@ fn corpus_on(s: &Server, tcp: Option<u16>) -> Corpus {
     );
 
     corpus
+}
+
+fn unbuilt_hook_indexes(corpus: &mut Corpus) -> Vec<String> {
+    let answer = corpus.http("GET", "/monitoring/details", "", "");
+    let details = json::unmarshal_value(&answer.body).ok();
+    let indexes = details
+        .as_ref()
+        .and_then(|d| d.get("indexes"))
+        .and_then(Value::as_array);
+
+    HOOK_QUERY_FIELDS
+        .iter()
+        .filter(|(entity, field)| {
+            !indexes.is_some_and(|list| {
+                list.iter().any(|i| {
+                    let text = |key: &str| i.get(key).and_then(Value::as_str).unwrap_or("");
+                    text("entity") == *entity
+                        && (text("index") == format!("f:{field}")
+                            || text("index") == format!("b:{field}"))
+                        && text("state") == "ready"
+                })
+            })
+        })
+        .map(|(entity, field)| format!("{entity}.{field}"))
+        .collect()
+}
+
+fn wait_for_hook_indexes(s: &Server, corpus: &mut Corpus) {
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        let unbuilt = unbuilt_hook_indexes(corpus);
+        if unbuilt.is_empty() {
+            return;
+        }
+        if Instant::now() > deadline {
+            panic!(
+                "the indexes of the hooks are never built: {unbuilt:?}\n{}",
+                s.log.string()
+            );
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
 }
 
 fn copy_tree(src: &Path, dst: &Path) -> std::io::Result<()> {
@@ -862,6 +904,9 @@ fn the_golden_corpus_survives_a_change_of_binary_at_every_step() {
                 at += 1;
             }
 
+            if !crash {
+                wait_for_hook_indexes(&s, &mut corpus);
+            }
             drop(corpus);
             s.stop(crash);
         }

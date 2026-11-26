@@ -307,6 +307,12 @@ const PRE_READ_HOOK_SCRIPT: &str = "function preRead(ctx) {
   ctx.entity.label = ctx.entity.name + \" (\" + ctx.entity.status + \")\";
 }";
 
+pub const HOOK_QUERY_FIELDS: [(&str, &str); 3] = [
+    ("purchase", "month"),
+    ("step", "program_id"),
+    ("step", "done"),
+];
+
 pub fn hook_requests() -> Vec<FixtureRequest> {
     let hook = |name: &str, entity: &str, event: &str, script: &str, priority: i64| {
         format!(
