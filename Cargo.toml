@@ -6,6 +6,7 @@ rust-version = "1.91.1"
 license = "MIT"
 publish = false
 build = "build.rs"
+default-run = "elysiandb"
 
 [workspace]
 members = ["crates/gocompat", "crates/talos"]
@@ -16,6 +17,10 @@ path = "src/lib.rs"
 [[bin]]
 name = "elysiandb"
 path = "src/main.rs"
+
+[[bin]]
+name = "elysian_bench"
+path = "src/bin/elysian_bench.rs"
 
 [dependencies]
 arc-swap = "=1.7.1"
