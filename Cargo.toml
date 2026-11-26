@@ -232,3 +232,7 @@ path = "tests/internal/cmd_test/main.rs"
 [[test]]
 name = "boot_test"
 path = "tests/internal/boot_test/main.rs"
+
+[[test]]
+name = "e2e_http"
+path = "tests/e2e_http/main.rs"
