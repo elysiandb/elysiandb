@@ -3,7 +3,7 @@ use elysiandb::gocompat::json::{Map, Value};
 use elysiandb::hook;
 use talos::host::{DocMap, DocValue, MapRef};
 
-use crate::{fmt_field, obj, s, setup, write};
+use super::{fmt_field, obj, s, setup, write};
 
 const DEPTH: usize = 9990;
 
@@ -86,7 +86,7 @@ fn deep_query_rows_are_copied_without_recursion() {
   ctx.entity.n = n
   ctx.entity.s = ctx.sum("deep", {}, "deep.k")
 }"#;
-        let e = crate::entity(r#"{"id":"x"}"#);
+        let e = super::entity(r#"{"id":"x"}"#);
         if let Err(err) = hook::apply_post_read_script("", script, &e, true) {
             panic!("{err}");
         }
@@ -121,7 +121,7 @@ fn deep_rows_built_on_the_calling_thread_do_not_recurse() {
   while (typeof v === "object") { v = v.k; n++ }
   ctx.entity.n = n
 }"#;
-        let e = crate::entity(r#"{"id":"x"}"#);
+        let e = super::entity(r#"{"id":"x"}"#);
         if let Err(err) = hook::apply_post_read_script("", script, &e, true) {
             panic!("{err}");
         }

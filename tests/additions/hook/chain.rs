@@ -1,7 +1,7 @@
 use elysiandb::api;
 use elysiandb::hook::{self, Hook};
 
-use crate::{entity, fmt_field, obj, s, setup, write};
+use super::{entity, fmt_field, obj, s, setup, write};
 
 fn chain_hook(name: &str, priority: i64, script: &str) -> Hook {
     Hook {

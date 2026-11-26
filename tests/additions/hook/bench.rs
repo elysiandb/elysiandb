@@ -5,14 +5,13 @@ use elysiandb::gocompat::json::Value;
 use elysiandb::hook;
 use talos::host::MapRef;
 
-use crate::fold_test::{BUDGET_SCRIPT, random_purchase};
-use crate::hook_corpus::{field, read_jsonl};
-use crate::{entity, obj, rng, s, setup, write};
+use super::corpus::{field, read_jsonl};
+use super::{BUDGET_SCRIPT, random_purchase};
+use super::{entity, obj, rng, s, setup, write};
 
 fn go_p50(name: &str) -> i64 {
-    let text =
-        std::fs::read_to_string(crate::hook_corpus::golden_path("hooks/bench-baseline.json"))
-            .expect("bench baseline");
+    let text = std::fs::read_to_string(super::corpus::golden_path("hooks/bench-baseline.json"))
+        .expect("bench baseline");
     let v = elysiandb::gocompat::json::unmarshal_value(text.as_bytes()).expect("baseline");
     if let Some(Value::Array(cases)) = v.get("cases") {
         for c in cases {

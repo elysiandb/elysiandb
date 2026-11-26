@@ -1,7 +1,6 @@
 #[path = "../tempdir.rs"]
 mod tempdir;
 
-mod copy_test;
 mod file_mode_test;
 mod flush_test;
 mod reset_test;

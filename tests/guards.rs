@@ -40,73 +40,6 @@ const NOT_TRANSLATED_YET: [(&str, usize); 1] = [("test/bench", 2)];
 
 const PLURAL_ACRONYMS: [(&str, &str); 2] = [("ACLs", "Acls"), ("IDs", "Ids")];
 
-const ADDED_TO_TRANSLATED_TARGETS: [(&str, &[&str]); 8] = [
-    (
-        "test/internal/boot_test",
-        &[
-            "test_idle_tcp_connections_keep_the_thread_count_bounded",
-            "test_tcp_clients_that_do_not_read_do_not_hold_threads",
-        ],
-    ),
-    (
-        "test/internal/cache_test",
-        &[
-            "test_default_limits",
-            "test_dependencies_make_entries_stale",
-            "test_eviction_follows_the_sorted_order",
-            "test_eviction_removes_ids_after_data",
-            "test_size_accounting",
-            "test_ttl_defaults_to_one_second",
-        ],
-    ),
-    (
-        "test/internal/hook_test",
-        &[
-            "deep_entities_go_through_the_output_memo_without_recursion",
-            "deep_query_rows_are_copied_without_recursion",
-            "deep_rows_built_on_the_calling_thread_do_not_recurse",
-            "dotted_filters_reach_plain_nested_objects",
-            "hook_bench_local",
-            "hook_bench_parts",
-            "hook_corpus_europe_paris",
-            "hook_corpus_utc",
-            "hook_plan_bytecode_matches_the_baseline",
-            "query_views_stored_by_one_hook_are_read_again_by_the_next",
-        ],
-    ),
-    (
-        "test/internal/schema_test",
-        &[
-            "test_analyze_entity_schema_keeps_nested_ids_and_skips_core_fields",
-            "test_schema_handles_9990_levels_on_a_small_stack",
-            "test_validate_entity_displays_the_included_documents_type",
-            "test_validate_entity_reports_errors_in_d20_order",
-            "test_validate_entity_skips_ids_at_every_depth",
-            "test_validate_entity_update_keeps_errors_of_updated_roots",
-            "test_validation_error_to_error",
-        ],
-    ),
-    (
-        "test/internal/storage_test",
-        &["test_deep_copy_document_copies_9990_levels_on_a_small_stack"],
-    ),
-    (
-        "test/internal/transport_test/http_test/adminui_test",
-        &["admin_ui_handler_serves_the_embedded_assets"],
-    ),
-    (
-        "test/internal/transport_test/http_test/api_test/hook_test",
-        &[
-            "apply_post_read_hooks_keeps_the_order_of_the_documents",
-            "create_hook_decodes_the_body_like_go",
-        ],
-    ),
-    (
-        "test/internal/transport_test/tcp_test/tcp_routing_test",
-        &["test_unregistered_security_refuses_credentials"],
-    ),
-];
-
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
@@ -556,11 +489,6 @@ fn every_go_test_is_translated_once_under_its_name() {
     assert_eq!((tests, fuzz), (GO_TESTS, GO_FUZZ_SEED_TESTS));
 
     let mut problems = Vec::new();
-    for (package, _) in ADDED_TO_TRANSLATED_TARGETS {
-        if !packages.contains_key(package) {
-            problems.push(format!("{package}: listed with added tests, unknown to Go"));
-        }
-    }
     for (package, _) in NOT_TRANSLATED_YET {
         if !packages.contains_key(package) {
             problems.push(format!(
@@ -614,21 +542,9 @@ fn every_go_test_is_translated_once_under_its_name() {
             }
         }
 
-        let allowed: &[&str] = ADDED_TO_TRANSLATED_TARGETS
-            .iter()
-            .find(|(p, _)| p == package)
-            .map(|(_, names)| *names)
-            .unwrap_or(&[]);
         for name in &rust_names {
-            if !wanted.contains(&rust_key(name)) && !allowed.contains(&name.as_str()) {
+            if !wanted.contains(&rust_key(name)) {
                 problems.push(format!("{package}: {name} is not a Go test"));
-            }
-        }
-        for name in allowed {
-            if !rust_names.iter().any(|n| n == name) {
-                problems.push(format!(
-                    "{package}: {name} is listed as added, the target does not have it"
-                ));
             }
         }
     }

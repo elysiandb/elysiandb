@@ -1,7 +1,5 @@
 mod analyzer_test;
-mod deep_test;
 mod merge_test;
-mod rules_test;
 
 use std::sync::Arc;
 

@@ -197,26 +197,3 @@ fn test_command_name() {
         }
     }
 }
-
-#[test]
-fn test_unregistered_security_refuses_credentials() {
-    let _serial = serial();
-    globals::set_config(Some(Arc::new(Config::default())));
-    tcp_routing::set_security(Security::default());
-
-    let c = FakeConn::default();
-    let mut session = tcp_routing::new_session();
-    if session.is_authenticated() {
-        panic!("without a registered security module a session must not be authenticated");
-    }
-    if tcp_routing::route_line(b"AUTH anything", &c, &mut session) != b"ERR invalid credentials"
-        || session.is_authenticated()
-    {
-        panic!("without a registered security module AUTH must fail");
-    }
-    if tcp_routing::route_line(b"GET k", &c, &mut session) != b"ERR auth required" {
-        panic!("without a registered security module commands must be refused");
-    }
-
-    tcp_routing::set_security(config_security());
-}

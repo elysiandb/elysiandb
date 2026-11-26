@@ -6,7 +6,7 @@ use elysiandb::configuration::Config;
 use elysiandb::globals;
 use elysiandb::gocompat::time::Duration;
 
-use super::serial;
+use crate::serial;
 
 static VERSION: AtomicU64 = AtomicU64::new(0);
 

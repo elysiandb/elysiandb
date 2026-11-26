@@ -1,5 +1,4 @@
 mod cache_test;
-mod store_test;
 
 use std::collections::BTreeMap;
 

@@ -5,7 +5,7 @@ use elysiandb::gocompat::json::{self, Value};
 use elysiandb::hook;
 use talos::host::{DocValue, json as host_json};
 
-use crate::{obj, s, setup_with, write};
+use super::{obj, s, setup_with, write};
 
 const NEEDS_HOOK: [&str; 5] = [
     "ctx.query",
@@ -256,7 +256,7 @@ fn on_big_stack(f: impl FnOnce() + Send + 'static) {
 
 #[test]
 fn hook_corpus_utc() {
-    run_in_zone("hook_corpus::hook_corpus_utc", "UTC", || {
+    run_in_zone("hook::corpus::hook_corpus_utc", "UTC", || {
         on_big_stack(|| replay("hooks/corpus-utc.jsonl", "hooks/arch-amd64-utc.jsonl"))
     });
 }
@@ -264,7 +264,7 @@ fn hook_corpus_utc() {
 #[test]
 fn hook_corpus_europe_paris() {
     run_in_zone(
-        "hook_corpus::hook_corpus_europe_paris",
+        "hook::corpus::hook_corpus_europe_paris",
         "Europe/Paris",
         || {
             on_big_stack(|| {

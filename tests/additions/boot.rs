@@ -148,6 +148,7 @@ fn wait_open(want: i64) {
 
 #[test]
 fn test_idle_tcp_connections_keep_the_thread_count_bounded() {
+    let _serial = crate::serial();
     let _log = quiet_log();
     let n = connection_budget();
     assert!(
@@ -231,6 +232,7 @@ fn wait_threads(limit: usize, what: &str) {
 
 #[test]
 fn test_tcp_clients_that_do_not_read_do_not_hold_threads() {
+    let _serial = crate::serial();
     let _log = quiet_log();
     let dir = TempDir::new();
     let addr = start_tcp(dir.path(), None);
