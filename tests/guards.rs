@@ -19,6 +19,11 @@ const REMOVED_BY_D17: [&str; 3] = [
 const GO_TESTS: usize = 868;
 const GO_FUZZ_SEED_TESTS: usize = 1;
 
+const DEAD_DIR: &str = "guards";
+const DEAD_FILE: &str = "e2e-api-dead.tsv";
+const DEAD_PACKAGE: &str = "test/e2e/api";
+const DEAD_FUNCTIONS: usize = 64;
+
 const TARGETS: [(&str, &[&str]); 5] = [
     ("test/bench", &["tests/bench.rs", "tests/bench/main.rs"]),
     ("test/compat", &["tests/compat.rs", "tests/compat/main.rs"]),
@@ -556,4 +561,124 @@ fn every_go_test_is_translated_once_under_its_name() {
     }
 
     assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+fn dead_data(file: &str) -> Vec<u8> {
+    let path = root().join("tests").join(DEAD_DIR).join(file);
+    std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+}
+
+fn rust_files(dir: &Path, files: &mut Vec<PathBuf>) {
+    let mut entries: Vec<PathBuf> = std::fs::read_dir(dir)
+        .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .collect();
+    entries.sort();
+    for path in entries {
+        if path.is_dir() {
+            rust_files(&path, files);
+        } else if path.extension().is_some_and(|x| x == "rs") {
+            files.push(path);
+        }
+    }
+}
+
+fn dead_names(data: &[u8]) -> BTreeMap<String, String> {
+    let text = std::str::from_utf8(data).unwrap_or_else(|e| panic!("{DEAD_FILE}: {e}"));
+    let mut names = BTreeMap::new();
+    for row in text.lines() {
+        let Some((DEAD_PACKAGE, name)) = row.split_once('\t') else {
+            panic!("{DEAD_FILE}: malformed row {row:?}");
+        };
+        assert!(name.starts_with("Test"), "{DEAD_FILE}: {name}");
+        assert!(
+            names.insert(snake_case(name), name.to_string()).is_none(),
+            "{DEAD_FILE}: {name} collides with another name"
+        );
+    }
+
+    names
+}
+
+fn dead_problems(dead: &BTreeMap<String, String>, tests: &[(String, PathBuf)]) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (name, file) in tests {
+        let bare = name.strip_prefix("test_").unwrap_or(name);
+        if let Some(go) = dead.get(bare) {
+            problems.push(format!(
+                "{}: {name} ports {go}, which never ran in {DEAD_PACKAGE} (D23)",
+                file.strip_prefix(root()).unwrap_or(file).display()
+            ));
+        }
+    }
+
+    problems
+}
+
+#[test]
+fn the_dead_e2e_api_functions_are_listed_as_frozen() {
+    let path = root().join("tests").join(DEAD_DIR).join("MANIFEST.json");
+    let data = std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let manifest = elysiandb::gocompat::json::unmarshal_value_with_integers(&data)
+        .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    assert_eq!(str_field(&manifest, "part"), "guards");
+    assert_eq!(str_field(&manifest, "baseline"), "1a11e5e");
+    let files = manifest
+        .get("files")
+        .and_then(Value::as_array)
+        .unwrap_or_else(|| panic!("the manifest lists no files"));
+    let listed: Vec<&str> = files.iter().map(|f| str_field(f, "path")).collect();
+    assert_eq!(listed, [DEAD_FILE]);
+    for entry in files {
+        let data = dead_data(str_field(entry, "path"));
+        assert_eq!(
+            entry.get("size").and_then(Value::as_u64),
+            Some(data.len() as u64)
+        );
+        assert_eq!(str_field(entry, "sha256"), hex(&sha256::sum256(&data)));
+    }
+
+    let dead = dead_names(&dead_data(DEAD_FILE));
+    assert_eq!(dead.len(), DEAD_FUNCTIONS);
+    let live: BTreeSet<String> = rows("go-tests.tsv")
+        .iter()
+        .filter_map(|r| r.split_once('\t'))
+        .map(|(_, name)| snake_case(name))
+        .collect();
+    let shared: Vec<&String> = dead.keys().filter(|k| live.contains(*k)).collect();
+    assert!(shared.is_empty(), "names shared with Go tests: {shared:?}");
+}
+
+#[test]
+fn no_test_ports_a_dead_e2e_api_function() {
+    let dead = dead_names(&dead_data(DEAD_FILE));
+    let mut files = Vec::new();
+    rust_files(&root().join("tests"), &mut files);
+    let mut tests = Vec::new();
+    for file in &files {
+        for name in test_functions(std::slice::from_ref(file)) {
+            tests.push((name, file.clone()));
+        }
+    }
+    assert!(tests.len() > GO_TESTS, "{} tests found", tests.len());
+
+    let problems = dead_problems(&dead, &tests);
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+
+    let planted = [
+        ("auto_rest_filters".to_string(), root().join("tests/x.rs")),
+        (
+            "test_type_api_create_type_ok".to_string(),
+            root().join("tests/y.rs"),
+        ),
+        ("auto_rest".to_string(), root().join("tests/z.rs")),
+    ];
+    assert_eq!(
+        dead_problems(&dead, &planted),
+        [
+            "tests/x.rs: auto_rest_filters ports TestAutoREST_Filters, which never ran in test/e2e/api (D23)",
+            "tests/y.rs: test_type_api_create_type_ok ports TestTypeAPI_CreateType_OK, which never ran in test/e2e/api (D23)",
+        ]
+    );
 }
