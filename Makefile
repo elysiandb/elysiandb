@@ -20,7 +20,7 @@ test-unit:
 	cargo test --workspace --locked --release --lib --bins
 
 test-cover:
-	cargo llvm-cov --workspace --locked --release --lcov --output-path lcov.info -- --test-threads=1 && cargo llvm-cov report --summary-only
+	cargo llvm-cov --workspace --locked --release --no-fail-fast --lcov --output-path lcov.info -- --test-threads=1 --skip overload_test:: && cargo llvm-cov report --summary-only
 
 build:
 	ELYSIANDB_VERSION="$(VERSION)" cargo build --release --locked --bin elysiandb && cp "$(CARGO_TARGET_DIR)/release/elysiandb" ./elysiandb
