@@ -14,9 +14,9 @@ fn free_port() -> u16 {
     ln.local_addr().expect("local address").port()
 }
 
-fn server_config(http: u16, tcp: u16) -> String {
+fn server_config(http: u16, tcp: u16, http_options: &str) -> String {
     format!(
-        "store:\n  folder: data\n  shards: 4\nserver:\n  http: {{ enabled: true, host: 127.0.0.1, port: {http} }}\n  tcp: {{ enabled: true, host: 127.0.0.1, port: {tcp} }}\nlog:\n  level: info\n  format: text\nsecurity:\n  authentication:\n    enabled: false\nadminui:\n  enabled: true\n"
+        "store:\n  folder: data\n  shards: 4\nserver:\n  http: {{ enabled: true, host: 127.0.0.1, port: {http}{http_options} }}\n  tcp: {{ enabled: true, host: 127.0.0.1, port: {tcp} }}\nlog:\n  level: info\n  format: text\nsecurity:\n  authentication:\n    enabled: false\nadminui:\n  enabled: true\n"
     )
 }
 
@@ -24,11 +24,15 @@ struct Server {
     child: Child,
     out: std::sync::Arc<std::sync::Mutex<Vec<u8>>>,
     reader: Option<std::thread::JoinHandle<()>>,
-    port: u16,
+    http: u16,
 }
 
 impl Server {
     fn start(dir: &Path) -> Server {
+        Server::start_with(dir, "")
+    }
+
+    fn start_with(dir: &Path, http_options: &str) -> Server {
         let port = free_port();
         let http = loop {
             let p = free_port();
@@ -36,7 +40,8 @@ impl Server {
                 break p;
             }
         };
-        std::fs::write(dir.join("s.yaml"), server_config(http, port)).expect("config");
+        std::fs::write(dir.join("s.yaml"), server_config(http, port, http_options))
+            .expect("config");
         let mut child = Command::new(BIN)
             .args(["-config", "s.yaml"])
             .current_dir(dir)
@@ -68,7 +73,7 @@ impl Server {
             child,
             out,
             reader: Some(reader),
-            port,
+            http,
         };
         server.wait_for("msg=\"tcp listening\"");
         server.wait_for("msg=\"admin ui available\"");
@@ -153,31 +158,29 @@ fn a_second_signal_during_the_shutdown_ends_the_process() {
     use std::os::unix::process::ExitStatusExt;
 
     let dir = TempDir::new();
-    let server = Server::start(dir.path());
+    let server = Server::start_with(dir.path(), ", readTimeoutSeconds: 60");
 
     let mut conn =
-        TcpStream::connect(SocketAddr::from(([127, 0, 0, 1], server.port))).expect("connect");
-    let mut set = b"SET big ".to_vec();
-    set.extend(std::iter::repeat_n(b'x', 100_000));
-    set.push(b'\n');
-    conn.write_all(&set).expect("set");
-    let mut ok = [0u8; 3];
-    conn.read_exact(&mut ok).expect("answer");
-    assert_eq!(&ok, b"OK\n");
-    for _ in 0..400 {
-        conn.write_all(b"GET big\n").expect("get");
-    }
+        TcpStream::connect(SocketAddr::from(([127, 0, 0, 1], server.http))).expect("connect");
+    conn.write_all(
+        b"POST /kv/big HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 100\r\n\r\nonly a part",
+    )
+    .expect("partial request");
     std::thread::sleep(Duration::from_millis(500));
 
     server.signal(libc::SIGTERM);
     server.wait_for("msg=\"shutdown requested\"");
     std::thread::sleep(Duration::from_millis(300));
+    let draining = server.text();
     server.signal(libc::SIGTERM);
     let (status, out, _) = server.wait();
 
+    assert!(!draining.contains("msg=\"requests drained\""), "{draining}");
     assert_eq!(status.signal(), Some(libc::SIGTERM), "{status:?}\n{out}");
     assert!(!out.contains("msg=\"shutdown complete\""), "{out}");
-    drop(conn);
+    let mut rest = Vec::new();
+    let _ = conn.read_to_end(&mut rest);
+    assert!(rest.is_empty(), "{}", String::from_utf8_lossy(&rest));
 }
 
 fn refused<T>(r: Result<T, boot::AddrError>) -> String {
