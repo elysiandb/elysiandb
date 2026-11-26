@@ -61,6 +61,7 @@ pub fn update_transaction_controller(ctx: &mut RequestCtx) {
         entity,
         id,
         data: payload,
+        ..TxOperation::default()
     };
 
     if let Err(err) = transaction::add_operation(&tx_id, op) {

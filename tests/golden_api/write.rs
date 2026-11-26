@@ -239,18 +239,21 @@ fn write_corpus() {
                 entity: b"w".to_vec(),
                 id: b"bt1".to_vec(),
                 data: m(r#"{"id":"bt1","v":1}"#),
+                ..BatchOperation::default()
             },
             BatchOperation {
                 kind: "update".to_string(),
                 entity: b"w".to_vec(),
                 id: b"l1".to_vec(),
                 data: m(r#"{"v":2}"#),
+                ..BatchOperation::default()
             },
             BatchOperation {
                 kind: "delete".to_string(),
                 entity: b"w".to_vec(),
                 id: b"w7".to_vec(),
                 data: Map::new(),
+                ..BatchOperation::default()
             },
         ]);
         let mut result = Map::new();

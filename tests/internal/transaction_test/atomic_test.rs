@@ -33,18 +33,21 @@ fn commit_three_operations() {
             entity: b"acct".to_vec(),
             id: Vec::new(),
             data: doc(&[("id", s("a")), ("balance", Value::Number(10.0))]),
+            ..TxOperation::default()
         },
         TxOperation {
             kind: "update".to_string(),
             entity: b"acct".to_vec(),
             id: b"seed".to_vec(),
             data: doc(&[("balance", Value::Number(90.0))]),
+            ..TxOperation::default()
         },
         TxOperation {
             kind: "delete".to_string(),
             entity: b"acct".to_vec(),
             id: b"old".to_vec(),
             data: Map::new(),
+            ..TxOperation::default()
         },
     ] {
         if let Err(err) = transaction::add_operation(&tx.id, op) {

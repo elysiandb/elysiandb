@@ -898,6 +898,7 @@ pub struct BatchOperation {
     pub entity: Vec<u8>,
     pub id: Vec<u8>,
     pub data: Map,
+    pub fields: ByteFields,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -926,9 +927,8 @@ pub fn commit_batch(ops: &[BatchOperation]) -> Result<(), BoxError> {
             match op.kind.as_str() {
                 "write" => {
                     let mut data = deep_copy_document(&op.data);
-                    if !write_entity_tx(tx, &op.entity, &mut data, true, &ByteFields::new())
-                        .is_empty()
-                    {
+                    op.fields.apply(&mut data);
+                    if !write_entity_tx(tx, &op.entity, &mut data, true, &op.fields).is_empty() {
                         return Err(Box::new(BatchError::Validation));
                     }
                 }

@@ -1,4 +1,5 @@
 use crate::acl;
+use crate::api::ByteFields;
 use crate::globals;
 use crate::gocompat::json::{self, Map, Value};
 use crate::gocompat::utf8;
@@ -49,17 +50,20 @@ pub fn write_transaction_controller(ctx: &mut RequestCtx) {
         }
     }
 
+    let mut fields = ByteFields::new();
     if security::user_authentication_is_enabled() {
         payload.insert(
             acl::USERNAME_FIELD.to_string(),
             Value::String(utf8::decode_string(&username)),
         );
+        fields = fields.with(acl::USERNAME_FIELD, &username);
     }
 
     let op = TxOperation {
         kind: "write".to_string(),
         entity,
         data: payload,
+        fields,
         ..TxOperation::default()
     };
 

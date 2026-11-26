@@ -11,6 +11,7 @@ use elysiandb::gocompat::json::{self, Map, Value};
 use elysiandb::schema;
 use elysiandb::security::{self, BasicUser, Role};
 use elysiandb::storage;
+use elysiandb::transaction::{self, TxOperation};
 
 use tempdir::TempDir;
 
@@ -210,6 +211,7 @@ fn document_ids_with_invalid_utf8_are_stored_as_in_go() {
         entity: b"doc".to_vec(),
         id: R.to_vec(),
         data: doc(r#"{"v":5}"#),
+        ..BatchOperation::default()
     }])
     .expect("batch");
     assert_eq!(
@@ -291,5 +293,42 @@ fn the_users_key_is_read_rune_by_rune_and_written_as_given() {
     assert_eq!(
         security::create_key_file_or_get_key().expect("key"),
         "r\u{fffd}\u{fffd}(".as_bytes()
+    );
+}
+
+#[test]
+fn owners_with_invalid_utf8_are_stored_as_in_go() {
+    let _store = open_store();
+    let owner = ByteFields::new().with("_elysiandb_core_username", R);
+
+    let mut list = vec![doc(r#"{"id":"l1"}"#), doc(r#"{"id":"l2"}"#)];
+    let errs = api::write_list_of_entities_bytes(b"own", &mut list, &owner);
+    assert!(errs.iter().all(Vec::is_empty), "{errs:?}");
+    assert_eq!(
+        String::from_utf8(api::encode_document(&list[0], &owner).expect("encode")).expect("utf8"),
+        r#"{"_elysiandb_core_username":"\ufffd","id":"l1"}"#
+    );
+
+    let tx = transaction::begin_transaction();
+    transaction::add_operation(
+        &tx.id,
+        TxOperation {
+            kind: "write".to_string(),
+            entity: b"own".to_vec(),
+            data: doc(r#"{"id":"t1"}"#),
+            fields: owner.clone(),
+            ..TxOperation::default()
+        },
+    )
+    .expect("add");
+    transaction::commit_transaction(&tx.id).expect("commit");
+
+    assert_eq!(
+        stored(b"own"),
+        [
+            entry(b"l1", r#"{"_elysiandb_core_username":"\ufffd","id":"l1"}"#),
+            entry(b"l2", r#"{"_elysiandb_core_username":"\ufffd","id":"l2"}"#),
+            entry(b"t1", r#"{"_elysiandb_core_username":"\ufffd","id":"t1"}"#),
+        ]
     );
 }

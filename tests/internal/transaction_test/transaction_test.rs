@@ -64,6 +64,7 @@ fn op(kind: &str, entity: &str, id: &str, data: &[(&str, i64)]) -> TxOperation {
             .iter()
             .map(|(k, v)| (k.to_string(), Value::Int(*v)))
             .collect(),
+        ..TxOperation::default()
     }
 }
 

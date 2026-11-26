@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, LazyLock};
 use std::time::{Duration, Instant};
 
-use crate::api::{self, BatchOperation, WriteSimulation};
+use crate::api::{self, BatchOperation, ByteFields, WriteSimulation};
 use crate::engine;
 use crate::gocompat::errors::{self, BoxError};
 use crate::gocompat::json::Map;
@@ -16,6 +16,7 @@ pub struct TxOperation {
     pub entity: Vec<u8>,
     pub id: Vec<u8>,
     pub data: Map,
+    pub fields: ByteFields,
 }
 
 #[derive(Clone, Debug)]
@@ -58,6 +59,7 @@ impl BatchCommitter for RealStorage {
                 entity: op.entity.clone(),
                 id: op.id.clone(),
                 data: op.data.clone(),
+                fields: op.fields.clone(),
             })
             .collect();
 
