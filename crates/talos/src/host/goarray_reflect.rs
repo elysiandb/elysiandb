@@ -266,7 +266,10 @@ impl GoPairArray {
         let (res, ok) =
             BaseObject::_set_foreign_str(rt, o, name, None, val, &Value::Object(o), throw)?;
         if !ok {
-            rt.type_error_result(throw, &format!("Can't set property '{name}' on Go slice"))?;
+            rt.type_error_result(
+                throw,
+                &format!("Can't set property '{name}' on a host array"),
+            )?;
             return Ok(false);
         }
         Ok(res)
@@ -353,7 +356,7 @@ impl GoPairArray {
         }
         rt.type_error_result(
             throw,
-            &format!("Cannot define property '{idx}' on a Go slice"),
+            &format!("Cannot define property '{idx}' on a host array"),
         )?;
         Ok(false)
     }
@@ -375,7 +378,7 @@ impl GoPairArray {
         }
         rt.type_error_result(
             throw,
-            &format!("Cannot define property '{name}' on a Go slice"),
+            &format!("Cannot define property '{name}' on a host array"),
         )?;
         Ok(false)
     }

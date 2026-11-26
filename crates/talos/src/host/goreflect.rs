@@ -307,7 +307,7 @@ impl GoReflect {
         if GoReflect::_has(rt, o, &key_str(name)) {
             rt.type_error_result(
                 throw,
-                &format!("Cannot delete property {name} from a Go type"),
+                &format!("Cannot delete property {name} from a host object"),
             )?;
             return Ok(false);
         }

@@ -389,7 +389,7 @@ impl<E: GoElem> GoTypedSlice<E> {
                 if let Some(w) = cached {
                     E::repoint(rt, w, &b, idx);
                 }
-                rt.type_error_result(throw, &format!("Go type conversion error: {msg}"))?;
+                rt.type_error_result(throw, &format!("type conversion error: {msg}"))?;
                 Ok(false)
             }
         }
@@ -470,7 +470,10 @@ impl<E: GoElem> GoTypedSlice<E> {
         let (res, ok) =
             BaseObject::_set_foreign_str(rt, o, name, None, val, &Value::Object(o), throw)?;
         if !ok {
-            rt.type_error_result(throw, &format!("Can't set property '{name}' on Go slice"))?;
+            rt.type_error_result(
+                throw,
+                &format!("Can't set property '{name}' on a host array"),
+            )?;
             return Ok(false);
         }
         Ok(res)
@@ -589,7 +592,7 @@ impl<E: GoElem> GoTypedSlice<E> {
         }
         rt.type_error_result(
             throw,
-            &format!("Cannot define property '{idx}' on a Go slice"),
+            &format!("Cannot define property '{idx}' on a host array"),
         )?;
         Ok(false)
     }
@@ -622,7 +625,7 @@ impl<E: GoElem> GoTypedSlice<E> {
         }
         rt.type_error_result(
             throw,
-            &format!("Cannot define property '{name}' on a Go slice"),
+            &format!("Cannot define property '{name}' on a host array"),
         )?;
         Ok(false)
     }
