@@ -3,6 +3,8 @@ use std::os::fd::RawFd;
 use std::ptr;
 use std::time::Duration;
 
+use super::poller::Interest;
+
 pub(crate) const TCP_KEEPIDLE_OPTION: libc::c_int = libc::TCP_KEEPIDLE;
 
 pub(crate) const MAX_WORKERS: usize = 16384;
@@ -31,8 +33,17 @@ impl Selector {
         Ok(Selector { epfd })
     }
 
-    pub(crate) fn add(&self, fd: RawFd, token: u64, oneshot: bool) -> io::Result<()> {
-        let mut flags = libc::EPOLLIN | libc::EPOLLRDHUP;
+    pub(crate) fn add(
+        &self,
+        fd: RawFd,
+        token: u64,
+        oneshot: bool,
+        interest: Interest,
+    ) -> io::Result<()> {
+        let mut flags = match interest {
+            Interest::Read => libc::EPOLLIN | libc::EPOLLRDHUP,
+            Interest::Write => libc::EPOLLOUT,
+        };
         if oneshot {
             flags |= libc::EPOLLONESHOT;
         }
@@ -47,7 +58,7 @@ impl Selector {
         Ok(())
     }
 
-    pub(crate) fn delete(&self, fd: RawFd) -> io::Result<()> {
+    pub(crate) fn delete(&self, fd: RawFd, _interest: Interest) -> io::Result<()> {
         let rc = unsafe { libc::epoll_ctl(self.epfd, libc::EPOLL_CTL_DEL, fd, ptr::null_mut()) };
         if rc < 0 {
             return Err(io::Error::last_os_error());

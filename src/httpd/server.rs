@@ -383,7 +383,7 @@ impl ServerInner {
             self.close_conn(st);
             return;
         };
-        if let Err(st) = poller.register(st, deadline, closable_at) {
+        if let Err(st) = poller.register(st, deadline, Some(closable_at)) {
             self.close_conn(st);
         }
     }

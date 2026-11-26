@@ -14,9 +14,9 @@ fn free_port() -> u16 {
     ln.local_addr().expect("local address").port()
 }
 
-fn server_config(http: u16, tcp: u16, http_options: &str) -> String {
+fn server_config(http: u16, tcp: u16, http_options: &str, level: &str) -> String {
     format!(
-        "store:\n  folder: data\n  shards: 4\nserver:\n  http: {{ enabled: true, host: 127.0.0.1, port: {http}{http_options} }}\n  tcp: {{ enabled: true, host: 127.0.0.1, port: {tcp} }}\nlog:\n  level: info\n  format: text\nsecurity:\n  authentication:\n    enabled: false\nadminui:\n  enabled: true\n"
+        "store:\n  folder: data\n  shards: 4\nserver:\n  http: {{ enabled: true, host: 127.0.0.1, port: {http}{http_options} }}\n  tcp: {{ enabled: true, host: 127.0.0.1, port: {tcp} }}\nlog:\n  level: {level}\n  format: text\nsecurity:\n  authentication:\n    enabled: false\nadminui:\n  enabled: true\n"
     )
 }
 
@@ -30,10 +30,10 @@ struct Server {
 
 impl Server {
     fn start(dir: &Path) -> Server {
-        Server::start_with(dir, "")
+        Server::start_with(dir, "", "info")
     }
 
-    fn start_with(dir: &Path, http_options: &str) -> Server {
+    fn start_with(dir: &Path, http_options: &str, level: &str) -> Server {
         let port = free_port();
         let http = loop {
             let p = free_port();
@@ -41,8 +41,11 @@ impl Server {
                 break p;
             }
         };
-        std::fs::write(dir.join("s.yaml"), server_config(http, port, http_options))
-            .expect("config");
+        std::fs::write(
+            dir.join("s.yaml"),
+            server_config(http, port, http_options, level),
+        )
+        .expect("config");
         let mut child = Command::new(BIN)
             .args(["-config", "s.yaml"])
             .current_dir(dir)
@@ -111,6 +114,19 @@ impl Server {
             let _ = e.read_to_string(&mut err);
         }
         (status, self.text(), err)
+    }
+
+    fn wait_within(mut self, limit: Duration) -> (std::process::ExitStatus, String, String) {
+        let deadline = Instant::now() + limit;
+        while Instant::now() < deadline {
+            if let Ok(Some(_)) = self.child.try_wait() {
+                return self.wait();
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let _ = self.child.kill();
+        let (_, out, _) = self.wait();
+        panic!("the server still runs {limit:?} after the signal\n{out}");
     }
 }
 
@@ -206,11 +222,57 @@ fn sigterm_closes_the_idle_tcp_connections_without_waiting_for_the_timeout() {
 }
 
 #[test]
+fn sigterm_stops_within_the_drain_timeout_with_a_tcp_client_that_does_not_read() {
+    let dir = TempDir::new();
+    let server = Server::start_with(dir.path(), "", "debug");
+    let mut conn =
+        TcpStream::connect(SocketAddr::from(([127, 0, 0, 1], server.tcp))).expect("connect");
+    let mut set = b"SET big ".to_vec();
+    set.extend(std::iter::repeat_n(b'x', 100_000));
+    set.push(b'\n');
+    conn.write_all(&set).expect("set");
+    let mut ok = [0u8; 3];
+    conn.read_exact(&mut ok).expect("answer");
+    assert_eq!(&ok, b"OK\n");
+    conn.write_all(&b"GET big\n".repeat(400)).expect("gets");
+    conn.set_nonblocking(true).expect("nonblocking");
+    let mut unread = vec![0u8; 100_000];
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !matches!(conn.peek(&mut unread), Ok(n) if n == unread.len()) {
+        assert!(Instant::now() < deadline, "no answer to the GET lines");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    std::thread::sleep(Duration::from_millis(200));
+
+    server.signal(libc::SIGTERM);
+    let (status, out, err) = server.wait_within(Duration::from_secs(20));
+
+    assert_eq!(status.code(), Some(0), "{status:?}\n{out}\n{err}");
+    assert_eq!(err, "");
+    assert!(!out.contains("msg=\"connection error\""), "{out}");
+    let drained = drain_ms(&out);
+    assert!((4000.0..10000.0).contains(&drained), "{out}");
+    let at = positions(
+        &out,
+        &[
+            "msg=\"shutdown requested\" component=boot signal=terminated\n",
+            "msg=\"connection ended\" component=tcp op=flush remote_addr=127.0.0.1 err=\"Broken pipe (os error 32)\"\n",
+            "msg=\"connection closed\" component=tcp remote_addr=127.0.0.1 duration_ms=",
+            "msg=\"requests drained\" component=boot duration_ms=",
+            "msg=\"data flushed on shutdown\" component=boot duration_ms=",
+            "msg=\"shutdown complete\" component=boot uptime=",
+        ],
+    );
+    assert!(at.windows(2).all(|w| w[0] < w[1]), "{out}");
+    drop(conn);
+}
+
+#[test]
 fn a_second_signal_during_the_shutdown_ends_the_process() {
     use std::os::unix::process::ExitStatusExt;
 
     let dir = TempDir::new();
-    let server = Server::start_with(dir.path(), ", readTimeoutSeconds: 60");
+    let server = Server::start_with(dir.path(), ", readTimeoutSeconds: 60", "info");
 
     let mut conn =
         TcpStream::connect(SocketAddr::from(([127, 0, 0, 1], server.http))).expect("connect");

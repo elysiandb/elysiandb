@@ -11,8 +11,18 @@ use crate::sync::Mutex;
 const WAKE_TOKEN: u64 = u64::MAX;
 const STOP_TICK: Duration = Duration::from_millis(100);
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Interest {
+    Read,
+    Write,
+}
+
 pub(crate) trait Parked: Send {
     fn fd(&self) -> RawFd;
+
+    fn interest(&self) -> Interest {
+        Interest::Read
+    }
 }
 
 pub(crate) trait Host<T>: Send + Sync {
@@ -25,8 +35,9 @@ pub(crate) trait Host<T>: Send + Sync {
 
 struct Entry<T> {
     conn: T,
+    interest: Interest,
     deadline: Option<Instant>,
-    closable_at: Instant,
+    closable_at: Option<Instant>,
 }
 
 struct Registry<T> {
@@ -46,7 +57,7 @@ impl<T: Parked> Poller<T> {
     pub(crate) fn new() -> io::Result<Poller<T>> {
         let selector = Selector::new()?;
         let wake = WakePipe::new()?;
-        selector.add(wake.read_fd(), WAKE_TOKEN, false)?;
+        selector.add(wake.read_fd(), WAKE_TOKEN, false, Interest::Read)?;
         Ok(Poller {
             selector,
             wake,
@@ -67,7 +78,7 @@ impl<T: Parked> Poller<T> {
         &self,
         conn: T,
         deadline: Option<Instant>,
-        closable_at: Instant,
+        closable_at: Option<Instant>,
     ) -> Result<(), T> {
         let mut reg = self.registry.lock();
         if reg.exited {
@@ -76,6 +87,7 @@ impl<T: Parked> Poller<T> {
         let token = reg.next_token;
         reg.next_token += 1;
         let fd = conn.fd();
+        let interest = conn.interest();
         if let Some(d) = deadline {
             reg.deadlines.insert((d, token));
         }
@@ -83,11 +95,12 @@ impl<T: Parked> Poller<T> {
             token,
             Entry {
                 conn,
+                interest,
                 deadline,
                 closable_at,
             },
         );
-        if self.selector.add(fd, token, true).is_err() {
+        if self.selector.add(fd, token, true, interest).is_err() {
             let entry = reg.entries.remove(&token);
             if let Some(d) = deadline {
                 reg.deadlines.remove(&(d, token));
@@ -109,7 +122,7 @@ impl<T: Parked> Poller<T> {
         if let Some(d) = entry.deadline {
             reg.deadlines.remove(&(d, token));
         }
-        let _ = self.selector.delete(entry.conn.fd());
+        let _ = self.selector.delete(entry.conn.fd(), entry.interest);
         Some(entry.conn)
     }
 
@@ -165,7 +178,7 @@ impl<T: Parked> Poller<T> {
                     let closable: Vec<u64> = reg
                         .entries
                         .iter()
-                        .filter(|(_, e)| e.closable_at <= now)
+                        .filter(|(_, e)| e.closable_at.is_some_and(|at| at <= now))
                         .map(|(t, _)| *t)
                         .collect();
                     for token in closable {

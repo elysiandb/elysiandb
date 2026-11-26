@@ -3,6 +3,8 @@ use std::os::fd::RawFd;
 use std::ptr;
 use std::time::Duration;
 
+use super::poller::Interest;
+
 pub(crate) const TCP_KEEPIDLE_OPTION: libc::c_int = libc::TCP_KEEPALIVE;
 
 pub(crate) const MAX_WORKERS: usize = 4096;
@@ -42,10 +44,14 @@ impl Selector {
         Ok(Selector { kq })
     }
 
-    fn change(&self, fd: RawFd, flags: u16, token: u64) -> io::Result<()> {
+    fn change(&self, fd: RawFd, interest: Interest, flags: u16, token: u64) -> io::Result<()> {
+        let filter = match interest {
+            Interest::Read => libc::EVFILT_READ,
+            Interest::Write => libc::EVFILT_WRITE,
+        };
         let ev = libc::kevent {
             ident: fd as libc::uintptr_t,
-            filter: libc::EVFILT_READ,
+            filter,
             flags,
             fflags: 0,
             data: 0,
@@ -58,16 +64,22 @@ impl Selector {
         Ok(())
     }
 
-    pub(crate) fn add(&self, fd: RawFd, token: u64, oneshot: bool) -> io::Result<()> {
+    pub(crate) fn add(
+        &self,
+        fd: RawFd,
+        token: u64,
+        oneshot: bool,
+        interest: Interest,
+    ) -> io::Result<()> {
         let mut flags = libc::EV_ADD;
         if oneshot {
             flags |= libc::EV_ONESHOT;
         }
-        self.change(fd, flags, token)
+        self.change(fd, interest, flags, token)
     }
 
-    pub(crate) fn delete(&self, fd: RawFd) -> io::Result<()> {
-        self.change(fd, libc::EV_DELETE, 0)
+    pub(crate) fn delete(&self, fd: RawFd, interest: Interest) -> io::Result<()> {
+        self.change(fd, interest, libc::EV_DELETE, 0)
     }
 
     pub(crate) fn wait(&self, out: &mut Vec<u64>, timeout: Option<Duration>) -> io::Result<()> {

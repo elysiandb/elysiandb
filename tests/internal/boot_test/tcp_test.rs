@@ -17,6 +17,9 @@ const MIN_CONNECTIONS: usize = 1000;
 const SPARE_DESCRIPTORS: libc::rlim_t = 512;
 const EXTRA_THREADS: usize = 64;
 const CONNECT_BATCH: usize = 64;
+const SLOW_READERS: usize = 128;
+const GETS_PER_READER: usize = 16;
+const LARGE_VALUE: usize = 100_000;
 
 struct QuietLog;
 
@@ -90,16 +93,22 @@ fn connection_budget() -> usize {
     usize::try_from(usable).map_or(WANTED_CONNECTIONS, |n| n.min(WANTED_CONNECTIONS))
 }
 
-fn start_tcp(folder: &std::path::Path) -> SocketAddr {
+fn start_tcp(folder: &std::path::Path, token: Option<&str>) -> SocketAddr {
     let mut cfg = Config::default();
     cfg.store.folder = folder.join("data").to_string_lossy().into_owned();
+    cfg.store.shards = 4;
     cfg.server.tcp.enabled = true;
     cfg.server.tcp.host = "127.0.0.1".to_string();
     cfg.server.tcp.port = 0;
-    cfg.security.authentication.enabled = true;
-    cfg.security.authentication.mode = "token".to_string();
-    cfg.security.authentication.token = "idle-token".to_string();
+    if let Some(token) = token {
+        cfg.security.authentication.enabled = true;
+        cfg.security.authentication.mode = "token".to_string();
+        cfg.security.authentication.token = token.to_string();
+    }
     globals::set_config(Some(Arc::new(cfg)));
+    if token.is_none() {
+        boot::init_db();
+    }
 
     let before = boot::tcp_listener_addr();
     std::thread::spawn(boot::init_tcp);
@@ -146,7 +155,7 @@ fn test_idle_tcp_connections_keep_the_thread_count_bounded() {
         "the file limit leaves room for {n} connections"
     );
     let dir = TempDir::new();
-    let addr = start_tcp(dir.path());
+    let addr = start_tcp(dir.path(), Some("idle-token"));
     let open_before = TCP_OPEN.load(Ordering::SeqCst);
     let threads_before = threads();
 
@@ -181,5 +190,93 @@ fn test_idle_tcp_connections_keep_the_thread_count_bounded() {
 
     drop(conns);
     drop(fresh);
+    wait_open(open_before);
+}
+
+fn wait_unread(conn: &TcpStream, want: usize) {
+    conn.set_nonblocking(true).expect("nonblocking");
+    let mut buf = vec![0u8; want];
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        match conn.peek(&mut buf) {
+            Ok(n) if n >= want => break,
+            Ok(0) => panic!("the server closed a connection that does not read"),
+            Ok(_) => {}
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+            Err(e) => panic!("peek: {e}"),
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the server did not answer a connection that does not read"
+        );
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    conn.set_nonblocking(false).expect("blocking");
+}
+
+fn wait_threads(limit: usize, what: &str) {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        let n = threads();
+        if n <= limit {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "{what} run on {n} threads, want at most {limit}"
+        );
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+#[test]
+fn test_tcp_clients_that_do_not_read_do_not_hold_threads() {
+    let _log = quiet_log();
+    let dir = TempDir::new();
+    let addr = start_tcp(dir.path(), None);
+    let open_before = TCP_OPEN.load(Ordering::SeqCst);
+
+    let mut normal = TcpStream::connect(addr).expect("connect");
+    let mut set = b"SET big ".to_vec();
+    set.extend(std::iter::repeat_n(b'x', LARGE_VALUE));
+    set.push(b'\n');
+    normal.write_all(&set).expect("set");
+    let mut ok = [0u8; 3];
+    normal.read_exact(&mut ok).expect("set answer");
+    assert_eq!(&ok, b"OK\n");
+    let threads_before = threads();
+
+    let gets = b"GET big\n".repeat(GETS_PER_READER);
+    let mut readers = Vec::with_capacity(SLOW_READERS);
+    for _ in 0..SLOW_READERS {
+        let conn = TcpStream::connect(addr).expect("connect");
+        (&conn).write_all(&gets).expect("gets");
+        wait_unread(&conn, LARGE_VALUE);
+        readers.push(conn);
+    }
+    wait_open(open_before + SLOW_READERS as i64 + 1);
+    wait_threads(
+        threads_before + EXTRA_THREADS,
+        &format!("{SLOW_READERS} clients that do not read their answers"),
+    );
+
+    let start = Instant::now();
+    ping(&mut normal);
+    let mut fresh = TcpStream::connect(addr).expect("connect");
+    ping(&mut fresh);
+    normal.write_all(b"GET big\n").expect("get");
+    let mut value = vec![0u8; "big=".len() + LARGE_VALUE + 1];
+    normal.read_exact(&mut value).expect("get answer");
+    assert!(value.starts_with(b"big=x"));
+    assert_eq!(value.last(), Some(&b'\n'));
+    assert!(
+        start.elapsed() < Duration::from_secs(2),
+        "a client that reads waited {:?} behind {SLOW_READERS} clients that do not",
+        start.elapsed()
+    );
+
+    drop(readers);
+    drop(fresh);
+    drop(normal);
     wait_open(open_before);
 }

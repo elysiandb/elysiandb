@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::fmt;
-use std::io::{self, ErrorKind, Write};
+use std::io::{self, ErrorKind, Read, Write};
 use std::net::{
     IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr, TcpListener, TcpStream, ToSocketAddrs,
 };
@@ -14,7 +14,8 @@ use crate::globals;
 use crate::gocompat::json::quote_text;
 use crate::gocompat::time::Duration;
 use crate::httpd::{
-    Host, Parked, Poller, Pool, TCP_KEEPIDLE_OPTION, Wait, WakePipe, somaxconn, wait_readable,
+    Host, Interest, Parked, Poller, Pool, TCP_KEEPIDLE_OPTION, Wait, WakePipe, somaxconn,
+    wait_readable,
 };
 use crate::kv;
 use crate::log::{self, Level, Logger, Throttle};
@@ -396,7 +397,7 @@ fn accept_loop(listener: &TcpListener, listening: &Listening) {
 }
 
 fn configure_accepted(stream: &TcpStream) {
-    let _ = stream.set_nonblocking(false);
+    let _ = stream.set_nonblocking(true);
     let _ = stream.set_nodelay(true);
     let fd = stream.as_raw_fd();
     let _ = setsockopt(fd, libc::SOL_SOCKET, libc::SO_KEEPALIVE, 1);
@@ -442,6 +443,7 @@ pub fn stop_tcp(timeout: StdDuration) {
 
     if !CONNS.wait_timeout(timeout) {
         for_each_open(|s| {
+            let _ = s.shutdown(Shutdown::Write);
             let _ = s.shutdown(Shutdown::Both);
         });
         CONNS.wait();
@@ -482,8 +484,12 @@ impl Listening {
     }
 
     fn park(&self, conn: Connection) {
-        let deadline = conn.deadline;
-        if let Err(conn) = self.poller.register(conn, deadline, Instant::now()) {
+        let (deadline, closable_at) = if conn.writer.pending() {
+            (None, None)
+        } else {
+            (conn.deadline, Some(Instant::now()))
+        };
+        if let Err(conn) = self.poller.register(conn, deadline, closable_at) {
             conn.finish();
         }
     }
@@ -502,7 +508,7 @@ impl Host<Connection> for Listening {
     }
 
     fn accept_finished(&self) -> bool {
-        !self.accepting.load(Ordering::SeqCst)
+        !self.accepting.load(Ordering::SeqCst) && CONNS.count() == 0
     }
 
     fn expired(&self, conn: Connection) {
@@ -562,6 +568,14 @@ impl Parked for Connection {
     fn fd(&self) -> RawFd {
         self.conn.stream.as_raw_fd()
     }
+
+    fn interest(&self) -> Interest {
+        if self.writer.pending() {
+            Interest::Write
+        } else {
+            Interest::Read
+        }
+    }
 }
 
 impl Connection {
@@ -612,6 +626,15 @@ impl Connection {
 
     fn advance(&mut self) -> Next {
         loop {
+            match self.writer.pump(&self.conn.stream) {
+                Ok(Sent::Done) => {}
+                Ok(Sent::Blocked) => return Next::Wait,
+                Err((op, e)) => {
+                    write_error(op, &self.addr, &self.conn, &e);
+                    return Next::Close;
+                }
+            }
+
             if !self.reading && !self.begin_line() {
                 return Next::Close;
             }
@@ -619,9 +642,7 @@ impl Connection {
             match self.reader.read_slice(&self.conn.stream, self.deadline) {
                 Ok(Some((lo, hi))) => {
                     self.reading = false;
-                    if !self.answer(lo, hi) {
-                        return Next::Close;
-                    }
+                    self.answer(lo, hi);
                 }
                 Ok(None) => return Next::Wait,
                 Err(err) => {
@@ -634,7 +655,7 @@ impl Connection {
         }
     }
 
-    fn answer(&mut self, lo: usize, hi: usize) -> bool {
+    fn answer(&mut self, lo: usize, hi: usize) {
         let line = &self.reader.buf[lo..hi];
 
         let command_start = Instant::now();
@@ -645,23 +666,7 @@ impl Connection {
             command_start,
         );
         self.commands += 1;
-
-        let stream = &*self.conn.stream;
-        if !resp.is_empty()
-            && let Err(e) = self.writer.write(stream, &resp)
-        {
-            write_error("write", &self.addr, &self.conn, &e);
-            return false;
-        }
-        if let Err(e) = self.writer.write(stream, b"\n") {
-            write_error("write", &self.addr, &self.conn, &e);
-            return false;
-        }
-        if let Err(e) = self.writer.flush(stream) {
-            write_error("flush", &self.addr, &self.conn, &e);
-            return false;
-        }
-        true
+        self.writer.start(resp);
     }
 
     fn finish(self) {
@@ -716,7 +721,7 @@ impl LineReader {
 
     fn read_slice(
         &mut self,
-        stream: &TcpStream,
+        mut stream: &TcpStream,
         deadline: Option<Instant>,
     ) -> Result<Option<(usize, usize)>, ReadError> {
         loop {
@@ -750,7 +755,7 @@ impl LineReader {
                 self.buf = vec![0u8; BUFFER_SIZE];
             }
 
-            match receive(stream, &mut self.buf[self.end..]) {
+            match stream.read(&mut self.buf[self.end..]) {
                 Ok(0) => return Err(ReadError::Eof),
                 Ok(n) => self.end += n,
                 Err(e) if e.kind() == ErrorKind::Interrupted => {}
@@ -764,64 +769,132 @@ impl LineReader {
     }
 }
 
-fn receive(stream: &TcpStream, buf: &mut [u8]) -> io::Result<usize> {
-    let n = unsafe {
-        libc::recv(
-            stream.as_raw_fd(),
-            buf.as_mut_ptr().cast::<libc::c_void>(),
-            buf.len(),
-            libc::MSG_DONTWAIT,
-        )
-    };
-    if n < 0 {
-        return Err(io::Error::last_os_error());
-    }
-    Ok(n as usize)
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Stage {
+    Idle,
+    Response,
+    Newline,
+    Flush,
+}
+
+enum Sent {
+    Done,
+    Blocked,
 }
 
 struct LineWriter {
     buf: Vec<u8>,
+    written: usize,
+    flushing: bool,
+    resp: Vec<u8>,
+    pos: usize,
+    stage: Stage,
 }
 
 impl LineWriter {
     fn new() -> LineWriter {
-        LineWriter { buf: Vec::new() }
+        LineWriter {
+            buf: Vec::new(),
+            written: 0,
+            flushing: false,
+            resp: Vec::new(),
+            pos: 0,
+            stage: Stage::Idle,
+        }
     }
 
-    fn write(&mut self, mut stream: &TcpStream, mut p: &[u8]) -> io::Result<()> {
-        while p.len() > BUFFER_SIZE - self.buf.len() {
+    fn pending(&self) -> bool {
+        self.stage != Stage::Idle
+    }
+
+    fn start(&mut self, resp: Vec<u8>) {
+        self.stage = if resp.is_empty() {
+            Stage::Newline
+        } else {
+            Stage::Response
+        };
+        self.resp = resp;
+        self.pos = 0;
+    }
+
+    fn pump(&mut self, stream: &TcpStream) -> Result<Sent, (&'static str, io::Error)> {
+        loop {
+            let sent = match self.stage {
+                Stage::Idle => return Ok(Sent::Done),
+                Stage::Response => {
+                    let resp = std::mem::take(&mut self.resp);
+                    let sent = self.write(stream, &resp);
+                    self.resp = resp;
+                    sent.map_err(|e| ("write", e))?
+                }
+                Stage::Newline => self.write(stream, b"\n").map_err(|e| ("write", e))?,
+                Stage::Flush => self.flush(stream).map_err(|e| ("flush", e))?,
+            };
+            if let Sent::Blocked = sent {
+                return Ok(Sent::Blocked);
+            }
+            self.pos = 0;
+            self.stage = match self.stage {
+                Stage::Response => Stage::Newline,
+                Stage::Newline => Stage::Flush,
+                Stage::Flush | Stage::Idle => {
+                    self.resp = Vec::new();
+                    Stage::Idle
+                }
+            };
+        }
+    }
+
+    fn write(&mut self, mut stream: &TcpStream, input: &[u8]) -> io::Result<Sent> {
+        loop {
+            if self.flushing {
+                if let Sent::Blocked = self.flush(stream)? {
+                    return Ok(Sent::Blocked);
+                }
+                self.flushing = false;
+            }
+            let p = &input[self.pos..];
+            if p.len() <= BUFFER_SIZE - self.buf.len() {
+                self.buf.extend_from_slice(p);
+                self.pos = input.len();
+                return Ok(Sent::Done);
+            }
             if self.buf.is_empty() {
-                let n = stream.write(p)?;
-                p = &p[n..];
+                match stream.write(p) {
+                    Ok(n) => self.pos += n,
+                    Err(e) if e.kind() == ErrorKind::WouldBlock => return Ok(Sent::Blocked),
+                    Err(e) => return Err(e),
+                }
             } else {
                 let n = (BUFFER_SIZE - self.buf.len()).min(p.len());
                 self.buf.extend_from_slice(&p[..n]);
-                p = &p[n..];
-                self.flush(stream)?;
+                self.pos += n;
+                self.flushing = true;
             }
         }
-        self.buf.extend_from_slice(p);
-        Ok(())
     }
 
-    fn flush(&mut self, mut stream: &TcpStream) -> io::Result<()> {
-        let mut written = 0;
-        while written < self.buf.len() {
-            match stream.write(&self.buf[written..]) {
+    fn flush(&mut self, mut stream: &TcpStream) -> io::Result<Sent> {
+        while self.written < self.buf.len() {
+            match stream.write(&self.buf[self.written..]) {
                 Ok(0) => {
-                    self.buf.drain(..written);
+                    self.buf.drain(..self.written);
+                    self.written = 0;
                     return Err(io::Error::from(ErrorKind::WriteZero));
                 }
-                Ok(n) => written += n,
+                Ok(n) => self.written += n,
                 Err(e) if e.kind() == ErrorKind::Interrupted => {}
+                Err(e) if e.kind() == ErrorKind::WouldBlock => return Ok(Sent::Blocked),
                 Err(e) => {
-                    self.buf.drain(..written);
+                    self.buf.drain(..self.written);
+                    self.written = 0;
                     return Err(e);
                 }
             }
         }
         self.buf.clear();
-        Ok(())
+        self.written = 0;
+        Ok(Sent::Done)
     }
 }
 

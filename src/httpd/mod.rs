@@ -44,7 +44,7 @@ pub use multipart::{
     FileHeader, Form, MultipartError, Part, Reader as MultipartReader, read_multipart_form,
     write_multipart_form,
 };
-pub(crate) use poller::{Host, Parked, Poller};
+pub(crate) use poller::{Host, Interest, Parked, Poller};
 pub use request::{
     DEFAULT_MAX_REQUEST_BODY_SIZE, MSG_BAD_REQUEST, MSG_BODY_TOO_LARGE, MSG_HEADER_TOO_LARGE,
     MSG_REQUEST_TIMEOUT, MultipartFormError, REASON_BODY_TOO_LARGE,
