@@ -15,6 +15,9 @@ pub fn message_for(scenario: &str, id: &str) -> Option<&'static str> {
         ("off", "034-query-syntax-error") | ("basic", "038-query-syntax-error") => {
             r#"{"error":"invalid JSON at byte 2: unexpected character 'o'"}"#
         }
+        ("off", "126-restore-not-an-archive") => {
+            r#"{"error":"invalid backup archive: not a gzip file: invalid gzip header"}"#
+        }
         _ => return None,
     };
     Some(msg)

@@ -1,6 +1,7 @@
 mod args;
 mod bufio;
 mod bytesconv;
+mod chunked;
 mod conn;
 mod cookie;
 mod ctx;
@@ -30,6 +31,7 @@ mod sys;
 pub use args::Args;
 pub use bufio::{BufReader, PeekErr, ReadErr, SliceErr};
 pub use bytesconv::{append_http_date, parse_uint};
+pub use chunked::{ChunkedError, ChunkedReader, is_chunked_error};
 pub use conn::{ConnHandle, HijackConn};
 pub use cookie::{Cookie, CookieError, CookieSameSite};
 pub use ctx::{HijackHandler, MATCHED_ROUTE_PATH_PARAM, RequestCtx};

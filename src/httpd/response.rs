@@ -32,7 +32,7 @@ impl std::fmt::Debug for Response {
 }
 
 enum Sink<'a> {
-    Chunked(&'a mut dyn Write),
+    Chunked(&'a mut (dyn Write + Send)),
     Raw(&'a mut Vec<u8>),
     Discard,
 }
@@ -238,7 +238,7 @@ impl Response {
         self.skip_body || status == 304 || status == 204 || (100..200).contains(&status)
     }
 
-    pub fn write<W: Write>(&mut self, w: &mut W) -> io::Result<()> {
+    pub fn write<W: Write + Send>(&mut self, w: &mut W) -> io::Result<()> {
         let send_body = !self.must_skip_body();
         if self.body_stream.is_some() {
             return self.write_body_stream(w, send_body);
@@ -254,7 +254,7 @@ impl Response {
         Ok(())
     }
 
-    fn write_body_stream<W: Write>(&mut self, w: &mut W, send_body: bool) -> io::Result<()> {
+    fn write_body_stream<W: Write + Send>(&mut self, w: &mut W, send_body: bool) -> io::Result<()> {
         let Some(stream) = self.body_stream.take() else {
             return Ok(());
         };

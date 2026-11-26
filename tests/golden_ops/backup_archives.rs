@@ -4,13 +4,23 @@ use std::sync::Arc;
 
 use std::io::Read;
 
+use std::cell::Cell;
+use std::net::SocketAddr;
+use std::time::Duration;
+
 use elysiandb::archive::{gzip, tar};
-use elysiandb::backup::{self, ArchiveError, Options, Report};
+use elysiandb::backup::{self, ArchiveError, Report};
 use elysiandb::configuration::Config;
 use elysiandb::globals;
-use elysiandb::gocompat::json::Value;
+use elysiandb::gocompat::base64;
+use elysiandb::gocompat::json::{self, Value};
 use elysiandb::gocompat::time::Time;
+use elysiandb::httpd::{Request, RequestCtx};
+use elysiandb::httprouter::Router;
+use elysiandb::routing;
 use elysiandb::storage;
+use elysiandb::transport::http::api as http_api;
+use elysiandb::transport::tcp::tcp_routing::{self, Conn};
 
 use super::archives::{archive, gunzip, gzip_once};
 use super::common::{read_jsonl, str_field};
@@ -95,11 +105,6 @@ const JSON_DETAILS: [(&str, &str); JSON_ROWS] = [
         "invalid/kv-array.tar.gz",
         "invalid JSON: the value must be an object, got an array",
     ),
-];
-
-const PENDING_DATA_SETS: [(&str, &str); 2] = [
-    ("api", "13 http, 9 tcp, 1 sleep"),
-    ("large", "1 http_repeat"),
 ];
 
 pub(super) struct Store {
@@ -462,30 +467,165 @@ fn go_tars_of(dataset: &str) -> Vec<(String, Vec<u8>)> {
         .collect()
 }
 
+struct RecipeConn {
+    closed: Cell<bool>,
+}
+
+impl Conn for RecipeConn {
+    fn close(&self) {
+        self.closed.set(true);
+    }
+
+    fn remote_addr(&self) -> Option<SocketAddr> {
+        Some(SocketAddr::from(([127, 0, 0, 1], 40000)))
+    }
+}
+
+fn http_call(router: &Router, method: &str, path: &str, body: &[u8]) -> RequestCtx {
+    let mut req = Request::new();
+    req.set_request_uri(path);
+    req.header.set_method(method);
+    if !body.is_empty() {
+        req.header.set_content_type("application/json");
+        req.set_body(body);
+    }
+    let mut ctx = RequestCtx::new();
+    ctx.init(&req, Some(SocketAddr::from(([127, 0, 0, 1], 40001))));
+    router.handler(&mut ctx);
+    ctx
+}
+
+fn bytes_of(step: &Value, field: &str) -> Vec<u8> {
+    match step.get(field).and_then(Value::as_str) {
+        Some(text) => text.as_bytes().to_vec(),
+        None => base64::STD_ENCODING
+            .decode_string(str_field(step, &format!("{field}_b64")).as_bytes())
+            .unwrap_or_else(|e| panic!("{field}_b64: {e:?}")),
+    }
+}
+
+fn status_of(step: &Value) -> u16 {
+    step.get("status")
+        .and_then(Value::as_i64)
+        .unwrap_or_else(|| panic!("no status in {step:?}")) as u16
+}
+
+fn run_step(dataset: &str, router: &Router, step: &Value) {
+    match str_field(step, "op") {
+        "restore" => {
+            let data = archive(str_field(step, "file"));
+            backup::restore(Cursor::new(data)).unwrap_or_else(|e| panic!("{dataset}: {e}"));
+        }
+        "http" => {
+            let ctx = http_call(
+                router,
+                str_field(step, "method"),
+                str_field(step, "path"),
+                str_field(step, "body").as_bytes(),
+            );
+            assert_eq!(
+                ctx.response.status_code(),
+                status_of(step),
+                "{dataset}: {}",
+                str_field(step, "path")
+            );
+        }
+        "http_repeat" => {
+            let count = step.get("count").and_then(Value::as_i64).unwrap_or(0);
+            let width = step.get("id_width").and_then(Value::as_i64).unwrap_or(0) as usize;
+            let items = step.get("items").and_then(Value::as_i64).unwrap_or(0) as usize;
+            let mut statuses: BTreeMap<String, Value> = BTreeMap::new();
+            for n in 0..count {
+                let body = format!(
+                    "{}{}{n:0width$}{}{}{}",
+                    str_field(step, "body_head"),
+                    str_field(step, "id_prefix"),
+                    str_field(step, "body_mid"),
+                    str_field(step, "item").repeat(items),
+                    str_field(step, "body_tail"),
+                );
+                let ctx = http_call(
+                    router,
+                    str_field(step, "method"),
+                    str_field(step, "path"),
+                    body.as_bytes(),
+                );
+                let key = ctx.response.status_code().to_string();
+                let seen = match statuses.get(&key) {
+                    Some(Value::Int(v)) => *v,
+                    _ => 0,
+                };
+                statuses.insert(key, Value::Int(seen + 1));
+            }
+            assert_eq!(
+                json::marshal(&statuses).expect("statuses"),
+                json::marshal(step.get("statuses").expect("statuses")).expect("statuses"),
+                "{dataset}: statuses"
+            );
+        }
+        "tcp" => {
+            let conn = RecipeConn {
+                closed: Cell::new(false),
+            };
+            let mut session = tcp_routing::new_session();
+            let mut reply = tcp_routing::route_line(&bytes_of(step, "send"), &conn, &mut session);
+            reply.push(b'\n');
+            assert_eq!(
+                String::from_utf8_lossy(&reply),
+                String::from_utf8_lossy(&bytes_of(step, "reply")),
+                "{dataset}: tcp step"
+            );
+        }
+        "sleep" => {
+            let ms = step.get("ms").and_then(Value::as_i64).unwrap_or(0) as u64;
+            std::thread::sleep(Duration::from_millis(ms));
+        }
+        other => panic!("{dataset}: unknown op {other}"),
+    }
+}
+
+fn hot_backup(router: &Router) -> (String, Vec<u8>) {
+    let mut ctx = http_call(router, "GET", "/api/backup", b"");
+    assert_eq!(ctx.response.status_code(), 200);
+    assert_eq!(ctx.response.header.content_type(), b"application/gzip");
+    let name =
+        String::from_utf8_lossy(ctx.response.header.peek("Content-Disposition")).into_owned();
+    let body = ctx.response.body().to_vec();
+    (name, body)
+}
+
+fn served_name(name: &str) -> String {
+    let Some(start) = name.find("elysiandb-backup-") else {
+        return name.to_string();
+    };
+    let stamp = start + "elysiandb-backup-".len();
+    let Some(end) = name[stamp..].find(".tar.gz") else {
+        return name.to_string();
+    };
+    format!("{}<STAMP>{}", &name[..stamp], &name[stamp + end..])
+}
+
 fn replay(dataset: &str, steps: &[&Value]) -> Vec<(String, Vec<u8>)> {
     let store = open_store();
+    elysiandb::security::register();
+    let mut router = Router::new();
+    routing::register_routes(&mut router);
     for step in steps {
-        assert_eq!(str_field(step, "op"), "restore", "{dataset}");
-        let data = archive(str_field(step, "file"));
-        backup::restore(Cursor::new(data)).unwrap_or_else(|e| panic!("{dataset}: {e}"));
+        run_step(dataset, &router, step);
     }
 
     let mut built = Vec::new();
 
-    let mut beats = 0;
-    let mut beat = || beats += 1;
-    let mut hot = Vec::new();
-    let mut src = backup::prepare(Time::now().utc()).expect("prepare");
-    src.write_archive(
-        &mut hot,
-        Options {
-            beat: Some(&mut beat),
-            flush: true,
-            pace: true,
-        },
-    )
-    .expect("hot backup");
-    src.close();
+    let (name, hot) = hot_backup(&router);
+    for row in read_jsonl("ops/archives/archives.jsonl") {
+        if str_field(&row, "dataset") == dataset && str_field(&row, "kind").starts_with("hot") {
+            assert_eq!(
+                served_name(&name),
+                str_field(&row, "served_name"),
+                "{dataset}: served name"
+            );
+        }
+    }
     built.push(("hot".to_string(), hot));
 
     let periodic = store.path().join("periodic");
@@ -523,22 +663,9 @@ fn recipe_data_sets_rebuild_the_tar_of_go() {
             .push(row);
     }
 
-    let mut pending = Vec::new();
     let mut replayed = 0;
     for (dataset, rows) in &steps {
-        let mut ops: BTreeMap<&str, usize> = BTreeMap::new();
-        for row in rows.iter().skip(1) {
-            *ops.entry(str_field(row, "op")).or_default() += 1;
-        }
         assert_eq!(str_field(rows[0], "op"), "restore", "{dataset}");
-
-        if !ops.is_empty() {
-            let mut summary: Vec<(usize, &str)> = ops.iter().map(|(k, v)| (*v, *k)).collect();
-            summary.sort_by(|a, b| b.cmp(a));
-            let text: Vec<String> = summary.iter().map(|(n, op)| format!("{n} {op}")).collect();
-            pending.push((dataset.clone(), text.join(", ")));
-            continue;
-        }
 
         let go = go_tars_of(dataset);
         assert!(!go.is_empty(), "{dataset}");
@@ -558,10 +685,59 @@ fn recipe_data_sets_rebuild_the_tar_of_go() {
         replayed += 1;
     }
 
-    assert_eq!(replayed, 1);
-    let want: Vec<(String, String)> = PENDING_DATA_SETS
-        .iter()
-        .map(|(d, s)| (d.to_string(), s.to_string()))
-        .collect();
-    assert_eq!(pending, want);
+    assert_eq!(replayed, 3);
+    assert_eq!(steps.len(), replayed);
+}
+
+#[test]
+fn every_archive_is_answered_over_http_with_the_reason_of_go() {
+    let mut rows = 0;
+    let mut accepted = 0;
+    for row in &read_jsonl("ops/archives/expected.jsonl") {
+        let _store = open_store();
+        let file = str_field(row, "file");
+        let data = archive(file);
+
+        let mut req = Request::new();
+        req.set_request_uri("/api/restore");
+        req.header.set_method("POST");
+        req.header.set_content_type("application/gzip");
+        req.set_body(&data);
+        let mut ctx = RequestCtx::new();
+        ctx.init(&req, None);
+        http_api::restore_controller(&mut ctx);
+
+        let body = String::from_utf8_lossy(ctx.response.body_bytes()).into_owned();
+        let reason = match data.is_empty() {
+            true => Some("the request body must be a backup archive".to_string()),
+            false => expected_reason(row, &data),
+        };
+        match reason {
+            None => {
+                assert_eq!(ctx.response.status_code(), 200, "{file}: {body}");
+                assert!(
+                    body.contains("\"status\":\"restore completed\""),
+                    "{file}: {body}"
+                );
+                accepted += 1;
+            }
+            Some(want) => {
+                let mut m = BTreeMap::new();
+                m.insert("error".to_string(), want);
+                let want =
+                    String::from_utf8(json::marshal(&m).expect("error body")).expect("utf-8");
+                assert_eq!(ctx.response.status_code(), 400, "{file}: {body}");
+                assert_eq!(body, want, "{file}");
+            }
+        }
+        assert_eq!(
+            ctx.response.header.content_type(),
+            b"application/json",
+            "{file}"
+        );
+        rows += 1;
+    }
+
+    assert_eq!(rows, EXPECTED_ROWS);
+    assert_eq!(accepted, ACCEPTED_ROWS);
 }

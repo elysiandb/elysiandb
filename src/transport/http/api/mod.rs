@@ -1,4 +1,5 @@
 pub mod acl;
+mod backup;
 mod core_entity;
 mod count;
 mod create;
@@ -26,10 +27,12 @@ pub mod pre_read;
 mod put_schema;
 pub mod query;
 mod response;
+mod restore;
 pub mod security;
 pub mod transactions;
 mod update;
 
+pub use backup::backup_controller;
 pub use core_entity::{
     references_core_entity, reject_core_entity, reject_core_entity_references,
     send_core_entity_forbidden,
@@ -58,5 +61,8 @@ pub use query::{
 pub use response::{
     Spool, cache_deps, count_planned, encode_list, send_deadline_exceeded, write_count,
     write_documents,
+};
+pub use restore::{
+    HIDDEN_BODY_HEADER, close_after_unread_body, restore_controller, streaming_routes,
 };
 pub use update::{update_by_id_controller, update_list_controller};

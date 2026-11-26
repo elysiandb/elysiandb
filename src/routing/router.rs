@@ -40,6 +40,8 @@ pub fn register_routes(r: &mut Router) {
 
     r.handle("GET", "/api/export", version(security::authenticate_admin(h(api::export_controller))));
     r.handle("POST", "/api/import", version(security::authenticate_admin(h(api::import_controller))));
+    r.handle("GET", "/api/backup", version(security::authenticate_admin(h(api::backup_controller))));
+    r.handle("POST", "/api/restore", version(security::authenticate_admin(h(api::restore_controller))));
     r.handle("GET", "/api/{entity}", version(security::authenticate(api::reject_core_entity(h(api::list_controller)))));
     r.handle("POST", "/api/query", version(security::authenticate(h(api::query_controller))));
     r.handle("POST", "/api/{entity}", version(security::authenticate(api::reject_core_entity(h(api::create_controller)))));

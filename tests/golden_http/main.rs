@@ -441,3 +441,30 @@ fn test_routed_strict_cases_replay_the_go_corpus() {
 fn test_routed_timeouts_cases_replay_the_go_corpus() {
     run_routed("timeouts");
 }
+
+#[test]
+fn test_streamed_restore_body_errors_use_the_d27_messages() {
+    let head = "POST /api/restore HTTP/1.1\r\nHost: h\r\nContent-Type: application/gzip\r\n";
+    let cut = format!("{head}Content-Length: 100\r\n\r\nshort");
+    let bad_chunk = format!("{head}Transfer-Encoding: chunked\r\n\r\nzz\r\nabc\r\n0\r\n\r\n");
+    let cut_chunk = format!("{head}Transfer-Encoding: chunked\r\n\r\n10\r\nabc");
+    let replies = routed::send_raw(
+        "off",
+        &[cut.as_bytes(), bad_chunk.as_bytes(), cut_chunk.as_bytes()],
+    );
+
+    let want = [
+        r#"{"error":"unexpected end of the request body"}"#,
+        r#"{"error":"invalid chunked body"}"#,
+        r#"{"error":"unexpected end of the request body"}"#,
+    ];
+    for (raw, want) in replies.iter().zip(want) {
+        let text = String::from_utf8_lossy(raw).into_owned();
+        assert!(
+            text.starts_with("HTTP/1.1 500 Internal Server Error\r\n"),
+            "{text}"
+        );
+        assert!(text.contains("\r\nConnection: close\r\n"), "{text}");
+        assert_eq!(String::from_utf8_lossy(&body_of(raw)), want, "{text}");
+    }
+}

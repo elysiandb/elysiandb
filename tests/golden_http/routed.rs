@@ -5,7 +5,7 @@ use std::sync::{Arc, Once};
 use std::time::Duration;
 
 use elysiandb::acl;
-use elysiandb::api;
+use elysiandb::api as api_storage;
 use elysiandb::cache;
 use elysiandb::configuration;
 use elysiandb::globals;
@@ -19,6 +19,7 @@ use elysiandb::routing;
 use elysiandb::security;
 use elysiandb::stat;
 use elysiandb::storage;
+use elysiandb::transport::http::api;
 use elysiandb::transport::http::{adminui, observe};
 
 use super::{Case, LogBuffer, Running, load_case, new_http_server_config, read_response};
@@ -42,94 +43,24 @@ pub const SERVER_LEVEL: [(&str, &str); 11] = [
     ("limit", "002-concurrency-503"),
 ];
 
-pub const EXCLUDED: [(&str, &str, &str); 22] = [
-    ("off", "060-backup-head", "backup controller"),
-    (
-        "off",
-        "061-monitoring-overview",
-        "monitoring sources and sampler of boot",
-    ),
-    (
-        "off",
-        "062-monitoring-series",
-        "monitoring sources and sampler of boot",
-    ),
-    (
-        "off",
-        "063-monitoring-details",
-        "monitoring sources and sampler of boot",
-    ),
-    (
-        "off",
-        "064-monitoring-logs",
-        "monitoring sources and sampler of boot",
-    ),
-    (
-        "off",
-        "115-client-internal-body-length",
-        "close_after_unread_body of restore",
-    ),
-    ("off", "123-restore-length", "restore controller"),
-    ("off", "124-restore-chunked", "restore controller"),
-    ("off", "125-restore-multipart-expect", "restore controller"),
-    ("off", "126-restore-not-an-archive", "restore controller"),
-    (
-        "off",
-        "127-restore-multipart-malformed",
-        "restore controller",
-    ),
-    (
-        "off",
-        "128-list-after-restore",
-        "state left by the restore cases",
-    ),
-    (
-        "off",
-        "130-list-after-reset",
-        "state left by the restore cases",
-    ),
-    ("basic", "064-backup-head", "backup controller"),
-    (
-        "basic",
-        "065-monitoring-overview",
-        "monitoring sources and sampler of boot",
-    ),
-    (
-        "basic",
-        "066-monitoring-series",
-        "monitoring sources and sampler of boot",
-    ),
-    (
-        "basic",
-        "067-monitoring-details",
-        "monitoring sources and sampler of boot",
-    ),
-    (
-        "basic",
-        "068-monitoring-logs",
-        "monitoring sources and sampler of boot",
-    ),
-    (
-        "disk-full",
-        "001-write-refused",
-        "refuse_writes_without_disk of boot",
-    ),
-    (
-        "disk-full",
-        "002-kv-refused",
-        "refuse_writes_without_disk of boot",
-    ),
-    (
-        "disk-full",
-        "003-delete-allowed",
-        "refuse_writes_without_disk of boot",
-    ),
-    (
-        "disk-full",
-        "004-read-allowed",
-        "refuse_writes_without_disk of boot",
-    ),
+pub const EXCLUDED: [(&str, &str, &str); 12] = [
+    ("off", "061-monitoring-overview", MONITORING),
+    ("off", "062-monitoring-series", MONITORING),
+    ("off", "063-monitoring-details", MONITORING),
+    ("off", "064-monitoring-logs", MONITORING),
+    ("basic", "065-monitoring-overview", MONITORING),
+    ("basic", "066-monitoring-series", MONITORING),
+    ("basic", "067-monitoring-details", MONITORING),
+    ("basic", "068-monitoring-logs", MONITORING),
+    ("disk-full", "001-write-refused", REFUSED_WRITES),
+    ("disk-full", "002-kv-refused", REFUSED_WRITES),
+    ("disk-full", "003-delete-allowed", REFUSED_WRITES),
+    ("disk-full", "004-read-allowed", REFUSED_WRITES),
 ];
+
+const MONITORING: &str = "monitoring sources and sampler of boot";
+
+const REFUSED_WRITES: &str = "refuse_writes_without_disk of boot";
 
 const ADMIN_UI_CASES: [&str; 6] = [
     "090-admin-redirect",
@@ -183,7 +114,7 @@ fn new_router() -> Router {
 }
 
 fn boot(scenario: &str) -> Booted {
-    INDEX.call_once(api::index::register);
+    INDEX.call_once(api_storage::index::register);
     let data = TempDir::new();
     let conf = TempDir::new();
     let folder = data.path().to_string_lossy().into_owned();
@@ -232,9 +163,12 @@ fn boot(scenario: &str) -> Booted {
         stat::init();
     }
 
-    let chain = observe::middleware(security::protect(new_router().into_handler()));
+    let chain = api::close_after_unread_body(observe::middleware(security::protect(
+        new_router().into_handler(),
+    )));
     let mut server_cfg = new_http_server_config(100_000);
     server_cfg.handler = chain;
+    server_cfg.header_received = Some(api::streaming_routes);
     let running = Running::start(server_cfg);
 
     Booted {
@@ -429,6 +363,19 @@ pub struct Replay {
     pub replayed: usize,
     pub skipped: usize,
     pub total: usize,
+}
+
+pub fn send_raw(scenario: &str, requests: &[&[u8]]) -> Vec<Vec<u8>> {
+    let booted = boot(scenario);
+    let mut out = Vec::new();
+    for req in requests {
+        let mut conn = TcpStream::connect(booted.running.addr).unwrap_or_else(|e| panic!("{e}"));
+        let _ = conn.write_all(req);
+        let _ = conn.shutdown(Shutdown::Write);
+        let (raw, _) = read_response(&mut conn, true, 0, 10000);
+        out.push(raw);
+    }
+    out
 }
 
 pub fn replay(scenario: &str) -> Replay {
