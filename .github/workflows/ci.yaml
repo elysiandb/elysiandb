@@ -59,7 +59,8 @@ jobs:
         run: mkdir -p adminui/dist
 
       - name: Coverage
-        run: cargo llvm-cov --workspace --locked --release --no-fail-fast --lcov --output-path lcov.info -- --test-threads=1 --skip overload_test::
+        run: |
+          cargo llvm-cov --workspace --locked --release --no-fail-fast --lcov --output-path lcov.info -- --test-threads=1 --skip overload_test::
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v6
