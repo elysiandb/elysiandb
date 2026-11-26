@@ -8,7 +8,7 @@
 
 ElysianDB is a self-contained backend engine that turns raw JSON into a usable, queryable API in seconds.
 
-It combines automatic REST API generation, advanced querying and indexing, authentication, ACLs, hooks, and optional KV and TCP interfaces into a single fast Go binary, on top of its own storage engine designed together with the API.
+It combines automatic REST API generation, advanced querying and indexing, authentication, ACLs, hooks, and optional KV and TCP interfaces into a single fast binary, on top of its own storage engine designed together with the API.
 
 The goal is simple: remove backend boilerplate so you can focus on shipping features instead of infrastructure.
 
@@ -154,21 +154,23 @@ docker run -d -p 8089:8089 -v elysian-data:/data -v $(pwd)/elysian.yaml:/app/ely
 
 ## Build and Run Locally
 
+ElysianDB is built with Cargo. Install Rust with [rustup](https://rustup.rs): `rust-toolchain.toml` pins the version, which rustup installs on the first build. The Admin UI needs Node.js 20.19 or later.
+
 ```bash
-make build-admin   # optional: embeds the Admin UI in the binary
+make build-admin   # optional: builds the Admin UI, embedded by the next build
 make build && ./elysiandb server
 ```
 
-`make build` stamps the binary with the version from `git describe`, returned in the `X-Elysian-Version` header and by `/stats`. A plain `go build` reports `dev`:
+`make build` stamps the binary with the version from `git describe`, returned in the `X-Elysian-Version` header and by `/stats`; outside a git checkout, from a source archive for example, it reports `dev`. A plain `cargo build` reports `dev`:
 
 ```bash
-go build && ./elysiandb server
+cargo build --release && ./target/release/elysiandb server
 ```
 
 Or:
 
 ```bash
-go run elysiandb.go server
+cargo run --release -- server
 ```
 
 ## Security Notes
