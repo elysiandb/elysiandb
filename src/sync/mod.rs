@@ -1,4 +1,12 @@
+use std::any::Any;
+use std::backtrace::Backtrace;
+use std::cell::RefCell;
 use std::fmt;
+use std::fs::File;
+use std::io::Write;
+use std::mem::ManuallyDrop;
+use std::os::fd::FromRawFd;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync as stdsync;
 use std::sync::PoisonError;
 use std::time::{Duration, Instant};
@@ -370,6 +378,94 @@ impl WaitGroup {
     }
 }
 
+pub const UNKNOWN_PANIC: &str = "unknown panic";
+
+thread_local! {
+    static PANIC_TRACE: RefCell<Option<String>> = const { RefCell::new(None) };
+    static PANIC_TEXT: RefCell<Option<String>> = const { RefCell::new(None) };
+}
+
+fn backtrace_requested() -> bool {
+    std::env::var_os("RUST_BACKTRACE").is_some_and(|v| v != "0")
+}
+
+pub fn install_base_panic_hook() {
+    std::panic::set_hook(Box::new(|info| {
+        let text = panic_message(info.payload());
+        let trace = backtrace_requested().then(|| Backtrace::force_capture().to_string());
+        PANIC_TEXT.with(|t| *t.borrow_mut() = Some(text));
+        PANIC_TRACE.with(|t| *t.borrow_mut() = trace);
+    }));
+}
+
+pub fn panic_message(payload: &(dyn Any + Send)) -> String {
+    if let Some(s) = payload.downcast_ref::<&str>() {
+        return (*s).to_string();
+    }
+
+    if let Some(s) = payload.downcast_ref::<String>() {
+        return s.clone();
+    }
+
+    UNKNOWN_PANIC.to_string()
+}
+
+pub fn die(payload: &(dyn Any + Send)) -> ! {
+    die_with(&panic_message(payload))
+}
+
+fn die_with(message: &str) -> ! {
+    let mut out = format!("fatal error: {message}\n");
+    if let Some(trace) = PANIC_TRACE.with(|t| t.borrow_mut().take()) {
+        out.push_str(&trace);
+        if !out.ends_with('\n') {
+            out.push('\n');
+        }
+    }
+
+    let mut stderr = ManuallyDrop::new(unsafe { File::from_raw_fd(libc::STDERR_FILENO) });
+    let _ = stderr.write_all(out.as_bytes());
+    std::process::exit(2)
+}
+
+pub fn run_fatal<T>(f: impl FnOnce() -> T) -> T {
+    match catch_unwind(AssertUnwindSafe(f)) {
+        Ok(v) => v,
+        Err(payload) => die(payload.as_ref()),
+    }
+}
+
+pub struct FatalOnPanic;
+
+impl Drop for FatalOnPanic {
+    fn drop(&mut self) {
+        if std::thread::panicking() {
+            let text = PANIC_TEXT.with(|t| t.borrow_mut().take());
+            die_with(text.as_deref().unwrap_or(UNKNOWN_PANIC));
+        }
+    }
+}
+
+pub fn block_shutdown_signals() {
+    unsafe {
+        let mut set: libc::sigset_t = std::mem::zeroed();
+        libc::sigemptyset(&mut set);
+        libc::sigaddset(&mut set, libc::SIGINT);
+        libc::sigaddset(&mut set, libc::SIGTERM);
+        libc::pthread_sigmask(libc::SIG_BLOCK, &set, std::ptr::null_mut());
+    }
+}
+
+fn thread_body<F, T>(f: F) -> impl FnOnce() -> T
+where
+    F: FnOnce() -> T,
+{
+    move || {
+        block_shutdown_signals();
+        run_fatal(f)
+    }
+}
+
 pub fn spawn<F, T>(name: &str, f: F) -> std::thread::JoinHandle<T>
 where
     F: FnOnce() -> T + Send + 'static,
@@ -377,6 +473,21 @@ where
 {
     std::thread::Builder::new()
         .name(name.to_string())
-        .spawn(f)
+        .spawn(thread_body(f))
         .unwrap_or_else(|e| panic!("cannot start thread {name}: {e}"))
+}
+
+pub fn spawn_with_stack<F, T>(
+    name: &str,
+    stack: usize,
+    f: F,
+) -> std::io::Result<std::thread::JoinHandle<T>>
+where
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
+{
+    std::thread::Builder::new()
+        .name(name.to_string())
+        .stack_size(stack)
+        .spawn(thread_body(f))
 }

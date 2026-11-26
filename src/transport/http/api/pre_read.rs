@@ -110,6 +110,7 @@ where
                     .name("hook-helper".to_string())
                     .stack_size(HOOK_HELPER_STACK)
                     .spawn_scoped(s, move || {
+                        let _fatal = crate::sync::FatalOnPanic;
                         let _token = token;
                         run();
                     });

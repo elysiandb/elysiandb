@@ -4,10 +4,11 @@ use elysiandb::gocompat::time::Duration;
 use elysiandb::kv;
 use elysiandb::log::{self, Options, ToValue};
 
+use super::cli::{BIN, cli_config};
 use super::common::{self, str_field, unhex};
+use super::pty;
+use super::tempdir::TempDir;
 use super::{Capture, Restore, log_state};
-
-const CHECKED_LATER: [(&str, &str); 1] = [("banner", "src/main.rs, command-line part")];
 
 fn text_value(capture: &Capture, v: &dyn ToValue) -> String {
     log::info("fmt", kv!["v" => v]);
@@ -35,7 +36,7 @@ fn fmt_vectors_match_go() {
     log::set_output(Some(Box::new(capture.clone())), false);
 
     let rows = common::read_jsonl("ops/fmt/cases.jsonl");
-    let (mut floats, mut durations, mut quotes, mut later) = (0, 0, 0, 0);
+    let (mut floats, mut durations, mut quotes, mut banners) = (0, 0, 0, 0);
 
     for row in &rows {
         match str_field(row, "fn") {
@@ -94,16 +95,48 @@ fn fmt_vectors_match_go() {
                 );
                 quotes += 1;
             }
-            name => {
+            "banner" => {
+                let want = unhex(str_field(row, "hex"));
+                let shown = run_on_terminal();
                 assert!(
-                    CHECKED_LATER.iter().any(|(n, _)| *n == name),
-                    "unexpected fmt case {name}"
+                    shown.starts_with(&want),
+                    "the banner differs: {:?}",
+                    String::from_utf8_lossy(&shown)
                 );
-                later += 1;
+                banners += 1;
             }
+            name => panic!("unexpected fmt case {name}"),
         }
     }
 
-    assert_eq!((floats, durations, quotes, later), (321, 12, 13, 1));
-    assert_eq!(floats + durations + quotes + later, rows.len());
+    assert_eq!((floats, durations, quotes, banners), (321, 12, 13, 1));
+    assert_eq!(floats + durations + quotes + banners, rows.len());
+}
+
+fn run_on_terminal() -> Vec<u8> {
+    use std::process::{Command, Stdio};
+
+    let dir = TempDir::new();
+    std::fs::write(dir.path().join("c.yaml"), cli_config("", 1)).expect("config");
+
+    let mut term = pty::open();
+    let mut child = Command::new(BIN)
+        .args(["-config", "c.yaml", "help"])
+        .current_dir(dir.path())
+        .env_clear()
+        .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+        .env("TZ", "UTC")
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(term.slave()))
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("start the CLI");
+
+    assert!(
+        term.wait_for(b"Start ElysianDB server\n"),
+        "no help on the terminal"
+    );
+    let status = child.wait().expect("wait for the CLI");
+    assert!(status.success(), "{status:?}");
+    term.seen
 }

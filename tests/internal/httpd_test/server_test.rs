@@ -891,25 +891,29 @@ fn test_handler_runs_on_elastic_workers() {
 }
 
 #[test]
-fn test_handler_panic_releases_the_connection() {
+fn test_handler_panic_outside_a_recovery_point_ends_the_process() {
+    const NAME: &str = "server_test::test_handler_panic_outside_a_recovery_point_ends_the_process";
+    if std::env::var_os("RUN_FATAL_HELPER").is_some_and(|v| v == "http-worker") {
+        elysiandb::sync::install_base_panic_hook();
+        let ts = TestServer::start(elysian_config(|ctx: &mut RequestCtx| {
+            if ctx.path() == b"/panic" {
+                std::panic::panic_any("handler failure");
+            }
+            ctx.set_body_string("ok");
+        }));
+        let _ = roundtrip(&ts, b"GET /panic HTTP/1.1\r\nHost: h\r\n\r\n");
+        std::thread::sleep(Duration::from_secs(10));
+        return;
+    }
+
     let _g = serial();
-    let ts = TestServer::start(elysian_config(|ctx: &mut RequestCtx| {
-        if ctx.path() == b"/panic" {
-            std::panic::panic_any("handler failure");
-        }
-        ctx.set_body_string("ok");
-    }));
-    let prev = std::panic::take_hook();
-    std::panic::set_hook(Box::new(|_| {}));
-    let (raw, closed) = roundtrip(&ts, b"GET /panic HTTP/1.1\r\nHost: h\r\n\r\n");
-    std::panic::set_hook(prev);
-    assert!(raw.is_empty());
-    assert!(closed);
-    std::thread::sleep(Duration::from_millis(50));
-    assert_eq!(ts.server.open_connections(), 0);
-    let (raw, _) = roundtrip(
-        &ts,
-        b"GET /ok HTTP/1.1\r\nHost: h\r\nConnection: close\r\n\r\n",
-    );
-    assert_eq!(parse_responses(&raw)[0].body, b"ok");
+    let out = std::process::Command::new(std::env::current_exe().expect("test binary"))
+        .args([NAME, "--exact", "--test-threads=1"])
+        .env("RUN_FATAL_HELPER", "http-worker")
+        .env_remove("RUST_BACKTRACE")
+        .output()
+        .expect("child test run");
+
+    assert_eq!(out.status.code(), Some(2), "{:?}", out.status);
+    assert_eq!(text(&out.stderr), "fatal error: handler failure\n");
 }

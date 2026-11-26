@@ -155,6 +155,7 @@ pub fn restore_raw_entities(entity: &[u8], next: RawNext<'_>) -> (usize, Result<
         let producer = std::thread::Builder::new()
             .name("restore-reader".to_string())
             .spawn_scoped(s, move || -> Option<BoxError> {
+                let _fatal = crate::sync::FatalOnPanic;
                 let mut batch: Vec<RawDocument> = Vec::with_capacity(RAW_BATCH_DOCUMENTS);
                 let mut size = 0usize;
                 let send = |batch: &mut Vec<RawDocument>, size: &mut usize| {
@@ -173,6 +174,7 @@ pub fn restore_raw_entities(entity: &[u8], next: RawNext<'_>) -> (usize, Result<
                     let spawned = std::thread::Builder::new()
                         .name("restore-decoder".to_string())
                         .spawn_scoped(s, move || {
+                            let _fatal = crate::sync::FatalOnPanic;
                             let res = decode_batch(docs);
                             slots.give();
                             let _ = done_tx.send(res);

@@ -16,6 +16,7 @@ use super::delete_user::delete_user;
 use super::export_legacy::export_legacy;
 use super::reset::reset_all;
 use super::restore::restore;
+use super::server::start_server;
 
 pub const CREATE_USER_COMMAND: &str = "create-user";
 pub const DELETE_USER_COMMAND: &str = "delete-user";
@@ -83,6 +84,7 @@ pub fn get_handlers() -> BTreeMap<&'static str, Handler> {
     BTreeMap::from([
         (CREATE_USER_COMMAND, create_user as Handler),
         (DELETE_USER_COMMAND, delete_user as Handler),
+        (SERVER_COMMAND, start_server as Handler),
         (CHANGE_PASSWORD_COMMAND, change_password as Handler),
         (RESET_COMMAND, reset_all as Handler),
         (BACKUP_COMMAND, backup as Handler),
@@ -174,6 +176,10 @@ pub fn println(text: impl AsRef<[u8]>) {
     let mut line = text.as_ref().to_vec();
     line.push(b'\n');
     print(line);
+}
+
+pub fn write_stderr(text: impl AsRef<[u8]>) {
+    write_fd(libc::STDERR_FILENO, text.as_ref());
 }
 
 pub(crate) fn write_fd(fd: libc::c_int, text: &[u8]) {

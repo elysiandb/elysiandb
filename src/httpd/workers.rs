@@ -64,7 +64,7 @@ impl Pool {
             let spawned = std::thread::Builder::new()
                 .name("http-worker".to_string())
                 .stack_size(WORKER_STACK_SIZE)
-                .spawn(move || self.run(job));
+                .spawn(move || crate::sync::run_fatal(|| self.run(job)));
             if spawned.is_err() {
                 let mut st = self.state.lock();
                 st.total -= 1;

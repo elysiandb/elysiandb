@@ -791,7 +791,10 @@ fn build_rows(
                         return None;
                     }
                     let work = &work;
-                    Some(s.spawn(move || work(w, lo, hi)))
+                    Some(s.spawn(move || {
+                        let _fatal = crate::sync::FatalOnPanic;
+                        work(w, lo, hi)
+                    }))
                 })
                 .collect();
             handles

@@ -198,7 +198,7 @@ fn path_arg(p: &Path) -> String {
 }
 
 #[test]
-fn delete_user_auth_disabled() {
+fn test_delete_user_auth_disabled() {
     let _dir = init_cmd_store(auth(false, ""));
 
     let (buf, _restore) = capture_cmd_output();
@@ -212,7 +212,7 @@ fn delete_user_auth_disabled() {
 }
 
 #[test]
-fn delete_user_wrong_mode() {
+fn test_delete_user_wrong_mode() {
     let _dir = init_cmd_store(auth(true, "token"));
 
     let (buf, _restore) = capture_cmd_output();
@@ -226,7 +226,7 @@ fn delete_user_wrong_mode() {
 }
 
 #[test]
-fn create_user_auth_disabled() {
+fn test_create_user_auth_disabled() {
     let _dir = init_cmd_store(auth(false, ""));
 
     let (buf, _restore) = capture_cmd_output();
@@ -240,7 +240,7 @@ fn create_user_auth_disabled() {
 }
 
 #[test]
-fn create_user_wrong_mode() {
+fn test_create_user_wrong_mode() {
     let _dir = init_cmd_store(auth(true, "token"));
 
     let (buf, _restore) = capture_cmd_output();
@@ -254,7 +254,7 @@ fn create_user_wrong_mode() {
 }
 
 #[test]
-fn delete_user_ok() {
+fn test_delete_user_ok() {
     let _dir = init_cmd_store(auth(true, "basic"));
 
     create_basic_user("john", "x", Role::user());
@@ -272,7 +272,7 @@ fn delete_user_ok() {
 }
 
 #[test]
-fn delete_user_unknown() {
+fn test_delete_user_unknown() {
     let _dir = init_cmd_store(auth(true, "basic"));
 
     let _restore_in = mock_stdin("ghost\n");
@@ -291,7 +291,7 @@ fn delete_user_unknown() {
 }
 
 #[test]
-fn create_user_ok() {
+fn test_create_user_ok() {
     let _dir = init_cmd_store(auth(true, "basic"));
 
     let _restore_in = mock_stdin("alice\n1\n");
@@ -309,7 +309,7 @@ fn create_user_ok() {
 }
 
 #[test]
-fn create_user_password_mismatch() {
+fn test_create_user_password_mismatch() {
     let _dir = init_cmd_store(auth(true, "basic"));
 
     let _restore_in = mock_stdin("bob\n2\n");
@@ -337,7 +337,7 @@ fn create_user_password_mismatch() {
 }
 
 #[test]
-fn get_available_commands() {
+fn test_get_available_commands() {
     let cmds = cmd::get_available_commands();
 
     let present = |name: &str| cmds.get(name).is_some_and(|help| !help.is_empty());
@@ -355,7 +355,25 @@ fn get_available_commands() {
 }
 
 #[test]
-fn print_help() {
+fn test_get_handlers() {
+    let h = cmd::get_handlers();
+
+    let present = |name: &str| h.contains_key(name);
+    if !present(cmd::SERVER_COMMAND)
+        || !present(cmd::CREATE_USER_COMMAND)
+        || !present(cmd::DELETE_USER_COMMAND)
+        || !present(cmd::HELP_COMMAND)
+        || !present(cmd::CHANGE_PASSWORD_COMMAND)
+        || !present(cmd::RESET_COMMAND)
+        || !present(cmd::BACKUP_COMMAND)
+        || !present(cmd::RESTORE_COMMAND)
+    {
+        panic!("expected all handlers to be present");
+    }
+}
+
+#[test]
+fn test_print_help() {
     let (buf, _restore) = capture_cmd_output();
 
     cmd::print_help();
@@ -381,7 +399,7 @@ fn print_help() {
 }
 
 #[test]
-fn change_password_auth_disabled() {
+fn test_change_password_auth_disabled() {
     let _dir = init_cmd_store(auth(false, ""));
 
     let (buf, _restore) = capture_cmd_output();
@@ -395,7 +413,7 @@ fn change_password_auth_disabled() {
 }
 
 #[test]
-fn change_password_wrong_mode() {
+fn test_change_password_wrong_mode() {
     let _dir = init_cmd_store(auth(true, "token"));
 
     let (buf, _restore) = capture_cmd_output();
@@ -409,7 +427,7 @@ fn change_password_wrong_mode() {
 }
 
 #[test]
-fn change_password_user_not_found() {
+fn test_change_password_user_not_found() {
     let dir = TempDir::new();
     let mut cfg = auth(true, "basic");
     cfg.store.folder = dir.path().to_string_lossy().into_owned();
@@ -441,7 +459,7 @@ fn change_password_user_not_found() {
 }
 
 #[test]
-fn change_password_mismatch() {
+fn test_change_password_mismatch() {
     let _dir = init_cmd_store(auth(true, "basic"));
 
     create_basic_user("bob", "x", Role::user());
@@ -473,7 +491,7 @@ fn change_password_mismatch() {
 }
 
 #[test]
-fn change_password_ok() {
+fn test_change_password_ok() {
     let _dir = init_cmd_store(auth(true, "basic"));
 
     create_basic_user("alice", "old", Role::user());
@@ -493,7 +511,7 @@ fn change_password_ok() {
 }
 
 #[test]
-fn reset_all_abort_on_no() {
+fn test_reset_all_abort_on_no() {
     let dir = TempDir::new();
     let mut cfg = Config::default();
     cfg.store.folder = dir.path().to_string_lossy().into_owned();
@@ -517,7 +535,7 @@ fn reset_all_abort_on_no() {
 }
 
 #[test]
-fn reset_all_with_force_deletes_folder() {
+fn test_reset_all_with_force_deletes_folder() {
     let dir = TempDir::new();
     let mut cfg = Config::default();
     cfg.store.folder = dir.path().to_string_lossy().into_owned();
@@ -544,7 +562,7 @@ fn reset_all_with_force_deletes_folder() {
 }
 
 #[test]
-fn delete_user_default_admin_is_kept() {
+fn test_delete_user_default_admin_is_kept() {
     let _dir = init_cmd_store(auth(true, "user"));
 
     create_basic_user(security::DEFAULT_ADMIN_USERNAME, "x", Role::admin());
@@ -568,7 +586,7 @@ fn delete_user_default_admin_is_kept() {
 }
 
 #[test]
-fn print_help_lists_commands_in_order() {
+fn test_print_help_lists_commands_in_order() {
     let (buf, _restore) = capture_cmd_output();
 
     cmd::print_help();
@@ -583,7 +601,7 @@ fn print_help_lists_commands_in_order() {
 }
 
 #[test]
-fn run_backup_writes_an_archive_in_the_output_folder() {
+fn test_run_backup_writes_an_archive_in_the_output_folder() {
     let _dir = init_cmd_store(Config::default());
     write_entity("book", r#"{"id":"b1"}"#);
     let output_dir = TempDir::new();
@@ -612,7 +630,7 @@ fn run_backup_writes_an_archive_in_the_output_folder() {
 }
 
 #[test]
-fn run_backup_rejects_invalid_arguments() {
+fn test_run_backup_rejects_invalid_arguments() {
     let _dir = init_cmd_store(Config::default());
     let file_dir = TempDir::new();
     let file = file_dir.path().join("file");
@@ -635,7 +653,7 @@ fn run_backup_rejects_invalid_arguments() {
 }
 
 #[test]
-fn run_restore_asks_for_confirmation() {
+fn test_run_restore_asks_for_confirmation() {
     let _first = init_cmd_store(Config::default());
     write_entity("book", r#"{"id":"b1"}"#);
     let output = TempDir::new();
@@ -674,7 +692,7 @@ fn run_restore_asks_for_confirmation() {
 }
 
 #[test]
-fn run_restore_with_force_does_not_ask() {
+fn test_run_restore_with_force_does_not_ask() {
     let _first = init_cmd_store(Config::default());
     write_entity("book", r#"{"id":"b1"}"#);
     let output = TempDir::new();
@@ -694,7 +712,7 @@ fn run_restore_with_force_does_not_ask() {
 }
 
 #[test]
-fn run_restore_refuses_invalid_input() {
+fn test_run_restore_refuses_invalid_input() {
     let _dir = init_cmd_store(Config::default());
     let invalid_dir = TempDir::new();
     let invalid = path_arg(&invalid_dir.path().join("invalid.tar.gz"));
@@ -718,7 +736,7 @@ fn run_restore_refuses_invalid_input() {
 }
 
 #[test]
-fn backup_and_restore_handlers_exit_on_error() {
+fn test_backup_and_restore_handlers_exit_on_error() {
     let _dir = init_cmd_store(Config::default());
     cmd::set_flag_args(Vec::new());
 

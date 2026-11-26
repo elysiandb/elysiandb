@@ -18,7 +18,7 @@ pub fn run_gently<F: FnOnce() + Send>(f: F) {
                     );
                     libc::setpriority(libc::PRIO_PROCESS, 0, GENTLE_NICE);
                 }
-                f();
+                crate::sync::run_fatal(f);
             })
             .unwrap_or_else(|e| panic!("cannot start thread gentle: {e}"));
         if let Err(payload) = handle.join() {

@@ -11,12 +11,15 @@ fn poisoned_locks_stay_usable() {
     let m = Arc::new(Mutex::new(1));
     let rw = Arc::new(RwLock::new(2));
     let (m2, rw2) = (m.clone(), rw.clone());
-    let r = spawn("poison", move || {
-        let _g = m2.lock();
-        let _w = rw2.write();
-        panic!("poison both locks");
-    })
-    .join();
+    let r = std::thread::Builder::new()
+        .name("poison".to_string())
+        .spawn(move || {
+            let _g = m2.lock();
+            let _w = rw2.write();
+            panic!("poison both locks");
+        })
+        .unwrap_or_else(|e| panic!("cannot start thread poison: {e}"))
+        .join();
     assert!(r.is_err());
     *m.lock() += 1;
     *rw.write() += 1;
@@ -184,4 +187,41 @@ fn spawned_threads_carry_their_name() {
         std::thread::current().name().map(str::to_string)
     });
     assert_eq!(h.join().unwrap().as_deref(), Some("named-thread"));
+}
+
+const FATAL_TEST: &str = "a_panic_in_a_spawned_thread_ends_the_process";
+
+#[test]
+fn a_panic_in_a_spawned_thread_ends_the_process() {
+    if std::env::var_os("RUN_FATAL_HELPER").is_some_and(|v| v == "spawn") {
+        elysiandb::sync::install_base_panic_hook();
+        let _ = spawn("doomed", || panic!("boom in a thread")).join();
+        std::thread::sleep(Duration::from_secs(10));
+        return;
+    }
+
+    let run = |backtrace: bool| {
+        let mut cmd = std::process::Command::new(std::env::current_exe().expect("test binary"));
+        cmd.args([FATAL_TEST, "--exact", "--test-threads=1"])
+            .env("RUN_FATAL_HELPER", "spawn")
+            .env_remove("RUST_BACKTRACE")
+            .env_remove("RUST_LIB_BACKTRACE");
+        if backtrace {
+            cmd.env("RUST_BACKTRACE", "1");
+        }
+        cmd.output().expect("child test run")
+    };
+
+    let out = run(false);
+    assert_eq!(out.status.code(), Some(2), "{:?}", out.status);
+    assert_eq!(
+        String::from_utf8_lossy(&out.stderr),
+        "fatal error: boom in a thread\n"
+    );
+
+    let out = run(true);
+    assert_eq!(out.status.code(), Some(2), "{:?}", out.status);
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.starts_with("fatal error: boom in a thread\n"), "{err}");
+    assert!(err.lines().count() > 1, "no backtrace in {err}");
 }

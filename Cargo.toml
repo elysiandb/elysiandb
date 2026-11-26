@@ -228,3 +228,7 @@ path = "tests/internal/transport_test/http_test/api_test/transaction_test/main.r
 [[test]]
 name = "cmd_test"
 path = "tests/internal/cmd_test/main.rs"
+
+[[test]]
+name = "boot_test"
+path = "tests/internal/boot_test/main.rs"

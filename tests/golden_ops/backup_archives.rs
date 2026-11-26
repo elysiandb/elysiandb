@@ -217,7 +217,7 @@ pub(super) fn normalized(tar: &[u8]) -> Vec<u8> {
     out
 }
 
-fn expected_reason(row: &Value, data: &[u8]) -> Option<String> {
+pub(super) fn expected_reason(row: &Value, data: &[u8]) -> Option<String> {
     let reason = row.get("reason").and_then(Value::as_str)?;
     let file = str_field(row, "file");
 

@@ -6,12 +6,16 @@ mod tempdir;
 mod archives;
 mod backup_archives;
 mod backup_ops;
+mod cli;
 mod config;
 mod fmt;
+mod lifecycle;
 mod logs;
 mod metrics;
+mod pty;
 mod tar_archives;
 mod tcp;
+mod tcp_listener;
 mod yaml;
 
 use elysiandb::log::{self, Options};
@@ -40,6 +44,10 @@ impl Write for Capture {
 }
 
 impl Capture {
+    fn peek(&self) -> String {
+        String::from_utf8(self.0.lock().clone()).expect("log output is UTF-8")
+    }
+
     fn take(&self) -> String {
         let bytes = std::mem::take(&mut *self.0.lock());
         String::from_utf8(bytes).expect("log output is UTF-8")

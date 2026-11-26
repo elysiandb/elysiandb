@@ -4,6 +4,7 @@ mod dates;
 mod deep;
 mod keys;
 mod memory;
+mod memory_container;
 mod pages;
 mod postings;
 mod primitives;

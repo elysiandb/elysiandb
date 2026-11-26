@@ -38,6 +38,7 @@ pub use ctx::{HijackHandler, MATCHED_ROUTE_PATH_PARAM, RequestCtx};
 pub use date::server_date;
 pub use header::*;
 pub use listener::{ListenError, bind_tcp4};
+pub(crate) use listener::{Wait, WakePipe, wait_readable};
 pub use mime::{MediaParams, MediaTypeError, parse_media_type};
 pub use multipart::{
     FileHeader, Form, MultipartError, Part, Reader as MultipartReader, read_multipart_form,
@@ -56,5 +57,6 @@ pub use server::{
     ServerConfig, ShutdownError, handler,
 };
 pub use status::*;
+pub(crate) use sys::{TCP_KEEPIDLE_OPTION, somaxconn};
 pub use textproto::{MimeHeader, canonical_mime_header_key, header_get as mime_header_get};
 pub use uri::{URI, UriError, normalize_path};
