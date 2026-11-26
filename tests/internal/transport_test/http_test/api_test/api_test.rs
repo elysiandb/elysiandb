@@ -147,7 +147,7 @@ fn create(entity: &str, body: &str) -> RequestCtx {
 }
 
 #[test]
-fn test_create_and_get_by_id() {
+fn create_and_get_by_id() {
     let _s = setup();
 
     let ctx = create("books", r#"{"title":"Dune"}"#);
@@ -169,7 +169,7 @@ fn test_create_and_get_by_id() {
 }
 
 #[test]
-fn test_list_and_count() {
+fn list_and_count() {
     let _s = setup();
 
     for _ in 0..3 {
@@ -194,7 +194,7 @@ fn test_list_and_count() {
 }
 
 #[test]
-fn test_update_by_id() {
+fn update_by_id() {
     let _s = setup();
 
     let ctx = create("profile", r#"{"name":"alice"}"#);
@@ -218,7 +218,7 @@ fn create_type(entity: &str, body: &str) -> RequestCtx {
 }
 
 #[test]
-fn test_update_by_id_keeps_strict_manual_schema() {
+fn update_by_id_keeps_strict_manual_schema() {
     let _s = setup();
 
     update_config(|cfg| cfg.api.schema.strict = true);
@@ -273,7 +273,7 @@ fn test_update_by_id_keeps_strict_manual_schema() {
 }
 
 #[test]
-fn test_update_list() {
+fn update_list() {
     let _s = setup();
 
     create("e", r#"[{"a":1},{"a":2}]"#);
@@ -287,7 +287,7 @@ fn test_update_list() {
     }
 }
 
-fn update_by_id(entity: &str, id: &str, body: &str) -> RequestCtx {
+fn update_by_id_ctx(entity: &str, id: &str, body: &str) -> RequestCtx {
     let mut ctx = new_ctx("PUT", &format!("/api/{entity}/{id}"), body);
     ctx.set_param("entity", entity);
     ctx.set_param("id", id);
@@ -296,7 +296,7 @@ fn update_by_id(entity: &str, id: &str, body: &str) -> RequestCtx {
     ctx
 }
 
-fn update_list(entity: &str, body: &str) -> RequestCtx {
+fn update_list_ctx(entity: &str, body: &str) -> RequestCtx {
     let mut ctx = new_ctx("PUT", &format!("/api/{entity}"), body);
     ctx.set_param("entity", entity);
     api_controller::update_list_controller(&mut ctx);
@@ -305,12 +305,12 @@ fn update_list(entity: &str, body: &str) -> RequestCtx {
 }
 
 #[test]
-fn test_update_by_id_missing_entity_is_not_found() {
+fn update_by_id_missing_entity_is_not_found() {
     let _s = setup();
 
     write("movie", r#"{"id":"m1","title":"Alien"}"#);
 
-    let ctx = update_by_id("movie", "nope", r#"{"title":"x"}"#);
+    let ctx = update_by_id_ctx("movie", "nope", r#"{"title":"x"}"#);
     if status(&ctx) != STATUS_NOT_FOUND || body(&ctx) != r#"{"error":"entity not found"}"# {
         panic!("expected 404, got {}: {}", status(&ctx), body(&ctx));
     }
@@ -321,7 +321,7 @@ fn test_update_by_id_missing_entity_is_not_found() {
 }
 
 #[test]
-fn test_update_by_id_missing_entity_is_not_found_before_strict_validation() {
+fn update_by_id_missing_entity_is_not_found_before_strict_validation() {
     let _s = setup();
 
     update_config(|cfg| cfg.api.schema.strict = true);
@@ -331,7 +331,7 @@ fn test_update_by_id_missing_entity_is_not_found_before_strict_validation() {
         r#"{"fields":{"title":{"type":"string","required":true},"year":{"type":"number","required":false}}}"#,
     );
 
-    let ctx = update_by_id("book", "nope", r#"{"year":2000}"#);
+    let ctx = update_by_id_ctx("book", "nope", r#"{"year":2000}"#);
     if status(&ctx) != STATUS_NOT_FOUND {
         panic!(
             "expected 404 instead of a validation error, got {}: {}",
@@ -342,12 +342,12 @@ fn test_update_by_id_missing_entity_is_not_found_before_strict_validation() {
 }
 
 #[test]
-fn test_update_list_missing_entities_are_not_found() {
+fn update_list_missing_entities_are_not_found() {
     let _s = setup();
 
     write("movie", r#"{"id":"m1","title":"Alien"}"#);
 
-    let ctx = update_list(
+    let ctx = update_list_ctx(
         "movie",
         r#"[{"id":"m1","title":"Alien (1979)"},{"id":"nope","title":"x"},{"id":"nope","title":"y"},{"id":"gone"}]"#,
     );
@@ -367,18 +367,18 @@ fn test_update_list_missing_entities_are_not_found() {
         );
     }
 
-    let ctx = update_list("movie", r#"[{"id":"m1","title":"Alien (1979)"}]"#);
+    let ctx = update_list_ctx("movie", r#"[{"id":"m1","title":"Alien (1979)"}]"#);
     if status(&ctx) != STATUS_OK {
         panic!("expected 200, got {}: {}", status(&ctx), body(&ctx));
     }
 }
 
 #[test]
-fn test_update_list_invalid_body_is_bad_request() {
+fn update_list_invalid_body_is_bad_request() {
     let _s = setup();
 
     for body in [r#"{"id":"m1"}"#, "[]", "not json"] {
-        let ctx = update_list("movie", body);
+        let ctx = update_list_ctx("movie", body);
         if status(&ctx) != STATUS_BAD_REQUEST {
             panic!("body {body}: expected 400, got {}", status(&ctx));
         }
@@ -386,7 +386,7 @@ fn test_update_list_invalid_body_is_bad_request() {
 }
 
 #[test]
-fn test_delete_and_destroy() {
+fn delete_and_destroy() {
     let _s = setup();
 
     let ctx = create("d", r#"{"x":1}"#);
@@ -411,7 +411,7 @@ fn test_delete_and_destroy() {
 }
 
 #[test]
-fn test_create_type_controller_ok() {
+fn create_type_controller_ok() {
     let _s = setup();
 
     let body = r#"{"fields":{"title":"string","age":"number"}}"#;
@@ -450,7 +450,7 @@ fn admin_ctx(method: &str, uri: &str, body: &str, entity: &str) -> RequestCtx {
 }
 
 #[test]
-fn test_create_strict_manual_schema_with_user_authentication() {
+fn create_strict_manual_schema_with_user_authentication() {
     let _s = setup();
 
     enable_user_authentication();
@@ -541,7 +541,7 @@ fn assert_manual_schema(step: &str) {
 }
 
 #[test]
-fn test_update_strict_manual_schema_with_user_authentication_keeps_schema() {
+fn update_strict_manual_schema_with_user_authentication_keeps_schema() {
     let _s = setup();
 
     enable_user_authentication();
@@ -659,7 +659,7 @@ fn test_update_strict_manual_schema_with_user_authentication_keeps_schema() {
 }
 
 #[test]
-fn test_create_type_controller_invalid_json() {
+fn create_type_controller_invalid_json() {
     let _s = setup();
 
     let mut ctx = new_ctx("POST", "/api/type/badjson", "{invalid");
@@ -677,7 +677,7 @@ fn test_create_type_controller_invalid_json() {
 }
 
 #[test]
-fn test_create_type_controller_no_fields() {
+fn create_type_controller_no_fields() {
     let _s = setup();
 
     let mut ctx = new_ctx("POST", "/api/type/test", r#"{"x":1}"#);
@@ -702,7 +702,7 @@ fn entities_of(ctx: &RequestCtx) -> Vec<Value> {
 }
 
 #[test]
-fn test_get_entity_types_names_controller_empty() {
+fn get_entity_types_names_controller_empty() {
     let _s = setup();
 
     let mut ctx = new_ctx("GET", "/api/types", "");
@@ -719,7 +719,7 @@ fn test_get_entity_types_names_controller_empty() {
 }
 
 #[test]
-fn test_get_entity_types_names_controller_with_entities() {
+fn get_entity_types_names_controller_with_entities() {
     let _s = setup();
 
     let _ = api::create_entity_type(b"book");
@@ -771,7 +771,7 @@ fn list_of(entity: &str, uri: &str) -> RequestCtx {
 }
 
 #[test]
-fn test_get_by_id_with_post_read_hook() {
+fn get_by_id_with_post_read_hook() {
     let _s = setup();
 
     enable_hooks(true);
@@ -806,7 +806,7 @@ fn test_get_by_id_with_post_read_hook() {
 }
 
 #[test]
-fn test_list_with_post_read_hook() {
+fn list_with_post_read_hook() {
     let _s = setup();
 
     enable_hooks(true);
@@ -845,7 +845,7 @@ fn test_list_with_post_read_hook() {
 }
 
 #[test]
-fn test_list_without_hooks_enabled() {
+fn list_without_hooks_enabled() {
     let _s = setup();
 
     enable_hooks(false);
@@ -872,7 +872,7 @@ fn test_list_without_hooks_enabled() {
 }
 
 #[test]
-fn test_get_by_id_no_hook_for_entity() {
+fn get_by_id_no_hook_for_entity() {
     let _s = setup();
 
     enable_hooks(true);
@@ -895,7 +895,7 @@ fn test_get_by_id_no_hook_for_entity() {
 }
 
 #[test]
-fn test_list_with_pre_read_hook_filtering() {
+fn list_with_pre_read_hook_filtering() {
     let _s = setup();
 
     enable_hooks(true);
@@ -931,7 +931,7 @@ fn test_list_with_pre_read_hook_filtering() {
 }
 
 #[test]
-fn test_list_pre_read_hook_ignored_when_disabled() {
+fn list_pre_read_hook_ignored_when_disabled() {
     let _s = setup();
 
     enable_hooks(false);
@@ -958,7 +958,7 @@ fn test_list_pre_read_hook_ignored_when_disabled() {
 }
 
 #[test]
-fn test_list_pre_read_hook_filtering_excludes_missing_stored_field() {
+fn list_pre_read_hook_filtering_excludes_missing_stored_field() {
     let _s = setup();
 
     enable_hooks(true);
@@ -997,7 +997,7 @@ fn test_list_pre_read_hook_filtering_excludes_missing_stored_field() {
 }
 
 #[test]
-fn test_list_pre_read_and_post_read_together() {
+fn list_pre_read_and_post_read_together() {
     let _s = setup();
 
     enable_hooks(true);
@@ -1043,7 +1043,7 @@ fn query(body: &str) -> RequestCtx {
 }
 
 #[test]
-fn test_query_controller_basic_query() {
+fn query_controller_basic_query() {
     let _s = setup();
 
     write("book", r#"{"id":"1","title":"Go"}"#);
@@ -1068,7 +1068,7 @@ fn test_query_controller_basic_query() {
 }
 
 #[test]
-fn test_query_controller_count_only() {
+fn query_controller_count_only() {
     let _s = setup();
 
     for id in ["a", "b", "c"] {
@@ -1092,7 +1092,7 @@ fn test_query_controller_count_only() {
 }
 
 #[test]
-fn test_query_controller_fields_filtering() {
+fn query_controller_fields_filtering() {
     let _s = setup();
 
     write("f", r#"{"id":"1","title":"Go","meta":{"x":1}}"#);
@@ -1117,7 +1117,7 @@ fn test_query_controller_fields_filtering() {
 }
 
 #[test]
-fn test_query_controller_invalid_json() {
+fn query_controller_invalid_json() {
     let _s = setup();
 
     let ctx = query("{invalid");
@@ -1128,7 +1128,7 @@ fn test_query_controller_invalid_json() {
 }
 
 #[test]
-fn test_query_controller_invalid_filter() {
+fn query_controller_invalid_filter() {
     let _s = setup();
 
     let ctx = query(
@@ -1144,7 +1144,7 @@ fn test_query_controller_invalid_filter() {
 }
 
 #[test]
-fn test_query_controller_cache_hit_and_miss() {
+fn query_controller_cache_hit_and_miss() {
     let _s = setup();
 
     update_config(|cfg| {
@@ -1172,7 +1172,7 @@ fn test_query_controller_cache_hit_and_miss() {
 }
 
 #[test]
-fn test_query_payload_hash_deterministic() {
+fn query_payload_hash_deterministic() {
     let p = api_controller::QueryPayload {
         entity: "a".to_string(),
         filters: Some(doc(r#"{"or":[{"x":{"eq":"1"}},{"y":{"eq":"2"}}]}"#)),
@@ -1262,7 +1262,7 @@ fn assert_note(id: &str, owner: &str, title: &str) {
 }
 
 #[test]
-fn test_update_by_id_owning_update_rejects_other_users_entity() {
+fn update_by_id_owning_update_rejects_other_users_entity() {
     let _s = setup_ownership();
 
     let id = create_note_as("alice", r#"{"title":"alice"}"#);
@@ -1285,7 +1285,7 @@ fn test_update_by_id_owning_update_rejects_other_users_entity() {
 }
 
 #[test]
-fn test_update_by_id_owner_can_update_without_username_field() {
+fn update_by_id_owner_can_update_without_username_field() {
     let _s = setup_ownership();
 
     let id = create_note_as("alice", r#"{"title":"alice"}"#);
@@ -1299,7 +1299,7 @@ fn test_update_by_id_owner_can_update_without_username_field() {
 }
 
 #[test]
-fn test_update_by_id_owning_update_cannot_change_owner() {
+fn update_by_id_owning_update_cannot_change_owner() {
     let _s = setup_ownership();
 
     let id = create_note_as("alice", r#"{"title":"alice"}"#);
@@ -1317,7 +1317,7 @@ fn test_update_by_id_owning_update_cannot_change_owner() {
 }
 
 #[test]
-fn test_update_by_id_id_in_payload_does_not_redirect_write() {
+fn update_by_id_id_in_payload_does_not_redirect_write() {
     let _s = setup_ownership();
 
     let alice_id = create_note_as("alice", r#"{"title":"alice"}"#);
@@ -1340,7 +1340,7 @@ fn test_update_by_id_id_in_payload_does_not_redirect_write() {
 }
 
 #[test]
-fn test_update_by_id_missing_entity_is_not_found_before_acl() {
+fn update_by_id_missing_entity_is_not_found_before_acl() {
     let _s = setup_ownership();
 
     let ctx = update_note_as("bob", "nope", r#"{"title":"bob"}"#);
@@ -1355,7 +1355,7 @@ fn test_update_by_id_missing_entity_is_not_found_before_acl() {
 }
 
 #[test]
-fn test_update_list_owning_update_rejects_other_users_entity() {
+fn update_list_owning_update_rejects_other_users_entity() {
     let _s = setup_ownership();
 
     let alice_id = create_note_as("alice", r#"{"title":"alice"}"#);
@@ -1377,7 +1377,7 @@ fn test_update_list_owning_update_rejects_other_users_entity() {
 }
 
 #[test]
-fn test_update_list_owner_can_update_without_username_field() {
+fn update_list_owner_can_update_without_username_field() {
     let _s = setup_ownership();
 
     let id = create_note_as("alice", r#"{"title":"alice"}"#);
@@ -1468,7 +1468,7 @@ fn run_during_concurrent_login(
 }
 
 #[test]
-fn test_create_owner_comes_from_own_request_during_concurrent_login() {
+fn create_owner_comes_from_own_request_during_concurrent_login() {
     let _s = setup_ownership();
 
     let mut alice_ctx = new_session_ctx("alice", "POST", "/api/notes", r#"{"title":"alice"}"#);
@@ -1492,7 +1492,7 @@ fn test_create_owner_comes_from_own_request_during_concurrent_login() {
 }
 
 #[test]
-fn test_update_by_id_acl_uses_own_request_user_during_concurrent_login() {
+fn update_by_id_acl_uses_own_request_user_during_concurrent_login() {
     let _s = setup_ownership();
 
     write(
@@ -1523,7 +1523,7 @@ fn count_notes() -> usize {
 }
 
 #[test]
-fn test_create_existing_id_of_other_user_is_forbidden() {
+fn create_existing_id_of_other_user_is_forbidden() {
     let _s = setup_ownership();
 
     let id = create_note_as("alice", r#"{"title":"alice"}"#);
@@ -1550,7 +1550,7 @@ fn test_create_existing_id_of_other_user_is_forbidden() {
 }
 
 #[test]
-fn test_create_owner_can_rewrite_own_entity() {
+fn create_owner_can_rewrite_own_entity() {
     let _s = setup_ownership();
 
     let id = create_note_as("alice", r#"{"title":"alice"}"#);
@@ -1564,7 +1564,7 @@ fn test_create_owner_can_rewrite_own_entity() {
 }
 
 #[test]
-fn test_create_requires_create_permission() {
+fn create_requires_create_permission() {
     let _s = setup_ownership();
 
     let mut perms = acl::new_permissions();
@@ -1594,7 +1594,7 @@ fn test_create_requires_create_permission() {
 }
 
 #[test]
-fn test_create_core_entity_is_forbidden() {
+fn create_core_entity_is_forbidden() {
     let _s = setup_ownership();
 
     let mut ctx = new_user_ctx(
@@ -1617,7 +1617,7 @@ fn test_create_core_entity_is_forbidden() {
 }
 
 #[test]
-fn test_create_new_entity_type_uses_role_defaults() {
+fn create_new_entity_type_uses_role_defaults() {
     let _s = setup_ownership();
 
     if let Err(err) = security::init_admin_user_if_not_exists() {
@@ -1664,7 +1664,7 @@ fn get_note_as(username: &str, id: &str) -> RequestCtx {
 }
 
 #[test]
-fn test_get_by_id_cache_hit_checks_read_acl() {
+fn get_by_id_cache_hit_checks_read_acl() {
     let _s = setup_ownership();
     update_config(|cfg| cfg.api.cache.enabled = true);
 
@@ -1685,7 +1685,7 @@ fn test_get_by_id_cache_hit_checks_read_acl() {
 }
 
 #[test]
-fn test_get_by_id_filtered_response_is_not_cached() {
+fn get_by_id_filtered_response_is_not_cached() {
     let _s = setup();
     update_config(|cfg| cfg.api.cache.enabled = true);
 
@@ -1708,7 +1708,7 @@ fn test_get_by_id_filtered_response_is_not_cached() {
 }
 
 #[test]
-fn test_query_payload_hash_depends_on_count_only_fields_and_sort_order() {
+fn query_payload_hash_depends_on_count_only_fields_and_sort_order() {
     let base = api_controller::QueryPayload {
         entity: "book".to_string(),
         ..api_controller::QueryPayload::default()
@@ -1794,7 +1794,7 @@ fn leaf_value(node: &elysiandb::query::FilterNode, field: &str, op: &str) -> Str
 }
 
 #[test]
-fn test_parse_filter_node_typed_values() {
+fn parse_filter_node_typed_values() {
     let raw = doc(r#"{"year":{"eq":1983.0,"lt":2000.5},"color":{"eq":true},"title":{"eq":"C"}}"#);
     let node = match api_controller::parse_filter_node(Some(&raw)) {
         Ok(node) => node,
@@ -1826,7 +1826,7 @@ fn test_parse_filter_node_typed_values() {
 }
 
 #[test]
-fn test_query_controller_returns_json_errors() {
+fn query_controller_returns_json_errors() {
     let _s = setup();
 
     for body in [
@@ -1853,7 +1853,7 @@ fn test_query_controller_returns_json_errors() {
 }
 
 #[test]
-fn test_query_controller_rejects_core_entities() {
+fn query_controller_rejects_core_entities() {
     let _s = setup();
 
     let ctx = query(r#"{"entity":"_elysiandb_core_user"}"#);
@@ -1864,7 +1864,7 @@ fn test_query_controller_rejects_core_entities() {
 }
 
 #[test]
-fn test_reject_core_entity() {
+fn reject_core_entity() {
     let called = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let flag = called.clone();
     let h = api_controller::reject_core_entity(Arc::new(move |_ctx: &mut RequestCtx| {

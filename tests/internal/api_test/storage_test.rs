@@ -14,7 +14,7 @@ fn list(entity: &str, f: Option<&elysiandb::query::Filters>) -> Vec<Map> {
 }
 
 #[test]
-fn test_write_and_read_entity_by_id() {
+fn write_and_read_entity_by_id() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -42,7 +42,7 @@ fn test_write_and_read_entity_by_id() {
 }
 
 #[test]
-fn test_read_all_entities() {
+fn read_all_entities() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -61,7 +61,7 @@ fn test_read_all_entities() {
 }
 
 #[test]
-fn test_update_entity_by_id_merges_and_persists() {
+fn update_entity_by_id_merges_and_persists() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -85,7 +85,7 @@ fn test_update_entity_by_id_merges_and_persists() {
 }
 
 #[test]
-fn test_delete_entity_by_id_removes_single() {
+fn delete_entity_by_id_removes_single() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -103,7 +103,7 @@ fn test_delete_entity_by_id_removes_single() {
 }
 
 #[test]
-fn test_delete_all_entities_removes_all_for_that_entity_only() {
+fn delete_all_entities_removes_all_for_that_entity_only() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -123,7 +123,7 @@ fn test_delete_all_entities_removes_all_for_that_entity_only() {
 }
 
 #[test]
-fn test_list_entities_with_filters() {
+fn list_entities_with_filters() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -179,7 +179,7 @@ fn test_list_entities_with_filters() {
 }
 
 #[test]
-fn test_list_entities_with_nested_filters() {
+fn list_entities_with_nested_filters() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -233,7 +233,7 @@ fn test_list_entities_with_nested_filters() {
 }
 
 #[test]
-fn test_list_entities_with_numeric_filters() {
+fn list_entities_with_numeric_filters() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -258,7 +258,7 @@ fn test_list_entities_with_numeric_filters() {
 }
 
 #[test]
-fn test_offset_limit_and_sort() {
+fn offset_limit_and_sort() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -273,7 +273,7 @@ fn test_offset_limit_and_sort() {
 }
 
 #[test]
-fn test_entity_exists_true() {
+fn entity_exists_true() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -285,7 +285,7 @@ fn test_entity_exists_true() {
 }
 
 #[test]
-fn test_entity_exists_false() {
+fn entity_exists_false() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -297,7 +297,7 @@ fn test_entity_exists_false() {
 }
 
 #[test]
-fn test_entity_exists_wrong_entity() {
+fn entity_exists_wrong_entity() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -309,7 +309,7 @@ fn test_entity_exists_wrong_entity() {
 }
 
 #[test]
-fn test_entity_exists_empty_store() {
+fn entity_exists_empty_store() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -319,7 +319,7 @@ fn test_entity_exists_empty_store() {
 }
 
 #[test]
-fn test_entity_types_and_exists() {
+fn entity_types_and_exists() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -335,7 +335,7 @@ fn test_entity_types_and_exists() {
 }
 
 #[test]
-fn test_write_list_and_update_list() {
+fn write_list_and_update_list() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -372,7 +372,7 @@ fn test_write_list_and_update_list() {
 }
 
 #[test]
-fn test_delete_all_and_count_all() {
+fn delete_all_and_count_all() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -392,7 +392,7 @@ fn test_delete_all_and_count_all() {
 }
 
 #[test]
-fn test_dump_all_and_import_all() {
+fn dump_all_and_import_all() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -421,7 +421,7 @@ fn test_dump_all_and_import_all() {
 }
 
 #[test]
-fn test_list_entities_auto_include_nested() {
+fn list_entities_auto_include_nested() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -452,7 +452,7 @@ fn test_list_entities_auto_include_nested() {
 }
 
 #[test]
-fn test_list_entities_filter_excludes_missing_field() {
+fn list_entities_filter_excludes_missing_field() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -470,7 +470,7 @@ fn test_list_entities_filter_excludes_missing_field() {
 }
 
 #[test]
-fn test_list_entities_filter_traverses_arrays() {
+fn list_entities_filter_traverses_arrays() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -488,7 +488,7 @@ fn test_list_entities_filter_traverses_arrays() {
 }
 
 #[test]
-fn test_list_entities_filter_on_relation_list() {
+fn list_entities_filter_on_relation_list() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -523,7 +523,7 @@ fn test_list_entities_filter_on_relation_list() {
 }
 
 #[test]
-fn test_list_entities_auto_include_deep_nested() {
+fn list_entities_auto_include_deep_nested() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -558,7 +558,7 @@ fn test_list_entities_auto_include_deep_nested() {
 }
 
 #[test]
-fn test_create_entity_type() {
+fn create_entity_type() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -577,7 +577,7 @@ fn test_create_entity_type() {
 }
 
 #[test]
-fn test_delete_entity_type() {
+fn delete_entity_type() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -605,7 +605,7 @@ fn test_delete_entity_type() {
 }
 
 #[test]
-fn test_update_entity_schema() {
+fn update_entity_schema() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -634,7 +634,7 @@ fn test_update_entity_schema() {
 }
 
 #[test]
-fn test_get_list_of_ids_no_sort_field() {
+fn get_list_of_ids_no_sort_field() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -649,7 +649,7 @@ fn test_get_list_of_ids_no_sort_field() {
 }
 
 #[test]
-fn test_get_entity_schema() {
+fn get_entity_schema() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -665,7 +665,7 @@ fn test_get_entity_schema() {
 }
 
 #[test]
-fn test_update_schema_if_needed_disabled() {
+fn update_schema_if_needed_disabled() {
     let _s = setup();
     let _db = init_test_store();
     set_schema(false, false);
@@ -678,7 +678,7 @@ fn test_update_schema_if_needed_disabled() {
 }
 
 #[test]
-fn test_update_schema_if_needed_enabled() {
+fn update_schema_if_needed_enabled() {
     let _s = setup();
     let _db = init_test_store();
     set_schema(true, false);
@@ -691,7 +691,7 @@ fn test_update_schema_if_needed_enabled() {
 }
 
 #[test]
-fn test_write_list_of_entities_returns_validation_errors() {
+fn write_list_of_entities_returns_validation_errors() {
     let _s = setup();
     let _db = init_test_store();
     set_schema(true, true);
@@ -714,7 +714,7 @@ fn test_write_list_of_entities_returns_validation_errors() {
 }
 
 #[test]
-fn test_list_entities_includes_param() {
+fn list_entities_includes_param() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -732,7 +732,7 @@ fn test_list_entities_includes_param() {
 }
 
 #[test]
-fn test_list_entities_empty() {
+fn list_entities_empty() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -743,7 +743,7 @@ fn test_list_entities_empty() {
 }
 
 #[test]
-fn test_delete_all_entities_removes_indexes_too() {
+fn delete_all_entities_removes_indexes_too() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -758,7 +758,7 @@ fn test_delete_all_entities_removes_indexes_too() {
 }
 
 #[test]
-fn test_get_entity_schema_no_schema() {
+fn get_entity_schema_no_schema() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -768,7 +768,7 @@ fn test_get_entity_schema_no_schema() {
 }
 
 #[test]
-fn test_dump_all_empty() {
+fn dump_all_empty() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -779,7 +779,7 @@ fn test_dump_all_empty() {
 }
 
 #[test]
-fn test_import_all_multiple_entities() {
+fn import_all_multiple_entities() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -797,7 +797,7 @@ fn test_import_all_multiple_entities() {
 }
 
 #[test]
-fn test_update_entity_by_id_no_existing() {
+fn update_entity_by_id_no_existing() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -807,7 +807,7 @@ fn test_update_entity_by_id_no_existing() {
 }
 
 #[test]
-fn test_update_entity_by_id_keeps_manual_schema_in_strict_mode() {
+fn update_entity_by_id_keeps_manual_schema_in_strict_mode() {
     let _s = setup();
     let _db = init_test_store();
     set_schema(true, true);
@@ -846,7 +846,7 @@ fn test_update_entity_by_id_keeps_manual_schema_in_strict_mode() {
 }
 
 #[test]
-fn test_update_entity_by_id_updates_inferred_schema() {
+fn update_entity_by_id_updates_inferred_schema() {
     let _s = setup();
     let _db = init_test_store();
     set_schema(true, false);
@@ -865,7 +865,7 @@ fn test_update_entity_by_id_updates_inferred_schema() {
 }
 
 #[test]
-fn test_write_entity_auto_id_assignment() {
+fn write_entity_auto_id_assignment() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -883,7 +883,7 @@ fn test_write_entity_auto_id_assignment() {
 }
 
 #[test]
-fn test_write_entity_skip_schema_updates_for_manual_strict() {
+fn write_entity_skip_schema_updates_for_manual_strict() {
     let _s = setup();
     let _db = init_test_store();
     set_schema(true, true);
@@ -904,7 +904,7 @@ fn with_fields(base: &Map, extra: &str) -> Map {
 }
 
 #[test]
-fn test_sub_entity_references_keep_target_fields() {
+fn sub_entity_references_keep_target_fields() {
     let _s = setup();
     let movie = doc(r#"{"id":"m1","title":"Blade Runner","year":1982.0,"rating":8.0}"#);
     let person = doc(r#"{"id":"p1","name":"Ridley Scott","born":1937.0,"country":"UK"}"#);
@@ -976,7 +976,7 @@ fn test_sub_entity_references_keep_target_fields() {
 }
 
 #[test]
-fn test_write_entity_sub_entity_without_id_is_created() {
+fn write_entity_sub_entity_without_id_is_created() {
     let _s = setup();
     let _db = init_test_store();
 

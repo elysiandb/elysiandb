@@ -217,7 +217,7 @@ fn reopen_and_check(label: &str, dir: &Path, image: &MemFs, acked: &Ledger) {
 }
 
 #[test]
-fn test_every_crash_point_keeps_acknowledged_writes() {
+fn every_crash_point_keeps_acknowledged_writes() {
     const STEPS: usize = 70;
     let tmp = TempDir::new();
     let dir = tmp.path();
@@ -247,7 +247,7 @@ fn test_every_crash_point_keeps_acknowledged_writes() {
 }
 
 #[test]
-fn test_state_survives_repeated_restarts() {
+fn state_survives_repeated_restarts() {
     let tmp = TempDir::new();
     let dir = tmp.path();
     let mut fs = new_mem_fs();

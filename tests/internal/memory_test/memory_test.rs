@@ -28,7 +28,7 @@ impl fmt::Display for ClientLeft {
 impl StdError for ClientLeft {}
 
 #[test]
-fn test_shares_follow_the_budget() {
+fn shares_follow_the_budget() {
     memory::configure(1 << 40);
     let _cleanup = Cleanup(|| memory::configure(0));
 
@@ -57,7 +57,7 @@ fn test_shares_follow_the_budget() {
 }
 
 #[test]
-fn test_without_a_budget_nothing_is_limited() {
+fn without_a_budget_nothing_is_limited() {
     memory::configure(0);
 
     assert!(
@@ -73,7 +73,7 @@ fn test_without_a_budget_nothing_is_limited() {
 }
 
 #[test]
-fn test_acquire_waits_then_gives_up() {
+fn acquire_waits_then_gives_up() {
     memory::configure(1 << 40);
     let _cleanup = Cleanup(|| memory::configure(0));
 
@@ -117,7 +117,7 @@ fn test_acquire_waits_then_gives_up() {
 }
 
 #[test]
-fn test_pressure_follows_the_process() {
+fn pressure_follows_the_process() {
     memory::configure(1 << 20);
     let _cleanup = Cleanup(|| memory::configure(0));
 

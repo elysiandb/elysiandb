@@ -109,7 +109,7 @@ fn abandon() {
 }
 
 #[test]
-fn test_commit_is_atomic_across_a_crash() {
+fn commit_is_atomic_across_a_crash() {
     let _s = serial();
     for torn in [false, true] {
         let dir = TempDir::new();
@@ -154,7 +154,7 @@ fn test_commit_is_atomic_across_a_crash() {
 }
 
 #[test]
-fn test_commit_is_one_batch() {
+fn commit_is_one_batch() {
     let _s = serial();
     let dir = TempDir::new();
     let folder = dir.path();

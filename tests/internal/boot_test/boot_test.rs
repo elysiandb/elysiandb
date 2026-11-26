@@ -103,7 +103,7 @@ fn object(text: &str) -> Map {
 }
 
 #[test]
-fn test_log_configuration() {
+fn log_configuration() {
     let _log = setup_log();
     let dir = TempDir::new();
     config(dir.path(), |cfg| {
@@ -135,7 +135,7 @@ fn test_log_configuration() {
 }
 
 #[test]
-fn test_warn_if_authentication_is_off_on_public_address() {
+fn warn_if_authentication_is_off_on_public_address() {
     let _log = setup_log();
 
     let first = TempDir::new();
@@ -166,7 +166,7 @@ fn test_warn_if_authentication_is_off_on_public_address() {
 }
 
 #[test]
-fn test_monitoring_sources() {
+fn monitoring_sources() {
     let dir = TempDir::new();
     config(dir.path(), |_| {});
     storage::load_db();
@@ -255,7 +255,7 @@ impl Drop for MetricsGuard {
 }
 
 #[test]
-fn test_boot_monitoring_starts_the_sampler() {
+fn boot_monitoring_starts_the_sampler() {
     let dir = TempDir::new();
     config(dir.path(), |_| {});
     storage::load_db();
@@ -290,7 +290,7 @@ fn free_port() -> i64 {
 }
 
 #[test]
-fn test_http_handler_adds_request_ids_and_recovers_panics() {
+fn http_handler_adds_request_ids_and_recovers_panics() {
     let _log = setup_log();
     let dir = TempDir::new();
     config(dir.path(), |cfg| {
@@ -332,7 +332,7 @@ fn get_status(port: i64, path: &str) -> std::io::Result<u16> {
 }
 
 #[test]
-fn test_start_http() {
+fn start_http() {
     let _log = setup_log();
     let port = free_port();
     let dir = TempDir::new();
@@ -377,7 +377,7 @@ impl Drop for CloseGuard {
 }
 
 #[test]
-fn test_init_db_migrates_a024_folder_with_a_pending_recovery_log() {
+fn init_db_migrates_a024_folder_with_a_pending_recovery_log() {
     let seed = TempDir::new();
     config(seed.path(), |_| {});
     storage::load_db();
@@ -469,7 +469,7 @@ fn write_private(path: &std::path::Path, data: &[u8]) {
 }
 
 #[test]
-fn test_an_explicit_budget_stays_under_the_container_limit() {
+fn an_explicit_budget_stays_under_the_container_limit() {
     let _log = setup_log();
 
     let gb: i64 = 1 << 30;

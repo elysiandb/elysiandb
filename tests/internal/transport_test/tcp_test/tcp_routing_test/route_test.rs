@@ -67,7 +67,7 @@ fn set_config(cfg: Config) {
 }
 
 #[test]
-fn test_route_line_ping() {
+fn route_line_ping() {
     let _serial = serial();
     let c = FakeConn::default();
     let out = tcp_routing::route_line(b"PING", &c, &mut Session::default());
@@ -77,7 +77,7 @@ fn test_route_line_ping() {
 }
 
 #[test]
-fn test_route_line_exit() {
+fn route_line_exit() {
     let _serial = serial();
     let c = FakeConn::default();
     let out = tcp_routing::route_line(b"EXIT", &c, &mut Session::default());
@@ -90,7 +90,7 @@ fn test_route_line_exit() {
 }
 
 #[test]
-fn test_route_line_unknown() {
+fn route_line_unknown() {
     let _serial = serial();
     set_config(Config::default());
     let c = FakeConn::default();
@@ -101,7 +101,7 @@ fn test_route_line_unknown() {
 }
 
 #[test]
-fn test_route_line_requires_auth_when_authentication_is_enabled() {
+fn route_line_requires_auth_when_authentication_is_enabled() {
     let _serial = serial();
     let mut cfg = Config::default();
     cfg.security.authentication.enabled = true;
@@ -168,7 +168,7 @@ fn test_route_line_requires_auth_when_authentication_is_enabled() {
 }
 
 #[test]
-fn test_new_session_is_authenticated_without_authentication() {
+fn new_session_is_authenticated_without_authentication() {
     let _serial = serial();
     set_config(Config::default());
 
@@ -178,7 +178,7 @@ fn test_new_session_is_authenticated_without_authentication() {
 }
 
 #[test]
-fn test_command_name() {
+fn command_name() {
     let cases = [
         ("GET k\n", metrics::TCP_GET),
         ("get k\n", metrics::TCP_GET),

@@ -230,7 +230,7 @@ fn check(step: usize, tr: &Tree, m: &Model) {
 }
 
 #[test]
-fn test_random_operations_against_a_sorted_map() {
+fn random_operations_against_a_sorted_map() {
     let mut r = Rand::new(rand::new_source(1));
     let store = MemStore::new();
     let mut tr = Tree::new(loader(&store));
@@ -318,7 +318,7 @@ fn test_random_operations_against_a_sorted_map() {
 }
 
 #[test]
-fn test_from_sorted_matches_inserts() {
+fn from_sorted_matches_inserts() {
     let store = MemStore::new();
     let mut m = Model::new();
     let mut keys: Vec<Vec<u8>> = Vec::new();
@@ -349,7 +349,7 @@ fn test_from_sorted_matches_inserts() {
 }
 
 #[test]
-fn test_a_published_tree_never_changes() {
+fn a_published_tree_never_changes() {
     let tok = Token::new();
     let mut tr = Tree::new(None).with_token(Some(&tok));
     for i in 0..3000 {
@@ -394,7 +394,7 @@ fn test_a_published_tree_never_changes() {
 }
 
 #[test]
-fn test_encode_decode_round_trip() {
+fn encode_decode_round_trip() {
     let store = MemStore::new();
     let tok = Token::new();
     let mut tr = Tree::new(loader(&store)).with_token(Some(&tok));
@@ -434,7 +434,7 @@ fn test_encode_decode_round_trip() {
 }
 
 #[test]
-fn test_relocate_moves_only_victim_pages() {
+fn relocate_moves_only_victim_pages() {
     let store = MemStore::new();
     let mut m = Model::new();
     let tok = Token::new();

@@ -4,7 +4,7 @@ use elysiandb::gocompat::json::{self, Value};
 use super::{doc, setup, value};
 
 #[test]
-fn test_parse_migration_query_single_set() {
+fn parse_migration_query_single_set() {
     let _s = setup();
     let result = api::parse_migration_query(br#"[{"set": [{"name": "test"}]}]"#, b"users");
     if result.len() != 1 {
@@ -27,7 +27,7 @@ fn test_parse_migration_query_single_set() {
 }
 
 #[test]
-fn test_parse_migration_query_invalid_json() {
+fn parse_migration_query_invalid_json() {
     let _s = setup();
     let result = api::parse_migration_query(b"invalid json", b"users");
     if !result.is_empty() {
@@ -36,7 +36,7 @@ fn test_parse_migration_query_invalid_json() {
 }
 
 #[test]
-fn test_execute_migrations_unsupported_action() {
+fn execute_migrations_unsupported_action() {
     let _s = setup();
     let q = vec![MigrationQuery {
         entity: b"users".to_vec(),
@@ -50,7 +50,7 @@ fn test_execute_migrations_unsupported_action() {
 }
 
 #[test]
-fn test_parse_migration_query_object_syntax() {
+fn parse_migration_query_object_syntax() {
     let _s = setup();
     let raw = json::marshal(&value(r#"[{"set":{"age":30}}]"#)).expect("encode");
     let result = api::parse_migration_query(&raw, b"users");

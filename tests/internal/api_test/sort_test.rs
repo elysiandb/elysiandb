@@ -35,7 +35,7 @@ fn contains_exactly(got: &[String], want: &[&str]) -> bool {
 }
 
 #[test]
-fn test_get_sorted_entity_ids_by_field_int_asc_desc() {
+fn get_sorted_entity_ids_by_field_int_asc_desc() {
     check(
         "people",
         "age",
@@ -50,7 +50,7 @@ fn test_get_sorted_entity_ids_by_field_int_asc_desc() {
 }
 
 #[test]
-fn test_get_sorted_entity_ids_by_field_float_asc_desc() {
+fn get_sorted_entity_ids_by_field_float_asc_desc() {
     check(
         "scores",
         "score",
@@ -65,7 +65,7 @@ fn test_get_sorted_entity_ids_by_field_float_asc_desc() {
 }
 
 #[test]
-fn test_get_sorted_entity_ids_by_field_string_asc_desc() {
+fn get_sorted_entity_ids_by_field_string_asc_desc() {
     check(
         "cities",
         "name",
@@ -80,7 +80,7 @@ fn test_get_sorted_entity_ids_by_field_string_asc_desc() {
 }
 
 #[test]
-fn test_get_sorted_entity_ids_by_field_mixed_types_and_missing() {
+fn get_sorted_entity_ids_by_field_mixed_types_and_missing() {
     let _s = setup();
     let _db = init_test_store();
     write("mixed", r#"{"id":"m1","rank":10}"#);
@@ -106,7 +106,7 @@ fn test_get_sorted_entity_ids_by_field_mixed_types_and_missing() {
 }
 
 #[test]
-fn test_get_sorted_entity_ids_by_field_nested_fields() {
+fn get_sorted_entity_ids_by_field_nested_fields() {
     check(
         "books",
         "author.name",
@@ -121,7 +121,7 @@ fn test_get_sorted_entity_ids_by_field_nested_fields() {
 }
 
 #[test]
-fn test_get_sorted_entity_ids_by_field_date_asc_desc() {
+fn get_sorted_entity_ids_by_field_date_asc_desc() {
     check(
         "events",
         "date",
@@ -136,7 +136,7 @@ fn test_get_sorted_entity_ids_by_field_date_asc_desc() {
 }
 
 #[test]
-fn test_get_sorted_entity_ids_by_field_date_time_asc_desc() {
+fn get_sorted_entity_ids_by_field_date_time_asc_desc() {
     check(
         "events",
         "date",
@@ -151,7 +151,7 @@ fn test_get_sorted_entity_ids_by_field_date_time_asc_desc() {
 }
 
 #[test]
-fn test_get_sorted_entity_ids_by_field_nested_date_asc_desc() {
+fn get_sorted_entity_ids_by_field_nested_date_asc_desc() {
     check(
         "meetings",
         "schedule.start",

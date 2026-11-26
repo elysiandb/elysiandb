@@ -1,7 +1,7 @@
 use elysiandb::globals;
 
 #[test]
-fn test_api_entity_key() {
+fn api_entity_key() {
     let tests = [
         ("users", "api:entity:users"),
         ("posts", "api:entity:posts"),
@@ -19,7 +19,7 @@ fn test_api_entity_key() {
 }
 
 #[test]
-fn test_api_entities_all_key() {
+fn api_entities_all_key() {
     let tests = [
         ("users", "api:entity:users:*"),
         ("orders", "api:entity:orders:*"),
@@ -36,7 +36,7 @@ fn test_api_entities_all_key() {
 }
 
 #[test]
-fn test_api_single_entity_key() {
+fn api_single_entity_key() {
     let tests = [
         ("users", "123", "api:entity:users:id:123"),
         ("articles", "a1b2c3", "api:entity:articles:id:a1b2c3"),

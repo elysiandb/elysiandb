@@ -12,7 +12,7 @@ use super::tempdir::TempDir;
 use super::{Closer, doc, open, options, s};
 
 #[test]
-fn test_stats_answer_during_a_checkpoint() {
+fn stats_answer_during_a_checkpoint() {
     let tmp = TempDir::new();
     let mut opts = options(tmp.path());
     opts.segment_size = 0;
@@ -81,7 +81,7 @@ fn dir_bytes(dir: &Path) -> i64 {
 }
 
 #[test]
-fn test_disk_is_given_back_after_an_entity_is_emptied() {
+fn disk_is_given_back_after_an_entity_is_emptied() {
     let tmp = TempDir::new();
     let dir = tmp.path();
     let e = Closer(
@@ -146,7 +146,7 @@ fn test_disk_is_given_back_after_an_entity_is_emptied() {
 }
 
 #[test]
-fn test_a_reset_keeps_every_known_index_following_the_fill() {
+fn a_reset_keeps_every_known_index_following_the_fill() {
     let tmp = TempDir::new();
     let e = Closer(
         datastore::open(Options {

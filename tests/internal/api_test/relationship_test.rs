@@ -19,7 +19,7 @@ fn text<'a>(m: &'a Map, key: &str) -> Option<&'a str> {
 }
 
 #[test]
-fn test_extract_sub_entities_simple() {
+fn extract_sub_entities_simple() {
     let _s = setup();
     let mut data = doc(r#"{"name":"youyou","author":{"@entity":"author","fullname":"Taymour"}}"#);
     let subs = api::extract_sub_entities(b"article", &mut data);
@@ -47,7 +47,7 @@ fn test_extract_sub_entities_simple() {
 }
 
 #[test]
-fn test_extract_sub_entities_nested() {
+fn extract_sub_entities_nested() {
     let _s = setup();
     let mut data = doc(
         r#"{"name":"youyou","author":{"@entity":"author","fullname":"Taymour Negib","status":"writer","job":{"@entity":"job","designation":"Worker"}}}"#,
@@ -82,7 +82,7 @@ fn test_extract_sub_entities_nested() {
 }
 
 #[test]
-fn test_extract_sub_entities_array() {
+fn extract_sub_entities_array() {
     let _s = setup();
     let mut data = doc(
         r#"{"name":"youyou","age":13,"title":"this is it","authors":[{"@entity":"author","fullname":"Taymour Negib","status":"writer","job":{"@entity":"job","designation":"Worker"}},{"@entity":"author","fullname":"Alberto","status":"coco"}]}"#,
@@ -131,7 +131,7 @@ fn test_extract_sub_entities_array() {
 }
 
 #[test]
-fn test_extract_sub_entities_array_pure_reference() {
+fn extract_sub_entities_array_pure_reference() {
     let _s = setup();
     let mut data = doc(
         r#"{"label":"Box set","items":[{"@entity":"movie","id":"m1"},{"@entity":"movie","@id":"m2"},{"@entity":"movie","id":"m3","title":"Alien"}]}"#,
@@ -162,7 +162,7 @@ fn test_extract_sub_entities_array_pure_reference() {
 }
 
 #[test]
-fn test_merge_with_existing() {
+fn merge_with_existing() {
     let _s = setup();
     let sub = doc(r#"{"id":"m1","rating":10.0}"#);
     let got = api::merge_with_existing(sub.clone(), None);

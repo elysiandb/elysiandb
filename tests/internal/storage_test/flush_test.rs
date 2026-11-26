@@ -37,7 +37,7 @@ fn error_lines() -> Vec<Arc<log::Entry>> {
 }
 
 #[test]
-fn test_failed_checkpoint_is_reported_and_retried() {
+fn failed_checkpoint_is_reported_and_retried() {
     if unsafe { libc::geteuid() } == 0 {
         return;
     }

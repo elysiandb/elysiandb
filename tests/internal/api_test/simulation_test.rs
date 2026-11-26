@@ -11,7 +11,7 @@ fn new_simulation() -> WriteSimulation<'static> {
 }
 
 #[test]
-fn test_write_simulation_tracks_schema_evolution() {
+fn write_simulation_tracks_schema_evolution() {
     let _s = setup();
     let _db = init_test_store();
     set_schema(true, false);
@@ -31,7 +31,7 @@ fn test_write_simulation_tracks_schema_evolution() {
 }
 
 #[test]
-fn test_write_simulation_uses_stored_schema() {
+fn write_simulation_uses_stored_schema() {
     let _s = setup();
     let _db = init_test_store();
     set_schema(true, false);
@@ -44,7 +44,7 @@ fn test_write_simulation_uses_stored_schema() {
 }
 
 #[test]
-fn test_write_simulation_tracks_existence() {
+fn write_simulation_tracks_existence() {
     let _s = setup();
     let _db = init_test_store();
     set_schema(true, false);
@@ -72,7 +72,7 @@ fn test_write_simulation_tracks_existence() {
 }
 
 #[test]
-fn test_write_simulation_tracks_sub_entities() {
+fn write_simulation_tracks_sub_entities() {
     let _s = setup();
     let _db = init_test_store();
     set_schema(true, false);
@@ -90,7 +90,7 @@ fn test_write_simulation_tracks_sub_entities() {
 }
 
 #[test]
-fn test_nested_entity_types() {
+fn nested_entity_types() {
     let _s = setup();
     let data = value(
         r#"{"author":{"@entity":"author","id":"a1","job":{"@entity":"job","id":"j1"}},"tags":[{"@entity":"tag","id":"t1"},{"@entity":"author","id":"a2"},"plain"],"meta":{"x":1.0}}"#,
@@ -111,7 +111,7 @@ fn test_nested_entity_types() {
 }
 
 #[test]
-fn test_write_simulation_sub_entities_follow_the_storage_rules() {
+fn write_simulation_sub_entities_follow_the_storage_rules() {
     let _s = setup();
     let _db = init_test_store();
     set_schema(true, false);

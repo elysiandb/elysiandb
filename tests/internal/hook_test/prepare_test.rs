@@ -37,7 +37,7 @@ fn wait_for_index(entity: &str, name: &str) -> IndexState {
 }
 
 #[test]
-fn test_hooks_get_their_query_indexes_in_advance_and_keep_them() {
+fn hooks_get_their_query_indexes_in_advance_and_keep_them() {
     let _s = setup(true);
     hook::init_hooks();
 
@@ -98,7 +98,7 @@ fn test_hooks_get_their_query_indexes_in_advance_and_keep_them() {
 }
 
 #[test]
-fn test_dynamic_hook_queries_are_prepared_at_first_run() {
+fn dynamic_hook_queries_are_prepared_at_first_run() {
     let _s = setup(true);
     hook::init_hooks();
 

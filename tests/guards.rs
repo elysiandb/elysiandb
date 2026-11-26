@@ -405,8 +405,62 @@ fn snake_case(go_name: &str) -> String {
     out
 }
 
-fn rust_key(name: &str) -> String {
-    name.strip_prefix("test_").unwrap_or(name).to_string()
+fn package_problems(package: &str, go_names: &[String], rust_names: &[String]) -> Vec<String> {
+    let mut problems = Vec::new();
+    let mut translated: BTreeMap<&str, usize> = BTreeMap::new();
+    for name in rust_names {
+        *translated.entry(name.as_str()).or_default() += 1;
+    }
+
+    let mut wanted = BTreeSet::new();
+    for name in go_names {
+        let key = snake_case(name);
+        match translated.get(key.as_str()).copied().unwrap_or(0) {
+            1 => {}
+            0 => problems.push(format!("{package}: {name} is not translated as {key}")),
+            n => problems.push(format!("{package}: {name} is translated {n} times")),
+        }
+        if !wanted.insert(key) {
+            problems.push(format!("{package}: {name} collides with another Go name"));
+        }
+    }
+
+    for name in rust_names {
+        if wanted.contains(name) {
+            continue;
+        }
+        match name.strip_prefix("test_") {
+            Some(bare) if wanted.contains(bare) => problems.push(format!(
+                "{package}: {name} keeps the test_ prefix, the Go name gives {bare}"
+            )),
+            _ => problems.push(format!("{package}: {name} is not a Go test")),
+        }
+    }
+
+    problems
+}
+
+#[test]
+fn a_translated_target_holds_only_the_go_tests_under_their_bare_names() {
+    let go = ["TestCount".to_string(), "TestTestMode".to_string()];
+    let names = |list: &[&str]| -> Vec<String> { list.iter().map(|n| n.to_string()).collect() };
+
+    assert!(package_problems("p", &go, &names(&["count", "test_mode"])).is_empty());
+    assert_eq!(
+        package_problems("p", &go, &names(&["test_count", "test_mode"])),
+        [
+            "p: TestCount is not translated as count",
+            "p: test_count keeps the test_ prefix, the Go name gives count",
+        ]
+    );
+    assert_eq!(
+        package_problems("p", &go, &names(&["count", "test_mode", "extra"])),
+        ["p: extra is not a Go test"]
+    );
+    assert_eq!(
+        package_problems("p", &go, &names(&["count", "count", "test_mode"])),
+        ["p: TestCount is translated 2 times"]
+    );
 }
 
 #[test]
@@ -498,31 +552,7 @@ fn every_go_test_is_translated_once_under_its_name() {
 
         let mut files = Vec::new();
         collect_files(&target, true, &mut files);
-        let rust_names = test_functions(&files);
-
-        let mut translated: BTreeMap<String, Vec<&str>> = BTreeMap::new();
-        for name in &rust_names {
-            translated.entry(rust_key(name)).or_default().push(name);
-        }
-
-        let mut wanted = BTreeSet::new();
-        for name in go_names {
-            let key = snake_case(name);
-            match translated.get(&key).map(Vec::len).unwrap_or(0) {
-                1 => {}
-                0 => problems.push(format!("{package}: {name} is not translated as {key}")),
-                n => problems.push(format!("{package}: {name} is translated {n} times")),
-            }
-            if !wanted.insert(key) {
-                problems.push(format!("{package}: {name} collides with another Go name"));
-            }
-        }
-
-        for name in &rust_names {
-            if !wanted.contains(&rust_key(name)) {
-                problems.push(format!("{package}: {name} is not a Go test"));
-            }
-        }
+        problems.extend(package_problems(package, go_names, &test_functions(&files)));
     }
 
     assert!(problems.is_empty(), "{}", problems.join("\n"));

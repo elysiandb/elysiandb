@@ -20,7 +20,7 @@ fn index_kinds(entity: &str) -> BTreeSet<String> {
 }
 
 #[test]
-fn test_the_advisor_turns_low_cardinality_filters_into_bitmaps() {
+fn the_advisor_turns_low_cardinality_filters_into_bitmaps() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -196,7 +196,7 @@ fn check_composite(label: &str) {
 }
 
 #[test]
-fn test_composite_indexes_page_like_the_sort_index() {
+fn composite_indexes_page_like_the_sort_index() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -243,7 +243,7 @@ fn test_composite_indexes_page_like_the_sort_index() {
 }
 
 #[test]
-fn test_query_shapes_create_composite_indexes() {
+fn query_shapes_create_composite_indexes() {
     let _s = setup();
     let _db = init_test_store();
 

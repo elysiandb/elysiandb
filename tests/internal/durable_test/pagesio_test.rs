@@ -141,7 +141,7 @@ fn fill_tree(store: &Arc<PageStore>, n: usize, padding: usize) -> Tree {
 }
 
 #[test]
-fn test_page_reads_do_not_wait_for_a_sync() {
+fn page_reads_do_not_wait_for_a_sync() {
     let fs = GateFs::new(new_mem_fs());
     let dir = TempDir::new();
     let store = match durable::open_page_store(Some(Arc::new(fs.clone())), dir.path(), 1 << 30, 0) {
@@ -199,7 +199,7 @@ fn test_page_reads_do_not_wait_for_a_sync() {
 }
 
 #[test]
-fn test_pages_are_synced_in_slices_with_a_pause() {
+fn pages_are_synced_in_slices_with_a_pause() {
     let fs = GateFs::new(new_mem_fs());
     let dir = TempDir::new();
     let store = match durable::open_page_store(Some(Arc::new(fs.clone())), dir.path(), 1 << 30, 0) {

@@ -63,7 +63,7 @@ fn folder_bytes(dir: &Path) -> i64 {
 }
 
 #[test]
-fn test_nothing_drifts_at_constant_volume() {
+fn nothing_drifts_at_constant_volume() {
     let tmp = TempDir::new();
     let folder = tmp.path();
     let mut opts = options(folder);

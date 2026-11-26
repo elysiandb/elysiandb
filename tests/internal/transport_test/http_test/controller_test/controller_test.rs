@@ -55,7 +55,7 @@ fn put(key: &str, value: &str) {
 }
 
 #[test]
-fn test_health_controller() {
+fn health_controller() {
     let _store = setup();
 
     let mut ctx = new_ctx("GET", "/health", "");
@@ -65,7 +65,7 @@ fn test_health_controller() {
 }
 
 #[test]
-fn test_put_and_get() {
+fn put_and_get() {
     let _store = setup();
 
     let mut ctx = new_ctx("PUT", "/kv/foo", "bar");
@@ -82,7 +82,7 @@ fn test_put_and_get() {
 }
 
 #[test]
-fn test_delete_key_controller() {
+fn delete_key_controller() {
     let _store = setup();
 
     put("a", "1");
@@ -95,7 +95,7 @@ fn test_delete_key_controller() {
 }
 
 #[test]
-fn test_reset_controller() {
+fn reset_controller() {
     let _store = setup();
 
     put("x", "y");
@@ -111,7 +111,7 @@ fn test_reset_controller() {
 }
 
 #[test]
-fn test_save_controller() {
+fn save_controller() {
     let _store = setup();
 
     let mut ctx = new_ctx("POST", "/save", "");
@@ -121,7 +121,7 @@ fn test_save_controller() {
 }
 
 #[test]
-fn test_multi_get_controller() {
+fn multi_get_controller() {
     let _store = setup();
 
     put("a", "1");
@@ -140,7 +140,7 @@ fn test_multi_get_controller() {
 }
 
 #[test]
-fn test_wildcard_get_controller() {
+fn wildcard_get_controller() {
     let _store = setup();
 
     put("a1", "x");
@@ -162,7 +162,7 @@ fn test_wildcard_get_controller() {
 }
 
 #[test]
-fn test_stats_controller() {
+fn stats_controller() {
     let _store = setup();
 
     let mut ctx = new_ctx("GET", "/stats", "");
@@ -175,7 +175,7 @@ fn test_stats_controller() {
 }
 
 #[test]
-fn test_get_config_controller() {
+fn get_config_controller() {
     let _store = setup();
 
     let mut ctx = new_ctx("GET", "/config", "");

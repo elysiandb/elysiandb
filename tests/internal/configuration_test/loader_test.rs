@@ -4,7 +4,7 @@ use super::serial;
 use super::tempdir::TempDir;
 
 #[test]
-fn test_load_config_ok() {
+fn load_config_ok() {
     let _serial = serial();
     let tmp = TempDir::new();
     let folder = tmp.path().to_string_lossy().into_owned();
@@ -74,7 +74,7 @@ log:
 }
 
 #[test]
-fn test_load_config_file_missing_returns_error() {
+fn load_config_file_missing_returns_error() {
     let _serial = serial();
     let tmp = TempDir::new();
     let result = load_config(&tmp.path().join("this-file-does-not-exist.yaml"));
@@ -85,7 +85,7 @@ fn test_load_config_file_missing_returns_error() {
 }
 
 #[test]
-fn test_load_config_invalid_yaml_returns_error() {
+fn load_config_invalid_yaml_returns_error() {
     let _serial = serial();
     let tmp = TempDir::new();
     let path = tmp.path().join("bad.yaml");
@@ -101,7 +101,7 @@ fn test_load_config_invalid_yaml_returns_error() {
 }
 
 #[test]
-fn test_load_config_log_defaults() {
+fn load_config_log_defaults() {
     let _serial = serial();
     let tmp = TempDir::new();
     let path = tmp.path().join("elysian.yaml");
@@ -127,7 +127,7 @@ fn test_load_config_log_defaults() {
 }
 
 #[test]
-fn test_load_config_log_values() {
+fn load_config_log_values() {
     let _serial = serial();
     let tmp = TempDir::new();
     let path = tmp.path().join("elysian.yaml");
@@ -158,7 +158,7 @@ fn test_load_config_log_values() {
 }
 
 #[test]
-fn test_load_config_rejects_invalid_log_values() {
+fn load_config_rejects_invalid_log_values() {
     let _serial = serial();
     let cases = [
         ("bufferLines", "log:\n  bufferLines: -5\n"),
@@ -177,7 +177,7 @@ fn test_load_config_rejects_invalid_log_values() {
 }
 
 #[test]
-fn test_load_config_query_overload_settings() {
+fn load_config_query_overload_settings() {
     let _serial = serial();
     let tmp = TempDir::new();
     let write = |content: &str| {

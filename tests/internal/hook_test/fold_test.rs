@@ -181,7 +181,7 @@ pub fn compare_budget(months: i64, label: &str) {
 }
 
 #[test]
-fn test_budget_fold_answers_like_the_script() {
+fn budget_fold_answers_like_the_script() {
     let _s = setup(true);
     api::create_entity_type(b"purchase").expect("create purchase");
 
@@ -224,7 +224,7 @@ fn test_budget_fold_answers_like_the_script() {
 }
 
 #[test]
-fn test_progress_fold_answers_like_the_script() {
+fn progress_fold_answers_like_the_script() {
     let _s = setup(true);
     api::create_entity_type(b"step").expect("create step");
 
@@ -290,7 +290,7 @@ fn test_progress_fold_answers_like_the_script() {
 }
 
 #[test]
-fn test_fold_falls_back_on_values_it_does_not_handle() {
+fn fold_falls_back_on_values_it_does_not_handle() {
     let _s = setup(true);
     api::create_entity_type(b"step").expect("create step");
 
@@ -344,7 +344,7 @@ fn test_fold_falls_back_on_values_it_does_not_handle() {
 }
 
 #[test]
-fn test_kept_results_do_not_survive_their_engine() {
+fn kept_results_do_not_survive_their_engine() {
     let script = r#"function postRead(ctx) {
   ctx.entity.ids = ctx.query("twice", {}).map(function (d) { return d.id }).join(",")
 }"#;
@@ -374,7 +374,7 @@ fn test_kept_results_do_not_survive_their_engine() {
 }
 
 #[test]
-fn test_fold_stays_exact_under_concurrent_writes() {
+fn fold_stays_exact_under_concurrent_writes() {
     let _s = setup(true);
     api::create_entity_type(b"purchase").expect("create purchase");
 
@@ -414,7 +414,7 @@ fn test_fold_stays_exact_under_concurrent_writes() {
 }
 
 #[test]
-fn test_results_follow_the_entities_reached_by_their_filters() {
+fn results_follow_the_entities_reached_by_their_filters() {
     let _s = setup(true);
     let _ = api::create_entity_type(b"author");
     let _ = api::create_entity_type(b"book");
@@ -454,7 +454,7 @@ fn test_results_follow_the_entities_reached_by_their_filters() {
 }
 
 #[test]
-fn test_equality_keys_cover_every_kind_of_value() {
+fn equality_keys_cover_every_kind_of_value() {
     let _s = setup(true);
     let _ = api::create_entity_type(b"mixed");
 
@@ -573,7 +573,7 @@ fn test_equality_keys_cover_every_kind_of_value() {
 }
 
 #[test]
-fn test_views_follow_writes_before_any_read() {
+fn views_follow_writes_before_any_read() {
     let _s = setup(true);
     storage::open(storage::MODE_SERVER).expect("open");
     hook::init_hooks();

@@ -40,7 +40,7 @@ pub fn res_ids(res: &api::ListResult<'_>) -> Vec<String> {
 }
 
 #[test]
-fn test_concurrent_writes_to_one_entity_lose_no_id() {
+fn concurrent_writes_to_one_entity_lose_no_id() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -83,7 +83,7 @@ fn test_concurrent_writes_to_one_entity_lose_no_id() {
 }
 
 #[test]
-fn test_write_during_an_index_build_is_in_the_index() {
+fn write_during_an_index_build_is_in_the_index() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -118,7 +118,7 @@ fn test_write_during_an_index_build_is_in_the_index() {
 }
 
 #[test]
-fn test_sort_ties_come_in_insertion_order_and_missing_values_last() {
+fn sort_ties_come_in_insertion_order_and_missing_values_last() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -188,7 +188,7 @@ fn test_sort_ties_come_in_insertion_order_and_missing_values_last() {
 }
 
 #[test]
-fn test_indexes_follow_updates_deletes_and_resets() {
+fn indexes_follow_updates_deletes_and_resets() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -248,7 +248,7 @@ fn test_indexes_follow_updates_deletes_and_resets() {
 }
 
 #[test]
-fn test_index_keys_for_the_documented_entity_keys() {
+fn index_keys_for_the_documented_entity_keys() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -404,7 +404,7 @@ pub fn random_leaf(r: &mut Rand) -> Filters {
 }
 
 #[test]
-fn test_planner_matches_the_scan_on_random_documents_and_filters() {
+fn planner_matches_the_scan_on_random_documents_and_filters() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -502,7 +502,7 @@ fn test_planner_matches_the_scan_on_random_documents_and_filters() {
 }
 
 #[test]
-fn test_search_index_matches_the_scan() {
+fn search_index_matches_the_scan() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -592,7 +592,7 @@ fn test_search_index_matches_the_scan() {
 }
 
 #[test]
-fn test_unfiltered_pages_and_counts_use_the_live_set() {
+fn unfiltered_pages_and_counts_use_the_live_set() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -646,7 +646,7 @@ fn test_unfiltered_pages_and_counts_use_the_live_set() {
 }
 
 #[test]
-fn test_filters_through_references_match_the_scan() {
+fn filters_through_references_match_the_scan() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -771,7 +771,7 @@ fn test_filters_through_references_match_the_scan() {
 }
 
 #[test]
-fn test_sorted_pages_match_the_query_api_comparator() {
+fn sorted_pages_match_the_query_api_comparator() {
     let _s = setup();
     let _db = init_test_store();
 

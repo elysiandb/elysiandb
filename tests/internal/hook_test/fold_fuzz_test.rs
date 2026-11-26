@@ -207,7 +207,7 @@ fn run_both(script: &str, id: &str) -> (String, String) {
 }
 
 #[test]
-fn test_fold_matches_the_script_on_random_scripts() {
+fn fold_matches_the_script_on_random_scripts() {
     let _s = setup(true);
     api::create_entity_type(b"fuzz").expect("create fuzz");
 
@@ -299,7 +299,7 @@ fn make2(r: &mut Rand, filters: &[&str], n: usize) -> Vec<String> {
 }
 
 #[test]
-fn test_results_stay_valid_across_writes_to_other_keys() {
+fn results_stay_valid_across_writes_to_other_keys() {
     let _s = setup(true);
     api::create_entity_type(b"step").expect("create step");
 

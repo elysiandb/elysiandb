@@ -41,7 +41,7 @@ fn bulk(r: &mut Rand, from: usize, n: usize) {
 }
 
 #[test]
-fn test_bulk_writes_answer_like_a_scan() {
+fn bulk_writes_answer_like_a_scan() {
     let _s = setup();
     let (_db, e) = open_background_store();
     let mut r = Rand::new(rand::new_source(11));
@@ -97,7 +97,7 @@ fn test_bulk_writes_answer_like_a_scan() {
 }
 
 #[test]
-fn test_reads_during_bulk_writes_never_see_an_old_index() {
+fn reads_during_bulk_writes_never_see_an_old_index() {
     let _s = setup();
     let (_db, e) = open_background_store();
     ensure(&e, b"live", &IndexSpec::new(INDEX_FILTER, "tag"));
@@ -168,7 +168,7 @@ fn test_reads_during_bulk_writes_never_see_an_old_index() {
 }
 
 #[test]
-fn test_an_index_in_backlog_is_rebuilt_after_a_crash() {
+fn an_index_in_backlog_is_rebuilt_after_a_crash() {
     let _s = setup();
     let _db = init_test_store();
     let Some(current) = storage::engine() else {
@@ -243,7 +243,7 @@ fn test_an_index_in_backlog_is_rebuilt_after_a_crash() {
 }
 
 #[test]
-fn test_log_replay_keeps_indexes_exact() {
+fn log_replay_keeps_indexes_exact() {
     let _s = setup();
     let (_db, e) = open_background_store();
     let mut r = Rand::new(rand::new_source(23));

@@ -21,7 +21,7 @@ fn store(folder: &str, shards: i64) -> Arc<Config> {
 }
 
 #[test]
-fn test_get_config_when_unset_is_nil() {
+fn get_config_when_unset_is_nil() {
     let _serial = serial();
     globals::set_config(None);
 
@@ -31,7 +31,7 @@ fn test_get_config_when_unset_is_nil() {
 }
 
 #[test]
-fn test_set_then_get_config_same_pointer_and_values() {
+fn set_then_get_config_same_pointer_and_values() {
     let _serial = serial();
     globals::set_config(None);
 
@@ -79,7 +79,7 @@ fn test_set_then_get_config_same_pointer_and_values() {
 }
 
 #[test]
-fn test_concurrent_set_and_get_no_panics_final_is_known_value() {
+fn concurrent_set_and_get_no_panics_final_is_known_value() {
     let _serial = serial();
     globals::set_config(None);
 

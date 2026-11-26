@@ -42,7 +42,7 @@ fn capture_stdout(f: impl FnOnce()) -> String {
 }
 
 #[test]
-fn test_load_config_unknown_keys_are_reported_but_ignored() {
+fn load_config_unknown_keys_are_reported_but_ignored() {
     let _serial = serial();
     let tmp = TempDir::new();
     let path = tmp.path().join("elysian.yaml");
@@ -93,7 +93,7 @@ server:
 }
 
 #[test]
-fn test_load_config_known_keys_produce_no_warning() {
+fn load_config_known_keys_produce_no_warning() {
     let _serial = serial();
     let tmp = TempDir::new();
     let path = tmp.path().join("elysian.yaml");
@@ -130,7 +130,7 @@ fn text<'a>(v: &'a Value, path: &[&str]) -> &'a str {
 }
 
 #[test]
-fn test_config_to_json_redacts_secrets() {
+fn config_to_json_redacts_secrets() {
     let _serial = serial();
     let mut cfg = Config::default();
     cfg.security.authentication.enabled = true;
@@ -177,7 +177,7 @@ fn test_config_to_json_redacts_secrets() {
 }
 
 #[test]
-fn test_load_config_checks_the_engine() {
+fn load_config_checks_the_engine() {
     let _serial = serial();
     let cases = [
         ("empty name", "engine:\n  name: \"\"\n", false, false),
@@ -237,7 +237,7 @@ fn test_load_config_checks_the_engine() {
 }
 
 #[test]
-fn test_load_config_checks_the_authentication_mode() {
+fn load_config_checks_the_authentication_mode() {
     let _serial = serial();
     let cases = [
         (

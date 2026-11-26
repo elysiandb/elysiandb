@@ -149,7 +149,7 @@ fn str_attr(e: &Entry, key: &str) -> Option<String> {
 }
 
 #[test]
-fn test_request_id_is_kept_or_generated() {
+fn request_id_is_kept_or_generated() {
     let s = setup(None);
     let h = &s.handler;
 
@@ -195,7 +195,7 @@ fn test_request_id_is_kept_or_generated() {
 }
 
 #[test]
-fn test_server_error_is_logged_once_with_its_error() {
+fn server_error_is_logged_once_with_its_error() {
     let s = setup(None);
 
     let ctx = call(
@@ -228,7 +228,7 @@ fn test_server_error_is_logged_once_with_its_error() {
 }
 
 #[test]
-fn test_panic_is_recovered_and_logged_once() {
+fn panic_is_recovered_and_logged_once() {
     let s = setup(None);
     observe::install_panic_hook();
 
@@ -253,7 +253,7 @@ fn test_panic_is_recovered_and_logged_once() {
 }
 
 #[test]
-fn test_unauthorized_is_a_warning_only_with_credentials() {
+fn unauthorized_is_a_warning_only_with_credentials() {
     let s = setup(None);
     let h = &s.handler;
 
@@ -286,7 +286,7 @@ fn test_unauthorized_is_a_warning_only_with_credentials() {
 }
 
 #[test]
-fn test_forbidden_is_a_warning_with_the_user() {
+fn forbidden_is_a_warning_with_the_user() {
     let s = setup(None);
 
     call(&s.handler, "GET", "/forbidden", &[]);
@@ -301,7 +301,7 @@ fn test_forbidden_is_a_warning_with_the_user() {
 }
 
 #[test]
-fn test_client_errors_are_debug() {
+fn client_errors_are_debug() {
     let s = setup(None);
 
     call(&s.handler, "GET", "/missing", &[]);
@@ -329,7 +329,7 @@ fn test_client_errors_are_debug() {
 }
 
 #[test]
-fn test_slow_request_is_a_warning() {
+fn slow_request_is_a_warning() {
     let s = setup(None);
 
     call(&s.handler, "GET", "/slow", &[]);
@@ -344,7 +344,7 @@ fn test_slow_request_is_a_warning() {
 }
 
 #[test]
-fn test_slow_request_can_be_disabled() {
+fn slow_request_can_be_disabled() {
     let s = setup(Some(&|cfg: &mut Config| cfg.log.slow_request_ms = 0));
 
     call(&s.handler, "GET", "/slow", &[]);
@@ -357,7 +357,7 @@ fn test_slow_request_can_be_disabled() {
 }
 
 #[test]
-fn test_access_log() {
+fn access_log() {
     let s = setup(Some(&|cfg: &mut Config| cfg.log.access_log = true));
 
     call(&s.handler, "GET", "/ok/books", &[]);
@@ -374,7 +374,7 @@ fn test_access_log() {
 }
 
 #[test]
-fn test_access_log_leaves_streamed_responses_streamed() {
+fn access_log_leaves_streamed_responses_streamed() {
     let s = setup(Some(&|cfg: &mut Config| cfg.log.access_log = true));
 
     let ctx = call(&s.handler, "GET", "/stream", &[]);
@@ -394,7 +394,7 @@ fn test_access_log_leaves_streamed_responses_streamed() {
 }
 
 #[test]
-fn test_no_access_log_by_default() {
+fn no_access_log_by_default() {
     let s = setup(None);
 
     call(&s.handler, "GET", "/ok/books", &[]);
@@ -407,7 +407,7 @@ fn test_no_access_log_by_default() {
 }
 
 #[test]
-fn test_monitoring_requests_are_not_measured() {
+fn monitoring_requests_are_not_measured() {
     let s = setup(None);
     let t0 = Moment::now();
 
@@ -424,7 +424,7 @@ fn test_monitoring_requests_are_not_measured() {
 }
 
 #[test]
-fn test_kind() {
+fn kind() {
     let cases = [
         ("GET", "/kv/{key}", metrics::KIND_KV_GET),
         ("GET", "/kv/mget", metrics::KIND_KV_GET),
@@ -447,7 +447,7 @@ fn test_kind() {
 }
 
 #[test]
-fn test_excluded() {
+fn excluded() {
     for (path, want) in [
         ("/health", true),
         ("/metrics", true),
@@ -464,7 +464,7 @@ fn test_excluded() {
 }
 
 #[test]
-fn test_audit_carries_actor_and_request() {
+fn audit_carries_actor_and_request() {
     let _s = setup(None);
 
     let mut req = Request::new();
@@ -490,7 +490,7 @@ fn test_audit_carries_actor_and_request() {
 }
 
 #[test]
-fn test_rejected_requests_are_grouped_warnings() {
+fn rejected_requests_are_grouped_warnings() {
     let s = setup(None);
 
     for _ in 0..3 {

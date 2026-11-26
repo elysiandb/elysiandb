@@ -10,7 +10,7 @@ fn matches(entity: &Map, spec: &[(&str, &[(&str, &str)])]) -> bool {
 }
 
 #[test]
-fn test_search_matches_entity_simple() {
+fn search_matches_entity_simple() {
     let _s = setup();
     let entity = doc(r#"{"name":"Alice"}"#);
     if !api::search_matches_entity(&entity, b"Ali*") {
@@ -22,7 +22,7 @@ fn test_search_matches_entity_simple() {
 }
 
 #[test]
-fn test_search_matches_entity_nested_map() {
+fn search_matches_entity_nested_map() {
     let _s = setup();
     let entity = doc(r#"{"user":{"profile":{"city":"Paris"}}}"#);
     if !api::search_matches_entity(&entity, b"Par*") {
@@ -34,7 +34,7 @@ fn test_search_matches_entity_nested_map() {
 }
 
 #[test]
-fn test_search_matches_entity_nested_array() {
+fn search_matches_entity_nested_array() {
     let _s = setup();
     let entity = doc(r#"{"tags":["blue","green","red"]}"#);
     if !api::search_matches_entity(&entity, b"gr*") {
@@ -46,7 +46,7 @@ fn test_search_matches_entity_nested_array() {
 }
 
 #[test]
-fn test_search_matches_entity_mixed_structures() {
+fn search_matches_entity_mixed_structures() {
     let _s = setup();
     let entity = doc(r#"{"data":[{"info":["hello",{"deep":"world"}]}]}"#);
     if !api::search_matches_entity(&entity, b"wor*") {
@@ -58,7 +58,7 @@ fn test_search_matches_entity_mixed_structures() {
 }
 
 #[test]
-fn test_search_matches_entity_no_string_values() {
+fn search_matches_entity_no_string_values() {
     let _s = setup();
     let entity = doc(r#"{"nums":[1,2,3],"obj":{"flag":false}}"#);
     if api::search_matches_entity(&entity, b"*") {
@@ -67,7 +67,7 @@ fn test_search_matches_entity_no_string_values() {
 }
 
 #[test]
-fn test_search_matches_entity_skips_ids_markers_and_core_fields() {
+fn search_matches_entity_skips_ids_markers_and_core_fields() {
     let _s = setup();
     let entity = doc(
         r#"{"id":"m1","_elysiandb_core_username":"admin","title":"Blade Runner","directors":[{"@entity":"director","id":"ridley-scott"}]}"#,
@@ -85,7 +85,7 @@ fn test_search_matches_entity_skips_ids_markers_and_core_fields() {
 }
 
 #[test]
-fn test_search_matches_entity_included_document_content() {
+fn search_matches_entity_included_document_content() {
     let _s = setup();
     let entity = doc(
         r#"{"id":"f1","title":"Blade Runner","directors":[{"@entity":"director","id":"ridley-scott","_elysiandb_core_username":"admin","name":"Ridley Scott"}]}"#,
@@ -105,7 +105,7 @@ fn test_search_matches_entity_included_document_content() {
 }
 
 #[test]
-fn test_search_matches_entity_included_list() {
+fn search_matches_entity_included_list() {
     let _s = setup();
     let mut entity = doc(r#"{"title":"Blade Runner"}"#);
     entity.insert(
@@ -123,7 +123,7 @@ fn test_search_matches_entity_included_list() {
 }
 
 #[test]
-fn test_get_nested_value() {
+fn get_nested_value() {
     let _s = setup();
     let data =
         doc(r#"{"user":{"name":"Alice","info":{"age":30.0,"date":"2025-09-27T10:00:00Z"}}}"#);
@@ -148,7 +148,7 @@ fn test_get_nested_value() {
 }
 
 #[test]
-fn test_filters_match_entity_string_glob() {
+fn filters_match_entity_string_glob() {
     let _s = setup();
     let entity = doc(r#"{"name":"Alice"}"#);
     if !matches(&entity, &[("name", &[("eq", "Ali*")])]) {
@@ -160,7 +160,7 @@ fn test_filters_match_entity_string_glob() {
 }
 
 #[test]
-fn test_filters_match_entity_float_ops() {
+fn filters_match_entity_float_ops() {
     let _s = setup();
     let entity = doc(r#"{"age":30.0}"#);
     if !matches(&entity, &[("age", &[("eq", "30")])]) {
@@ -184,7 +184,7 @@ fn test_filters_match_entity_float_ops() {
 }
 
 #[test]
-fn test_filters_match_entity_date_ops() {
+fn filters_match_entity_date_ops() {
     let _s = setup();
     let now = Time::now().utc();
     let now_text = now.format(time::RFC3339);
@@ -214,7 +214,7 @@ fn test_filters_match_entity_date_ops() {
 }
 
 #[test]
-fn test_filters_match_entity_date_only_against_date_time() {
+fn filters_match_entity_date_only_against_date_time() {
     let _s = setup();
     let entity = doc(r#"{"createdAt":"2023-05-10T15:04:05Z"}"#);
     if !matches(&entity, &[("createdAt", &[("eq", "2023-05-10")])]) {
@@ -238,7 +238,7 @@ fn test_filters_match_entity_date_only_against_date_time() {
 }
 
 #[test]
-fn test_filters_match_entity_date_only_ops() {
+fn filters_match_entity_date_only_ops() {
     let _s = setup();
     let today = Time::from_date(2023, Month::MAY, 10, 0, 0, 0, 0, &Location::utc());
     let today_text = today.format("2006-01-02");
@@ -268,7 +268,7 @@ fn test_filters_match_entity_date_only_ops() {
 }
 
 #[test]
-fn test_filters_match_entity_array_contains() {
+fn filters_match_entity_array_contains() {
     let _s = setup();
     let entity = doc(r#"{"tags":["toto","tata","titi"]}"#);
     if !matches(&entity, &[("tags", &[("contains", "toto")])]) {
@@ -280,7 +280,7 @@ fn test_filters_match_entity_array_contains() {
 }
 
 #[test]
-fn test_filters_match_entity_array_not_contains() {
+fn filters_match_entity_array_not_contains() {
     let _s = setup();
     let entity = doc(r#"{"tags":["toto","tata","titi"]}"#);
     if !matches(&entity, &[("tags", &[("not_contains", "tutu")])]) {
@@ -292,7 +292,7 @@ fn test_filters_match_entity_array_not_contains() {
 }
 
 #[test]
-fn test_filters_match_entity_array_all() {
+fn filters_match_entity_array_all() {
     let _s = setup();
     let entity = doc(r#"{"tags":["toto","tata","titi"]}"#);
     if !matches(&entity, &[("tags", &[("all", "toto,tata")])]) {
@@ -304,7 +304,7 @@ fn test_filters_match_entity_array_all() {
 }
 
 #[test]
-fn test_filters_match_entity_array_any() {
+fn filters_match_entity_array_any() {
     let _s = setup();
     let entity = doc(r#"{"tags":["toto","tata","titi"]}"#);
     if !matches(&entity, &[("tags", &[("any", "tutu,tata")])]) {
@@ -316,7 +316,7 @@ fn test_filters_match_entity_array_any() {
 }
 
 #[test]
-fn test_filters_match_entity_array_eq() {
+fn filters_match_entity_array_eq() {
     let _s = setup();
     let entity = doc(r#"{"tags":["toto","tata","titi"]}"#);
     if !matches(&entity, &[("tags", &[("eq", "toto,tata,titi")])]) {
@@ -331,7 +331,7 @@ fn test_filters_match_entity_array_eq() {
 }
 
 #[test]
-fn test_filters_match_entity_array_none() {
+fn filters_match_entity_array_none() {
     let _s = setup();
     let entity = doc(r#"{"tags":["toto","tata","titi"]}"#);
     if !matches(&entity, &[("tags", &[("none", "tutu,tete")])]) {
@@ -343,7 +343,7 @@ fn test_filters_match_entity_array_none() {
 }
 
 #[test]
-fn test_filters_match_entity_array_mixed_types() {
+fn filters_match_entity_array_mixed_types() {
     let _s = setup();
     let entity = doc(r#"{"values":["1",2.0,"three"]}"#);
     if !matches(&entity, &[("values", &[("contains", "1")])]) {
@@ -361,7 +361,7 @@ fn test_filters_match_entity_array_mixed_types() {
 }
 
 #[test]
-fn test_filters_match_entity_missing_field_does_not_match() {
+fn filters_match_entity_missing_field_does_not_match() {
     let _s = setup();
     let entity = doc(r#"{"id":"nf","title":"No year"}"#);
     for op in [
@@ -398,7 +398,7 @@ fn test_filters_match_entity_missing_field_does_not_match() {
 }
 
 #[test]
-fn test_filters_match_entity_null_value_does_not_match() {
+fn filters_match_entity_null_value_does_not_match() {
     let _s = setup();
     let entity = doc(r#"{"year":null}"#);
     if matches(&entity, &[("year", &[("gte", "1982")])]) {
@@ -407,7 +407,7 @@ fn test_filters_match_entity_null_value_does_not_match() {
 }
 
 #[test]
-fn test_filters_match_entity_array_traversal() {
+fn filters_match_entity_array_traversal() {
     let _s = setup();
     let entity =
         doc(r#"{"cats":[{"name":"sf","meta":{"rank":1.0}},{"name":"noir","meta":{"rank":4.0}}]}"#);
@@ -427,7 +427,7 @@ fn test_filters_match_entity_array_traversal() {
 }
 
 #[test]
-fn test_filters_match_entity_traverses_included_relation_list() {
+fn filters_match_entity_traverses_included_relation_list() {
     let _s = setup();
     let mut entity = Map::new();
     entity.insert(
@@ -447,7 +447,7 @@ fn test_filters_match_entity_traverses_included_relation_list() {
 }
 
 #[test]
-fn test_filters_match_entity_integer_values() {
+fn filters_match_entity_integer_values() {
     let _s = setup();
     let mut entity = Map::new();
     entity.insert("score".to_string(), Value::Int(5));
@@ -470,7 +470,7 @@ fn test_filters_match_entity_integer_values() {
 }
 
 #[test]
-fn test_filters_match_entity_same_semantics_as_query_filter() {
+fn filters_match_entity_same_semantics_as_query_filter() {
     let _s = setup();
     let data = docs(
         r#"[{"id":"f1","year":1981.0},{"id":"f2","year":1982.0},{"id":"nf","title":"No year"},{"id":"t1","cats":[{"name":"sf"},{"name":"noir"}]},{"id":"t2","cats":[{"name":"comedy"}]},{"id":"n1","year":null,"cats":"sf"}]"#,
@@ -496,7 +496,7 @@ fn test_filters_match_entity_same_semantics_as_query_filter() {
 }
 
 #[test]
-fn test_stored_filters_match_entity_ignores_unresolved_fields() {
+fn stored_filters_match_entity_ignores_unresolved_fields() {
     let _s = setup();
     let entity = doc(r#"{"tag":"a","cats":[{"name":"sf"}]}"#);
 

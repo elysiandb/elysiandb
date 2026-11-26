@@ -17,7 +17,7 @@ fn sort_map(spec: &[(&str, &str)]) -> BTreeMap<Vec<u8>, Vec<u8>> {
 }
 
 #[test]
-fn test_sort_entities_uses_every_key_in_order() {
+fn sort_entities_uses_every_key_in_order() {
     let _s = setup();
     let mut data = docs(
         r#"[{"id":"f1","title":"C","year":1983.0},{"id":"f2","title":"B","year":1982.0},{"id":"f3","title":"A","year":1979.0},{"id":"f4","title":"A","year":1983.0}]"#,
@@ -33,7 +33,7 @@ fn test_sort_entities_uses_every_key_in_order() {
 }
 
 #[test]
-fn test_sort_entities_dates_nested_fields_and_missing_values() {
+fn sort_entities_dates_nested_fields_and_missing_values() {
     let _s = setup();
     let mut data = docs(
         r#"[{"id":"a","meta":{"at":"2024-05-01"},"rank":1.0},{"id":"b","rank":1.0},{"id":"c","meta":{"at":"2023-01-01T10:00:00Z"},"rank":1.0},{"id":"d","meta":{"at":"2024-05-01"},"rank":0.0}]"#,
@@ -49,7 +49,7 @@ fn test_sort_entities_dates_nested_fields_and_missing_values() {
 }
 
 #[test]
-fn test_sort_entities_mixed_types_are_deterministic() {
+fn sort_entities_mixed_types_are_deterministic() {
     let _s = setup();
     let build = || {
         docs(
@@ -78,7 +78,7 @@ fn test_sort_entities_mixed_types_are_deterministic() {
 }
 
 #[test]
-fn test_execute_query_with_several_sorts() {
+fn execute_query_with_several_sorts() {
     let _s = setup();
     let _db = init_test_store();
     for d in [
@@ -108,7 +108,7 @@ fn test_execute_query_with_several_sorts() {
 }
 
 #[test]
-fn test_ordered_sorts() {
+fn ordered_sorts() {
     let _s = setup();
     let q = Query {
         sorts: sort_map(&[("year", "DESC"), ("title", "asc"), ("rank", "whatever")]),
@@ -141,7 +141,7 @@ fn test_ordered_sorts() {
 }
 
 #[test]
-fn test_sort_entities_ties_missing_values_and_other_types() {
+fn sort_entities_ties_missing_values_and_other_types() {
     let _s = setup();
     let mut data = docs(
         r#"[{"id":"x","k":2.0},{"id":"y","k":1.0},{"id":"z","v":1.0,"k":1.0},{"id":"same1","v":1.0,"k":1.0}]"#,
@@ -173,7 +173,7 @@ fn test_sort_entities_ties_missing_values_and_other_types() {
 }
 
 #[test]
-fn test_sort_entities_go_number_types() {
+fn sort_entities_go_number_types() {
     let _s = setup();
     let entry = |id: &str, n: Value| {
         let mut m = Map::new();
@@ -198,7 +198,7 @@ fn test_sort_entities_go_number_types() {
 }
 
 #[test]
-fn test_primary_sort() {
+fn primary_sort() {
     let _s = setup();
     let (field, ascending) = Query {
         sorts: sort_map(&[("year", "desc"), ("title", "asc")]),

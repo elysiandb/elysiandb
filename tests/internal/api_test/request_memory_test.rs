@@ -15,7 +15,7 @@ impl Drop for ResetBudget {
 }
 
 #[test]
-fn test_requests_beyond_the_memory_budget_are_rejected() {
+fn requests_beyond_the_memory_budget_are_rejected() {
     let _s = setup();
     let _db = init_overload_store(ApiQueryConfig {
         queue_timeout_ms: 20,
@@ -75,7 +75,7 @@ fn test_requests_beyond_the_memory_budget_are_rejected() {
 }
 
 #[test]
-fn test_request_memory_is_free_without_a_budget() {
+fn request_memory_is_free_without_a_budget() {
     let _s = setup();
     let _db = init_overload_store(ApiQueryConfig::default());
     memory::configure(0);

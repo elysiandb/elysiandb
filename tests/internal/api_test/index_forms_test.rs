@@ -97,7 +97,7 @@ pub fn check_planner_against_scan(r: &mut Rand, entity: &str, rounds: usize) {
 }
 
 #[test]
-fn test_bitmap_indexes_answer_like_ordered_indexes() {
+fn bitmap_indexes_answer_like_ordered_indexes() {
     let _s = setup();
     let _db = init_test_store();
 

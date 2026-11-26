@@ -40,7 +40,7 @@ fn run(script: &str, text: &str) -> MapRef {
 }
 
 #[test]
-fn test_query_results_behave_like_plain_arrays() {
+fn query_results_behave_like_plain_arrays() {
     let _s = setup(true);
     seed_orders(6);
 
@@ -132,7 +132,7 @@ function postRead(ctx) {
 }
 
 #[test]
-fn test_query_results_follow_writes() {
+fn query_results_follow_writes() {
     let _s = setup(true);
     seed_orders(4);
 
@@ -184,7 +184,7 @@ function postRead(ctx) {
 }
 
 #[test]
-fn test_deterministic_outputs_are_reused_until_read_entities_change() {
+fn deterministic_outputs_are_reused_until_read_entities_change() {
     let _s = setup(true);
     seed_orders(3);
     hook::reset_output_memo();
@@ -240,7 +240,7 @@ function postRead(ctx) {
 }
 
 #[test]
-fn test_non_deterministic_scripts_are_never_reused() {
+fn non_deterministic_scripts_are_never_reused() {
     let _s = setup(true);
     seed_orders(1);
     hook::reset_output_memo();
@@ -286,7 +286,7 @@ fn test_non_deterministic_scripts_are_never_reused() {
 }
 
 #[test]
-fn test_failing_scripts_are_not_reused() {
+fn failing_scripts_are_not_reused() {
     let _s = setup(true);
     seed_orders(1);
     hook::reset_output_memo();
@@ -314,7 +314,7 @@ fn test_failing_scripts_are_not_reused() {
 }
 
 #[test]
-fn test_query_results_stay_exact_across_many_writes() {
+fn query_results_stay_exact_across_many_writes() {
     let _s = setup(true);
     api::create_entity_type(b"item").expect("create item");
 
@@ -387,7 +387,7 @@ impl Drop for Budget {
 }
 
 #[test]
-fn test_oversized_query_results_are_refused_quickly() {
+fn oversized_query_results_are_refused_quickly() {
     let _s = setup(true);
     hook::init_hooks();
     api::create_entity_type(b"big").expect("create big");

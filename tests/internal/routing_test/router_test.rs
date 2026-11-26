@@ -82,7 +82,7 @@ fn perform(r: &Router, method: &str, path: &str) -> bool {
 }
 
 #[test]
-fn test_version_wrapper() {
+fn version_wrapper() {
     let h = routing::version(handler(|ctx: &mut RequestCtx| {
         ctx.set_body(b"ok");
     }));
@@ -101,7 +101,7 @@ fn test_version_wrapper() {
 }
 
 #[test]
-fn test_register_routes_no_optional() {
+fn register_routes_no_optional() {
     let _env = init_env(false, false, false);
     let r = new_router();
 
@@ -142,7 +142,7 @@ fn test_register_routes_no_optional() {
 }
 
 #[test]
-fn test_register_routes_with_stats() {
+fn register_routes_with_stats() {
     let _env = init_env(true, false, false);
     let r = new_router();
     if !perform(&r, "GET", "/stats") {
@@ -151,7 +151,7 @@ fn test_register_routes_with_stats() {
 }
 
 #[test]
-fn test_register_routes_with_schema() {
+fn register_routes_with_schema() {
     let _env = init_env(false, true, false);
     let r = new_router();
     if !perform(&r, "POST", "/api/books/create") {
@@ -189,7 +189,7 @@ fn ensure_user(username: &str, role: Role) {
 }
 
 #[test]
-fn test_register_routes_admin_routes_in_user_mode() {
+fn register_routes_admin_routes_in_user_mode() {
     let mut env = init_env(true, true, false);
     env.update(|cfg| {
         cfg.security.authentication.enabled = true;
@@ -270,7 +270,7 @@ impl Write for Output {
 }
 
 #[test]
-fn test_register_routes_admin_ui_warns_when_assets_are_missing() {
+fn register_routes_admin_ui_warns_when_assets_are_missing() {
     let _env = init_env(false, false, true);
 
     let output = Output::default();
@@ -297,7 +297,7 @@ fn test_register_routes_admin_ui_warns_when_assets_are_missing() {
 }
 
 #[test]
-fn test_register_routes_metrics_only_when_prometheus_is_enabled() {
+fn register_routes_metrics_only_when_prometheus_is_enabled() {
     let mut env = init_env(false, false, false);
 
     let r = new_router();
@@ -315,7 +315,7 @@ fn test_register_routes_metrics_only_when_prometheus_is_enabled() {
 }
 
 #[test]
-fn test_register_routes_monitoring_does_not_hide_entity_types() {
+fn register_routes_monitoring_does_not_hide_entity_types() {
     let _env = init_env(false, false, false);
 
     let r = new_router();

@@ -7,7 +7,7 @@ use super::{
 };
 
 #[test]
-fn test_analyze_entity_schema_simple() {
+fn analyze_entity_schema_simple() {
     let _serial = serial();
     let _restore = patch_strict(false);
 
@@ -29,7 +29,7 @@ fn test_analyze_entity_schema_simple() {
 }
 
 #[test]
-fn test_analyze_entity_schema_strict_required_true() {
+fn analyze_entity_schema_strict_required_true() {
     let _serial = serial();
     let _restore = patch_strict(true);
 
@@ -44,7 +44,7 @@ fn test_analyze_entity_schema_strict_required_true() {
 }
 
 #[test]
-fn test_analyze_entity_schema_nested() {
+fn analyze_entity_schema_nested() {
     let _serial = serial();
     let _restore = patch_strict(false);
 
@@ -68,7 +68,7 @@ fn test_analyze_entity_schema_nested() {
 }
 
 #[test]
-fn test_analyze_entity_schema_array_nested() {
+fn analyze_entity_schema_array_nested() {
     let _serial = serial();
     let _restore = patch_strict(false);
 
@@ -91,7 +91,7 @@ fn test_analyze_entity_schema_array_nested() {
 }
 
 #[test]
-fn test_detect_json_type() {
+fn detect_json_type() {
     let tests = vec![
         (s("x"), "string"),
         (Value::Int(30), "number"),
@@ -110,7 +110,7 @@ fn test_detect_json_type() {
 }
 
 #[test]
-fn test_validate_entity_strict_new_field_rejected() {
+fn validate_entity_strict_new_field_rejected() {
     let _serial = serial();
     let mock_schema = Entity {
         id: b"users".to_vec(),
@@ -130,7 +130,7 @@ fn test_validate_entity_strict_new_field_rejected() {
 }
 
 #[test]
-fn test_validate_entity_strict_required_missing() {
+fn validate_entity_strict_required_missing() {
     let _serial = serial();
     let mock_schema = Entity {
         id: b"users".to_vec(),
@@ -153,7 +153,7 @@ fn test_validate_entity_strict_required_missing() {
 }
 
 #[test]
-fn test_validate_entity_strict_deep_new_field_rejected() {
+fn validate_entity_strict_deep_new_field_rejected() {
     let _serial = serial();
     let mock_schema = Entity {
         id: b"books".to_vec(),
@@ -187,7 +187,7 @@ fn test_validate_entity_strict_deep_new_field_rejected() {
 }
 
 #[test]
-fn test_validate_entity_strict_core_fields_allowed() {
+fn validate_entity_strict_core_fields_allowed() {
     let _serial = serial();
     let mock_schema = Entity {
         id: b"oeuvre".to_vec(),
@@ -211,7 +211,7 @@ fn test_validate_entity_strict_core_fields_allowed() {
 }
 
 #[test]
-fn test_validate_entity_type_mismatch() {
+fn validate_entity_type_mismatch() {
     let _serial = serial();
     let mock_schema = Entity {
         id: b"u".to_vec(),
@@ -229,7 +229,7 @@ fn test_validate_entity_type_mismatch() {
 }
 
 #[test]
-fn test_validate_entity_no_schema() {
+fn validate_entity_no_schema() {
     let _serial = serial();
     let _restore = patch_load_schema(None);
 
@@ -240,7 +240,7 @@ fn test_validate_entity_no_schema() {
 }
 
 #[test]
-fn test_is_manual_schema_no_flag() {
+fn is_manual_schema_no_flag() {
     let _serial = serial();
     let _restore = patch_manual_flag(false);
 
@@ -250,7 +250,7 @@ fn test_is_manual_schema_no_flag() {
 }
 
 #[test]
-fn test_is_manual_schema_yes_flag() {
+fn is_manual_schema_yes_flag() {
     let _serial = serial();
     let _restore = patch_manual_flag(true);
 
@@ -260,7 +260,7 @@ fn test_is_manual_schema_yes_flag() {
 }
 
 #[test]
-fn test_fields_to_map_and_back() {
+fn fields_to_map_and_back() {
     let fields = fields(vec![(
         "name",
         Field::new("name", "string", true)
@@ -279,7 +279,7 @@ fn test_fields_to_map_and_back() {
 }
 
 #[test]
-fn test_schema_entity_to_storable_structure() {
+fn schema_entity_to_storable_structure() {
     let e = Entity {
         id: b"x".to_vec(),
         fields: fields(vec![("a", Field::new("a", "string", true))]),
@@ -298,7 +298,7 @@ fn test_schema_entity_to_storable_structure() {
 }
 
 #[test]
-fn test_analyze_entity_schema_ignores_id() {
+fn analyze_entity_schema_ignores_id() {
     let _serial = serial();
     let _restore = patch_strict(false);
 
@@ -316,7 +316,7 @@ fn test_analyze_entity_schema_ignores_id() {
 }
 
 #[test]
-fn test_analyze_entity_schema_array_no_subfields() {
+fn analyze_entity_schema_array_no_subfields() {
     let _serial = serial();
     let _restore = patch_strict(false);
 
@@ -335,7 +335,7 @@ fn test_analyze_entity_schema_array_no_subfields() {
 }
 
 #[test]
-fn test_validate_entity_array_object_validation() {
+fn validate_entity_array_object_validation() {
     let _serial = serial();
     let mock = Entity {
         id: b"e".to_vec(),
@@ -363,7 +363,7 @@ fn test_validate_entity_array_object_validation() {
 }
 
 #[test]
-fn test_validate_entity_array_missing_required() {
+fn validate_entity_array_missing_required() {
     let _serial = serial();
     let mock = Entity {
         id: b"test".to_vec(),
@@ -387,7 +387,7 @@ fn test_validate_entity_array_missing_required() {
 }
 
 #[test]
-fn test_validate_entity_object_wrong_type() {
+fn validate_entity_object_wrong_type() {
     let _serial = serial();
     let mock = Entity {
         id: b"wrong".to_vec(),
@@ -405,7 +405,7 @@ fn test_validate_entity_object_wrong_type() {
 }
 
 #[test]
-fn test_validate_entity_array_wrong_type() {
+fn validate_entity_array_wrong_type() {
     let _serial = serial();
     let mock = Entity {
         id: b"wrong".to_vec(),
@@ -423,7 +423,7 @@ fn test_validate_entity_array_wrong_type() {
 }
 
 #[test]
-fn test_map_to_fields_name_override() {
+fn map_to_fields_name_override() {
     let m = obj(vec![(
         "x",
         object(obj(vec![
@@ -441,7 +441,7 @@ fn test_map_to_fields_name_override() {
 }
 
 #[test]
-fn test_load_schema_for_entity_no_data() {
+fn load_schema_for_entity_no_data() {
     let _serial = serial();
     let _restore = patch_get_json_by_key(None);
 
@@ -453,7 +453,7 @@ fn test_load_schema_for_entity_no_data() {
 }
 
 #[test]
-fn test_load_schema_for_entity_with_data() {
+fn load_schema_for_entity_with_data() {
     let _serial = serial();
     let _restore = patch_get_json_by_key(Some(obj(vec![(
         "fields",

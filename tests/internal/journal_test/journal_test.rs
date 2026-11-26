@@ -67,7 +67,7 @@ fn glob(dir: &Path, suffix: &str) -> Vec<String> {
 }
 
 #[test]
-fn test_append_replay_across_segments() {
+fn append_replay_across_segments() {
     let dir = TempDir::new();
     let j = open_journal(dir.path(), opts(journal::Mode::Write, 4096));
     j.start();
@@ -159,7 +159,7 @@ fn test_append_replay_across_segments() {
 }
 
 #[test]
-fn test_torn_last_batch_is_dropped() {
+fn torn_last_batch_is_dropped() {
     let dir = TempDir::new();
     let j = open_journal(dir.path(), opts(journal::Mode::Write, 0));
     j.start();
@@ -206,7 +206,7 @@ fn test_torn_last_batch_is_dropped() {
 }
 
 #[test]
-fn test_corruption_in_a_sealed_segment_ends_the_replay_and_keeps_the_rest_aside() {
+fn corruption_in_a_sealed_segment_ends_the_replay_and_keeps_the_rest_aside() {
     let dir = TempDir::new();
     let j = open_journal(dir.path(), opts(journal::Mode::Write, 256));
     j.start();
@@ -351,7 +351,7 @@ impl Fs for FaultyHandle {
 }
 
 #[test]
-fn test_write_faults_are_reported_and_retried() {
+fn write_faults_are_reported_and_retried() {
     for (name, mode) in [("failed sync", 3), ("no space", 1), ("short write", 2)] {
         let dir = TempDir::new();
         let fs = FaultyHandle(Arc::new(FaultyFs {
@@ -415,7 +415,7 @@ fn test_write_faults_are_reported_and_retried() {
 }
 
 #[test]
-fn test_group_commit_under_concurrent_writers() {
+fn group_commit_under_concurrent_writers() {
     let dir = TempDir::new();
     let j = open_journal(dir.path(), opts(journal::Mode::Write, 0));
     j.start();
@@ -458,7 +458,7 @@ fn test_group_commit_under_concurrent_writers() {
 }
 
 #[test]
-fn test_background_mode_writes_on_flush() {
+fn background_mode_writes_on_flush() {
     let dir = TempDir::new();
     let j = open_journal(dir.path(), opts(journal::Mode::Background, 0));
     j.start();
@@ -572,7 +572,7 @@ fn fuzz_replay_never_panics() {
 }
 
 #[test]
-fn test_abandoned_journal_never_writes_its_pending_batches() {
+fn abandoned_journal_never_writes_its_pending_batches() {
     let dir = TempDir::new();
     let j = open_journal(dir.path(), opts(journal::Mode::Write, 0));
     j.start();

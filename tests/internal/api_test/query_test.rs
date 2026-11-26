@@ -11,7 +11,7 @@ fn leaf(spec: Spec<'_>) -> FilterNode {
 }
 
 #[test]
-fn test_apply_query_filter_empty_node_matches_nothing() {
+fn apply_query_filter_empty_node_matches_nothing() {
     let _s = setup();
     let data = docs(r#"[{"id":"1","title":"abc"}]"#);
     let out = api::apply_query_filter(data, &FilterNode::default());
@@ -21,7 +21,7 @@ fn test_apply_query_filter_empty_node_matches_nothing() {
 }
 
 #[test]
-fn test_apply_query_filter_primitives_and_nested_arrays() {
+fn apply_query_filter_primitives_and_nested_arrays() {
     let _s = setup();
     let data = docs(
         r#"[{"id":"1","title":"abcXYZdef","price":10.0,"flag":true,"tags":["Go","kv"],"author":{"name":"Taymour Negib"},"categories":[{"title":"coco"},{"title":"caca"}]},{"id":"2","title":"nope"}]"#,
@@ -40,7 +40,7 @@ fn test_apply_query_filter_primitives_and_nested_arrays() {
 }
 
 #[test]
-fn test_apply_query_filter_glob_strict_match_branches() {
+fn apply_query_filter_glob_strict_match_branches() {
     let _s = setup();
     let data = docs(r#"[{"id":"1","title":"abcXYZdef"}]"#);
     let cases: [(&str, &str, &str, usize); 9] = [
@@ -66,7 +66,7 @@ fn test_apply_query_filter_glob_strict_match_branches() {
 }
 
 #[test]
-fn test_apply_query_filter_or_and_nodes() {
+fn apply_query_filter_or_and_nodes() {
     let _s = setup();
     let data = docs(
         r#"[{"id":"1","title":"Go","status":"published"},{"id":"2","title":"Python","status":"draft"}]"#,
@@ -82,7 +82,7 @@ fn test_apply_query_filter_or_and_nodes() {
 }
 
 #[test]
-fn test_apply_query_filter_unsupported_value_type_fails() {
+fn apply_query_filter_unsupported_value_type_fails() {
     let _s = setup();
     let data = docs(r#"[{"id":"1","meta":{"a":1}}]"#);
     let out = api::apply_query_filter(data, &leaf(&[("meta", &[("eq", "*")])]));
@@ -92,7 +92,7 @@ fn test_apply_query_filter_unsupported_value_type_fails() {
 }
 
 #[test]
-fn test_execute_query_with_sort_offset_limit() {
+fn execute_query_with_sort_offset_limit() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -133,7 +133,7 @@ fn test_execute_query_with_sort_offset_limit() {
 }
 
 #[test]
-fn test_execute_query_complex_nested_query() {
+fn execute_query_complex_nested_query() {
     let _s = setup();
     let _db = init_test_store();
 

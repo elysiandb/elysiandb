@@ -45,7 +45,7 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
 }
 
 #[test]
-fn test_handle_set_and_get() {
+fn handle_set_and_get() {
     let _s = setup();
 
     if handler::handle_set(b"a 1", 0) != b"OK" {
@@ -59,7 +59,7 @@ fn test_handle_set_and_get() {
 }
 
 #[test]
-fn test_handle_set_with_ttl() {
+fn handle_set_with_ttl() {
     let _s = setup();
 
     if handler::handle_set(b"ttl 123", 1) != b"OK" {
@@ -73,7 +73,7 @@ fn test_handle_set_with_ttl() {
 }
 
 #[test]
-fn test_handle_get_not_found() {
+fn handle_get_not_found() {
     let _s = setup();
 
     let out = handler::handle_get(b"missing");
@@ -83,7 +83,7 @@ fn test_handle_get_not_found() {
 }
 
 #[test]
-fn test_handle_delete_single() {
+fn handle_delete_single() {
     let _s = setup();
 
     handler::handle_set(b"x 9", 0);
@@ -100,7 +100,7 @@ fn test_handle_delete_single() {
 }
 
 #[test]
-fn test_handle_reset() {
+fn handle_reset() {
     let _s = setup();
 
     handler::handle_set(b"a 1", 0);
@@ -113,7 +113,7 @@ fn test_handle_reset() {
 }
 
 #[test]
-fn test_handle_save() {
+fn handle_save() {
     let _s = setup();
 
     handler::handle_set(b"a 1", 0);
@@ -125,7 +125,7 @@ fn test_handle_save() {
 }
 
 #[test]
-fn test_handle_multi_get() {
+fn handle_multi_get() {
     let _s = setup();
 
     handler::handle_set(b"a 1", 0);
@@ -138,7 +138,7 @@ fn test_handle_multi_get() {
 }
 
 #[test]
-fn test_handle_wildcard_get() {
+fn handle_wildcard_get() {
     let _s = setup();
 
     handler::handle_set(b"user:1 a", 0);
@@ -151,7 +151,7 @@ fn test_handle_wildcard_get() {
 }
 
 #[test]
-fn test_handle_wildcard_delete() {
+fn handle_wildcard_delete() {
     let _s = setup();
 
     handler::handle_set(b"wild:1 a", 0);
@@ -169,7 +169,7 @@ fn test_handle_wildcard_delete() {
 }
 
 #[test]
-fn test_handle_multi_get_wildcard() {
+fn handle_multi_get_wildcard() {
     let _s = setup();
 
     handler::handle_set(b"a:1 x", 0);

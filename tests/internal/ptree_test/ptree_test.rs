@@ -63,7 +63,7 @@ fn check(tree: &Tree<i64>, m: &Model) {
 }
 
 #[test]
-fn test_random_operations_against_model() {
+fn random_operations_against_model() {
     let mut r = Rand::new(rand::new_source(7));
     let mut tree: Tree<i64> = Tree::new();
     let mut m = Model::new();
@@ -111,7 +111,7 @@ fn test_random_operations_against_model() {
 }
 
 #[test]
-fn test_ranges_and_bulk_load() {
+fn ranges_and_bulk_load() {
     let mut keys: Vec<Vec<u8>> = Vec::new();
     let mut vals: Vec<i64> = Vec::new();
     for i in 0..5000i64 {

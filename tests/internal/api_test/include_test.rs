@@ -82,7 +82,7 @@ fn text<'a>(m: &'a Map, key: &str) -> Option<&'a str> {
 }
 
 #[test]
-fn test_apply_includes_simple_include() {
+fn apply_includes_simple_include() {
     let _s = setup();
     let mut data = docs(
         r#"[{"id":"d5a3e752","name":"youyou","category":{"@entity":"category","id":"e6a49734"}}]"#,
@@ -95,7 +95,7 @@ fn test_apply_includes_simple_include() {
 }
 
 #[test]
-fn test_apply_includes_multiple_includes() {
+fn apply_includes_multiple_includes() {
     let _s = setup();
     let mut data = docs(
         r#"[{"id":"d5a3e752","name":"youyou","category":{"@entity":"category","id":"e6a49734"},"authors":[{"@entity":"author","id":"32e1f608"},{"@entity":"author","id":"25667686"}]}]"#,
@@ -122,7 +122,7 @@ fn test_apply_includes_multiple_includes() {
 }
 
 #[test]
-fn test_apply_includes_all_mode() {
+fn apply_includes_all_mode() {
     let _s = setup();
     let mut data = docs(
         r#"[{"id":"test1","name":"entity1","category":{"@entity":"category","id":"e6a49734"},"authors":[{"@entity":"author","id":"32e1f608"}]}]"#,
@@ -151,7 +151,7 @@ fn test_apply_includes_all_mode() {
 }
 
 #[test]
-fn test_apply_includes_empty_include() {
+fn apply_includes_empty_include() {
     let _s = setup();
     let data = docs(r#"[{"id":"1","name":"simple"}]"#);
     let mut result = data.clone();
@@ -162,7 +162,7 @@ fn test_apply_includes_empty_include() {
 }
 
 #[test]
-fn test_apply_includes_missing_relations() {
+fn apply_includes_missing_relations() {
     let _s = setup();
     let mut data = docs(r#"[{"id":"x","name":"test","unknown":{"@entity":"missing","id":"000"}}]"#);
     api::apply_includes(&mut data, b"unknown");
@@ -173,7 +173,7 @@ fn test_apply_includes_missing_relations() {
 }
 
 #[test]
-fn test_extract_auto_includes_simple() {
+fn extract_auto_includes_simple() {
     let _s = setup();
     let input = filters(&[("author.name", &[("eq", "John")])]);
     let got = api::extract_auto_includes(&input);
@@ -183,7 +183,7 @@ fn test_extract_auto_includes_simple() {
 }
 
 #[test]
-fn test_extract_auto_includes_multiple() {
+fn extract_auto_includes_multiple() {
     let _s = setup();
     let input = filters(&[
         ("author.name", &[("eq", "John")]),
@@ -205,7 +205,7 @@ fn test_extract_auto_includes_multiple() {
 }
 
 #[test]
-fn test_merge_includes() {
+fn merge_includes() {
     let _s = setup();
     let got = api::merge_includes(b"author,profile", b"profile,category");
     let s: BTreeSet<&[u8]> = got.split(|&c| c == b',').collect();

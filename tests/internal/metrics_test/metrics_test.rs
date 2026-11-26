@@ -153,7 +153,7 @@ fn millis(n: u64) -> StdDuration {
 }
 
 #[test]
-fn test_rates_and_percentiles_per_second() {
+fn rates_and_percentiles_per_second() {
     let _s = setup(Sources::default(), |_| {});
     let t0 = Moment::now();
 
@@ -220,7 +220,7 @@ fn test_rates_and_percentiles_per_second() {
 }
 
 #[test]
-fn test_series_since_and_resolutions() {
+fn series_since_and_resolutions() {
     let _s = setup(Sources::default(), |_| {});
     let t0 = Moment::now().add(-(Duration::SECOND * 20));
 
@@ -269,7 +269,7 @@ fn test_series_since_and_resolutions() {
 }
 
 #[test]
-fn test_gauges_come_from_sources() {
+fn gauges_come_from_sources() {
     let _s = setup(
         Sources {
             kv_keys: source(|| (42, 7)),
@@ -322,7 +322,7 @@ fn test_gauges_come_from_sources() {
 }
 
 #[test]
-fn test_flush_status_and_problem() {
+fn flush_status_and_problem() {
     let _s = setup(Sources::default(), |_| {});
     let now = Moment::now();
 
@@ -367,7 +367,7 @@ fn test_flush_status_and_problem() {
 }
 
 #[test]
-fn test_error_rate_and_latency_problems() {
+fn error_rate_and_latency_problems() {
     let _s = setup(Sources::default(), |cfg| cfg.log.slow_request_ms = 10);
     let t0 = Moment::now();
 
@@ -400,7 +400,7 @@ fn test_error_rate_and_latency_problems() {
 }
 
 #[test]
-fn test_few_requests_do_not_raise_error_rate() {
+fn few_requests_do_not_raise_error_rate() {
     let _s = setup(Sources::default(), |_| {});
     let t0 = Moment::now();
 
@@ -414,7 +414,7 @@ fn test_few_requests_do_not_raise_error_rate() {
 }
 
 #[test]
-fn test_security_and_configuration_problems() {
+fn security_and_configuration_problems() {
     let _s = setup(
         Sources {
             default_admin_password: source(|| true),
@@ -456,7 +456,7 @@ fn test_security_and_configuration_problems() {
 }
 
 #[test]
-fn test_hook_recovery_replay_transaction_and_backlog_problems() {
+fn hook_recovery_replay_transaction_and_backlog_problems() {
     let backlog = Arc::new(AtomicI64::new(3));
     let read = backlog.clone();
     let _s = setup(
@@ -513,7 +513,7 @@ fn test_hook_recovery_replay_transaction_and_backlog_problems() {
 }
 
 #[test]
-fn test_problem_keeps_its_start_time() {
+fn problem_keeps_its_start_time() {
     let _s = setup(
         Sources {
             default_admin_password: source(|| true),
@@ -537,7 +537,7 @@ fn test_problem_keeps_its_start_time() {
 }
 
 #[test]
-fn test_overview() {
+fn overview() {
     let _s = setup(
         Sources {
             kv_keys: source(|| (10, 1)),
@@ -623,7 +623,7 @@ impl Drop for RestoreLog {
 }
 
 #[test]
-fn test_overview_counts_log_lines() {
+fn overview_counts_log_lines() {
     let _s = setup(Sources::default(), |_| {});
     let _ = log::configure(&Options::default());
     log::set_output(Some(Box::new(Sink)), false);
@@ -645,7 +645,7 @@ fn test_overview_counts_log_lines() {
 }
 
 #[test]
-fn test_details() {
+fn details() {
     let _s = setup(
         Sources {
             entity_counts: source(|| counts(&[("books", 2), ("authors", 9)])),
@@ -696,7 +696,7 @@ fn test_details() {
 }
 
 #[test]
-fn test_prometheus() {
+fn prometheus() {
     let _s = setup(
         Sources {
             entity_counts: source(|| counts(&[("we\"ird", 1)])),
@@ -736,7 +736,7 @@ fn test_prometheus() {
 }
 
 #[test]
-fn test_authentication_off_on_public_address() {
+fn authentication_off_on_public_address() {
     let cases: [(bool, &[&str], bool); 5] = [
         (false, &["0.0.0.0"], true),
         (false, &["127.0.0.1", "::1", "localhost"], false),
@@ -758,7 +758,7 @@ fn test_authentication_off_on_public_address() {
 }
 
 #[test]
-fn test_slow_sources_disk_and_default_password() {
+fn slow_sources_disk_and_default_password() {
     let folder = TempDir::new();
     let path = folder.path().join("data.json");
     if let Err(err) = std::fs::write(&path, vec![0u8; 1234]) {
@@ -791,7 +791,7 @@ fn test_slow_sources_disk_and_default_password() {
 }
 
 #[test]
-fn test_start_and_stop() {
+fn start_and_stop() {
     let _s = setup(Sources::default(), |_| {});
 
     metrics::start();
@@ -809,7 +809,7 @@ fn test_start_and_stop() {
 }
 
 #[test]
-fn test_disk_and_backup_series_follow_their_sources() {
+fn disk_and_backup_series_follow_their_sources() {
     let disk = Arc::new(Mutex::new(DiskSample {
         read_bytes: 1000,
         write_bytes: 2000,

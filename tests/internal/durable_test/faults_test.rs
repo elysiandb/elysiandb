@@ -132,7 +132,7 @@ impl File for FailingFile {
 }
 
 #[test]
-fn test_preallocated_space_changes_nothing_in_a_file() {
+fn preallocated_space_changes_nothing_in_a_file() {
     let dir = TempDir::new();
     let path = filepath::join(dir.path(), "segment");
 
@@ -373,7 +373,7 @@ fn reopen_mixed(label: &str, dir: &Path, image: &MemFs, mode: journal::Mode, l: 
 }
 
 #[test]
-fn test_process_crash_at_every_point_keeps_confirmed_writes() {
+fn process_crash_at_every_point_keeps_confirmed_writes() {
     const STEPS: usize = 70;
     let tmp = TempDir::new();
     let dir = tmp.path();
@@ -400,7 +400,7 @@ fn test_process_crash_at_every_point_keeps_confirmed_writes() {
 }
 
 #[test]
-fn test_power_cut_at_every_point_keeps_synced_writes() {
+fn power_cut_at_every_point_keeps_synced_writes() {
     const STEPS: usize = 70;
     let tmp = TempDir::new();
     let dir = tmp.path();
@@ -423,7 +423,7 @@ fn test_power_cut_at_every_point_keeps_synced_writes() {
 }
 
 #[test]
-fn test_concurrent_writers_share_their_syncs() {
+fn concurrent_writers_share_their_syncs() {
     let fs = GateFs::new(new_mem_fs());
     fs.set_delay(Duration::from_micros(200));
     let tmp = TempDir::new();
@@ -494,7 +494,7 @@ fn log_image(dir: &Path) -> (MemFs, MixedLedger) {
 }
 
 #[test]
-fn test_a_torn_log_is_never_read_as_valid() {
+fn a_torn_log_is_never_read_as_valid() {
     let tmp = TempDir::new();
     let dir = tmp.path();
     let (fs, l) = log_image(dir);
@@ -592,7 +592,7 @@ fn test_a_torn_log_is_never_read_as_valid() {
 }
 
 #[test]
-fn test_damage_before_the_end_of_the_log_sets_the_rest_aside() {
+fn damage_before_the_end_of_the_log_sets_the_rest_aside() {
     let tmp = TempDir::new();
     let dir = tmp.path();
     let fs = new_mem_fs();
@@ -651,7 +651,7 @@ fn test_damage_before_the_end_of_the_log_sets_the_rest_aside() {
 }
 
 #[test]
-fn test_an_interrupted_checkpoint_and_a_partial_page_are_ignored() {
+fn an_interrupted_checkpoint_and_a_partial_page_are_ignored() {
     let tmp = TempDir::new();
     let dir = tmp.path();
     let (fs, l) = log_image(dir);
@@ -696,7 +696,7 @@ fn test_an_interrupted_checkpoint_and_a_partial_page_are_ignored() {
 type TxResult = Result<(), elysiandb::gocompat::errors::BoxError>;
 
 #[test]
-fn test_a_full_disk_refuses_writes_and_comes_back() {
+fn a_full_disk_refuses_writes_and_comes_back() {
     let tmp = TempDir::new();
     let dir = tmp.path();
     let fs = new_mem_fs();
@@ -834,7 +834,7 @@ fn plain_options(dir: &Path, fs: Option<Arc<dyn Fs>>) -> Options {
 }
 
 #[test]
-fn test_a_migration_interrupted_at_any_step_completes_at_the_next_start() {
+fn a_migration_interrupted_at_any_step_completes_at_the_next_start() {
     let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/compat/testdata/v0.2.4/full");
 

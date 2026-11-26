@@ -124,7 +124,7 @@ fn first_id() -> String {
 }
 
 #[test]
-fn test_get_hooks_for_entity_ok() {
+fn get_hooks_for_entity_ok() {
     let _s = setup_hook_test();
 
     let _ = hook::create_hook(&mut doc_hook());
@@ -143,7 +143,7 @@ fn test_get_hooks_for_entity_ok() {
 }
 
 #[test]
-fn test_get_hooks_for_entity_forbidden() {
+fn get_hooks_for_entity_forbidden() {
     let _s = setup_hook_test();
 
     let mut ctx = user_ctx("GET");
@@ -155,7 +155,7 @@ fn test_get_hooks_for_entity_forbidden() {
 }
 
 #[test]
-fn test_create_hook_for_entity_ok() {
+fn create_hook_for_entity_ok() {
     let _s = setup_hook_test();
 
     let body = json::marshal(&object(vec![
@@ -195,7 +195,7 @@ fn test_create_hook_for_entity_ok() {
 }
 
 #[test]
-fn test_create_hook_for_entity_invalid_json() {
+fn create_hook_for_entity_invalid_json() {
     let _s = setup_hook_test();
 
     let mut ctx = admin_ctx("POST", Some(b"{bad"));
@@ -211,7 +211,7 @@ fn test_create_hook_for_entity_invalid_json() {
 }
 
 #[test]
-fn test_create_hook_for_entity_forbidden() {
+fn create_hook_for_entity_forbidden() {
     let _s = setup_hook_test();
 
     let mut ctx = user_ctx("POST");
@@ -223,7 +223,7 @@ fn test_create_hook_for_entity_forbidden() {
 }
 
 #[test]
-fn test_get_hook_by_id_ok() {
+fn get_hook_by_id_ok() {
     let _s = setup_hook_test();
 
     let _ = hook::create_hook(&mut doc_hook());
@@ -239,7 +239,7 @@ fn test_get_hook_by_id_ok() {
 }
 
 #[test]
-fn test_get_hook_by_id_not_found() {
+fn get_hook_by_id_not_found() {
     let _s = setup_hook_test();
 
     let mut ctx = admin_ctx("GET", None);
@@ -251,7 +251,7 @@ fn test_get_hook_by_id_not_found() {
 }
 
 #[test]
-fn test_get_hook_by_id_forbidden() {
+fn get_hook_by_id_forbidden() {
     let _s = setup_hook_test();
 
     let mut ctx = user_ctx("GET");
@@ -263,7 +263,7 @@ fn test_get_hook_by_id_forbidden() {
 }
 
 #[test]
-fn test_update_hook_by_id_ok() {
+fn update_hook_by_id_ok() {
     let _s = setup_hook_test();
 
     let _ = hook::create_hook(&mut doc_hook());
@@ -287,7 +287,7 @@ fn test_update_hook_by_id_ok() {
 }
 
 #[test]
-fn test_update_hook_by_id_invalid_json() {
+fn update_hook_by_id_invalid_json() {
     let _s = setup_hook_test();
 
     let mut ctx = admin_ctx("POST", Some(b"{bad"));
@@ -303,7 +303,7 @@ fn test_update_hook_by_id_invalid_json() {
 }
 
 #[test]
-fn test_update_hook_by_id_forbidden() {
+fn update_hook_by_id_forbidden() {
     let _s = setup_hook_test();
 
     let mut ctx = user_ctx("POST");
@@ -315,7 +315,7 @@ fn test_update_hook_by_id_forbidden() {
 }
 
 #[test]
-fn test_delete_hook_by_id_ok() {
+fn delete_hook_by_id_ok() {
     let _s = setup_hook_test();
 
     let _ = hook::create_hook(&mut doc_hook());
@@ -331,7 +331,7 @@ fn test_delete_hook_by_id_ok() {
 }
 
 #[test]
-fn test_delete_hook_by_id_not_found() {
+fn delete_hook_by_id_not_found() {
     let _s = setup_hook_test();
 
     let mut ctx = admin_ctx("DELETE", None);
@@ -343,7 +343,7 @@ fn test_delete_hook_by_id_not_found() {
 }
 
 #[test]
-fn test_delete_hook_by_id_forbidden() {
+fn delete_hook_by_id_forbidden() {
     let _s = setup_hook_test();
 
     let mut ctx = user_ctx("DELETE");

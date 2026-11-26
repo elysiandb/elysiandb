@@ -6,7 +6,7 @@ use talos::host::DocValue;
 use crate::{doc, entity, entity_of, field, setup, text};
 
 #[test]
-fn test_get_default_hook_script_js_for_post_read() {
+fn get_default_hook_script_js_for_post_read() {
     let _s = setup(true);
 
     let s = hook::get_default_hook_script_js_for_post_read();
@@ -15,7 +15,7 @@ fn test_get_default_hook_script_js_for_post_read() {
 }
 
 #[test]
-fn test_get_default_hook_script_js_for_pre_read() {
+fn get_default_hook_script_js_for_pre_read() {
     let _s = setup(true);
 
     let s = hook::get_default_hook_script_js_for_pre_read();
@@ -24,7 +24,7 @@ fn test_get_default_hook_script_js_for_pre_read() {
 }
 
 #[test]
-fn test_hook_to_data_map_and_from_data_map() {
+fn hook_to_data_map_and_from_data_map() {
     let _s = setup(true);
 
     let h = Hook {
@@ -57,7 +57,7 @@ fn test_hook_to_data_map_and_from_data_map() {
 }
 
 #[test]
-fn test_init_hooks_disabled_does_nothing() {
+fn init_hooks_disabled_does_nothing() {
     let _s = setup(false);
 
     hook::init_hooks();
@@ -68,7 +68,7 @@ fn test_init_hooks_disabled_does_nothing() {
 }
 
 #[test]
-fn test_init_hooks_creates_entity_type() {
+fn init_hooks_creates_entity_type() {
     let _s = setup(true);
 
     assert!(
@@ -85,7 +85,7 @@ fn test_init_hooks_creates_entity_type() {
 }
 
 #[test]
-fn test_create_hook_entity() {
+fn create_hook_entity() {
     let _s = setup(true);
 
     assert!(
@@ -159,17 +159,17 @@ fn query_works(
 }
 
 #[test]
-fn test_apply_post_read_script_missing_post_read_is_noop() {
+fn apply_post_read_script_missing_post_read_is_noop() {
     missing_entry_is_noop(hook::apply_post_read_script);
 }
 
 #[test]
-fn test_apply_post_read_script_syntax_error() {
+fn apply_post_read_script_syntax_error() {
     syntax_error(hook::apply_post_read_script, "function postRead(ctx) {");
 }
 
 #[test]
-fn test_apply_post_read_script_query_arg_error() {
+fn apply_post_read_script_query_arg_error() {
     syntax_error(
         hook::apply_post_read_script,
         "\nfunction postRead(ctx) {\n  ctx.query(\"order\")\n  return ctx.entity\n}",
@@ -177,7 +177,7 @@ fn test_apply_post_read_script_query_arg_error() {
 }
 
 #[test]
-fn test_apply_post_read_script_mutates_entity_and_query_works() {
+fn apply_post_read_script_mutates_entity_and_query_works() {
     query_works(
         hook::apply_post_read_script,
         "\nfunction postRead(ctx) {\n  const orders = ctx.query(\"order\", { totoId: { eq: ctx.entity.id } })\n  ctx.entity.ordersCount = orders.length\n  ctx.entity.ok = true\n  return ctx.entity\n}",
@@ -185,7 +185,7 @@ fn test_apply_post_read_script_mutates_entity_and_query_works() {
 }
 
 #[test]
-fn test_create_update_delete_get_hook_and_queries() {
+fn create_update_delete_get_hook_and_queries() {
     let _s = setup(true);
 
     hook::init_hooks();
@@ -265,7 +265,7 @@ fn test_create_update_delete_get_hook_and_queries() {
 }
 
 #[test]
-fn test_create_hook_duplicate_id() {
+fn create_hook_duplicate_id() {
     let _s = setup(true);
 
     hook::init_hooks();
@@ -318,7 +318,7 @@ fn new_hook(name: &str, event: &str, script: &str, enabled: bool, priority: i64)
 }
 
 #[test]
-fn test_get_post_read_hooks_for_entity_filters_event() {
+fn get_post_read_hooks_for_entity_filters_event() {
     let _s = setup(true);
 
     hook::init_hooks();
@@ -379,7 +379,7 @@ fn priority_enabled_and_error_tolerance(
 }
 
 #[test]
-fn test_apply_post_read_hooks_for_entity_priority_enabled_and_error_tolerance() {
+fn apply_post_read_hooks_for_entity_priority_enabled_and_error_tolerance() {
     priority_enabled_and_error_tolerance(
         hook::HOOK_EVENT_POST_READ,
         "postRead",
@@ -388,7 +388,7 @@ fn test_apply_post_read_hooks_for_entity_priority_enabled_and_error_tolerance() 
 }
 
 #[test]
-fn test_get_pre_read_hooks_for_entity_filters_event() {
+fn get_pre_read_hooks_for_entity_filters_event() {
     let _s = setup(true);
 
     hook::init_hooks();
@@ -415,7 +415,7 @@ fn test_get_pre_read_hooks_for_entity_filters_event() {
 }
 
 #[test]
-fn test_apply_pre_read_hooks_for_entity_priority_enabled_and_error_tolerance() {
+fn apply_pre_read_hooks_for_entity_priority_enabled_and_error_tolerance() {
     priority_enabled_and_error_tolerance(
         hook::HOOK_EVENT_PRE_READ,
         "preRead",
@@ -424,17 +424,17 @@ fn test_apply_pre_read_hooks_for_entity_priority_enabled_and_error_tolerance() {
 }
 
 #[test]
-fn test_apply_pre_read_script_missing_pre_read_is_noop() {
+fn apply_pre_read_script_missing_pre_read_is_noop() {
     missing_entry_is_noop(hook::apply_pre_read_script);
 }
 
 #[test]
-fn test_apply_pre_read_script_syntax_error() {
+fn apply_pre_read_script_syntax_error() {
     syntax_error(hook::apply_pre_read_script, "function preRead(ctx) {");
 }
 
 #[test]
-fn test_apply_pre_read_script_query_arg_error() {
+fn apply_pre_read_script_query_arg_error() {
     syntax_error(
         hook::apply_pre_read_script,
         "\nfunction preRead(ctx) {\n  ctx.query(\"order\")\n  return ctx.entity\n}",
@@ -442,7 +442,7 @@ fn test_apply_pre_read_script_query_arg_error() {
 }
 
 #[test]
-fn test_apply_pre_read_script_mutates_entity_and_query_works() {
+fn apply_pre_read_script_mutates_entity_and_query_works() {
     query_works(
         hook::apply_pre_read_script,
         "\nfunction preRead(ctx) {\n  const orders = ctx.query(\"order\", { totoId: { eq: ctx.entity.id } })\n  ctx.entity.ordersCount = orders.length\n  ctx.entity.ok = true\n  return ctx.entity\n}",
@@ -450,7 +450,7 @@ fn test_apply_pre_read_script_mutates_entity_and_query_works() {
 }
 
 #[test]
-fn test_hook_validate_requires_core_fields() {
+fn hook_validate_requires_core_fields() {
     let valid = Hook {
         name: "n".to_string(),
         entity: "e".to_string(),
@@ -481,7 +481,7 @@ fn test_hook_validate_requires_core_fields() {
 }
 
 #[test]
-fn test_update_hook_restores_default_script_and_rejects_invalid_hooks() {
+fn update_hook_restores_default_script_and_rejects_invalid_hooks() {
     let _s = setup(true);
     hook::init_hooks();
 
@@ -519,7 +519,7 @@ fn test_update_hook_restores_default_script_and_rejects_invalid_hooks() {
 }
 
 #[test]
-fn test_update_hook_rejects_unknown_hooks_and_events() {
+fn update_hook_rejects_unknown_hooks_and_events() {
     let _s = setup(true);
     hook::init_hooks();
 

@@ -98,7 +98,7 @@ fn minutes(m: i64) -> GoDuration {
 }
 
 #[test]
-fn test_batched_index_build_follows_concurrent_writes() {
+fn batched_index_build_follows_concurrent_writes() {
     let bg = open_background();
     let e: &Arc<Engine> = &bg.e.0;
     put_docs(e, b"w", 0, 20000, work_doc);
@@ -193,7 +193,7 @@ fn test_batched_index_build_follows_concurrent_writes() {
 }
 
 #[test]
-fn test_idle_index_is_released_and_rebuilt_on_use() {
+fn idle_index_is_released_and_rebuilt_on_use() {
     let bg = open_background();
     let e = &bg.e.0;
     put_docs(e, b"idle", 0, 3000, work_doc);
@@ -251,7 +251,7 @@ fn test_idle_index_is_released_and_rebuilt_on_use() {
 }
 
 #[test]
-fn test_small_entity_index_is_built_at_once() {
+fn small_entity_index_is_built_at_once() {
     let bg = open_background();
     let e = &bg.e.0;
     put_docs(e, b"small", 0, 200, work_doc);
@@ -277,7 +277,7 @@ fn test_small_entity_index_is_built_at_once() {
 }
 
 #[test]
-fn test_restart_rebuilds_search_indexes_and_keeps_released_indexes() {
+fn restart_rebuilds_search_indexes_and_keeps_released_indexes() {
     let tmp = TempDir::new();
     let mut opts = options(tmp.path());
     opts.background = true;
@@ -325,7 +325,7 @@ fn test_restart_rebuilds_search_indexes_and_keeps_released_indexes() {
 }
 
 #[test]
-fn test_reset_releases_the_cached_values() {
+fn reset_releases_the_cached_values() {
     let tmp = TempDir::new();
     let mut opts = options(tmp.path());
     opts.background = true;
@@ -377,7 +377,7 @@ fn pages_on_disk(folder: &Path) -> i64 {
 }
 
 #[test]
-fn test_fragmented_page_segments_are_cleaned() {
+fn fragmented_page_segments_are_cleaned() {
     let tmp = TempDir::new();
     let mut opts = options(tmp.path());
     opts.segment_size = 0;

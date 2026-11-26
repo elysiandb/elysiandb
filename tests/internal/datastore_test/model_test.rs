@@ -101,7 +101,7 @@ fn compare(step: i64, e: &Engine, m: &Model) {
 }
 
 #[test]
-fn test_random_operations_against_a_model() {
+fn random_operations_against_a_model() {
     for (cache, pages, segment) in [(0, 0, 0), (4 << 10, 0, 0), (4 << 10, 16 << 10, 64 << 10)] {
         let tmp = TempDir::new();
         let mut opts = options(tmp.path());
@@ -195,7 +195,7 @@ fn test_random_operations_against_a_model() {
 }
 
 #[test]
-fn test_compaction_removes_dead_segments() {
+fn compaction_removes_dead_segments() {
     let tmp = TempDir::new();
     let e = Closer(open(&options(tmp.path())));
     let e = &e.0;
@@ -252,7 +252,7 @@ fn test_compaction_removes_dead_segments() {
 }
 
 #[test]
-fn test_snapshots_are_stable_while_writes_continue() {
+fn snapshots_are_stable_while_writes_continue() {
     let tmp = TempDir::new();
     let e = Closer(open(&options(tmp.path())));
     let e = &e.0;
@@ -282,7 +282,7 @@ fn test_snapshots_are_stable_while_writes_continue() {
 }
 
 #[test]
-fn test_conflicting_transactions_are_retried() {
+fn conflicting_transactions_are_retried() {
     let tmp = TempDir::new();
     let e = Closer(open(&options(tmp.path())));
     let e = &e.0;
@@ -324,7 +324,7 @@ fn child(test: &str, var: &str, dir: &std::path::Path) -> Command {
 }
 
 #[test]
-fn test_lock_file_rejects_a_second_process_on_the_folder() {
+fn lock_file_rejects_a_second_process_on_the_folder() {
     if let Some(dir) = std::env::var_os("ELYSIAN_LOCK_CHILD") {
         match datastore::open(options(std::path::Path::new(&dir))) {
             Err(err) => println!("LOCKED {err}"),
@@ -338,7 +338,7 @@ fn test_lock_file_rejects_a_second_process_on_the_folder() {
     let e = open(&options(tmp.path()));
 
     let out = child(
-        "model_test::test_lock_file_rejects_a_second_process_on_the_folder",
+        "model_test::lock_file_rejects_a_second_process_on_the_folder",
         "ELYSIAN_LOCK_CHILD",
         tmp.path(),
     )
@@ -408,7 +408,7 @@ fn parse_ack(line: &str) -> Option<String> {
 }
 
 #[test]
-fn test_kill9_loses_no_acknowledged_write() {
+fn kill9_loses_no_acknowledged_write() {
     if let Some(dir) = std::env::var_os("ELYSIAN_CRASH_CHILD") {
         crash_child(std::path::Path::new(&dir));
     }
@@ -430,7 +430,7 @@ fn test_kill9_loses_no_acknowledged_write() {
 
     for run in 0..runs {
         let mut proc_ = child(
-            "model_test::test_kill9_loses_no_acknowledged_write",
+            "model_test::kill9_loses_no_acknowledged_write",
             "ELYSIAN_CRASH_CHILD",
             dir,
         )
@@ -526,7 +526,7 @@ fn test_kill9_loses_no_acknowledged_write() {
 }
 
 #[test]
-fn test_old_snapshots_read_pages_of_cleaned_segments() {
+fn old_snapshots_read_pages_of_cleaned_segments() {
     let tmp = TempDir::new();
     let mut opts = options(tmp.path());
     opts.cache_bytes = 4 << 10;

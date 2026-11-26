@@ -109,7 +109,7 @@ fn text(v: &Value) -> &str {
 }
 
 #[test]
-fn test_overview_controller() {
+fn overview_controller() {
     let _s = setup(10);
     metrics::tick(Moment::now());
 
@@ -138,7 +138,7 @@ fn test_overview_controller() {
 }
 
 #[test]
-fn test_series_controller() {
+fn series_controller() {
     let _s = setup(10);
     let t0 = Moment::now();
     metrics::tick(t0.clone());
@@ -181,7 +181,7 @@ fn test_series_controller() {
 }
 
 #[test]
-fn test_details_controller() {
+fn details_controller() {
     let _s = setup(10);
     metrics::observe_http("GET", "/api/{entity}", 200, StdDuration::from_millis(1), "");
 
@@ -191,7 +191,7 @@ fn test_details_controller() {
 }
 
 #[test]
-fn test_logs_controller_filters() {
+fn logs_controller_filters() {
     let _s = setup(100);
 
     log::for_component("http").error(
@@ -267,7 +267,7 @@ fn test_logs_controller_filters() {
 }
 
 #[test]
-fn test_logs_controller_without_buffer() {
+fn logs_controller_without_buffer() {
     let _s = setup(0);
 
     for h in [
@@ -285,7 +285,7 @@ fn test_logs_controller_without_buffer() {
 }
 
 #[test]
-fn test_logs_download() {
+fn logs_download() {
     let _s = setup(2000);
 
     for i in 0..1500i64 {
@@ -329,7 +329,7 @@ fn test_logs_download() {
 }
 
 #[test]
-fn test_log_level_controllers() {
+fn log_level_controllers() {
     let _s = setup(100);
 
     let info = decode(&get(
@@ -403,7 +403,7 @@ fn test_log_level_controllers() {
 }
 
 #[test]
-fn test_prometheus_token_auth() {
+fn prometheus_token_auth() {
     let _s = setup(10);
     set_prometheus_token("s3cret");
 

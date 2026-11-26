@@ -25,7 +25,7 @@ fn field_type(field: &Map) -> Option<&str> {
 }
 
 #[test]
-fn test_merge_analyzed_schema_keeps_absent_fields_and_takes_the_latest_types() {
+fn merge_analyzed_schema_keeps_absent_fields_and_takes_the_latest_types() {
     let _serial = serial();
     set_schema_config(false);
 
@@ -87,7 +87,7 @@ fn test_merge_analyzed_schema_keeps_absent_fields_and_takes_the_latest_types() {
 }
 
 #[test]
-fn test_merge_analyzed_schema_without_existing_schema() {
+fn merge_analyzed_schema_without_existing_schema() {
     let _serial = serial();
     set_schema_config(true);
 
@@ -99,7 +99,7 @@ fn test_merge_analyzed_schema_without_existing_schema() {
 }
 
 #[test]
-fn test_merge_analyzed_schema_upgrades_unknown_types() {
+fn merge_analyzed_schema_upgrades_unknown_types() {
     let _serial = serial();
     set_schema_config(false);
 
@@ -123,7 +123,7 @@ fn test_merge_analyzed_schema_upgrades_unknown_types() {
 }
 
 #[test]
-fn test_merge_analyzed_schema_merges_nested_objects_and_arrays() {
+fn merge_analyzed_schema_merges_nested_objects_and_arrays() {
     let _serial = serial();
     set_schema_config(false);
 
@@ -163,7 +163,7 @@ fn test_merge_analyzed_schema_merges_nested_objects_and_arrays() {
 }
 
 #[test]
-fn test_merge_analyzed_schema_keeps_manual_flag_and_required_flags() {
+fn merge_analyzed_schema_keeps_manual_flag_and_required_flags() {
     let _serial = serial();
     set_schema_config(false);
 
@@ -219,7 +219,7 @@ fn typed(ty: &str, required: Option<bool>) -> Value {
 }
 
 #[test]
-fn test_validate_entity_null_values() {
+fn validate_entity_null_values() {
     let _serial = serial();
     set_schema_config(true);
 
@@ -266,7 +266,7 @@ fn test_validate_entity_null_values() {
 }
 
 #[test]
-fn test_validate_entity_update_validates_the_merged_document() {
+fn validate_entity_update_validates_the_merged_document() {
     let _serial = serial();
     set_schema_config(true);
 
@@ -403,7 +403,7 @@ fn test_validate_entity_update_validates_the_merged_document() {
 }
 
 #[test]
-fn test_map_to_fields_shorthand_types() {
+fn map_to_fields_shorthand_types() {
     let fields = schema::map_to_fields(&obj(vec![
         ("title", s("string")),
         (

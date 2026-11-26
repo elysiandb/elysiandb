@@ -50,7 +50,7 @@ fn last(fs: &MemFs, prefix: &Path) -> String {
 type Damage = fn(&MemFs, &Path);
 
 #[test]
-fn test_damaged_files_never_prevent_a_start() {
+fn damaged_files_never_prevent_a_start() {
     let cases: Vec<(&str, Damage, bool)> = vec![
         (
             "unreadable manifest",
@@ -167,7 +167,7 @@ fn test_damaged_files_never_prevent_a_start() {
 }
 
 #[test]
-fn test_a_full_disk_never_acknowledges_a_lost_write() {
+fn a_full_disk_never_acknowledges_a_lost_write() {
     let tmp = TempDir::new();
     let dir = tmp.path();
     let fs = new_mem_fs();
@@ -228,7 +228,7 @@ fn test_a_full_disk_never_acknowledges_a_lost_write() {
 }
 
 #[test]
-fn test_a_previous_manifest_from_another_chain_is_ignored() {
+fn a_previous_manifest_from_another_chain_is_ignored() {
     let tmp = TempDir::new();
     let dir = tmp.path();
     let (fs, l) = filled_disk(dir);

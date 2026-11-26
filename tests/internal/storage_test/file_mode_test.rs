@@ -37,7 +37,7 @@ fn expect_owner_only(dir: &Path) {
 }
 
 #[test]
-fn test_data_files_are_owner_only() {
+fn data_files_are_owner_only() {
     let _serial = serial();
     let dir = TempDir::new();
     set_store(StoreConfig {
@@ -64,7 +64,7 @@ fn test_data_files_are_owner_only() {
 }
 
 #[test]
-fn test_existing_data_files_become_owner_only_at_startup() {
+fn existing_data_files_become_owner_only_at_startup() {
     let _serial = serial();
     let dir = TempDir::new();
     for name in [

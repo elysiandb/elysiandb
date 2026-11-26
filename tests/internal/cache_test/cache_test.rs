@@ -44,7 +44,7 @@ fn text(v: &Option<Arc<[u8]>>) -> String {
 }
 
 #[test]
-fn test_cache_set_get() {
+fn cache_set_get() {
     let _serial = serial();
     cache::init_cache(Duration::SECOND * 10);
     let entity = b"users";
@@ -62,7 +62,7 @@ fn test_cache_set_get() {
 }
 
 #[test]
-fn test_cache_get_not_exist() {
+fn cache_get_not_exist() {
     let _serial = serial();
     cache::init_cache(Duration::SECOND * 10);
     let entity = b"users";
@@ -74,7 +74,7 @@ fn test_cache_get_not_exist() {
 }
 
 #[test]
-fn test_cache_invalid_hash_length() {
+fn cache_invalid_hash_length() {
     let _serial = serial();
     cache::init_cache(Duration::SECOND * 10);
     let entity = b"users";
@@ -86,7 +86,7 @@ fn test_cache_invalid_hash_length() {
 }
 
 #[test]
-fn test_cache_purge() {
+fn cache_purge() {
     let _serial = serial();
     cache::init_cache(Duration::SECOND * 10);
     let entity = b"users";
@@ -101,7 +101,7 @@ fn test_cache_purge() {
 }
 
 #[test]
-fn test_hash_query_different_inputs() {
+fn hash_query_different_inputs() {
     let none = Filters::new();
     let h1 = users_hash(10, 0, "name", true, &none, "alice");
     let h2 = users_hash(20, 0, "name", true, &none, "alice");
@@ -123,7 +123,7 @@ fn test_hash_query_different_inputs() {
 }
 
 #[test]
-fn test_hash_query_with_different_users() {
+fn hash_query_with_different_users() {
     let none = Filters::new();
     let h1 = users_hash(10, 0, "name", true, &none, "alice");
     let h2 = users_hash(10, 0, "name", true, &none, "bob");
@@ -133,7 +133,7 @@ fn test_hash_query_with_different_users() {
 }
 
 #[test]
-fn test_hash_query_with_filters_string_ops() {
+fn hash_query_with_filters_string_ops() {
     let f1 = filters(&[("name", &[("eq", "Alice")])]);
     let f2 = filters(&[("name", &[("neq", "Alice")])]);
     let f3 = filters(&[("name", &[("eq", "Bob")])]);
@@ -149,7 +149,7 @@ fn test_hash_query_with_filters_string_ops() {
 }
 
 #[test]
-fn test_cache_expiration() {
+fn cache_expiration() {
     let _serial = serial();
     cache::init_cache(Duration::MILLISECOND * 100);
     let entity = b"users";
@@ -165,7 +165,7 @@ fn test_cache_expiration() {
 }
 
 #[test]
-fn test_cache_set_get_by_id() {
+fn cache_set_get_by_id() {
     let _serial = serial();
     cache::init_cache(Duration::SECOND * 10);
     let entity = b"users";
@@ -183,7 +183,7 @@ fn test_cache_set_get_by_id() {
 }
 
 #[test]
-fn test_cache_expiration_by_id() {
+fn cache_expiration_by_id() {
     let _serial = serial();
     cache::init_cache(Duration::MILLISECOND * 100);
     let entity = b"users";

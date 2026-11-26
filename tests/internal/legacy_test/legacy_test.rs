@@ -46,7 +46,7 @@ fn marshal<T: json::Encode + ?Sized>(v: &T) -> Vec<u8> {
 }
 
 #[test]
-fn test_read_kv_file() {
+fn read_kv_file() {
     let dir = TempDir::new();
     let path = write_file(
         dir.path(),
@@ -79,7 +79,7 @@ fn test_read_kv_file() {
 }
 
 #[test]
-fn test_read_expirations_file() {
+fn read_expirations_file() {
     let dir = TempDir::new();
     let path = write_file(
         dir.path(),
@@ -129,7 +129,7 @@ fn doc_key(entity: &[u8], id: &[u8]) -> String {
 }
 
 #[test]
-fn test_read_replays_the_recovery_logs_like024() {
+fn read_replays_the_recovery_logs_like024() {
     let dir = TempDir::new();
     let now = SystemTime::now();
     let expires_at = unix(now) + 3600;
@@ -284,7 +284,7 @@ fn open_engine() -> Arc<datastore::Engine> {
 }
 
 #[test]
-fn test_migration_moves_the_legacy_files_and_keeps_the_data() {
+fn migration_moves_the_legacy_files_and_keeps_the_data() {
     let _serial = serial();
     let dir = TempDir::new();
     let ttl_expires_at = unix(SystemTime::now()) + 600;
@@ -376,7 +376,7 @@ fn test_migration_moves_the_legacy_files_and_keeps_the_data() {
 }
 
 #[test]
-fn test_export_legacy_writes_a024_folder() {
+fn export_legacy_writes_a024_folder() {
     let _serial = serial();
     let dir = TempDir::new();
     set_store(dir.path());

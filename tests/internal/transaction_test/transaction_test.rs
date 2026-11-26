@@ -69,7 +69,7 @@ fn op(kind: &str, entity: &str, id: &str, data: &[(&str, i64)]) -> TxOperation {
 }
 
 #[test]
-fn test_begin_transaction() {
+fn begin_transaction() {
     let _s = serial();
     let tx = transaction::begin_transaction();
     if tx.id.is_empty() {
@@ -78,7 +78,7 @@ fn test_begin_transaction() {
 }
 
 #[test]
-fn test_get_transaction_ok() {
+fn get_transaction_ok() {
     let _s = serial();
     let tx = transaction::begin_transaction();
     match transaction::get_transaction(&tx.id) {
@@ -89,7 +89,7 @@ fn test_get_transaction_ok() {
 }
 
 #[test]
-fn test_get_transaction_not_found() {
+fn get_transaction_not_found() {
     let _s = serial();
     match transaction::get_transaction("missing") {
         Err(err) if err.to_string() == "transaction not found" => {}
@@ -98,7 +98,7 @@ fn test_get_transaction_not_found() {
 }
 
 #[test]
-fn test_add_operation_ok() {
+fn add_operation_ok() {
     let _s = serial();
     let tx = transaction::begin_transaction();
     if let Err(err) = transaction::add_operation(&tx.id, op("write", "x", "", &[("a", 1)])) {
@@ -111,7 +111,7 @@ fn test_add_operation_ok() {
 }
 
 #[test]
-fn test_add_operation_not_found() {
+fn add_operation_not_found() {
     let _s = serial();
     if transaction::add_operation("missing", TxOperation::default()).is_ok() {
         panic!("expected error");
@@ -119,7 +119,7 @@ fn test_add_operation_not_found() {
 }
 
 #[test]
-fn test_rollback_transaction_ok() {
+fn rollback_transaction_ok() {
     let _s = serial();
     let tx = transaction::begin_transaction();
     if let Err(err) = transaction::rollback_transaction(&tx.id) {
@@ -131,7 +131,7 @@ fn test_rollback_transaction_ok() {
 }
 
 #[test]
-fn test_rollback_transaction_not_found() {
+fn rollback_transaction_not_found() {
     let _s = serial();
     if transaction::rollback_transaction("missing").is_err() {
         panic!("unexpected err");
@@ -139,7 +139,7 @@ fn test_rollback_transaction_not_found() {
 }
 
 #[test]
-fn test_commit_transaction_write_validation_fails() {
+fn commit_transaction_write_validation_fails() {
     let _s = serial();
     let f = Arc::new(FakeStorage {
         write_err: true,
@@ -157,7 +157,7 @@ fn test_commit_transaction_write_validation_fails() {
 }
 
 #[test]
-fn test_commit_transaction_update_fails() {
+fn commit_transaction_update_fails() {
     let _s = serial();
     let f = Arc::new(FakeStorage {
         update_fail: true,
@@ -175,7 +175,7 @@ fn test_commit_transaction_update_fails() {
 }
 
 #[test]
-fn test_commit_transaction_delete_ok() {
+fn commit_transaction_delete_ok() {
     let _s = serial();
     let f = Arc::new(FakeStorage::default());
     let _restore = use_fake(f.clone());
@@ -192,7 +192,7 @@ fn test_commit_transaction_delete_ok() {
 }
 
 #[test]
-fn test_commit_transaction_not_found() {
+fn commit_transaction_not_found() {
     let _s = serial();
     if transaction::commit_transaction("missing").is_ok() {
         panic!("expected error");
@@ -200,7 +200,7 @@ fn test_commit_transaction_not_found() {
 }
 
 #[test]
-fn test_commit_transaction_write_and_update_success() {
+fn commit_transaction_write_and_update_success() {
     let _s = serial();
     let f = Arc::new(FakeStorage::default());
     let _restore = use_fake(f.clone());
@@ -219,7 +219,7 @@ fn test_commit_transaction_write_and_update_success() {
 }
 
 #[test]
-fn test_generate_tx_id() {
+fn generate_tx_id() {
     let _s = serial();
     let _id = Time::now().format("20060102150405.000000000");
     let got = transaction::begin_transaction();

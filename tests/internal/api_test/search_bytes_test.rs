@@ -9,7 +9,7 @@ use super::evaluate_test::wait_for_indexes;
 use super::{filters, ids, init_test_store, setup};
 
 #[test]
-fn test_searches_and_search_counts_match_the_scan() {
+fn searches_and_search_counts_match_the_scan() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -265,7 +265,7 @@ fn decode(raw: &[u8]) -> Map {
 }
 
 #[test]
-fn test_search_on_stored_bytes_matches_the_decoded_search() {
+fn search_on_stored_bytes_matches_the_decoded_search() {
     let _s = setup();
     let mut r = Rand::new(rand::new_source(11));
     for _ in 0..20000 {
@@ -287,7 +287,7 @@ fn test_search_on_stored_bytes_matches_the_decoded_search() {
 }
 
 #[test]
-fn test_search_on_hand_written_json() {
+fn search_on_hand_written_json() {
     let _s = setup();
     let cases: [(&str, &str); 10] = [
         (r#"{"a":"\/path\/to"}"#, "/path/to"),

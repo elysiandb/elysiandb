@@ -32,7 +32,7 @@ fn check(m: &BTreeMap<String, String>, want: &[(&str, &str)]) {
 }
 
 #[test]
-fn test_new_stats_container_zeroed() {
+fn new_stats_container_zeroed() {
     let s = new_stats_container();
     let m = strings(&s.to_json());
     check(
@@ -50,7 +50,7 @@ fn test_new_stats_container_zeroed() {
 }
 
 #[test]
-fn test_increments_and_sets() {
+fn increments_and_sets() {
     let s = new_stats_container();
     s.increment_keys_count();
     s.increment_expiration_keys_count();
@@ -76,7 +76,7 @@ fn test_increments_and_sets() {
 }
 
 #[test]
-fn test_decrement_does_not_go_below_zero() {
+fn decrement_does_not_go_below_zero() {
     let s = new_stats_container();
     s.decrement_keys_count();
     s.decrement_expiration_keys_count();
@@ -89,7 +89,7 @@ fn test_decrement_does_not_go_below_zero() {
 }
 
 #[test]
-fn test_reset() {
+fn reset() {
     let s = new_stats_container();
     s.set_keys_count(10);
     s.set_expiration_keys_count(5);
@@ -109,7 +109,7 @@ fn test_reset() {
 }
 
 #[test]
-fn test_to_json_values_are_strings() {
+fn to_json_values_are_strings() {
     let s = new_stats_container();
     s.set_keys_count(3);
     s.set_expiration_keys_count(4);
@@ -125,7 +125,7 @@ fn test_to_json_values_are_strings() {
 }
 
 #[test]
-fn test_concurrent_increments_no_race_and_counts_match() {
+fn concurrent_increments_no_race_and_counts_match() {
     let s = new_stats_container();
     const GOROUTINES: usize = 64;
     const ITERS: usize = 10_000;
@@ -156,7 +156,7 @@ fn test_concurrent_increments_no_race_and_counts_match() {
 }
 
 #[test]
-fn test_init_global_stats_is_zeroed() {
+fn init_global_stats_is_zeroed() {
     stat::stats().increment_hits();
     stat::stats().increment_misses();
     stat::stats().set_keys_count(9);

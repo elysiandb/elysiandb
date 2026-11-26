@@ -4,7 +4,7 @@ use elysiandb::gocompat::json::{Map, Value};
 use super::{doc, setup, value};
 
 #[test]
-fn test_field_get_nested_value() {
+fn field_get_nested_value() {
     let _s = setup();
     let data = doc(
         r#"{"name":"John","address":{"city":"Paris","geo":{"lat":48.85,"lng":2.35},"empty":{}}}"#,
@@ -38,7 +38,7 @@ fn test_field_get_nested_value() {
 }
 
 #[test]
-fn test_set_nested_field() {
+fn set_nested_field() {
     let _s = setup();
     let mut dest = Map::new();
     let _ = api::filter_fields(&Map::new(), &[]);
@@ -52,7 +52,7 @@ fn test_set_nested_field() {
 }
 
 #[test]
-fn test_filter_fields() {
+fn filter_fields() {
     let _s = setup();
     let data = doc(
         r#"{"id":"u1","name":"Alice","address":{"city":"Paris","geo":{"lat":48.85,"lng":2.35}}}"#,
@@ -66,7 +66,7 @@ fn test_filter_fields() {
 }
 
 #[test]
-fn test_parse_fields_param() {
+fn parse_fields_param() {
     let _s = setup();
     let tests: [(&str, &[&str]); 4] = [
         ("name,email", &["name", "email"]),

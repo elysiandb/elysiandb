@@ -112,7 +112,7 @@ fn commit_ctx(tx_id: &str) -> RequestCtx {
 }
 
 #[test]
-fn test_transaction_lifecycle() {
+fn transaction_lifecycle() {
     let _s = setup();
 
     let mut ctx = new_ctx("POST", "/api/tx/begin", "");
@@ -142,7 +142,7 @@ fn test_transaction_lifecycle() {
 }
 
 #[test]
-fn test_transaction_rollback() {
+fn transaction_rollback() {
     let _s = setup();
 
     let tx_id = begin_id();
@@ -166,7 +166,7 @@ fn test_transaction_rollback() {
 }
 
 #[test]
-fn test_transaction_delete() {
+fn transaction_delete() {
     let _s = setup();
 
     let tx_id = begin_id();
@@ -198,7 +198,7 @@ fn test_transaction_delete() {
 }
 
 #[test]
-fn test_transaction_update() {
+fn transaction_update() {
     let _s = setup();
 
     let tx_id = begin_id();
@@ -328,7 +328,7 @@ fn stored_note(id: &str) -> Map {
 }
 
 #[test]
-fn test_transaction_update_owning_update_rejects_other_users_entity() {
+fn transaction_update_owning_update_rejects_other_users_entity() {
     let _s = setup_ownership();
 
     let tx_id = begin();
@@ -354,7 +354,7 @@ fn test_transaction_update_owning_update_rejects_other_users_entity() {
 }
 
 #[test]
-fn test_transaction_update_owner_allowed() {
+fn transaction_update_owner_allowed() {
     let _s = setup_ownership();
 
     let tx_id = begin();
@@ -375,7 +375,7 @@ fn test_transaction_update_owner_allowed() {
 }
 
 #[test]
-fn test_transaction_delete_owning_delete_rejects_other_users_entity() {
+fn transaction_delete_owning_delete_rejects_other_users_entity() {
     let _s = setup_ownership();
 
     let tx_id = begin();
@@ -393,7 +393,7 @@ fn test_transaction_delete_owning_delete_rejects_other_users_entity() {
 }
 
 #[test]
-fn test_transaction_delete_owner_allowed() {
+fn transaction_delete_owner_allowed() {
     let _s = setup_ownership();
 
     let tx_id = begin();
@@ -411,7 +411,7 @@ fn test_transaction_delete_owner_allowed() {
 }
 
 #[test]
-fn test_transaction_write_stamps_owner() {
+fn transaction_write_stamps_owner() {
     let _s = setup_ownership();
 
     let tx_id = begin();
@@ -439,7 +439,7 @@ fn test_transaction_write_stamps_owner() {
 }
 
 #[test]
-fn test_transaction_write_existing_id_of_other_user_is_forbidden() {
+fn transaction_write_existing_id_of_other_user_is_forbidden() {
     let _s = setup_ownership();
 
     let tx_id = begin();
@@ -460,7 +460,7 @@ fn test_transaction_write_existing_id_of_other_user_is_forbidden() {
 }
 
 #[test]
-fn test_transaction_write_requires_create_permission() {
+fn transaction_write_requires_create_permission() {
     let _s = setup_ownership();
 
     let mut perms = acl::new_permissions();
@@ -487,7 +487,7 @@ fn test_transaction_write_requires_create_permission() {
 }
 
 #[test]
-fn test_transaction_write_null_payload() {
+fn transaction_write_null_payload() {
     let _s = setup();
 
     let tx_id = begin();
@@ -516,7 +516,7 @@ fn get_note(id: &str) -> RequestCtx {
 }
 
 #[test]
-fn test_transaction_commit_purges_cache() {
+fn transaction_commit_purges_cache() {
     let _s = setup();
     update_config(|cfg| cfg.api.cache.enabled = true);
 

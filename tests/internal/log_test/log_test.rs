@@ -72,7 +72,7 @@ fn count(q: Query) -> usize {
 }
 
 #[test]
-fn test_text_line_is_written_immediately_with_attributes() {
+fn text_line_is_written_immediately_with_attributes() {
     let _serial = serial();
     let (buf, _cleanup) = setup(Options::default());
 
@@ -100,7 +100,7 @@ fn test_text_line_is_written_immediately_with_attributes() {
 }
 
 #[test]
-fn test_component_comes_before_record_attributes() {
+fn component_comes_before_record_attributes() {
     let _serial = serial();
     let (buf, _cleanup) = setup(Options::default());
 
@@ -113,7 +113,7 @@ fn test_component_comes_before_record_attributes() {
 }
 
 #[test]
-fn test_client_values_are_quoted_and_escaped() {
+fn client_values_are_quoted_and_escaped() {
     let _serial = serial();
     let (buf, _cleanup) = setup(Options::default());
 
@@ -139,7 +139,7 @@ fn test_client_values_are_quoted_and_escaped() {
 }
 
 #[test]
-fn test_json_format() {
+fn json_format() {
     let _serial = serial();
     let (buf, _cleanup) = setup(options("", log::FORMAT_JSON, 0));
 
@@ -177,7 +177,7 @@ fn test_json_format() {
 }
 
 #[test]
-fn test_level_filtering() {
+fn level_filtering() {
     let _serial = serial();
     let (buf, _cleanup) = setup(options("warn", "", 0));
 
@@ -200,7 +200,7 @@ fn test_level_filtering() {
 }
 
 #[test]
-fn test_lines_keep_their_order() {
+fn lines_keep_their_order() {
     let _serial = serial();
     let (buf, _cleanup) = setup(Options::default());
 
@@ -218,7 +218,7 @@ fn test_lines_keep_their_order() {
 }
 
 #[test]
-fn test_concurrent_logging_is_safe() {
+fn concurrent_logging_is_safe() {
     let _serial = serial();
     let (buf, _cleanup) = setup(options("", "", 100));
 
@@ -241,7 +241,7 @@ fn test_concurrent_logging_is_safe() {
 }
 
 #[test]
-fn test_configure_rejects_unknown_values() {
+fn configure_rejects_unknown_values() {
     let _serial = serial();
 
     assert!(
@@ -256,7 +256,7 @@ fn test_configure_rejects_unknown_values() {
 }
 
 #[test]
-fn test_parse_level() {
+fn parse_level() {
     let cases = [
         ("", Level::INFO),
         ("INFO", Level::INFO),
@@ -273,7 +273,7 @@ fn test_parse_level() {
 }
 
 #[test]
-fn test_counts_warnings_and_errors() {
+fn counts_warnings_and_errors() {
     let _serial = serial();
     let (_buf, _cleanup) = setup(Options::default());
 
@@ -293,7 +293,7 @@ fn test_counts_warnings_and_errors() {
 }
 
 #[test]
-fn test_buffer_is_disabled_with_zero_lines() {
+fn buffer_is_disabled_with_zero_lines() {
     let _serial = serial();
     let (_buf, _cleanup) = setup(options("", "", 0));
 
@@ -309,7 +309,7 @@ fn test_buffer_is_disabled_with_zero_lines() {
 }
 
 #[test]
-fn test_buffer_keeps_the_last_lines_newest_first() {
+fn buffer_keeps_the_last_lines_newest_first() {
     let _serial = serial();
     let (_buf, _cleanup) = setup(options("", "", 3));
 
@@ -345,7 +345,7 @@ fn test_buffer_keeps_the_last_lines_newest_first() {
 }
 
 #[test]
-fn test_buffer_queries() {
+fn buffer_queries() {
     let _serial = serial();
     let (_buf, _cleanup) = setup(options("", "", 100));
 
@@ -441,7 +441,7 @@ fn test_buffer_queries() {
 }
 
 #[test]
-fn test_buffer_resize_keeps_the_newest_lines() {
+fn buffer_resize_keeps_the_newest_lines() {
     let _serial = serial();
     let (_buf, _cleanup) = setup(options("", "", 10));
 
@@ -462,7 +462,7 @@ fn test_buffer_resize_keeps_the_newest_lines() {
 }
 
 #[test]
-fn test_temporary_level_goes_back_by_itself() {
+fn temporary_level_goes_back_by_itself() {
     let _serial = serial();
     let (buf, _cleanup) = setup(options("info", "", 10));
 
@@ -501,7 +501,7 @@ fn test_temporary_level_goes_back_by_itself() {
 }
 
 #[test]
-fn test_setting_the_configured_level_cancels_the_override() {
+fn setting_the_configured_level_cancels_the_override() {
     let _serial = serial();
     let (_buf, _cleanup) = setup(options("warn", "", 0));
 
@@ -515,7 +515,7 @@ fn test_setting_the_configured_level_cancels_the_override() {
 }
 
 #[test]
-fn test_throttle() {
+fn throttle() {
     let th = Throttle::new(StdDuration::from_secs(60));
     let now = Arc::new(Mutex::new(Instant::now()));
     let clock = Arc::clone(&now);
@@ -544,7 +544,7 @@ fn test_throttle() {
 }
 
 #[test]
-fn test_with_suppressed() {
+fn with_suppressed() {
     let got = log::with_suppressed(kv!["a" => 1], 0);
     assert_eq!(got.len(), 1, "no attribute expected for 0");
 
@@ -555,10 +555,10 @@ fn test_with_suppressed() {
     );
 }
 
-const FATAL_TEST: &str = "log_test::test_fatal_logs_and_exits_with_code_one";
+const FATAL_TEST: &str = "log_test::fatal_logs_and_exits_with_code_one";
 
 #[test]
-fn test_fatal_logs_and_exits_with_code_one() {
+fn fatal_logs_and_exits_with_code_one() {
     if std::env::var_os("RUN_FATAL_HELPER").is_some_and(|v| v == "1") {
         let err = io::Error::other("kaboom");
         log::fatal("boom", kv!["err" => err]);
@@ -597,7 +597,7 @@ impl fmt::Display for Stringer {
 }
 
 #[test]
-fn test_value_kinds_in_text() {
+fn value_kinds_in_text() {
     let _serial = serial();
     let (buf, _cleanup) = setup(Options::default());
 
@@ -648,7 +648,7 @@ fn test_value_kinds_in_text() {
 }
 
 #[test]
-fn test_value_kinds_in_json() {
+fn value_kinds_in_json() {
     let _serial = serial();
     let (buf, _cleanup) = setup(options("", log::FORMAT_JSON, 10));
 
@@ -693,7 +693,7 @@ fn test_value_kinds_in_json() {
 }
 
 #[test]
-fn test_levels_are_colored_only_when_color_is_on() {
+fn levels_are_colored_only_when_color_is_on() {
     let _serial = serial();
     let (buf, _cleanup) = setup(options("debug", "", 0));
     log::set_output(Some(Box::new(buf.clone())), true);
@@ -725,7 +725,7 @@ fn test_levels_are_colored_only_when_color_is_on() {
 }
 
 #[test]
-fn test_throttle_forgets_old_keys_when_full() {
+fn throttle_forgets_old_keys_when_full() {
     let th = Throttle::new(StdDuration::from_secs(60));
     let now = Arc::new(Mutex::new(Instant::now()));
     let clock = Arc::clone(&now);

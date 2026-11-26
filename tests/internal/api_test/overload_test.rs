@@ -171,7 +171,7 @@ fn recv(name: &str, rx: &mpsc::Receiver<Outcome>) -> Outcome {
 }
 
 #[test]
-fn test_heavy_lane_rejects_requests_when_its_queue_is_full() {
+fn heavy_lane_rejects_requests_when_its_queue_is_full() {
     let _s = setup();
     let _db = init_overload_store(ApiQueryConfig {
         workers: 1,
@@ -217,7 +217,7 @@ fn test_heavy_lane_rejects_requests_when_its_queue_is_full() {
 }
 
 #[test]
-fn test_queued_heavy_query_leaves_when_its_client_is_gone() {
+fn queued_heavy_query_leaves_when_its_client_is_gone() {
     let _s = setup();
     let _db = init_overload_store(ApiQueryConfig {
         workers: 1,
@@ -245,7 +245,7 @@ fn test_queued_heavy_query_leaves_when_its_client_is_gone() {
 }
 
 #[test]
-fn test_queued_heavy_query_gives_up_after_the_queue_timeout() {
+fn queued_heavy_query_gives_up_after_the_queue_timeout() {
     let _s = setup();
     let _db = init_overload_store(ApiQueryConfig {
         workers: 1,
@@ -280,7 +280,7 @@ fn test_queued_heavy_query_gives_up_after_the_queue_timeout() {
 }
 
 #[test]
-fn test_abandon_stops_a_scan_and_keeps_its_error() {
+fn abandon_stops_a_scan_and_keeps_its_error() {
     let _s = setup();
     let _db = init_overload_store(ApiQueryConfig {
         queue_timeout_ms: -1,
@@ -337,7 +337,7 @@ fn test_abandon_stops_a_scan_and_keeps_its_error() {
 }
 
 #[test]
-fn test_a_cheap_plan_never_waits_for_the_heavy_lane() {
+fn a_cheap_plan_never_waits_for_the_heavy_lane() {
     let _s = setup();
     let _db = init_overload_store(ApiQueryConfig {
         workers: 1,
@@ -395,7 +395,7 @@ fn spawn_hook_run(guard: Arc<Guard>, errs: mpsc::Sender<Option<GuardError>>) {
 }
 
 #[test]
-fn test_the_hook_lane_queue_is_longer_than_the_heavy_one() {
+fn the_hook_lane_queue_is_longer_than_the_heavy_one() {
     let _s = setup();
     hook_config(0);
     let free = match api::acquire_hook_lane(Some(&Guard::default())) {
@@ -424,7 +424,7 @@ fn test_the_hook_lane_queue_is_longer_than_the_heavy_one() {
 }
 
 #[test]
-fn test_a_request_counts_once_in_the_hook_lane_queue() {
+fn a_request_counts_once_in_the_hook_lane_queue() {
     let _s = setup();
     hook_config(2);
     let free = match api::acquire_hook_lane(Some(&Guard::default())) {

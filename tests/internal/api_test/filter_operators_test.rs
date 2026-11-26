@@ -9,7 +9,7 @@ fn matches(entity: &Map, field: &str, op: &str, value: &str) -> bool {
 }
 
 #[test]
-fn test_filters_match_entity_string_comparisons() {
+fn filters_match_entity_string_comparisons() {
     let _s = setup();
     let entity = doc(r#"{"label":"banana"}"#);
     let cases: [(&str, &str, bool); 17] = [
@@ -40,7 +40,7 @@ fn test_filters_match_entity_string_comparisons() {
 }
 
 #[test]
-fn test_filters_match_entity_dates_still_compare_as_dates() {
+fn filters_match_entity_dates_still_compare_as_dates() {
     let _s = setup();
     let entity = doc(r#"{"day":"2024-05-01"}"#);
     if !matches(&entity, "day", "lt", "2024-06-01") || matches(&entity, "day", "gt", "2024-06-01") {
@@ -63,7 +63,7 @@ fn test_filters_match_entity_dates_still_compare_as_dates() {
 }
 
 #[test]
-fn test_filters_match_entity_array_contains_does_not_split_values() {
+fn filters_match_entity_array_contains_does_not_split_values() {
     let _s = setup();
     let entity = doc(r#"{"tags":["Smith, John","x"]}"#);
     if !matches(&entity, "tags", "contains", "Smith, John") {
@@ -92,7 +92,7 @@ fn test_filters_match_entity_array_contains_does_not_split_values() {
 }
 
 #[test]
-fn test_filters_match_entity_unsupported_operators_never_match() {
+fn filters_match_entity_unsupported_operators_never_match() {
     let _s = setup();
     let entity = doc(r#"{"n":3.0,"ok":true}"#);
     for op in ["contains", "any", "unknown"] {
@@ -112,7 +112,7 @@ fn test_filters_match_entity_unsupported_operators_never_match() {
 }
 
 #[test]
-fn test_apply_query_filter_uses_the_same_operators() {
+fn apply_query_filter_uses_the_same_operators() {
     let _s = setup();
     let data = docs(r#"[{"id":"t1","label":"banana"},{"id":"t2","label":"apple"}]"#);
     let out = api::apply_query_filter(
@@ -125,7 +125,7 @@ fn test_apply_query_filter_uses_the_same_operators() {
 }
 
 #[test]
-fn test_search_pattern() {
+fn search_pattern() {
     let _s = setup();
     let cases = [
         ("Zebra", "*Zebra*"),
@@ -155,7 +155,7 @@ fn test_search_pattern() {
 }
 
 #[test]
-fn test_list_entities_search_and_filters_before_pagination() {
+fn list_entities_search_and_filters_before_pagination() {
     let _s = setup();
     let _db = init_test_store();
     for d in [

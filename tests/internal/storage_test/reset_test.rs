@@ -18,7 +18,7 @@ fn put_document(entity: &[u8], id: &str) {
 }
 
 #[test]
-fn test_reset_store_deletes_kv_keys_and_keeps_the_documents() {
+fn reset_store_deletes_kv_keys_and_keeps_the_documents() {
     let _serial = serial();
     let dir = TempDir::new();
     globals::set_config(Some(Arc::new(Config {
@@ -106,7 +106,7 @@ fn test_reset_store_deletes_kv_keys_and_keeps_the_documents() {
 }
 
 #[test]
-fn test_list_json_keys_and_count_json_documents() {
+fn list_json_keys_and_count_json_documents() {
     let _serial = serial();
     let dir = TempDir::new();
     set_store(StoreConfig {

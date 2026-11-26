@@ -6,7 +6,7 @@ use talos::host::DocValue;
 use crate::{entity, field, obj, s, setup, write};
 
 #[test]
-fn test_native_aggregates_match_their_java_script_equivalent() {
+fn native_aggregates_match_their_java_script_equivalent() {
     let _s = setup(true);
     api::create_entity_type(b"buy").expect("create buy");
     for i in 0..300 {

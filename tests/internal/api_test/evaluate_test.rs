@@ -129,7 +129,7 @@ pub fn wait_for_indexes() {
 }
 
 #[test]
-fn test_filters_evaluated_on_the_index_match_the_scan() {
+fn filters_evaluated_on_the_index_match_the_scan() {
     let _s = setup();
     let _db = init_test_store();
 
@@ -238,7 +238,7 @@ fn test_filters_evaluated_on_the_index_match_the_scan() {
 }
 
 #[test]
-fn test_date_range_count_is_served_by_the_index() {
+fn date_range_count_is_served_by_the_index() {
     let _s = setup();
     let _db = init_test_store();
 

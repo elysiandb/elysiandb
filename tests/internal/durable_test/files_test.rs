@@ -5,7 +5,7 @@ use elysiandb::durable::{self, Fs, KvRecord, filepath};
 use super::memfs_test::new_mem_fs;
 
 #[test]
-fn test_kv_file_round_trip_and_corruption() {
+fn kv_file_round_trip_and_corruption() {
     let fs = new_mem_fs();
     let _ = fs.mkdir_all(Path::new("/d"), 0o755);
     let path = filepath::join(Path::new("/d"), "kv-1.ckpt");
@@ -44,7 +44,7 @@ fn test_kv_file_round_trip_and_corruption() {
 }
 
 #[test]
-fn test_atomic_writes_leave_the_old_file_until_they_are_complete() {
+fn atomic_writes_leave_the_old_file_until_they_are_complete() {
     let fs = new_mem_fs();
     let _ = fs.mkdir_all(Path::new("/d"), 0o755);
     let path = filepath::join(Path::new("/d"), "file");
@@ -76,7 +76,7 @@ fn test_atomic_writes_leave_the_old_file_until_they_are_complete() {
 }
 
 #[test]
-fn test_manifest_generations() {
+fn manifest_generations() {
     let fs = new_mem_fs();
     let _ = fs.mkdir_all(Path::new("/d"), 0o755);
     let shared: std::sync::Arc<dyn Fs> = std::sync::Arc::new(fs.clone());
