@@ -158,8 +158,8 @@ jobs:
           ELYSIANDB_BINARY: ${{ runner.temp }}/bin/elysiandb-baseline
           ELYSIANDB_PREVIOUS_BINARY: ${{ github.workspace }}/target/release/elysiandb
         run: |
-          cargo test --locked --release --test e2e_process -- --test-threads=1 2>&1 | tee "$RUNNER_TEMP/go-first.log"
-          if grep -n '^skipped:' "$RUNNER_TEMP/go-first.log"; then exit 1; fi
+          cargo test --locked --release --test e2e_process -- --test-threads=1 2>&1 | tee "$RUNNER_TEMP/baseline-first.log"
+          if grep -n '^skipped:' "$RUNNER_TEMP/baseline-first.log"; then exit 1; fi
 
   adminui:
     name: Admin UI tests
