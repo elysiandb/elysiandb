@@ -36,8 +36,6 @@ const TARGETS: [(&str, &[&str]); 5] = [
     ),
 ];
 
-const NOT_TRANSLATED_YET: [(&str, usize); 1] = [("test/bench", 2)];
-
 const PLURAL_ACRONYMS: [(&str, &str); 2] = [("ACLs", "Acls"), ("IDs", "Ids")];
 
 fn root() -> PathBuf {
@@ -489,36 +487,14 @@ fn every_go_test_is_translated_once_under_its_name() {
     assert_eq!((tests, fuzz), (GO_TESTS, GO_FUZZ_SEED_TESTS));
 
     let mut problems = Vec::new();
-    for (package, _) in NOT_TRANSLATED_YET {
-        if !packages.contains_key(package) {
-            problems.push(format!(
-                "{package}: listed as not translated, unknown to Go"
-            ));
-        }
-    }
-
     for (package, go_names) in &packages {
-        let pending = NOT_TRANSLATED_YET.iter().find(|(p, _)| p == package);
         let Some(target) = target_roots(package).into_iter().find(|r| r.exists()) else {
-            match pending {
-                Some((_, n)) if *n == go_names.len() => {}
-                Some((_, n)) => problems.push(format!(
-                    "{package}: {n} tests listed as not translated, Go has {}",
-                    go_names.len()
-                )),
-                None => problems.push(format!(
-                    "{package}: no Rust target for its {} tests",
-                    go_names.len()
-                )),
-            }
+            problems.push(format!(
+                "{package}: no Rust target for its {} tests",
+                go_names.len()
+            ));
             continue;
         };
-        if pending.is_some() {
-            problems.push(format!(
-                "{package}: translated in {}, still listed as not translated",
-                target.display()
-            ));
-        }
 
         let mut files = Vec::new();
         collect_files(&target, true, &mut files);
