@@ -4,6 +4,8 @@ use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
+use elysiandb::boot;
+
 use super::cli::BIN;
 use super::tempdir::TempDir;
 
@@ -176,4 +178,53 @@ fn a_second_signal_during_the_shutdown_ends_the_process() {
     assert_eq!(status.signal(), Some(libc::SIGTERM), "{status:?}\n{out}");
     assert!(!out.contains("msg=\"shutdown complete\""), "{out}");
     drop(conn);
+}
+
+fn refused<T>(r: Result<T, boot::AddrError>) -> String {
+    match r {
+        Ok(_) => panic!("the address should be refused"),
+        Err(e) => e.to_string(),
+    }
+}
+
+#[test]
+fn listen_addresses_are_reported_without_go_wording() {
+    assert_eq!(
+        refused(boot::listen_tcp4("::1:8089")),
+        "\"::1:8089\" is not a valid address"
+    );
+    assert_eq!(
+        refused(boot::listen_tcp4("127.0.0.1")),
+        "\"127.0.0.1\" is not a valid address"
+    );
+    assert_eq!(
+        refused(boot::listen_tcp4("127.0.0.1:70000")),
+        "\"127.0.0.1:70000\" is not a valid address"
+    );
+    assert_eq!(
+        refused(boot::listen_tcp4("[::1]:0")),
+        "cannot listen on [::1]:0: not an IPv4 address"
+    );
+
+    let busy = TcpListener::bind("127.0.0.1:0").expect("busy port");
+    let port = busy.local_addr().expect("local address").port();
+    assert_eq!(
+        refused(boot::listen_tcp4(&format!("127.0.0.1:{port}"))),
+        format!("cannot listen on 127.0.0.1:{port}: address already in use")
+    );
+
+    let tcp =
+        |addr: &str| boot::resolve_tcp_addr(addr).and_then(|(ip, port)| boot::listen_tcp(ip, port));
+    assert_eq!(
+        refused(tcp("::1:8088")),
+        "\"::1:8088\" is not a valid address"
+    );
+    assert_eq!(
+        refused(tcp(&format!("127.0.0.1:{port}"))),
+        format!("cannot listen on 127.0.0.1:{port}: address already in use")
+    );
+    drop(busy);
+
+    let ln = tcp("[::1]:0").expect("an IPv6 literal is accepted by the TCP listener");
+    assert!(ln.local_addr().expect("local address").is_ipv6());
 }
