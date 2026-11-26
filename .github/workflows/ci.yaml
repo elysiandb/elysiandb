@@ -7,8 +7,8 @@ on:
     branches: ["**"]
 
 jobs:
-  test:
-    name: Tests
+  lint:
+    name: Format, lint and lockfile
     runs-on: ubuntu-latest
 
     steps:
@@ -30,15 +30,24 @@ jobs:
       - name: Format
         run: cargo fmt --all --check
 
+      - name: Check the test groups
+        run: python3 .github/ci/tests.py check
+
       - name: Lint
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
-      - name: Run tests
-        run: make test
-
   coverage:
-    name: Coverage
+    name: Tests with coverage (${{ matrix.group }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [e2e-http, golden-http, golden-ops, rest]
+    env:
+      GROUP: ${{ matrix.group }}
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout
@@ -49,6 +58,9 @@ jobs:
 
       - name: Cache
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: coverage
+          save-if: ${{ matrix.group == 'rest' }}
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
@@ -58,17 +70,108 @@ jobs:
       - name: Ensure adminui dist exists
         run: mkdir -p adminui/dist
 
-      - name: Coverage
+      - name: Run the tests with coverage
         run: |
-          cargo llvm-cov --workspace --locked --release --no-fail-fast --lcov --output-path lcov.info -- --test-threads=1 --skip overload_test::
+          targets=$(python3 .github/ci/tests.py targets "$GROUP")
+          skips=$(python3 .github/ci/tests.py skip-args)
+          read -ra targets <<< "$targets"
+          read -ra skips <<< "$skips"
+          cargo llvm-cov --workspace --locked --release --no-fail-fast --lcov --output-path lcov.info "${targets[@]}" -- --test-threads=1 "${skips[@]}" 2>&1 | tee "$RUNNER_TEMP/run.log"
+
+      - name: Count the tests
+        run: |
+          mkdir -p "$RUNNER_TEMP/counts"
+          python3 .github/ci/tests.py summarize "$GROUP" "run=$RUNNER_TEMP/run.log" > "$RUNNER_TEMP/counts/$GROUP.json"
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v6
         with:
           files: lcov.info
+          disable_search: true
           flags: unittests
+          name: ${{ matrix.group }}
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
+
+      - name: Upload the counts
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-counts-${{ matrix.group }}
+          path: ${{ runner.temp }}/counts/${{ matrix.group }}.json
+          if-no-files-found: error
+          overwrite: true
+
+  uninstrumented:
+    name: Tests without instrumentation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        run: rustup toolchain install
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Ensure adminui dist exists
+        run: mkdir -p adminui/dist
+
+      - name: Build
+        run: cargo test --workspace --locked --release --lib --bins --tests --no-run
+
+      - name: List the tests
+        run: |
+          cargo test --workspace --locked --release --lib --bins --tests -- --list 2>&1 | tee "$RUNNER_TEMP/list.log"
+          cargo test --workspace --locked --release --lib --bins --tests -- --list --ignored 2>&1 | tee "$RUNNER_TEMP/ignored.log"
+
+      - name: Run the tests left out of coverage
+        run: |
+          filters=$(python3 .github/ci/tests.py filter-args)
+          read -ra filters <<< "$filters"
+          cargo test --workspace --locked --release --lib --bins --tests --no-fail-fast -- --test-threads=1 "${filters[@]}" 2>&1 | tee "$RUNNER_TEMP/run.log"
+
+      - name: Run the doc tests
+        run: cargo test --workspace --locked --release --doc -- --test-threads=1 2>&1 | tee "$RUNNER_TEMP/doc.log"
+
+      - name: Count the tests
+        run: |
+          mkdir -p "$RUNNER_TEMP/counts"
+          python3 .github/ci/tests.py summarize uninstrumented "list=$RUNNER_TEMP/list.log" "ignored=$RUNNER_TEMP/ignored.log" "run=$RUNNER_TEMP/run.log" "doc=$RUNNER_TEMP/doc.log" > "$RUNNER_TEMP/counts/uninstrumented.json"
+
+      - name: Upload the counts
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-counts-uninstrumented
+          path: ${{ runner.temp }}/counts/uninstrumented.json
+          if-no-files-found: error
+          overwrite: true
+
+  inventory:
+    name: Test inventory
+    needs: [coverage, uninstrumented]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        run: rustup toolchain install
+
+      - name: Download the counts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: test-counts-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/counts
+
+      - name: Check that every test ran once
+        run: python3 .github/ci/tests.py verify "$RUNNER_TEMP/counts"
 
   talos:
     name: talos conformance (${{ matrix.arch }})
