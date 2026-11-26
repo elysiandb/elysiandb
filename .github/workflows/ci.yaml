@@ -8,53 +8,7 @@ on:
 
 jobs:
   test:
-    name: Go tests
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version: ["1.24.x"]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: ${{ matrix.go-version }}
-          cache: true
-
-      - name: Ensure adminui dist exists
-        run: mkdir -p adminui/dist
-
-      - name: Verify go.mod
-        run: go mod tidy && git diff --exit-code
-
-      - name: Run tests (race)
-        run: make test
-
-      - name: Coverage (all packages)
-        run: |
-          COVERPKG=$(go list ./... | tr '\n' ',' | sed 's/,$//')
-          TEST_PKGS=$(go list -f '{{if or (len .TestGoFiles) (len .XTestGoFiles)}}{{.ImportPath}}{{end}}' ./... | grep -v '^$')
-          if [ -z "$TEST_PKGS" ]; then echo "no test packages"; exit 0; fi
-
-          go test $TEST_PKGS -race -covermode=atomic -coverpkg="$COVERPKG" \
-            -coverprofile=coverage.out -count=1
-
-          go tool cover -func=coverage.out | tail
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v6
-        with:
-          files: coverage.out
-          flags: unittests
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
-
-  rust:
-    name: Rust tests
+    name: Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -80,10 +34,78 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: Run tests
-        run: cargo test --workspace --locked --release -- --test-threads=1
+        run: make test
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        run: rustup toolchain install && rustup component add llvm-tools-preview
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Ensure adminui dist exists
+        run: mkdir -p adminui/dist
+
+      - name: Coverage
+        run: cargo llvm-cov --workspace --locked --release --lcov --output-path lcov.info -- --test-threads=1
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v6
+        with:
+          files: lcov.info
+          flags: unittests
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+
+  talos:
+    name: talos conformance (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      TEST262_COMMIT: cb4a6c8074671c00df8cbc17a620c0f9462b312a
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        run: rustup toolchain install
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Fetch test262
+        run: |
+          git init -q "$RUNNER_TEMP/test262"
+          git -C "$RUNNER_TEMP/test262" fetch -q --depth 1 https://github.com/tc39/test262.git "$TEST262_COMMIT"
+          git -C "$RUNNER_TEMP/test262" checkout -q FETCH_HEAD
+
+      - name: Run test262
+        env:
+          TALOS_TEST262_DIR: ${{ runner.temp }}/test262
+        run: cargo test --locked --release -p talos --test test262 -- --ignored tc39 --test-threads=1
 
   cross-binary:
-    name: Cross-binary tests
+    name: Compatibility with v0.3.0
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
