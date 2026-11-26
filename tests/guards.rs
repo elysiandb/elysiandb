@@ -40,7 +40,14 @@ const NOT_TRANSLATED_YET: [(&str, usize); 1] = [("test/bench", 2)];
 
 const PLURAL_ACRONYMS: [(&str, &str); 2] = [("ACLs", "Acls"), ("IDs", "Ids")];
 
-const ADDED_TO_TRANSLATED_TARGETS: [(&str, &[&str]); 7] = [
+const ADDED_TO_TRANSLATED_TARGETS: [(&str, &[&str]); 8] = [
+    (
+        "test/internal/boot_test",
+        &[
+            "test_idle_tcp_connections_keep_the_thread_count_bounded",
+            "test_tcp_clients_that_do_not_read_do_not_hold_threads",
+        ],
+    ),
     (
         "test/internal/cache_test",
         &[
