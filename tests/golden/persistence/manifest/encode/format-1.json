@@ -1,0 +1,8 @@
+{
+  "format": 1,
+  "checkpoint": "checkpoint-0000000000000001.ckpt",
+  "lsn": 1,
+  "segment": 0,
+  "offset": 0,
+  "created_at": "\u003ccreated_at\u003e"
+}

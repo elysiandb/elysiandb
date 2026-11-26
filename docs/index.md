@@ -2,7 +2,7 @@
 
 ElysianDB turns raw JSON into a complete backend instantly.
 
-It combines its own storage engine, designed together with the API, an auto-generated REST API, advanced querying, and optional KV/TCP interfaces into a single, high-performance Go binary.
+It combines its own storage engine, designed together with the API, an auto-generated REST API, advanced querying, and optional KV/TCP interfaces into a single, high-performance binary.
 
 This document explains how to use ElysianDB, its features, configuration, storage engine, and runtime behavior.
 
@@ -37,7 +37,7 @@ store:
   crashRecovery: { enabled: true, maxLogMB: 100 }
   durability: default     # default | fsync
   memory:
-    limitMB: 0            # 0 = auto: 75 % of the container memory limit if any, otherwise unlimited
+    limitMB: 0            # 0 = no budget
 server:
   http:
     enabled: true
@@ -77,7 +77,7 @@ api:
     timeoutMs: 2000
     requestBudgetMs: 0
   query:
-    workers: 0            # size of the heavy lane, 0 = half of GOMAXPROCS
+    workers: 0            # size of the heavy lane, 0 = half of the usable CPUs
     timeoutMs: 0          # 0 = no deadline
     maxQueued: 0          # 0 = 4 × workers, -1 = no limit
     queueTimeoutMs: 0     # 0 = 5000, -1 = wait as long as needed
@@ -88,8 +88,6 @@ adminui:
   enabled: true
 monitoring:
   prometheus:
-    enabled: false
-  pprof:
     enabled: false
 ```
 
@@ -109,7 +107,7 @@ Every key added after 0.2.4 is optional. Their defaults keep the 0.2.4 answers, 
 | **store.backup.folder**              | Folder of the periodic backups. Empty by default: no periodic backup |
 | **store.backup.everyMinutes**        | Period of the backups written to `store.backup.folder`. `0` (default) turns them off |
 | **store.backup.keep**                | Periodic backups kept in the folder, the oldest ones are removed. `0` (default) means 7 |
-| **store.memory.limitMB**             | Memory budget. `0` (default) uses 75 % of the container memory limit when there is one, and no limit otherwise. It sets `GOMEMLIMIT` (to 85 % of it when set explicitly, the rest being for goroutine stacks and the runtime); when set explicitly, the whole process is kept within it whatever the volume (see Memory budget below) |
+| **store.memory.limitMB**             | Memory budget. When set, the whole process is kept within it whatever the volume (see Memory budget below). `0` (default) means no budget |
 | **server.http**                      | Enables and configures the HTTP REST/KV interface                                     |
 | **server.http.cors.allowedOrigins**  | Origins allowed to call the HTTP API from a browser (see CORS below). Empty by default |
 | **server.http.trustedProxies**       | Addresses or CIDR ranges of the reverse proxies in front of ElysianDB (see Reverse proxy below). Empty by default |
@@ -127,7 +125,7 @@ Every key added after 0.2.4 is optional. Their defaults keep the 0.2.4 answers, 
 | **api.cache.enabled**                | Enables REST API caching for repeated queries                                         |
 | **api.cache.maxMB**                  | Size limit of the API cache. Default `128`                                            |
 | **api.cache.maxEntryKB**             | Responses larger than this are not cached. Default `1024`                             |
-| **api.query.workers**                | Requests that must check many documents (the heavy lane) run at most this many at a time. `0` (default) uses half of the threads (`GOMAXPROCS / 2`, at least 1), so that the other requests keep threads |
+| **api.query.workers**                | Requests that must check many documents (the heavy lane) run at most this many at a time. `0` (default) uses half of the usable CPUs (at least 1), so that the other requests keep CPUs; `ELYSIANDB_PROCS` overrides the CPU count (see Environment variables below) |
 | **api.query.timeoutMs**              | Deadline of a request: the documents it checks and its hooks stop there, and the answer is `503` `{"error":"request deadline exceeded"}`. `0` (default) means no deadline |
 | **api.query.maxQueued**              | Heavy requests that may wait for a slot. Past it, a heavy request is answered `503` `{"error":"server busy"}` with `Retry-After: 1`. `0` (default) means 4 × `api.query.workers` (32 per slot for the lane of expensive hooks), `-1` no limit |
 | **api.query.queueTimeoutMs**         | Longest wait for a slot of the heavy lane, then `503` `{"error":"server busy"}`. `0` (default) means 5000, `-1` no limit |
@@ -146,7 +144,15 @@ Every key added after 0.2.4 is optional. Their defaults keep the 0.2.4 answers, 
 | **adminui.enabled**                  | Enables the admin web interface                                                       |
 | **monitoring.prometheus.enabled**    | Serves `GET /metrics` in the Prometheus text format (see Monitoring below). Off by default |
 | **monitoring.prometheus.token**      | Bearer token for `GET /metrics`. Without it, `/metrics` takes the same credentials as the admin endpoints |
-| **monitoring.pprof.enabled**         | Serves the Go profiler under `GET /debug/pprof/` for admins. Off by default           |
+
+### Environment variables
+
+| Variable | Description |
+| -------- | ----------- |
+| `ELYSIANDB_ADMIN_PASSWORD` | Password of the `admin` account created at the first start, instead of `admin` (see Default admin password) |
+| `ELYSIANDB_PASSWORD` | Password used by `elysiandb backup --url` with `--user` (see Backup and Restore) |
+| `ELYSIANDB_PROCS` | An integer above `0` replaces the number of usable CPUs. By default it is the number of CPUs the process may run on (its CPU affinity); the CPU quota of a container does not lower it. It sizes the heavy lane (`api.query.workers: 0`), the lane of expensive hooks and the hook workers, and is the base of `cpu_percent` and `usable_cpus` |
+| `NO_COLOR` | Turns off the colors of the text logs (see Logging) |
 
 ### Overload and timeouts
 
@@ -244,13 +250,11 @@ The status is `healthy`, `warning` or `critical`, with these problems:
 
 With `monitoring.prometheus.enabled: true`, `GET /metrics` serves the counters, gauges and latency histograms in the Prometheus text format, for example `elysiandb_http_requests_total{status_class="5xx"}`, `elysiandb_http_request_duration_seconds`, `elysiandb_tcp_commands_total{command="GET"}`, `elysiandb_kv_keys` and `elysiandb_entities{entity_type="books"}`. Set `monitoring.prometheus.token` to let Prometheus authenticate with `Authorization: Bearer <token>`, since a scraper cannot log in with a session cookie in `user` mode.
 
-The CPU series are given two ways: `cpu_percent` is a share of all the threads the process may use (`gomaxprocs`), so 100 % means every thread is busy, and `cpu_cores` is the number of busy threads. The engine adds `log_since_checkpoint_bytes`, `log_bytes` (log on disk), `live_bytes` (data the log still holds), `checkpoint_ms`, `value_cache_hit_ratio` and `resident_bytes`, the heavy lane adds `heavy_queries_rps`, `heavy_queued_rps` (requests that waited for a slot), `heavy_waiting` (requests waiting now), `heavy_wait_p95_ms`, `heavy_rejected_rps` (answered `503` `server busy`) and `abandoned_rps` (requests stopped because their client left), and `tcp_auth_p95_ms` is the duration of TCP `AUTH`. Prometheus exports them as `elysiandb_heavy_queries_total`, `elysiandb_heavy_queued_total`, `elysiandb_heavy_rejected_total`, `elysiandb_requests_abandoned_total` and `elysiandb_heavy_waiting`. Hook statistics give the number of `ctx.query` calls, the rows they read, their cache hits and the time per run spent in them (`avg_query_ms`, the rest of `avg_ms` being the script).
+The CPU series are given two ways: `cpu_percent` is a share of all the CPUs the process may use (`usable_cpus`), so 100 % means every usable CPU is busy, and `cpu_cores` is the number of busy CPUs. The engine adds `log_since_checkpoint_bytes`, `log_bytes` (log on disk), `live_bytes` (data the log still holds), `checkpoint_ms`, `value_cache_hit_ratio` and `resident_bytes`, the heavy lane adds `heavy_queries_rps`, `heavy_queued_rps` (requests that waited for a slot), `heavy_waiting` (requests waiting now), `heavy_wait_p95_ms`, `heavy_rejected_rps` (answered `503` `server busy`) and `abandoned_rps` (requests stopped because their client left), and `tcp_auth_p95_ms` is the duration of TCP `AUTH`. Prometheus exports them as `elysiandb_heavy_queries_total`, `elysiandb_heavy_queued_total`, `elysiandb_heavy_rejected_total`, `elysiandb_requests_abandoned_total` and `elysiandb_heavy_waiting`. Hook statistics give the number of `ctx.query` calls, the rows they read, their cache hits and the time per run spent in them (`avg_query_ms`, the rest of `avg_ms` being the script).
 
-The disk adds `disk_read_bytes_rps` and `disk_write_bytes_rps` (the data folder), `disk_syncs_rps` and `disk_sync_ms` (synchronizations and their average duration), `disk_free_bytes`, `refused_writes_rps` (writes refused for a full or failing disk) and `index_upkeep_bytes` (index changes of large batches waiting to be applied, see Mass inserts). `disk_bytes`, `goroutines` and `open_fds` give the size of the data folder, the goroutines and the file descriptors. Backups add `backup_running`, `backup_last_ok` (`1` or `0`, absent before the first backup), `backup_duration_ms`, `backup_bytes` and `backup_age_seconds`, and `startup_ms` is the time from the start of the process until it could serve. Prometheus exports them as `elysiandb_disk_read_bytes_total`, `elysiandb_disk_write_bytes_total`, `elysiandb_disk_syncs_total`, `elysiandb_disk_sync_seconds_total`, `elysiandb_disk_free_bytes`, `elysiandb_refused_writes_total`, `elysiandb_index_upkeep_bytes`, `elysiandb_backups_total{result}`, `elysiandb_backup_running`, `elysiandb_backup_last_ok`, `elysiandb_backup_last_bytes`, `elysiandb_backup_last_duration_seconds`, `elysiandb_backup_age_seconds` and `elysiandb_startup_seconds`.
+The disk adds `disk_read_bytes_rps` and `disk_write_bytes_rps` (the data folder), `disk_syncs_rps` and `disk_sync_ms` (synchronizations and their average duration), `disk_free_bytes`, `refused_writes_rps` (writes refused for a full or failing disk) and `index_upkeep_bytes` (index changes of large batches waiting to be applied, see Mass inserts). `disk_bytes`, `threads` and `open_fds` give the size of the data folder, the threads of the process and its file descriptors. Backups add `backup_running`, `backup_last_ok` (`1` or `0`, absent before the first backup), `backup_duration_ms`, `backup_bytes` and `backup_age_seconds`, and `startup_ms` is the time from the start of the process until it could serve. Prometheus exports them as `elysiandb_disk_read_bytes_total`, `elysiandb_disk_write_bytes_total`, `elysiandb_disk_syncs_total`, `elysiandb_disk_sync_seconds_total`, `elysiandb_disk_free_bytes`, `elysiandb_refused_writes_total`, `elysiandb_index_upkeep_bytes`, `elysiandb_backups_total{result}`, `elysiandb_backup_running`, `elysiandb_backup_last_ok`, `elysiandb_backup_last_bytes`, `elysiandb_backup_last_duration_seconds`, `elysiandb_backup_age_seconds` and `elysiandb_startup_seconds`.
 
-The memory budget adds `memory_budget_bytes`, `heap_live_bytes` (memory the garbage collector found in use at its last cycle), `memory_pressure` (`0` normal, `1` high, `2` critical), `memory_refused_rps` (requests refused for memory), and one series per share: `value_cache_bytes`, `page_cache_bytes`, `dirty_page_bytes` (pages waiting for a checkpoint), `hook_results_bytes`, `index_build_bytes` and `request_reserved_bytes`. Hooks add `hook_query_hit_ratio` and `hook_output_hit_ratio` (`ctx.query` results and hook results reused or brought up to date without reading the entity again) and `hook_fold_hit_ratio` (aggregation loops answered without going through the whole view), and indexes `index_count` and `index_bytes`. `total_bytes` is the memory mapped by the runtime since it started, which never goes down, including what it has given back to the system; `held_bytes` is what it holds now, and is the figure the budget follows. The Admin UI shows them in the Memory budget section of the System tab, the Hooks tab and the Indexes section of the Data tab, which lists every index.
-
-With `monitoring.pprof.enabled: true`, admins can profile a running instance, for example `go tool pprof http://localhost:8089/debug/pprof/profile?seconds=30`.
+The memory budget adds `memory_budget_bytes`, `memory_live_bytes` (memory allocated by the process, which the pressure compares with the budget), `memory_pressure` (`0` normal, `1` high, `2` critical), `memory_refused_rps` (requests refused for memory), and one series per share: `value_cache_bytes`, `page_cache_bytes`, `dirty_page_bytes` (pages waiting for a checkpoint), `hook_results_bytes`, `index_build_bytes` and `request_reserved_bytes`. Hooks add `hook_query_hit_ratio` and `hook_output_hit_ratio` (`ctx.query` results and hook results reused or brought up to date without reading the entity again) and `hook_fold_hit_ratio` (aggregation loops answered without going through the whole view), and indexes `index_count` and `index_bytes`. `allocated_bytes` is the memory allocated by the process now, `total_bytes` the peak of its resident memory since it started, which never goes down, even after memory is given back to the system, and `held_bytes` its resident memory now, which the pressure also follows. The Admin UI shows them in the Memory budget section of the System tab, the Hooks tab and the Indexes section of the Data tab, which lists every index.
 
 `GET /stats` and `stats.enabled` work as before. `total_requests` counts every HTTP request and every TCP command, `keys_count` counts the KV keys, and `expiration_keys_count` the KV keys with a TTL.
 
@@ -605,7 +609,7 @@ This section describes the `internal` engine.
 
 **The log is the data.** Every document and KV change is appended once to log segments (`log/000001.seg`, …, sealed at 64 MB), as the exact JSON the API returns. The changes of one request or of one transaction form a batch with a CRC32-C checksum, which a replay applies entirely or not at all. One writer writes the batches of every waiting request together (group commit).
 
-**Entity state.** For each entity, the engine keeps the position of each document in the log, its insertion order, the id directory and the indexes as persistent trees of pages (`pages/000001.pgs`, …). Pages hold their keys and values as plain bytes, so the garbage collector does not walk them, and the pages used least are dropped from memory and read back from disk when the memory budget is reached. A write builds new versions of the few pages it touches, changes the pages it already copied in place within the same batch, and publishes them at once: a reader works on a consistent snapshot without any lock, and a write locks only its entity for a few microseconds. Deleting a document costs the same at 1,000 or 1,000,000 documents, and `DELETE /api/<entity>` is immediate. Writes that read a document first (updates, sub-entity merges) are checked at commit and replayed if another write changed that document meanwhile, so no update is lost.
+**Entity state.** For each entity, the engine keeps the position of each document in the log, its insertion order, the id directory and the indexes as persistent trees of pages (`pages/000001.pgs`, …). Pages hold their keys and values as plain bytes, and the pages used least are dropped from memory and read back from disk when the memory budget is reached. A write builds new versions of the few pages it touches, changes the pages it already copied in place within the same batch, and publishes them at once: a reader works on a consistent snapshot without any lock, and a write locks only its entity for a few microseconds. Deleting a document costs the same at 1,000 or 1,000,000 documents, and `DELETE /api/<entity>` is immediate. Writes that read a document first (updates, sub-entity merges) are checked at commit and replayed if another write changed that document meanwhile, so no update is lost.
 
 **Indexes.** Indexes only narrow the documents a request looks at: results, their order and counts are exactly the ones a scan of every document would give. A field gets a sort index the first time it is sorted on and a filter index the first time it is filtered on; they are built in the background, while requests keep working without them, then kept up to date by every write. The indexes an entity is waiting for are built together in one pass over its documents, oldest request first, within the share of the memory budget for index builds; an entity of up to 512 documents gets its indexes at once. ElysianDB uses several forms:
 
@@ -658,7 +662,7 @@ These guarantees are tested by cutting the process and the power at every write,
 
 **Mass inserts.** A large batch does not read the pages of the indexes under the write lock of its entity. The index changes of a batch of 64 documents or more are queued, sorted by key and applied in the background, outside the lock, so that each page is read and written once for many changes. Their document ids are read before the lock is taken. A request that uses an index first brings it up to date, and can never read an index that lags. When the queue reaches the share of changed pages, writers wait for it. Page and log segments are preallocated on Linux, which keeps their blocks together on a mechanical disk and spares the file system an allocation at every write. Checkpoints are written in slices with pauses as long as the syncs, as described above, unless the changed pages reach one and a half times their share.
 
-**Memory.** Documents and pages are kept as bytes, with no pointers for the garbage collector to scan. With `store.memory.limitMB` set, only the most read documents and pages stay in memory and the others are read from disk on demand, so the process stays within the budget at any volume (see Memory budget below). Without it, everything read stays in memory. After `DELETE /api/<entity>`, the memory of its documents is released and returned to the system. Large lists are streamed: their memory does not grow with their size.
+**Memory.** Documents and pages are kept as plain bytes. With `store.memory.limitMB` set, only the most read documents and pages stay in memory and the others are read from disk on demand, so the process stays within the budget at any volume (see Memory budget below). Without it, everything read stays in memory. After `DELETE /api/<entity>`, the memory of its documents is released and returned to the system. Large lists are streamed: their memory does not grow with their size.
 
 **Memory budget.** With an explicit `store.memory.limitMB`, the budget is shared out, and every share is counted at its real size:
 
@@ -671,7 +675,7 @@ These guarantees are tested by cutting the process and the power at every write,
 | Index builds | 6 % | The next build waits for the current one |
 | Working memory of requests | 12 % | A request waits for memory, then is answered `503` `server busy` |
 
-The API cache keeps its own limit, `api.cache.maxMB` (128 MB by default), and responses of more than `api.response.spoolMB` are spooled to disk. The rest, more than a third, is left for the runtime and the garbage collector, so that the live memory stays far below the budget and the garbage collector never runs continuously. While the live memory stays under about half of the budget, what the shares do not use lends up to 30 % of the budget more to the documents and pages (three quarters to the pages) and lets more changed pages gather before a checkpoint, which keeps a mass insert away from the disk; this loan is taken back as soon as the live memory grows. ElysianDB also follows the memory the process holds: above 65 % of the budget in use after a garbage collection, or 95 % held in total, the shares of documents, pages, index builds and requests are halved, and above 80 % or 105 % they and the results of hook queries are quartered, until the memory comes back down. A request reserves memory for the documents it decodes, the response it builds and, when it runs heavy work, an envelope of 8 MB; it gives it back when it ends.
+The API cache keeps its own limit, `api.cache.maxMB` (128 MB by default), and responses of more than `api.response.spoolMB` are spooled to disk. The rest, more than a third, is left for the working memory of the process outside the shares, so that the allocated memory stays far below the budget. While the live memory stays under about half of the budget, what the shares do not use lends up to 30 % of the budget more to the documents and pages (three quarters to the pages) and lets more changed pages gather before a checkpoint, which keeps a mass insert away from the disk; this loan is taken back as soon as the live memory grows. ElysianDB also follows the memory the process holds: above 65 % of the budget allocated, or 95 % held in total, the shares of documents, pages, index builds and requests are halved, and above 80 % or 105 % they and the results of hook queries are quartered, until the memory comes back down. A request reserves memory for the documents it decodes, the response it builds and, when it runs heavy work, an envelope of 8 MB; it gives it back when it ends.
 
 **One process per folder.** The engine locks `elysiandb.lock` in the data folder. A second process on the same folder, `elysiandb backup` on the folder of a running server for example, stops with an error.
 
@@ -1985,9 +1989,9 @@ Before starting the server, build the UI assets using:
 make build-admin
 ```
 
-This compiles the React Admin interface and embeds the generated assets into the Go binary.
+This compiles the React Admin interface into `adminui/dist`. The next build of the binary (`make build`) embeds these assets; to embed a build from another folder, set `ELYSIANDB_ADMINUI_DIST` to that folder when building.
 
-Whenever you change the Admin UI frontend code, rebuild it and restart the server.
+Whenever you change the Admin UI frontend code, rebuild it, rebuild the binary and restart the server.
 
 If the binary was built without the UI assets, `/admin` answers `404` and a warning is printed at startup when `adminui.enabled` is true. The official Docker image always contains the Admin UI (see Docker).
 
@@ -2061,8 +2065,8 @@ For local development:
 # Rebuild the UI
 make build-admin
 
-# Run server
-elysiandb server
+# Rebuild the binary, which embeds it, and run the server
+make build && ./elysiandb server
 ```
 
 If you wish to work on the frontend separately, you can use the Vite dev server, but the Admin UI in production always uses the embedded build.
@@ -2084,7 +2088,7 @@ To enable and test the Admin UI:
    * `adminui.enabled = true`
    * `security.authentication.enabled = true`
    * `security.authentication.mode = "user"`
-2. Run `make build-admin`
+2. Run `make build-admin`, then `make build`
 3. Start the server
 4. Visit `http://localhost:8089/admin`
 
@@ -2138,7 +2142,7 @@ Hooks do **not** persist changes back to storage. They only affect query process
 
 ### Hook Execution Model
 
-Hooks are executed using an embedded JavaScript runtime (Goja).
+Hooks are executed by talos, the JavaScript engine embedded in ElysianDB.
 Each hook must define a function matching the event name.
 
 #### `pre_read`
@@ -2232,13 +2236,13 @@ If `bypass_acl` is disabled, results returned by `query` are filtered using ACL 
 
 Hooks behave exactly as described above; ElysianDB only avoids repeating work:
 
-* **Aggregation loops without reading documents.** When a script reads a `ctx.query` result only through a counting or summing loop (`for (var i = 0; i < rows.length; i++) { … total += p.price … count++ … }`), ElysianDB keeps a view of the fields this loop reads, follows every write to it, in the background and from the changed documents only, even during a mass insert and before any read, and computes the loop in Go on this view. A filter on `{ field: { eq: <value of the document> } }` shares one view between all its values, so each value only looks at its own documents. For a view of many documents, the result is kept per value of the variables of the loop: a write that does not contribute to it leaves it untouched, a new last document continues it, and any other write computes it again. Results are strictly those of the script, down to the rounding of the sums, in the same document order. The script itself still runs for everything before and after the loop; any case outside this exact shape (`let`, `forEach`, a nested value, a string in a sum, a filter with a wildcard or a date, an ACL limited to its owner, …) runs the original loop in JavaScript, as before.
+* **Aggregation loops without reading documents.** When a script reads a `ctx.query` result only through a counting or summing loop (`for (var i = 0; i < rows.length; i++) { … total += p.price … count++ … }`), ElysianDB keeps a view of the fields this loop reads, follows every write to it, in the background and from the changed documents only, even during a mass insert and before any read, and computes the loop natively on this view. A filter on `{ field: { eq: <value of the document> } }` shares one view between all its values, so each value only looks at its own documents. For a view of many documents, the result is kept per value of the variables of the loop: a write that does not contribute to it leaves it untouched, a new last document continues it, and any other write computes it again. Results are strictly those of the script, down to the rounding of the sums, in the same document order. The script itself still runs for everything before and after the loop; any case outside this exact shape (`let`, `forEach`, a nested value, a string in a sum, a filter with a wildcard or a date, an ACL limited to its owner, …) runs the original loop in JavaScript, as before.
 * **Shared query results.** The result of a `ctx.query` is kept, without converting the documents, as long as it cannot have changed: every document of a page and every following request reads the same result, and a script receives it as a regular array whose objects read their fields on demand. A filter on `{ field: { eq: … } }` only depends on the documents that have or had this value: writes to other documents do not touch it. Any other write to the queried entity updates the kept result from the documents it changed, instead of reading the entity again. A result is never served older than the last acknowledged write. A filter through a reference (`author.name`) depends on other entities and is not kept. With an explicit budget, a result that cannot fit in its share is refused with `503` `server busy`; without one, it is served and simply not kept when it is larger than 256 MB.
 * **Reused hook results.** A hook run that reads neither the current time (`Date.now()`, `new Date()` without arguments) nor `Math.random()`, and that does not fail, depends only on the document it receives and on the results of its `ctx.query` calls. Its changes to the document are kept and applied again, without running the script, to the same document as long as the results it queried are unchanged.
 * **Indexes prepared in advance.** The fields that the `ctx.query` calls of a script filter on are indexed in the background when the hook is created or changed, and these indexes are kept while the hook exists (see Storage engine internals).
 * **Lane.** A hook whose script runs take more than a few milliseconds on average, waits for shared results aside, waits for a slot of the hook lane (see Overload and timeouts).
 
-Each script is compiled once. Every run gets a fresh JavaScript runtime, as before: creating one costs about a microsecond, and nothing a script leaves in its globals can reach another run. The monitoring gives, per hook, its executions, duration, `ctx.query` calls, rows read and reused results.
+Each script is compiled once. Every run gets a fresh JavaScript runtime, as before: creating one costs less than a microsecond, and nothing a script leaves in its globals can reach another run. The monitoring gives, per hook, its executions, duration, `ctx.query` calls, rows read and reused results.
 
 ---
 
@@ -2509,7 +2513,7 @@ GET foo
 PING
 ```
 
-The TCP benchmark accepts the same credentials: `./elysian_bench -addr 127.0.0.1:8088 -auth my-secret-token`.
+The TCP benchmark accepts the same credentials: `cargo run --release --locked --bin elysian_bench -- -addr 127.0.0.1:8088 -auth my-secret-token`.
 
 ---
 
@@ -2568,19 +2572,23 @@ Example output:
 
 ## Development
 
+ElysianDB is built with Cargo. Install Rust with [rustup](https://rustup.rs): `rust-toolchain.toml` pins the version, which rustup installs on the first build. The Admin UI needs Node.js 20.19 or later.
+
 ```bash
-make build-admin   # optional: embeds the Admin UI
+make build-admin   # optional: builds the Admin UI, embedded by the next build
 make build && ./elysiandb server
 # or
 make server
 ```
 
+The binary embeds the Admin UI found in `adminui/dist` when it is built, or in the folder named by `ELYSIANDB_ADMINUI_DIST`. Without a built UI it still builds, and `/admin` answers `404`.
+
 ### Versioning
 
-The version reported by `X-Elysian-Version` and `/stats` is set at build time. `make build`, `make install` and `make server` use `git describe --tags --always --dirty` (for example `0.1.14` on a release tag, `0.1.14-3-g244e812` three commits later). A plain `go build` reports `dev`. To set it yourself:
+The version reported by `X-Elysian-Version` and `/stats` is set at build time. `make build`, `make install` and `make server` use `git describe --tags --always --dirty` without its leading `v` (for example `0.1.14` on a release tag, `0.1.14-3-g244e812` three commits later), and `dev` outside a git checkout, from a source archive for example. A plain `cargo build` reports `dev`. To set it yourself, with or without the leading `v`:
 
 ```bash
-go build -ldflags "-X github.com/taymour/elysiandb/internal/globals.VERSION=1.2.3" -o elysiandb .
+ELYSIANDB_VERSION=0.4.0 cargo build --release
 ```
 
 Run tests:
@@ -2768,4 +2776,6 @@ docker run -d --name elysiandb \
 * The image contains the Admin UI: set `adminui.enabled: true` and `security.authentication.mode: user` to serve it at `/admin`.
 * Inside a container, clients connect through the Docker network, not the loopback address, so the default `admin` password is refused (see Default admin password). Set `ELYSIANDB_ADMIN_PASSWORD` the first time the container starts on an empty volume: `docker run -e ELYSIANDB_ADMIN_PASSWORD='a-long-password' ...`. For an existing volume, run `docker exec -it elysiandb elysiandb change-password`.
 * The `HEALTHCHECK` calls `/health`, which works in every authentication mode.
-* Images report the version computed by `git describe` at build time. To build one yourself: `docker build --build-arg VERSION=$(git describe --tags --always) -t elysiandb .`
+* Images report the version computed by `git describe` at build time. To build one yourself: `docker build --build-arg VERSION=$(git describe --tags --always) -t elysiandb .`. Without `VERSION`, from a source archive for example, the image reports `dev`.
+* The build compiles a static binary for the platform of the machine that runs it: on an amd64 machine, `docker build --platform linux/amd64 --build-arg VERSION=$(git describe --tags --always) -t elysiandb .` needs neither cross-compilation nor emulation. For another platform, `--platform linux/arm64` on an amd64 machine or the reverse, the binary is cross-compiled with `cargo-zigbuild` and only the few commands of the final Alpine stage run under emulation. The build needs BuildKit, the default builder of Docker since version 23.
+* On a machine with 4 cores, a first build takes about 5 minutes, depending on the network: one to two minutes compile ElysianDB, the rest downloads the base images and the crates, builds the Admin UI and installs the musl tools. Later builds reuse the downloaded crates and the compiled dependencies.

@@ -1,0 +1,1682 @@
+{
+  "baseline": "1a11e5e",
+  "cases": [
+    {
+      "name": "trivial",
+      "runs": 100000,
+      "ns_p50": 500,
+      "ns_p99": 834,
+      "allocs": 14.00226
+    },
+    {
+      "name": "budget-folds-on",
+      "runs": 100000,
+      "ns_p50": 1417,
+      "ns_p99": 2375,
+      "allocs": 27.00454
+    },
+    {
+      "name": "budget-folds-off",
+      "runs": 100000,
+      "ns_p50": 1417,
+      "ns_p99": 2417,
+      "allocs": 27.00401
+    },
+    {
+      "name": "progress-folds-on",
+      "runs": 100000,
+      "ns_p50": 1167,
+      "ns_p99": 1917,
+      "allocs": 34.00363
+    },
+    {
+      "name": "progress-folds-off",
+      "runs": 100000,
+      "ns_p50": 1125,
+      "ns_p99": 1833,
+      "allocs": 34.00374
+    },
+    {
+      "name": "plain-arrays",
+      "runs": 100000,
+      "ns_p50": 4584,
+      "ns_p99": 9167,
+      "allocs": 105.0126
+    },
+    {
+      "name": "cpu-bound",
+      "runs": 100000,
+      "ns_p50": 792,
+      "ns_p99": 1375,
+      "allocs": 18.00293
+    },
+    {
+      "name": "corpus/surface",
+      "runs": 43260,
+      "ns_p50": 2750,
+      "ns_p99": 3875,
+      "allocs": 84.00977808599168
+    },
+    {
+      "name": "corpus/regex1",
+      "runs": 57885,
+      "ns_p50": 1708,
+      "ns_p99": 2250,
+      "allocs": 80.00519996544874
+    },
+    {
+      "name": "corpus/regex2",
+      "runs": 57249,
+      "ns_p50": 1667,
+      "ns_p99": 2334,
+      "allocs": 78.00529266886758
+    },
+    {
+      "name": "corpus/regex3",
+      "runs": 57710,
+      "ns_p50": 1708,
+      "ns_p99": 2250,
+      "allocs": 78.00488650147288
+    },
+    {
+      "name": "corpus/regex4",
+      "runs": 57481,
+      "ns_p50": 1708,
+      "ns_p99": 2333,
+      "allocs": 78.00514952767001
+    },
+    {
+      "name": "corpus/regex5",
+      "runs": 57169,
+      "ns_p50": 1708,
+      "ns_p99": 2334,
+      "allocs": 78.00523010722594
+    },
+    {
+      "name": "corpus/regex6",
+      "runs": 56605,
+      "ns_p50": 1750,
+      "ns_p99": 2375,
+      "allocs": 80.0043989046904
+    },
+    {
+      "name": "corpus/regex7",
+      "runs": 56982,
+      "ns_p50": 1750,
+      "ns_p99": 2333,
+      "allocs": 80.004966480643
+    },
+    {
+      "name": "corpus/regex8",
+      "runs": 56040,
+      "ns_p50": 1791,
+      "ns_p99": 2458,
+      "allocs": 80.00503211991435
+    },
+    {
+      "name": "corpus/regex9",
+      "runs": 56008,
+      "ns_p50": 1792,
+      "ns_p99": 2375,
+      "allocs": 82.00508855877732
+    },
+    {
+      "name": "corpus/num2",
+      "runs": 53481,
+      "ns_p50": 1916,
+      "ns_p99": 2708,
+      "allocs": 80.0064508891008
+    },
+    {
+      "name": "corpus/dates2",
+      "runs": 53249,
+      "ns_p50": 1958,
+      "ns_p99": 2709,
+      "allocs": 80.00565268831339
+    },
+    {
+      "name": "corpus/dates3",
+      "runs": 13709,
+      "ns_p50": 11792,
+      "ns_p99": 33709,
+      "allocs": 465.91202859435407
+    },
+    {
+      "name": "corpus/forin-entity",
+      "runs": 57774,
+      "ns_p50": 1708,
+      "ns_p99": 2209,
+      "allocs": 78.00443105895386
+    },
+    {
+      "name": "corpus/entity-in",
+      "runs": 55886,
+      "ns_p50": 1792,
+      "ns_p99": 2417,
+      "allocs": 80.00517124145583
+    },
+    {
+      "name": "corpus/spread-entity",
+      "runs": 54572,
+      "ns_p50": 1834,
+      "ns_p99": 2625,
+      "allocs": 80.00571721762076
+    },
+    {
+      "name": "corpus/array-methods-entity",
+      "runs": 52724,
+      "ns_p50": 2000,
+      "ns_p99": 2709,
+      "allocs": 90.0062210757909
+    },
+    {
+      "name": "corpus/sort-entity",
+      "runs": 57158,
+      "ns_p50": 1709,
+      "ns_p99": 2292,
+      "allocs": 80.0044613177508
+    },
+    {
+      "name": "corpus/splice-entity",
+      "runs": 57085,
+      "ns_p50": 1709,
+      "ns_p99": 2333,
+      "allocs": 80.00494000175178
+    },
+    {
+      "name": "corpus/pop-entity",
+      "runs": 54919,
+      "ns_p50": 1834,
+      "ns_p99": 2500,
+      "allocs": 82.00544438172581
+    },
+    {
+      "name": "corpus/len-entity",
+      "runs": 56014,
+      "ns_p50": 1750,
+      "ns_p99": 2417,
+      "allocs": 80.00532009854679
+    },
+    {
+      "name": "corpus/nested-arr-obj",
+      "runs": 49966,
+      "ns_p50": 2041,
+      "ns_p99": 3125,
+      "allocs": 84.00612416443181
+    },
+    {
+      "name": "corpus/assign-then-push",
+      "runs": 53756,
+      "ns_p50": 1875,
+      "ns_p99": 2709,
+      "allocs": 82.00569238782647
+    },
+    {
+      "name": "corpus/obj-then-mutate",
+      "runs": 54366,
+      "ns_p50": 1875,
+      "ns_p99": 2542,
+      "allocs": 82.0047272192179
+    },
+    {
+      "name": "corpus/localecompare",
+      "runs": 56143,
+      "ns_p50": 1750,
+      "ns_p99": 2458,
+      "allocs": 80.00509413462052
+    },
+    {
+      "name": "corpus/string-misc",
+      "runs": 54402,
+      "ns_p50": 1834,
+      "ns_p99": 2583,
+      "allocs": 82.00597404507187
+    },
+    {
+      "name": "corpus/json-parse",
+      "runs": 51369,
+      "ns_p50": 2042,
+      "ns_p99": 2916,
+      "allocs": 86.00615157001305
+    },
+    {
+      "name": "corpus/const-fn",
+      "runs": 56866,
+      "ns_p50": 1708,
+      "ns_p99": 2375,
+      "allocs": 78.00487110048184
+    },
+    {
+      "name": "corpus/let-fn",
+      "runs": 56730,
+      "ns_p50": 1708,
+      "ns_p99": 2292,
+      "allocs": 78.00419531112286
+    },
+    {
+      "name": "corpus/var-fn",
+      "runs": 55147,
+      "ns_p50": 1750,
+      "ns_p99": 2542,
+      "allocs": 78.00433387128946
+    },
+    {
+      "name": "corpus/var-arrow",
+      "runs": 54915,
+      "ns_p50": 1750,
+      "ns_p99": 4292,
+      "allocs": 78.00458891013385
+    },
+    {
+      "name": "corpus/this-fn",
+      "runs": 55684,
+      "ns_p50": 1709,
+      "ns_p99": 2459,
+      "allocs": 78.00567487967818
+    },
+    {
+      "name": "corpus/class-fn",
+      "runs": 26330,
+      "ns_p50": 5375,
+      "ns_p99": 11292,
+      "allocs": 232.035017090771,
+      "error": "error"
+    },
+    {
+      "name": "corpus/async-fn",
+      "runs": 54828,
+      "ns_p50": 1792,
+      "ns_p99": 2542,
+      "allocs": 80.00534398482527
+    },
+    {
+      "name": "corpus/gen-fn",
+      "runs": 59348,
+      "ns_p50": 1583,
+      "ns_p99": 2125,
+      "allocs": 76.00429669070567
+    },
+    {
+      "name": "corpus/not-fn",
+      "runs": 35452,
+      "ns_p50": 3666,
+      "ns_p99": 6667,
+      "allocs": 141.02016811463386
+    },
+    {
+      "name": "corpus/toplevel",
+      "runs": 54513,
+      "ns_p50": 1833,
+      "ns_p99": 2542,
+      "allocs": 80.00576009392255
+    },
+    {
+      "name": "corpus/toplevel-throw",
+      "runs": 28859,
+      "ns_p50": 4792,
+      "ns_p99": 8792,
+      "allocs": 195.02498354066321,
+      "error": "error"
+    },
+    {
+      "name": "corpus/strict",
+      "runs": 25648,
+      "ns_p50": 5500,
+      "ns_p99": 12125,
+      "allocs": 228.0346615720524,
+      "error": "error"
+    },
+    {
+      "name": "corpus/const-reassign",
+      "runs": 26120,
+      "ns_p50": 5459,
+      "ns_p99": 11625,
+      "allocs": 228.03078101071975,
+      "error": "error"
+    },
+    {
+      "name": "corpus/tdz",
+      "runs": 25212,
+      "ns_p50": 5500,
+      "ns_p99": 12291,
+      "allocs": 226.03296049500238,
+      "error": "error"
+    },
+    {
+      "name": "corpus/null-prop",
+      "runs": 25809,
+      "ns_p50": 5500,
+      "ns_p99": 11083,
+      "allocs": 226.03285675539541,
+      "error": "error"
+    },
+    {
+      "name": "corpus/undef-prop",
+      "runs": 24256,
+      "ns_p50": 5750,
+      "ns_p99": 12666,
+      "allocs": 226.03302275725594,
+      "error": "error"
+    },
+    {
+      "name": "corpus/undef-call",
+      "runs": 25370,
+      "ns_p50": 5625,
+      "ns_p99": 12417,
+      "allocs": 226.0353961371699,
+      "error": "error"
+    },
+    {
+      "name": "corpus/member-call",
+      "runs": 25602,
+      "ns_p50": 5625,
+      "ns_p99": 10625,
+      "allocs": 230.0323802827904,
+      "error": "error"
+    },
+    {
+      "name": "corpus/json-bad",
+      "runs": 22897,
+      "ns_p50": 6333,
+      "ns_p99": 15083,
+      "allocs": 271.04135913001704,
+      "error": "error"
+    },
+    {
+      "name": "corpus/json-circular",
+      "runs": 21870,
+      "ns_p50": 6833,
+      "ns_p99": 16125,
+      "allocs": 276.0415637860082,
+      "error": "error"
+    },
+    {
+      "name": "corpus/syntax",
+      "runs": 74946,
+      "ns_p50": 875,
+      "ns_p99": 1375,
+      "allocs": 85.00438982734235,
+      "error": "error"
+    },
+    {
+      "name": "corpus/syntax2",
+      "runs": 75695,
+      "ns_p50": 875,
+      "ns_p99": 1333,
+      "allocs": 79.00365942268314,
+      "error": "error"
+    },
+    {
+      "name": "corpus/import",
+      "runs": 82974,
+      "ns_p50": 666,
+      "ns_p99": 958,
+      "allocs": 66.00269964085135,
+      "error": "error"
+    },
+    {
+      "name": "corpus/for-await",
+      "runs": 47305,
+      "ns_p50": 2125,
+      "ns_p99": 4875,
+      "allocs": 107.00615156960153,
+      "error": "error"
+    },
+    {
+      "name": "corpus/async-gen",
+      "runs": 58993,
+      "ns_p50": 1500,
+      "ns_p99": 4375,
+      "allocs": 96.00400047463259,
+      "error": "error"
+    },
+    {
+      "name": "corpus/label",
+      "runs": 55583,
+      "ns_p50": 1750,
+      "ns_p99": 2458,
+      "allocs": 78.00561322706582
+    },
+    {
+      "name": "corpus/opt-catch",
+      "runs": 57823,
+      "ns_p50": 1667,
+      "ns_p99": 2333,
+      "allocs": 78.00503259948464
+    },
+    {
+      "name": "corpus/static-block",
+      "runs": 57160,
+      "ns_p50": 1708,
+      "ns_p99": 2292,
+      "allocs": 78.00463610916725
+    },
+    {
+      "name": "corpus/tagged",
+      "runs": 56786,
+      "ns_p50": 1709,
+      "ns_p99": 2292,
+      "allocs": 78.00581129151551
+    },
+    {
+      "name": "corpus/extends",
+      "runs": 56723,
+      "ns_p50": 1750,
+      "ns_p99": 2375,
+      "allocs": 80.00481286250728
+    },
+    {
+      "name": "corpus/getset",
+      "runs": 53770,
+      "ns_p50": 1916,
+      "ns_p99": 2625,
+      "allocs": 82.0058582852892
+    },
+    {
+      "name": "corpus/with",
+      "runs": 55968,
+      "ns_p50": 1708,
+      "ns_p99": 2417,
+      "allocs": 78.00448470554602
+    },
+    {
+      "name": "corpus/octal",
+      "runs": 56661,
+      "ns_p50": 1750,
+      "ns_p99": 2333,
+      "allocs": 80.0050828612273
+    },
+    {
+      "name": "corpus/letloop",
+      "runs": 56740,
+      "ns_p50": 1750,
+      "ns_p99": 2292,
+      "allocs": 80.00493479027142
+    },
+    {
+      "name": "corpus/arguments",
+      "runs": 57421,
+      "ns_p50": 1708,
+      "ns_p99": 2250,
+      "allocs": 78.0042319012208
+    },
+    {
+      "name": "corpus/dup-fn",
+      "runs": 56729,
+      "ns_p50": 1708,
+      "ns_p99": 2333,
+      "allocs": 78.00474184279645
+    },
+    {
+      "name": "corpus/globals-leak",
+      "runs": 56427,
+      "ns_p50": 1708,
+      "ns_p99": 2416,
+      "allocs": 78.00552926790367
+    },
+    {
+      "name": "corpus/date-now-type",
+      "runs": 25212,
+      "ns_p50": 5667,
+      "ns_p99": 13292,
+      "allocs": 237.03430905917816
+    },
+    {
+      "name": "corpus/dates-ctor-string",
+      "runs": 56203,
+      "ns_p50": 1791,
+      "ns_p99": 2417,
+      "allocs": 80.00515986691101
+    },
+    {
+      "name": "corpus/number-formats-out",
+      "runs": 40201,
+      "ns_p50": 3083,
+      "ns_p99": 4916,
+      "allocs": 100.01241262655158
+    },
+    {
+      "name": "corpus/string-escapes-out",
+      "runs": 52962,
+      "ns_p50": 1958,
+      "ns_p99": 2667,
+      "allocs": 82.00632528983044
+    },
+    {
+      "name": "corpus/keys-special-out",
+      "runs": 52427,
+      "ns_p50": 1958,
+      "ns_p99": 2792,
+      "allocs": 82.00541705609704
+    },
+    {
+      "name": "corpus/nested-undef-out",
+      "runs": 52413,
+      "ns_p50": 1875,
+      "ns_p99": 2584,
+      "allocs": 82.00492244290538
+    },
+    {
+      "name": "corpus/nested-fn-out",
+      "runs": 27126,
+      "ns_p50": 5208,
+      "ns_p99": 9416,
+      "allocs": 191.33528717835287
+    },
+    {
+      "name": "corpus/sparse-out",
+      "runs": 53980,
+      "ns_p50": 1916,
+      "ns_p99": 2542,
+      "allocs": 84.00581696924787
+    },
+    {
+      "name": "corpus/typed-out",
+      "runs": 14101,
+      "ns_p50": 11250,
+      "ns_p99": 40000,
+      "allocs": 482.3962839514928
+    },
+    {
+      "name": "corpus/promise-out",
+      "runs": 19450,
+      "ns_p50": 7750,
+      "ns_p99": 19750,
+      "allocs": 330.39141388174806
+    },
+    {
+      "name": "corpus/proxy-out",
+      "runs": 26458,
+      "ns_p50": 5334,
+      "ns_p99": 10167,
+      "allocs": 206.34031294882456
+    },
+    {
+      "name": "corpus/args-out",
+      "runs": 56361,
+      "ns_p50": 1750,
+      "ns_p99": 2375,
+      "allocs": 80.00489700324692
+    },
+    {
+      "name": "corpus/goerror-type",
+      "runs": 56326,
+      "ns_p50": 1750,
+      "ns_p99": 2334,
+      "allocs": 80.00516635301636
+    },
+    {
+      "name": "corpus/int-key-objects",
+      "runs": 53199,
+      "ns_p50": 1917,
+      "ns_p99": 2667,
+      "allocs": 82.00511287806162
+    },
+    {
+      "name": "corpus/big-ints-out",
+      "runs": 51290,
+      "ns_p50": 2042,
+      "ns_p99": 2959,
+      "allocs": 84.00705790602457
+    },
+    {
+      "name": "corpus/date-in-array-out",
+      "runs": 23433,
+      "ns_p50": 5959,
+      "ns_p99": 13917,
+      "allocs": 217.32531045960823
+    },
+    {
+      "name": "corpus/symbol-desc-out",
+      "runs": 53841,
+      "ns_p50": 1833,
+      "ns_p99": 4875,
+      "allocs": 80.0054976690626
+    },
+    {
+      "name": "corpus/bigint-big-out",
+      "runs": 28084,
+      "ns_p50": 4959,
+      "ns_p99": 10208,
+      "allocs": 190.00238570004274
+    },
+    {
+      "name": "corpus/entity-set-undefined-key",
+      "runs": 53405,
+      "ns_p50": 1917,
+      "ns_p99": 2625,
+      "allocs": 82.00574852541897
+    },
+    {
+      "name": "corpus/symbol-key",
+      "runs": 56136,
+      "ns_p50": 1750,
+      "ns_p99": 2417,
+      "allocs": 78.00539760581445
+    },
+    {
+      "name": "corpus/row-proto",
+      "runs": 52531,
+      "ns_p50": 1875,
+      "ns_p99": 2709,
+      "allocs": 84.0052159677143
+    },
+    {
+      "name": "corpus/re-p",
+      "runs": 55986,
+      "ns_p50": 1750,
+      "ns_p99": 2417,
+      "allocs": 80.00548351373558
+    },
+    {
+      "name": "corpus/re-groups",
+      "runs": 56440,
+      "ns_p50": 1750,
+      "ns_p99": 2375,
+      "allocs": 80.00522678951098
+    },
+    {
+      "name": "corpus/re-s",
+      "runs": 55871,
+      "ns_p50": 1791,
+      "ns_p99": 2417,
+      "allocs": 80.00502944282364
+    },
+    {
+      "name": "corpus/re-i",
+      "runs": 55208,
+      "ns_p50": 1791,
+      "ns_p99": 2625,
+      "allocs": 80.00489059556585
+    },
+    {
+      "name": "corpus/re-misc",
+      "runs": 53866,
+      "ns_p50": 1875,
+      "ns_p99": 2875,
+      "allocs": 84.0064419114098
+    },
+    {
+      "name": "corpus/re-backref",
+      "runs": 54584,
+      "ns_p50": 1791,
+      "ns_p99": 4166,
+      "allocs": 80.00500146563095
+    },
+    {
+      "name": "corpus/re-nested-quantifier",
+      "runs": 57197,
+      "ns_p50": 1708,
+      "ns_p99": 2291,
+      "allocs": 78.00510516285819
+    },
+    {
+      "name": "corpus/proto-methods-rows",
+      "runs": 53869,
+      "ns_p50": 1875,
+      "ns_p99": 2583,
+      "allocs": 84.00516066754534
+    },
+    {
+      "name": "corpus/sort-stability",
+      "runs": 56523,
+      "ns_p50": 1750,
+      "ns_p99": 2375,
+      "allocs": 78.00546680112521
+    },
+    {
+      "name": "corpus/sort-inconsistent",
+      "runs": 56221,
+      "ns_p50": 1750,
+      "ns_p99": 2334,
+      "allocs": 78.00535387132922
+    },
+    {
+      "name": "corpus/sort-undefined-cmp",
+      "runs": 55152,
+      "ns_p50": 1750,
+      "ns_p99": 2458,
+      "allocs": 78.00422468813461
+    },
+    {
+      "name": "corpus/number-tostring-radix",
+      "runs": 55125,
+      "ns_p50": 1792,
+      "ns_p99": 2375,
+      "allocs": 80.00513378684808
+    },
+    {
+      "name": "corpus/parse-int-float",
+      "runs": 53508,
+      "ns_p50": 1834,
+      "ns_p99": 2750,
+      "allocs": 80.00575614861329
+    },
+    {
+      "name": "corpus/date-setters",
+      "runs": 55274,
+      "ns_p50": 1792,
+      "ns_p99": 2583,
+      "allocs": 80.00555414842421
+    },
+    {
+      "name": "corpus/date-tostring-variants",
+      "runs": 54716,
+      "ns_p50": 1834,
+      "ns_p99": 2542,
+      "allocs": 80.00593976167849
+    },
+    {
+      "name": "corpus/date-utc-rollover",
+      "runs": 55412,
+      "ns_p50": 1791,
+      "ns_p99": 2500,
+      "allocs": 80.00606366851946
+    },
+    {
+      "name": "corpus/string-localecompare-ext",
+      "runs": 55829,
+      "ns_p50": 1791,
+      "ns_p99": 2458,
+      "allocs": 80.00571387630085
+    },
+    {
+      "name": "corpus/json-stringify-opts",
+      "runs": 56376,
+      "ns_p50": 1791,
+      "ns_p99": 2458,
+      "allocs": 80.00509081878813
+    },
+    {
+      "name": "corpus/array-tostring",
+      "runs": 55694,
+      "ns_p50": 1791,
+      "ns_p99": 2500,
+      "allocs": 80.0059791000826
+    },
+    {
+      "name": "corpus/fn-names",
+      "runs": 55872,
+      "ns_p50": 1792,
+      "ns_p99": 2458,
+      "allocs": 80.00486827033218
+    },
+    {
+      "name": "corpus/ctx-mutation",
+      "runs": 58960,
+      "ns_p50": 1583,
+      "ns_p99": 2250,
+      "allocs": 76.0046302578019
+    },
+    {
+      "name": "corpus/row-identity",
+      "runs": 52694,
+      "ns_p50": 1958,
+      "ns_p99": 2666,
+      "allocs": 84.00552245037386
+    },
+    {
+      "name": "corpus/row-set-object",
+      "runs": 54538,
+      "ns_p50": 1833,
+      "ns_p99": 2500,
+      "allocs": 80.00471231068246
+    },
+    {
+      "name": "corpus/filter-values",
+      "runs": 40946,
+      "ns_p50": 3041,
+      "ns_p99": 4250,
+      "allocs": 121.00686269721096
+    },
+    {
+      "name": "corpus/fold-planned",
+      "runs": 51326,
+      "ns_p50": 2042,
+      "ns_p99": 2834,
+      "allocs": 90.00748158827885
+    },
+    {
+      "name": "corpus/count-sum-types",
+      "runs": 50825,
+      "ns_p50": 2084,
+      "ns_p99": 2916,
+      "allocs": 88.00684702410231
+    },
+    {
+      "name": "corpus/group-ops",
+      "runs": 53600,
+      "ns_p50": 1875,
+      "ns_p99": 2709,
+      "allocs": 82.00733208955224
+    },
+    {
+      "name": "corpus/re-repeat-capture",
+      "runs": 56918,
+      "ns_p50": 1708,
+      "ns_p99": 2416,
+      "allocs": 80.00690466987596
+    },
+    {
+      "name": "corpus/re-repeat-capture-2",
+      "runs": 56543,
+      "ns_p50": 1750,
+      "ns_p99": 2416,
+      "allocs": 80.005570981377
+    },
+    {
+      "name": "corpus/re-v-flag",
+      "runs": 14349,
+      "ns_p50": 10583,
+      "ns_p99": 57125,
+      "allocs": 502.1017492508189,
+      "error": "error"
+    },
+    {
+      "name": "corpus/hashbang",
+      "runs": 56981,
+      "ns_p50": 1708,
+      "ns_p99": 2375,
+      "allocs": 78.00672153875854
+    },
+    {
+      "name": "corpus/using",
+      "runs": 66490,
+      "ns_p50": 1167,
+      "ns_p99": 1917,
+      "allocs": 87.00560986614528,
+      "error": "error"
+    },
+    {
+      "name": "corpus/decorator",
+      "runs": 74833,
+      "ns_p50": 917,
+      "ns_p99": 1375,
+      "allocs": 71.00518487832908,
+      "error": "error"
+    },
+    {
+      "name": "corpus/html-comment",
+      "runs": 67408,
+      "ns_p50": 1125,
+      "ns_p99": 2000,
+      "allocs": 90.00522193211488,
+      "error": "error"
+    },
+    {
+      "name": "corpus/fn-tostring",
+      "runs": 56510,
+      "ns_p50": 1750,
+      "ns_p99": 2458,
+      "allocs": 80.00601663422403
+    },
+    {
+      "name": "corpus/reflect-time",
+      "runs": 55156,
+      "ns_p50": 1792,
+      "ns_p99": 3333,
+      "allocs": 80.00708898397274
+    },
+    {
+      "name": "corpus/reflect-row",
+      "runs": 53059,
+      "ns_p50": 1916,
+      "ns_p99": 2750,
+      "allocs": 82.00721837953975
+    },
+    {
+      "name": "corpus/reflect-array",
+      "runs": 53844,
+      "ns_p50": 1875,
+      "ns_p99": 2667,
+      "allocs": 82.00724314686873
+    },
+    {
+      "name": "corpus/reflect-group",
+      "runs": 54117,
+      "ns_p50": 1875,
+      "ns_p99": 2667,
+      "allocs": 82.00637507622373
+    },
+    {
+      "name": "corpus/reflect-pairs",
+      "runs": 55836,
+      "ns_p50": 1750,
+      "ns_p99": 2500,
+      "allocs": 80.00669818754925
+    },
+    {
+      "name": "corpus/reflect-bytes",
+      "runs": 56003,
+      "ns_p50": 1750,
+      "ns_p99": 2459,
+      "allocs": 80.00623180901023
+    },
+    {
+      "name": "corpus/reflect-proxy",
+      "runs": 55481,
+      "ns_p50": 1750,
+      "ns_p99": 2541,
+      "allocs": 80.00749806239973
+    },
+    {
+      "name": "corpus/reflect-func",
+      "runs": 55670,
+      "ns_p50": 1791,
+      "ns_p99": 2625,
+      "allocs": 80.00625112268726
+    },
+    {
+      "name": "corpus/weak",
+      "runs": 52758,
+      "ns_p50": 1917,
+      "ns_p99": 3833,
+      "allocs": 82.00693733651768
+    },
+    {
+      "name": "corpus/numbers",
+      "runs": 35895,
+      "ns_p50": 3292,
+      "ns_p99": 9042,
+      "allocs": 100.01777406324001
+    },
+    {
+      "name": "corpus/nan",
+      "runs": 27233,
+      "ns_p50": 5000,
+      "ns_p99": 12292,
+      "allocs": 175.36352954136527
+    },
+    {
+      "name": "corpus/inf",
+      "runs": 27634,
+      "ns_p50": 5000,
+      "ns_p99": 11833,
+      "allocs": 175.3733082434682
+    },
+    {
+      "name": "corpus/undef",
+      "runs": 53357,
+      "ns_p50": 1834,
+      "ns_p99": 3084,
+      "allocs": 80.00832130741983
+    },
+    {
+      "name": "corpus/date",
+      "runs": 27461,
+      "ns_p50": 4959,
+      "ns_p99": 12250,
+      "allocs": 185.34594515858853
+    },
+    {
+      "name": "corpus/date-strings",
+      "runs": 43453,
+      "ns_p50": 2625,
+      "ns_p99": 6625,
+      "allocs": 92.01339378178722
+    },
+    {
+      "name": "corpus/date-parse",
+      "runs": 40081,
+      "ns_p50": 3000,
+      "ns_p99": 7500,
+      "allocs": 98.0147700905666
+    },
+    {
+      "name": "corpus/objects",
+      "runs": 52368,
+      "ns_p50": 1959,
+      "ns_p99": 4500,
+      "allocs": 86.00769553926062
+    },
+    {
+      "name": "corpus/arrays",
+      "runs": 55305,
+      "ns_p50": 1750,
+      "ns_p99": 2792,
+      "allocs": 80.0060211554109
+    },
+    {
+      "name": "corpus/func",
+      "runs": 27542,
+      "ns_p50": 4916,
+      "ns_p99": 12875,
+      "allocs": 178.39641275143418
+    },
+    {
+      "name": "corpus/arrow",
+      "runs": 25284,
+      "ns_p50": 4958,
+      "ns_p99": 13375,
+      "allocs": 178.35429520645468
+    },
+    {
+      "name": "corpus/symbol",
+      "runs": 54999,
+      "ns_p50": 1708,
+      "ns_p99": 4750,
+      "allocs": 78.00690921653121
+    },
+    {
+      "name": "corpus/bigint",
+      "runs": 28772,
+      "ns_p50": 4708,
+      "ns_p99": 11583,
+      "allocs": 171.34189489781733
+    },
+    {
+      "name": "corpus/map",
+      "runs": 14074,
+      "ns_p50": 10833,
+      "ns_p99": 56917,
+      "allocs": 432.4551655535029
+    },
+    {
+      "name": "corpus/set",
+      "runs": 54187,
+      "ns_p50": 1791,
+      "ns_p99": 2667,
+      "allocs": 80.00594238470482
+    },
+    {
+      "name": "corpus/regexp",
+      "runs": 55898,
+      "ns_p50": 1750,
+      "ns_p99": 2500,
+      "allocs": 79.0076031342803
+    },
+    {
+      "name": "corpus/error-obj",
+      "runs": 56232,
+      "ns_p50": 1709,
+      "ns_p99": 2500,
+      "allocs": 79.00689998577323
+    },
+    {
+      "name": "corpus/class-inst",
+      "runs": 55312,
+      "ns_p50": 1750,
+      "ns_p99": 3875,
+      "allocs": 80.0074486549031
+    },
+    {
+      "name": "corpus/boxed",
+      "runs": 54578,
+      "ns_p50": 1833,
+      "ns_p99": 2625,
+      "allocs": 81.00665103155117
+    },
+    {
+      "name": "corpus/query-assign",
+      "runs": 24381,
+      "ns_p50": 5708,
+      "ns_p99": 15000,
+      "allocs": 202.33993683606087
+    },
+    {
+      "name": "corpus/row-assign",
+      "runs": 24653,
+      "ns_p50": 5709,
+      "ns_p99": 14583,
+      "allocs": 206.38908043645804
+    },
+    {
+      "name": "corpus/rows-slice",
+      "runs": 19548,
+      "ns_p50": 7500,
+      "ns_p99": 25500,
+      "allocs": 299.39569265397995
+    },
+    {
+      "name": "corpus/rows-json",
+      "runs": 45348,
+      "ns_p50": 2459,
+      "ns_p99": 5875,
+      "allocs": 100.01122430978214
+    },
+    {
+      "name": "corpus/rows-map",
+      "runs": 54811,
+      "ns_p50": 1833,
+      "ns_p99": 2667,
+      "allocs": 82.00623962343325
+    },
+    {
+      "name": "corpus/group-assign",
+      "runs": 24031,
+      "ns_p50": 5792,
+      "ns_p99": 15250,
+      "allocs": 200.35595688901836
+    },
+    {
+      "name": "corpus/group-json",
+      "runs": 48681,
+      "ns_p50": 2209,
+      "ns_p99": 4583,
+      "allocs": 88.00786754585978
+    },
+    {
+      "name": "corpus/push-entity-array",
+      "runs": 57012,
+      "ns_p50": 1708,
+      "ns_p99": 2458,
+      "allocs": 78.00673542412123
+    },
+    {
+      "name": "corpus/push-local",
+      "runs": 56803,
+      "ns_p50": 1708,
+      "ns_p99": 2500,
+      "allocs": 78.00727074274246
+    },
+    {
+      "name": "corpus/set-index",
+      "runs": 56077,
+      "ns_p50": 1750,
+      "ns_p99": 2500,
+      "allocs": 80.00531412165415
+    },
+    {
+      "name": "corpus/nested-map",
+      "runs": 53098,
+      "ns_p50": 1833,
+      "ns_p99": 2708,
+      "allocs": 80.0071565784022
+    },
+    {
+      "name": "corpus/identity",
+      "runs": 53561,
+      "ns_p50": 1834,
+      "ns_p99": 2875,
+      "allocs": 80.00672130841471
+    },
+    {
+      "name": "corpus/alias",
+      "runs": 51925,
+      "ns_p50": 2000,
+      "ns_p99": 4292,
+      "allocs": 84.00751083293211
+    },
+    {
+      "name": "corpus/typeof",
+      "runs": 43382,
+      "ns_p50": 2667,
+      "ns_p99": 6584,
+      "allocs": 92.01150246646074
+    },
+    {
+      "name": "corpus/numfmt",
+      "runs": 35441,
+      "ns_p50": 3583,
+      "ns_p99": 8958,
+      "allocs": 108.01619593126605
+    },
+    {
+      "name": "corpus/strings",
+      "runs": 34923,
+      "ns_p50": 3542,
+      "ns_p99": 8750,
+      "allocs": 106.01557712682187
+    },
+    {
+      "name": "corpus/es6",
+      "runs": 54249,
+      "ns_p50": 1833,
+      "ns_p99": 2917,
+      "allocs": 80.00689413629745
+    },
+    {
+      "name": "corpus/es-modern",
+      "runs": 54976,
+      "ns_p50": 1792,
+      "ns_p99": 2750,
+      "allocs": 80.00636641443539
+    },
+    {
+      "name": "corpus/logical-assign",
+      "runs": 56393,
+      "ns_p50": 1750,
+      "ns_p99": 2542,
+      "allocs": 80.00641923643005
+    },
+    {
+      "name": "corpus/class-fields",
+      "runs": 56194,
+      "ns_p50": 1750,
+      "ns_p99": 2625,
+      "allocs": 80.00670890130618
+    },
+    {
+      "name": "corpus/generators",
+      "runs": 56528,
+      "ns_p50": 1709,
+      "ns_p99": 2541,
+      "allocs": 80.00652773846589
+    },
+    {
+      "name": "corpus/async",
+      "runs": 53714,
+      "ns_p50": 1834,
+      "ns_p99": 3084,
+      "allocs": 80.00739099676062
+    },
+    {
+      "name": "corpus/await-top",
+      "runs": 56669,
+      "ns_p50": 1708,
+      "ns_p99": 2458,
+      "allocs": 78.00749969118918
+    },
+    {
+      "name": "corpus/proxy-reflect",
+      "runs": 55935,
+      "ns_p50": 1750,
+      "ns_p99": 3417,
+      "allocs": 80.00709752391168
+    },
+    {
+      "name": "corpus/symbols",
+      "runs": 56532,
+      "ns_p50": 1708,
+      "ns_p99": 2500,
+      "allocs": 78.00581971272908
+    },
+    {
+      "name": "corpus/mapset",
+      "runs": 55924,
+      "ns_p50": 1750,
+      "ns_p99": 3000,
+      "allocs": 80.00686646162649
+    },
+    {
+      "name": "corpus/regex",
+      "runs": 12627,
+      "ns_p50": 12333,
+      "ns_p99": 68250,
+      "allocs": 558.1195850162351,
+      "error": "error"
+    },
+    {
+      "name": "corpus/regex-flags-d",
+      "runs": 46057,
+      "ns_p50": 2375,
+      "ns_p99": 4834,
+      "allocs": 130.00762099138024,
+      "error": "error"
+    },
+    {
+      "name": "corpus/json",
+      "runs": 54342,
+      "ns_p50": 1834,
+      "ns_p99": 2791,
+      "allocs": 80.00737919104928
+    },
+    {
+      "name": "corpus/globals",
+      "runs": 55178,
+      "ns_p50": 1792,
+      "ns_p99": 2667,
+      "allocs": 80.00712240385661
+    },
+    {
+      "name": "corpus/console",
+      "runs": 23784,
+      "ns_p50": 5791,
+      "ns_p99": 18666,
+      "allocs": 226.04889841910529,
+      "error": "error"
+    },
+    {
+      "name": "corpus/throw-error",
+      "runs": 24256,
+      "ns_p50": 5500,
+      "ns_p99": 20375,
+      "allocs": 203.04254617414247,
+      "error": "error"
+    },
+    {
+      "name": "corpus/throw-string",
+      "runs": 30241,
+      "ns_p50": 4375,
+      "ns_p99": 11833,
+      "allocs": 159.03029000363745,
+      "error": "error"
+    },
+    {
+      "name": "corpus/throw-obj",
+      "runs": 30235,
+      "ns_p50": 4417,
+      "ns_p99": 11625,
+      "allocs": 164.03046138581115,
+      "error": "error"
+    },
+    {
+      "name": "corpus/type-error",
+      "runs": 25448,
+      "ns_p50": 5500,
+      "ns_p99": 15500,
+      "allocs": 226.04782301163155,
+      "error": "error"
+    },
+    {
+      "name": "corpus/ref-error",
+      "runs": 25162,
+      "ns_p50": 5584,
+      "ns_p99": 15875,
+      "allocs": 226.04149113742946,
+      "error": "error"
+    },
+    {
+      "name": "corpus/range-error",
+      "runs": 21095,
+      "ns_p50": 6834,
+      "ns_p99": 22291,
+      "allocs": 292.05916093861106,
+      "error": "error"
+    },
+    {
+      "name": "corpus/query-missing-arg",
+      "runs": 28290,
+      "ns_p50": 4834,
+      "ns_p99": 12583,
+      "allocs": 172.0299752562743,
+      "error": "error"
+    },
+    {
+      "name": "corpus/query-missing-arg-caught",
+      "runs": 55113,
+      "ns_p50": 1750,
+      "ns_p99": 2708,
+      "allocs": 80.00526191642625
+    },
+    {
+      "name": "corpus/query-null-params",
+      "runs": 54699,
+      "ns_p50": 1792,
+      "ns_p99": 2667,
+      "allocs": 80.00628896323516
+    },
+    {
+      "name": "corpus/query-nonobject-cond",
+      "runs": 54787,
+      "ns_p50": 1792,
+      "ns_p99": 2625,
+      "allocs": 80.00662565937175
+    },
+    {
+      "name": "corpus/query-number-cond",
+      "runs": 42233,
+      "ns_p50": 2791,
+      "ns_p99": 5834,
+      "allocs": 108.00783747306609
+    },
+    {
+      "name": "corpus/query-core",
+      "runs": 37974,
+      "ns_p50": 2167,
+      "ns_p99": 4791,
+      "allocs": 84.00747880128509
+    },
+    {
+      "name": "corpus/group-undef-sum",
+      "runs": 45754,
+      "ns_p50": 2166,
+      "ns_p99": 4792,
+      "allocs": 84.0092013813
+    },
+    {
+      "name": "corpus/sum-missing-arg",
+      "runs": 24800,
+      "ns_p50": 5416,
+      "ns_p99": 16083,
+      "allocs": 175.03358870967742,
+      "error": "error"
+    },
+    {
+      "name": "corpus/group-missing-arg",
+      "runs": 24432,
+      "ns_p50": 5458,
+      "ns_p99": 15708,
+      "allocs": 175.03544531761625,
+      "error": "error"
+    },
+    {
+      "name": "corpus/keys-order",
+      "runs": 52960,
+      "ns_p50": 1791,
+      "ns_p99": 4667,
+      "allocs": 78.00702416918429
+    },
+    {
+      "name": "corpus/keys-order-2",
+      "runs": 53881,
+      "ns_p50": 1750,
+      "ns_p99": 3625,
+      "allocs": 78.00697834115923
+    },
+    {
+      "name": "corpus/keys-order-3",
+      "runs": 55358,
+      "ns_p50": 1709,
+      "ns_p99": 3959,
+      "allocs": 78.00590700531089
+    },
+    {
+      "name": "corpus/row-keys",
+      "runs": 50508,
+      "ns_p50": 2000,
+      "ns_p99": 4875,
+      "allocs": 84.00595945196801
+    },
+    {
+      "name": "corpus/this",
+      "runs": 55523,
+      "ns_p50": 1750,
+      "ns_p99": 4083,
+      "allocs": 80.00662788393998
+    },
+    {
+      "name": "corpus/return-ignored",
+      "runs": 58795,
+      "ns_p50": 1583,
+      "ns_p99": 3500,
+      "allocs": 76.00613997788928
+    },
+    {
+      "name": "corpus/reassign-entity",
+      "runs": 53083,
+      "ns_p50": 1625,
+      "ns_p99": 4375,
+      "allocs": 76.0064239021909
+    },
+    {
+      "name": "corpus/error-message",
+      "runs": 54275,
+      "ns_p50": 1750,
+      "ns_p99": 4875,
+      "allocs": 80.0066513127591
+    },
+    {
+      "name": "corpus/error-message2",
+      "runs": 51853,
+      "ns_p50": 1959,
+      "ns_p99": 4667,
+      "allocs": 82.00781054133802
+    },
+    {
+      "name": "corpus/stack",
+      "runs": 56441,
+      "ns_p50": 1708,
+      "ns_p99": 3875,
+      "allocs": 78.00559876685388
+    },
+    {
+      "name": "corpus/sort",
+      "runs": 51202,
+      "ns_p50": 1958,
+      "ns_p99": 4625,
+      "allocs": 84.00783172532323
+    },
+    {
+      "name": "corpus/tolocale",
+      "runs": 55040,
+      "ns_p50": 1750,
+      "ns_p99": 4208,
+      "allocs": 80.00679505813953
+    },
+    {
+      "name": "corpus/eval",
+      "runs": 53159,
+      "ns_p50": 1833,
+      "ns_p99": 4250,
+      "allocs": 80.00639590661976
+    },
+    {
+      "name": "corpus/getter-def",
+      "runs": 20632,
+      "ns_p50": 6875,
+      "ns_p99": 24459,
+      "allocs": 263.0597130670803,
+      "error": "error"
+    },
+    {
+      "name": "corpus/freeze",
+      "runs": 21551,
+      "ns_p50": 6583,
+      "ns_p99": 19250,
+      "allocs": 257.5652173913044,
+      "error": "error"
+    },
+    {
+      "name": "corpus/proto-assign",
+      "runs": 56256,
+      "ns_p50": 1708,
+      "ns_p99": 3833,
+      "allocs": 78.00691481797497
+    },
+    {
+      "name": "corpus/int-keys",
+      "runs": 54562,
+      "ns_p50": 1792,
+      "ns_p99": 4208,
+      "allocs": 80.00584655987684
+    },
+    {
+      "name": "corpus/date-local",
+      "runs": 54387,
+      "ns_p50": 1791,
+      "ns_p99": 4208,
+      "allocs": 80.0079982348723
+    },
+    {
+      "name": "corpus/math",
+      "runs": 54653,
+      "ns_p50": 1833,
+      "ns_p99": 4208,
+      "allocs": 80.00686147146543
+    },
+    {
+      "name": "corpus/string-number",
+      "runs": 17494,
+      "ns_p50": 8583,
+      "ns_p99": 24209,
+      "allocs": 297.3992225906025
+    },
+    {
+      "name": "corpus/sourcemap-missing-file",
+      "runs": 51896,
+      "ns_p50": 1958,
+      "ns_p99": 3833,
+      "allocs": 90.00662864189918,
+      "error": "error"
+    },
+    {
+      "name": "corpus/sourcemap-bad-data",
+      "runs": 65080,
+      "ns_p50": 1250,
+      "ns_p99": 3417,
+      "allocs": 86.00619237861095,
+      "error": "error"
+    },
+    {
+      "name": "corpus/sourcemap-not-last",
+      "runs": 55384,
+      "ns_p50": 1709,
+      "ns_p99": 3042,
+      "allocs": 78.00642784919832
+    },
+    {
+      "name": "corpus/conv-time-add-str",
+      "runs": 58118,
+      "ns_p50": 1625,
+      "ns_p99": 3584,
+      "allocs": 76.00526515021164
+    },
+    {
+      "name": "corpus/conv-time-in-num",
+      "runs": 10782,
+      "ns_p50": 15209,
+      "ns_p99": 60291,
+      "allocs": 476.1024856241885,
+      "error": "error"
+    },
+    {
+      "name": "corpus/conv-time-format-obj",
+      "runs": 55531,
+      "ns_p50": 1750,
+      "ns_p99": 4042,
+      "allocs": 78.00648286542652
+    },
+    {
+      "name": "corpus/re-bad-literal",
+      "runs": 50628,
+      "ns_p50": 1959,
+      "ns_p99": 5125,
+      "allocs": 120.0066168918385,
+      "error": "error"
+    },
+    {
+      "name": "corpus/re-bad-ctor",
+      "runs": 14797,
+      "ns_p50": 10208,
+      "ns_p99": 51791,
+      "allocs": 453.0923835912685,
+      "error": "error"
+    },
+    {
+      "name": "corpus/re-bad-ctor-regexp2",
+      "runs": 13824,
+      "ns_p50": 11000,
+      "ns_p99": 58458,
+      "allocs": 474.12594039351853,
+      "error": "error"
+    },
+    {
+      "name": "corpus/re-bad-repeat",
+      "runs": 14034,
+      "ns_p50": 10875,
+      "ns_p99": 50292,
+      "allocs": 470.10488812883,
+      "error": "error"
+    },
+    {
+      "name": "corpus/re-bad-class",
+      "runs": 14575,
+      "ns_p50": 10375,
+      "ns_p99": 53541,
+      "allocs": 458.11197255574615,
+      "error": "error"
+    },
+    {
+      "name": "corpus/json-bad-2",
+      "runs": 46388,
+      "ns_p50": 2375,
+      "ns_p99": 5625,
+      "allocs": 88.00857980512201
+    }
+  ],
+  "cpus": 16,
+  "go_version": "go1.24.7",
+  "goarch": "arm64",
+  "goos": "darwin"
+}

@@ -1,0 +1,1362 @@
+[
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "001-no-credentials",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "001-no-credentials.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "002-wrong-credentials",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "002-wrong-credentials.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "003-malformed-header",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "003-malformed-header.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "004-bearer-in-basic-mode",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "004-bearer-in-basic-mode.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "005-health",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "005-health.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "head": true,
+    "id": "006-health-head",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "006-health-head.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "007-kv-put",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "007-kv-put.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "008-kv-put-ttl",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "008-kv-put-ttl.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "009-kv-get",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "009-kv-get.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "010-kv-put-escaped",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "010-kv-put-escaped.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "011-kv-get-escaped",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "011-kv-get-escaped.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "012-kv-get-unescaped",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "012-kv-get-unescaped.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "013-kv-mget",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "013-kv-mget.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "014-kv-put-mget",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "014-kv-put-mget.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "015-kv-get-missing",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "015-kv-get-missing.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "016-kv-delete",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "016-kv-delete.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "017-kv-get-deleted",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "017-kv-get-deleted.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "018-save",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "018-save.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "json-shape",
+    "conn": "new",
+    "half_close": false,
+    "id": "019-stats",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "019-stats.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "020-config",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "020-config.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "021-create",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "021-create.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "022-create-no-id",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "022-create-no-id.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "023-create-list",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "023-create-list.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "024-create-invalid-json",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "024-create-invalid-json.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "025-list",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "025-list.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "026-list-again-cached",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "026-list-again-cached.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "027-list-filter-encoded",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "027-list-filter-encoded.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "028-list-includes",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "028-list-includes.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "029-get",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "029-get.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "030-get-missing",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "030-get-missing.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "031-count",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "031-count.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "032-exists",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "032-exists.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "033-exists-missing",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "033-exists-missing.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "034-update",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "034-update.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "035-update-list",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "035-update-list.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "036-query",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "036-query.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "d27",
+    "conn": "new",
+    "half_close": false,
+    "id": "037-query-decode-error",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "037-query-decode-error.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "d27",
+    "conn": "new",
+    "half_close": false,
+    "id": "038-query-syntax-error",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "038-query-syntax-error.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "039-query-filter-error",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "039-query-filter-error.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "040-migrate",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "040-migrate.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "041-types",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "041-types.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "042-types-names",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "042-types-names.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "043-create-type",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "043-create-type.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "044-get-schema",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "044-get-schema.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "045-put-schema",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "045-put-schema.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "046-create-schema-error",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "046-create-schema-error.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "capture": {
+      "tx": "\"transaction_id\":\"([^\"]+)\""
+    },
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "047-tx-begin",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "047-tx-begin.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "048-tx-write",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "048-tx-write.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "049-tx-update",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "049-tx-update.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "050-tx-delete",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "050-tx-delete.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "051-tx-commit",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "051-tx-commit.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "capture": {
+      "tx2": "\"transaction_id\":\"([^\"]+)\""
+    },
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "052-tx-begin-2",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "052-tx-begin-2.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "053-tx-rollback",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "053-tx-rollback.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "054-tx-unknown",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "054-tx-unknown.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "capture": {
+      "hook": "\"id\":\"([^\"]+)\""
+    },
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "055-hook-create",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "055-hook-create.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "056-hook-list",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "056-hook-list.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "057-hook-get",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "057-hook-get.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "058-list-with-hook",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "058-list-with-hook.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "059-hook-update",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "059-hook-update.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "060-hook-delete",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "060-hook-delete.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "061-hook-get-missing",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "061-hook-get-missing.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "062-export",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "062-export.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "063-import",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "063-import.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "head-only",
+    "conn": "new",
+    "half_close": false,
+    "id": "064-backup-head",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "064-backup-head.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "json-shape",
+    "conn": "new",
+    "half_close": false,
+    "id": "065-monitoring-overview",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "065-monitoring-overview.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "json-shape",
+    "conn": "new",
+    "half_close": false,
+    "id": "066-monitoring-series",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "066-monitoring-series.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "json-shape",
+    "conn": "new",
+    "half_close": false,
+    "id": "067-monitoring-details",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "067-monitoring-details.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "json-shape",
+    "conn": "new",
+    "half_close": false,
+    "id": "068-monitoring-logs",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "068-monitoring-logs.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "head-only",
+    "conn": "new",
+    "half_close": false,
+    "id": "069-monitoring-logs-download",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "069-monitoring-logs-download.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "070-monitoring-level-get",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "070-monitoring-level-get.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "071-monitoring-level-put",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "071-monitoring-level-put.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "072-monitoring-level-put-bad",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "072-monitoring-level-put-bad.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "head-only",
+    "conn": "new",
+    "half_close": false,
+    "id": "073-metrics",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "073-metrics.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "074-delete",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "074-delete.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "075-destroy",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "075-destroy.req",
+        "pause_before_ms": 0
+      }
+    ]
+  }
+]

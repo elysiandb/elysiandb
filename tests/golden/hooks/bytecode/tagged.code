@@ -1,0 +1,51 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"tag" source:"function tag(s, ...v) { return s.raw.join('|') + v.join(',') }" length:1 strict:false}
+  func: "tag"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:1 args:1}
+  1	goja.createArgsRestStack	1
+  2	goja.initStackP	1
+  3	*goja.enterFuncBody	&{enterBlock:{names:map[] stashSize:0 stackSize:0} funcType:1 extensible:false adjustStack:false}
+  4	goja.loadStackLex	-1
+  5	goja.getProp	"raw"
+  6	goja.getPropCallee	"join"
+  7	goja.loadVal	{v:"|"}
+  8	goja.call	1
+  9	goja.loadStackLex	1
+  10	goja.getPropCallee	"join"
+  11	goja.loadVal	{v:","}
+  12	goja.call	1
+  13	goja._add	{}
+  14	goja._ret	{}
+  positions:
+  0	0
+  2	19
+  4	31
+  5	33
+  8	41
+  9	49
+  12	55
+  13	31
+1	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { ctx.entity.t = tag`a${1}b${2}c` }" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadDynamicCallee	"tag"
+  4	*goja.getTaggedTmplObject	&{raw:[&{value:"a" writable:false configurable:false enumerable:true accessor:false getterFunc:<nil> setterFunc:<nil>} &{value:"b" writable:false configurable:false enumerable:true accessor:false getterFunc:<nil> setterFunc:<nil>} &{value:"c" writable:false configurable:false enumerable:true accessor:false getterFunc:<nil> setterFunc:<nil>}] cooked:[&{value:"a" writable:false configurable:false enumerable:true accessor:false getterFunc:<nil> setterFunc:<nil>} &{value:"b" writable:false configurable:false enumerable:true accessor:false getterFunc:<nil> setterFunc:<nil>} &{value:"c" writable:false configurable:false enumerable:true accessor:false getterFunc:<nil> setterFunc:<nil>}]}
+  5	goja.loadVal	{v:1}
+  6	goja.loadVal	{v:2}
+  7	goja.call	3
+  8	goja.setPropP	"t"
+  9	goja._loadUndef	{}
+  10	goja._ret	{}
+  positions:
+  0	63
+  1	88
+  2	92
+  3	103
+  8	99
+2	*goja.bindGlobal	&{vars:[] funcs:["tag" "postRead"] lets:[] consts:[] deletable:false}
+positions:

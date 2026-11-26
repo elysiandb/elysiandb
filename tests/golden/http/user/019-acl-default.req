@@ -1,0 +1,6 @@
+PUT /api/acl/ann/book/default HTTP/1.1
+Host: h
+Connection: close
+Cookie: edb_session={{sid}}
+Content-Length: 0
+

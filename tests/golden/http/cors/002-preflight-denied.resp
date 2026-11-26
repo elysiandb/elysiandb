@@ -1,0 +1,6 @@
+HTTP/1.1 204 No Content
+Server: ElysianDB
+Date: <DATE>
+X-Request-Id: <RID>
+Connection: close
+

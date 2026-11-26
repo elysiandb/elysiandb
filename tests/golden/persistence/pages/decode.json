@@ -1,0 +1,132 @@
+[
+  {
+    "hex": "0100",
+    "name": "empty-leaf",
+    "page": {
+      "leaf": true,
+      "len": 0,
+      "reencoded": "0100",
+      "total": "0"
+    }
+  },
+  {
+    "hex": "0200",
+    "name": "empty-inner",
+    "page": {
+      "leaf": false,
+      "len": 0,
+      "reencoded": "0200",
+      "total": "0"
+    }
+  },
+  {
+    "hex": "01020161027879016200",
+    "name": "leaf-two",
+    "page": {
+      "leaf": true,
+      "len": 2,
+      "reencoded": "01020161027879016200",
+      "total": "2"
+    }
+  },
+  {
+    "hex": "0202016110000000010000002803016d40000000010000003204",
+    "name": "inner-two",
+    "page": {
+      "kids": [
+        {
+          "id": "4294967312",
+          "size": 40
+        },
+        {
+          "id": "4294967360",
+          "size": 50
+        }
+      ],
+      "leaf": false,
+      "len": 2,
+      "reencoded": "0202016110000000010000002803016d40000000010000003204",
+      "total": "7"
+    }
+  },
+  {
+    "error": "pagetree: corrupt page",
+    "hex": "0300",
+    "name": "kind-3"
+  },
+  {
+    "error": "pagetree: corrupt page",
+    "hex": "0000",
+    "name": "kind-0"
+  },
+  {
+    "error": "pagetree: corrupt page",
+    "hex": "01",
+    "name": "one-byte"
+  },
+  {
+    "error": "pagetree: corrupt page",
+    "hex": "",
+    "name": "nothing"
+  },
+  {
+    "error": "pagetree: corrupt page",
+    "hex": "01808004",
+    "name": "n-65536"
+  },
+  {
+    "error": "pagetree: corrupt page",
+    "hex": "01818004",
+    "name": "n-65537"
+  },
+  {
+    "error": "pagetree: corrupt page",
+    "hex": "0201016100000000000000000a01",
+    "name": "child-id-0"
+  },
+  {
+    "error": "pagetree: corrupt page",
+    "hex": "0102016102787901620000",
+    "name": "trailing-byte"
+  },
+  {
+    "error": "pagetree: corrupt page",
+    "hex": "0180",
+    "name": "truncated-varint"
+  },
+  {
+    "error": "pagetree: corrupt page",
+    "hex": "0101056162",
+    "name": "length-beyond-end"
+  },
+  {
+    "error": "pagetree: corrupt page",
+    "hex": "010101610978",
+    "name": "value-beyond-end"
+  },
+  {
+    "error": "pagetree: corrupt page",
+    "hex": "02010161010203",
+    "name": "inner-short-id"
+  },
+  {
+    "error": "pagetree: corrupt page",
+    "hex": "02010161050000000000000003",
+    "name": "inner-missing-total"
+  },
+  {
+    "error": "pagetree: corrupt page",
+    "hex": "0103016100",
+    "name": "count-too-high"
+  },
+  {
+    "hex": "01010300ff0001fe",
+    "name": "key-with-nul-ff",
+    "page": {
+      "leaf": true,
+      "len": 1,
+      "reencoded": "01010300ff0001fe",
+      "total": "1"
+    }
+  }
+]

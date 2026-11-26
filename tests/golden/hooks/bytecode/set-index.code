@@ -1,0 +1,22 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.tags[0] = \"z\"\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.getProp	"tags"
+  4	goja.loadVal	{v:0}
+  5	goja.loadVal	{v:"z"}
+  6	goja._setElemP	{}
+  7	goja._loadUndef	{}
+  8	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	36
+  6	40
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

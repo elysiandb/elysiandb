@@ -1,0 +1,21 @@
+{"password_err":"password must be at least 8 characters long","username_err":"invalid username: 1 to 128 characters, without spaces, control characters or '/'","value_hex":""}
+{"password_err":"password must be at least 8 characters long","username_err":null,"value_hex":"61"}
+{"password_err":"password must be at least 8 characters long","username_err":null,"value_hex":"61646d696e"}
+{"password_err":"password must be at least 8 characters long","username_err":"invalid username: 1 to 128 characters, without spaces, control characters or '/'","value_hex":"612062"}
+{"password_err":"password must be at least 8 characters long","username_err":"invalid username: 1 to 128 characters, without spaces, control characters or '/'","value_hex":"612f62"}
+{"password_err":"password must be at least 8 characters long","username_err":"invalid username: 1 to 128 characters, without spaces, control characters or '/'","value_hex":"610962"}
+{"password_err":"password must be at least 8 characters long","username_err":"invalid username: 1 to 128 characters, without spaces, control characters or '/'","value_hex":"61c2a062"}
+{"password_err":"password must be at least 8 characters long","username_err":"invalid username: 1 to 128 characters, without spaces, control characters or '/'","value_hex":"61e280a862"}
+{"password_err":"password must be at least 8 characters long","username_err":"invalid username: 1 to 128 characters, without spaces, control characters or '/'","value_hex":"61c28562"}
+{"password_err":"password must be at least 8 characters long","username_err":null,"value_hex":"61e2808b62"}
+{"password_err":"password must be at least 8 characters long","username_err":"invalid username: 1 to 128 characters, without spaces, control characters or '/'","value_hex":"617f62"}
+{"password_err":"password must be at least 8 characters long","username_err":"invalid username: 1 to 128 characters, without spaces, control characters or '/'","value_hex":"610062"}
+{"password_err":"password must be at least 8 characters long","username_err":null,"value_hex":"ff"}
+{"password_err":null,"username_err":null,"value_hex":"7575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575"}
+{"password_err":null,"username_err":"invalid username: 1 to 128 characters, without spaces, control characters or '/'","value_hex":"757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575757575"}
+{"password_err":"password must be at least 8 characters long","username_err":null,"value_hex":"c3a9c3a9c3a9c3a9c3a9c3a9c3a9"}
+{"password_err":null,"username_err":null,"value_hex":"c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9"}
+{"password_err":"password must be at least 8 characters long","username_err":null,"value_hex":"31323334353637"}
+{"password_err":null,"username_err":null,"value_hex":"3132333435363738"}
+{"password_err":"password must be at least 8 characters long","username_err":"invalid username: 1 to 128 characters, without spaces, control characters or '/'","value_hex":"e3808078"}
+{"password_err":"password must be at least 8 characters long","username_err":null,"value_hex":"78efbbbf"}

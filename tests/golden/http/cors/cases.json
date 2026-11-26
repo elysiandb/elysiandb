@@ -1,0 +1,92 @@
+[
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "001-preflight-allowed",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "001-preflight-allowed.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "002-preflight-denied",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "002-preflight-denied.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "003-get-allowed-origin",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "003-get-allowed-origin.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "004-get-denied-origin",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "004-get-denied-origin.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "005-get-no-origin",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "005-get-no-origin.req",
+        "pause_before_ms": 0
+      }
+    ]
+  }
+]

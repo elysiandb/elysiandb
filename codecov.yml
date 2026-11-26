@@ -1,3 +1,10 @@
+codecov:
+  notify:
+    after_n_builds: 4
+
+comment:
+  after_n_builds: 4
+
 coverage:
   status:
     project:
@@ -8,5 +15,7 @@ coverage:
         informational: true
 
 ignore:
-  - "benchmark/**"
+  - "src/bin/elysian_bench.rs"
+  - "tests/**"
+  - "crates/*/tests/**"
   - "docs/**"

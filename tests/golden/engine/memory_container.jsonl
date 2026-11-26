@@ -1,0 +1,51 @@
+{"fn":"BudgetWithinContainer","in":["0","0"],"out":"0"}
+{"fn":"BudgetWithinContainer","in":["0","-1"],"out":"0"}
+{"fn":"BudgetWithinContainer","in":["0","1073741824"],"out":"0"}
+{"fn":"BudgetWithinContainer","in":["0","2147483648"],"out":"0"}
+{"fn":"BudgetWithinContainer","in":["1048576","0"],"out":"1048576"}
+{"fn":"BudgetWithinContainer","in":["1048576","-1"],"out":"1048576"}
+{"fn":"BudgetWithinContainer","in":["1048576","1073741824"],"out":"1048576"}
+{"fn":"BudgetWithinContainer","in":["1048576","2147483648"],"out":"1048576"}
+{"fn":"BudgetWithinContainer","in":["943718400","0"],"out":"943718400"}
+{"fn":"BudgetWithinContainer","in":["943718400","-1"],"out":"943718400"}
+{"fn":"BudgetWithinContainer","in":["943718400","1073741824"],"out":"943718400"}
+{"fn":"BudgetWithinContainer","in":["943718400","2147483648"],"out":"943718400"}
+{"fn":"BudgetWithinContainer","in":["944766976","0"],"out":"944766976"}
+{"fn":"BudgetWithinContainer","in":["944766976","-1"],"out":"944766976"}
+{"fn":"BudgetWithinContainer","in":["944766976","1073741824"],"out":"944766976"}
+{"fn":"BudgetWithinContainer","in":["944766976","2147483648"],"out":"944766976"}
+{"fn":"BudgetWithinContainer","in":["1073741824","0"],"out":"1073741824"}
+{"fn":"BudgetWithinContainer","in":["1073741824","-1"],"out":"1073741824"}
+{"fn":"BudgetWithinContainer","in":["1073741824","1073741824"],"out":"966367641"}
+{"fn":"BudgetWithinContainer","in":["1073741824","2147483648"],"out":"1073741824"}
+{"fn":"BudgetWithinContainer","in":["4294967296","0"],"out":"4294967296"}
+{"fn":"BudgetWithinContainer","in":["4294967296","-1"],"out":"4294967296"}
+{"fn":"BudgetWithinContainer","in":["4294967296","1073741824"],"out":"966367641"}
+{"fn":"BudgetWithinContainer","in":["4294967296","2147483648"],"out":"1932735283"}
+{"first_file":"max","fn":"containerMemoryLimit","out":"0"}
+{"first_file":"max","fn":"containerMemoryLimit","out":"0","second_file":"2147483648"}
+{"first_file":"max\n","fn":"containerMemoryLimit","out":"0"}
+{"first_file":"max\n","fn":"containerMemoryLimit","out":"0","second_file":"2147483648"}
+{"first_file":"123456789","fn":"containerMemoryLimit","out":"123456789"}
+{"first_file":"123456789","fn":"containerMemoryLimit","out":"123456789","second_file":"2147483648"}
+{"first_file":" 456\n","fn":"containerMemoryLimit","out":"456"}
+{"first_file":" 456\n","fn":"containerMemoryLimit","out":"456","second_file":"2147483648"}
+{"first_file":"0","fn":"containerMemoryLimit","out":"0"}
+{"first_file":"0","fn":"containerMemoryLimit","out":"2147483648","second_file":"2147483648"}
+{"first_file":"-1","fn":"containerMemoryLimit","out":"0"}
+{"first_file":"-1","fn":"containerMemoryLimit","out":"2147483648","second_file":"2147483648"}
+{"first_file":"abc","fn":"containerMemoryLimit","out":"0"}
+{"first_file":"abc","fn":"containerMemoryLimit","out":"2147483648","second_file":"2147483648"}
+{"first_file":"1152921504606846976","fn":"containerMemoryLimit","out":"0"}
+{"first_file":"1152921504606846976","fn":"containerMemoryLimit","out":"2147483648","second_file":"2147483648"}
+{"first_file":"1152921504606846975","fn":"containerMemoryLimit","out":"1152921504606846975"}
+{"first_file":"1152921504606846975","fn":"containerMemoryLimit","out":"1152921504606846975","second_file":"2147483648"}
+{"first_file":"9223372036854775807","fn":"containerMemoryLimit","out":"0"}
+{"first_file":"9223372036854775807","fn":"containerMemoryLimit","out":"2147483648","second_file":"2147483648"}
+{"first_file":"9223372036854775808","fn":"containerMemoryLimit","out":"0"}
+{"first_file":"9223372036854775808","fn":"containerMemoryLimit","out":"2147483648","second_file":"2147483648"}
+{"first_file":"","fn":"containerMemoryLimit","out":"0"}
+{"first_file":"","fn":"containerMemoryLimit","out":"2147483648","second_file":"2147483648"}
+{"first_file":"12 34","fn":"containerMemoryLimit","out":"0"}
+{"first_file":"12 34","fn":"containerMemoryLimit","out":"2147483648","second_file":"2147483648"}
+{"first_file":null,"fn":"containerMemoryLimit","out":"0"}

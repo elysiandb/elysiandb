@@ -1,0 +1,69 @@
+[
+  {
+    "closed": true,
+    "compare": "d27",
+    "conn": "new",
+    "half_close": false,
+    "id": "001-header-read-timeout",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "001-header-read-timeout.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "d27",
+    "conn": "new",
+    "half_close": false,
+    "id": "002-body-read-timeout",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "002-body-read-timeout.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "003-idle-close",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 40000
+    },
+    "steps": [
+      {
+        "file": "003-idle-close.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": false,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "004-silent-connection",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 35000
+    },
+    "steps": null
+  }
+]

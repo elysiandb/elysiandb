@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+Server: ElysianDB
+Date: <DATE>
+Content-Type: application/json
+Content-Length: <LEN>
+X-Elysian-Version: <VER>
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Cache-Control: no-store
+X-Request-Id: <RID>
+Connection: close
+
+{"buffer_since":"\u003cstring\u003e","capacity":"\u003cnumber\u003e","components":["\u003cstring\u003e"],"entries":[{"attrs":{"actor":"\u003cstring\u003e","bytes":"\u003cnumber\u003e","duration_ms":"\u003cnumber\u003e","output":"\u003cstring\u003e","remote_addr":"\u003cstring\u003e","request_id":"\u003cstring\u003e","source":"\u003cstring\u003e"},"component":"\u003cstring\u003e","level":"\u003cstring\u003e","msg":"\u003cstring\u003e","seq":"\u003cnumber\u003e","time":"\u003cstring\u003e"}],"has_more":"\u003cbool\u003e","latest_seq":"\u003cnumber\u003e","oldest_seq":"\u003cnumber\u003e","size":"\u003cnumber\u003e"}

@@ -1,0 +1,74 @@
+[
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "001-write-refused",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "001-write-refused.req",
+        "pause_before_ms": 1500
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "002-kv-refused",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "002-kv-refused.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "003-delete-allowed",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "003-delete-allowed.req",
+        "pause_before_ms": 0
+      }
+    ]
+  },
+  {
+    "closed": true,
+    "compare": "exact",
+    "conn": "new",
+    "half_close": false,
+    "id": "004-read-allowed",
+    "logged": false,
+    "read": {
+      "until": "close",
+      "max_ms": 10000
+    },
+    "steps": [
+      {
+        "file": "004-read-allowed.req",
+        "pause_before_ms": 0
+      }
+    ]
+  }
+]

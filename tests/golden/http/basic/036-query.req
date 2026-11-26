@@ -1,0 +1,8 @@
+POST /api/query HTTP/1.1
+Host: h
+Connection: close
+Content-Type: application/json
+Authorization: Basic YWRtaW46YWRtaW4=
+Content-Length: 75
+
+{"entity":"book","filters":{"title":{"eq":"dune"}},"sorts":{"year":"desc"}}

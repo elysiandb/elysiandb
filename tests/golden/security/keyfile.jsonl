@@ -1,0 +1,8 @@
+{"content_hex":"","generated":true,"hex_alphabet":true,"length":1024}
+{"content_hex":"616263","key":"abc"}
+{"content_hex":"61626320646566","key":"abc"}
+{"content_hex":"20206b65792d776974682d7370616365732d6265666f7265","key":"key-with-spaces-before"}
+{"content_hex":"0a0a6b6579","error":true}
+{"content_hex":"6b65790a","key":"key"}
+{"content_hex":"0001","key":"\u0000\u0001"}
+{"content_hex":"200a20","error":true}

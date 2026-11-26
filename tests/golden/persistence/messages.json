@@ -1,0 +1,95 @@
+[
+  {
+    "error": {
+      "message": "the data folder is used by another ElysianDB process (\u003cdir\u003e)"
+    },
+    "site": "second open of a locked folder"
+  },
+  {
+    "error": {
+      "text": "no readable checkpoint: MANIFEST: cannot read MANIFEST: \u003cgo:json\u003e; MANIFEST.prev: cannot read MANIFEST: \u003cgo:json\u003e",
+      "wrapped": [
+        "json"
+      ]
+    },
+    "site": "MANIFEST and MANIFEST.prev both unreadable"
+  },
+  {
+    "error": {
+      "message": "MANIFEST has an invalid segment \"9x\""
+    },
+    "site": "live key 9x in MANIFEST"
+  },
+  {
+    "error": {
+      "message": "MANIFEST names an unknown index \"zz\""
+    },
+    "site": "unknown index name in MANIFEST"
+  },
+  {
+    "error": {
+      "message": "no readable checkpoint: MANIFEST: page 300003be1: durable: page checksum mismatch"
+    },
+    "site": "page checksum mismatch"
+  },
+  {
+    "error": {
+      "message": "no readable checkpoint: MANIFEST: page segment 3 is missing"
+    },
+    "site": "missing page segment"
+  },
+  {
+    "error": {
+      "text": "no readable checkpoint: MANIFEST: page 300003be1: \u003cgo:end_of_file\u003e",
+      "wrapped": [
+        "end_of_file"
+      ]
+    },
+    "site": "short page read"
+  },
+  {
+    "error": {
+      "message": "no readable checkpoint: MANIFEST: cannot read kv-0000000000000390.ckpt: durable: file is corrupt"
+    },
+    "site": "corrupt kv file"
+  },
+  {
+    "error": {
+      "text": "cannot read the checkpoint checkpoint-0000000000000192.ckpt: \u003cgo:file_system\u003e",
+      "wrapped": [
+        "file_system"
+      ]
+    },
+    "site": "format-1 MANIFEST.prev after upgrade, MANIFEST removed"
+  },
+  {
+    "error": {
+      "text": "cannot read the checkpoint checkpoint-0000000000000192.ckpt: \u003cgo:file_system\u003e",
+      "wrapped": [
+        "file_system"
+      ]
+    },
+    "site": "format-1 MANIFEST.prev after upgrade, MANIFEST unreadable"
+  },
+  {
+    "error": {
+      "text": "\u003cgo:end_of_file\u003e",
+      "wrapped": [
+        "end_of_file"
+      ]
+    },
+    "site": "ReadValue short read"
+  },
+  {
+    "error": {
+      "message": "journal: closed"
+    },
+    "site": "append after close"
+  },
+  {
+    "error": {
+      "message": "journal: unwritten data at close"
+    },
+    "site": "close with unwritten data"
+  }
+]

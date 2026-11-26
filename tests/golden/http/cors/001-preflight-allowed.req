@@ -1,0 +1,7 @@
+OPTIONS /api/book HTTP/1.1
+Host: h
+Connection: close
+Origin: http://allowed.test
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: content-type
+

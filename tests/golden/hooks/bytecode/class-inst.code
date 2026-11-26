@@ -1,0 +1,39 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nclass P { constructor() { this.x = 1 } }; ctx.entity.p = new P()\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:1 args:1}
+  1	goja.jump	1
+  2	*goja.newClass	&{ctor:<prog> name:"P" source:"class P { constructor() { this.x = 1 } }" initFields:<nil> privateFields:[] privateMethods:[] numPrivateFields:0 numPrivateMethods:0 length:0 hasPrivateEnv:false}
+    func: ""
+    code:
+    0	*goja.enterFuncStashless	&{stackSize:0 args:0}
+    1	goja.loadStack	0
+    2	goja.loadVal	{v:1}
+    3	goja.setPropStrictP	"x"
+    4	goja._loadUndef	{}
+    5	goja._ret	{}
+    positions:
+    0	35
+    1	51
+    3	56
+  3	goja._endVariadic	{}
+  4	goja.initStackP	1
+  5	goja.loadStackLex	-1
+  6	goja.getProp	"entity"
+  7	goja.loadStackLex	1
+  8	goja._new	0
+  9	goja.setPropP	"p"
+  10	goja._loadUndef	{}
+  11	goja._ret	{}
+  positions:
+  0	0
+  2	25
+  5	67
+  6	71
+  7	86
+  8	82
+  9	78
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

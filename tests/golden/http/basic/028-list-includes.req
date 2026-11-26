@@ -1,0 +1,5 @@
+GET /api/book?includes=author&fields=title,author.name HTTP/1.1
+Host: h
+Connection: close
+Authorization: Basic YWRtaW46YWRtaW4=
+

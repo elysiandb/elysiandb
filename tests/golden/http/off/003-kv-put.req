@@ -1,0 +1,6 @@
+PUT /kv/foo HTTP/1.1
+Host: h
+Connection: close
+Content-Length: 3
+
+bar

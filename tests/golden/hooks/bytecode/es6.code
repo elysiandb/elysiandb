@@ -1,0 +1,123 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nlet a = 1; const b = 2; var f = (x) => x * 2; var {p, q = 5} = {p: 1}; var [m, ...rest] = [1, 2, 3]; var s = `t${a + b}`; ctx.entity.r = [a, b, f(3), p, q, m, rest.length, s, Math.max(...rest)]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:8 args:1}
+  1	goja.loadVal	{v:1}
+  2	goja.initStackP	7
+  3	goja.loadVal	{v:2}
+  4	goja.initStackP	8
+  5	*goja.newArrowFunc	&{newFunc:{prg:<prog> name:"f" source:"(x) => x * 2" length:1 strict:false}}
+    func: "f"
+    code:
+    0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+    1	goja.loadStackLex	-1
+    2	goja.loadVal	{v:2}
+    3	goja._mul	{}
+    4	goja._ret	{}
+    positions:
+    0	57
+    1	64
+  6	goja.initStackP	1
+  7	goja._newObject	{}
+  8	goja.loadVal	{v:1}
+  9	goja.putProp	"p"
+  10	goja._checkObjectCoercible	{}
+  11	goja._dup	{}
+  12	goja.getProp	"p"
+  13	goja.initStackP	2
+  14	goja._dup	{}
+  15	goja.getProp	"q"
+  16	goja.jdef	2
+  17	goja.loadVal	{v:5}
+  18	goja.initStackP	3
+  19	goja._pop	{}
+  20	goja.newArray	3
+  21	goja.loadVal	{v:1}
+  22	goja._pushArrayItem	{}
+  23	goja.loadVal	{v:2}
+  24	goja._pushArrayItem	{}
+  25	goja.loadVal	{v:3}
+  26	goja._pushArrayItem	{}
+  27	goja._iterate	{}
+  28	goja.iterGetNextOrUndef	{}
+  29	goja.initStackP	4
+  30	goja._newArrayFromIter	{}
+  31	goja.initStackP	5
+  32	goja._pop	{}
+  33	goja.loadVal	{v:"t"}
+  34	goja.loadStackLex	7
+  35	goja.loadStackLex	8
+  36	goja._add	{}
+  37	goja._toString	{}
+  38	goja.concatStrings	2
+  39	goja.initStackP	6
+  40	goja.loadStackLex	-1
+  41	goja.getProp	"entity"
+  42	goja.newArray	9
+  43	goja.loadStackLex	7
+  44	goja._pushArrayItem	{}
+  45	goja.loadStackLex	8
+  46	goja._pushArrayItem	{}
+  47	goja._loadUndef	{}
+  48	goja.loadStack	1
+  49	goja.loadVal	{v:3}
+  50	goja.call	1
+  51	goja._pushArrayItem	{}
+  52	goja.loadStack	2
+  53	goja._pushArrayItem	{}
+  54	goja.loadStack	3
+  55	goja._pushArrayItem	{}
+  56	goja.loadStack	4
+  57	goja._pushArrayItem	{}
+  58	goja.loadStack	5
+  59	goja.getProp	"length"
+  60	goja._pushArrayItem	{}
+  61	goja.loadStack	6
+  62	goja._pushArrayItem	{}
+  63	goja._startVariadic	{}
+  64	goja.loadDynamic	"Math"
+  65	goja.getPropCallee	"max"
+  66	goja.loadStack	5
+  67	goja._pushSpread	{}
+  68	goja._callVariadic	{}
+  69	goja._endVariadic	{}
+  70	goja._pushArrayItem	{}
+  71	goja.setPropP	"r"
+  72	goja._loadUndef	{}
+  73	goja._ret	{}
+  positions:
+  0	0
+  2	29
+  4	42
+  6	53
+  7	88
+  13	76
+  18	79
+  20	115
+  29	101
+  31	107
+  34	138
+  35	142
+  36	138
+  39	130
+  40	147
+  41	151
+  42	162
+  43	163
+  45	166
+  47	169
+  50	170
+  52	175
+  54	178
+  56	181
+  58	184
+  59	189
+  61	197
+  64	200
+  66	212
+  68	208
+  71	158
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

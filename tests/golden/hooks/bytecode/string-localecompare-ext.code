@@ -1,0 +1,56 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.r = [\"résumé\".localeCompare(\"resume\"), \"a\".localeCompare(\"á\"), \"é\".localeCompare(\"é\"), \"10\".localeCompare(\"9\"), \"a b\".localeCompare(\"ab\"), \"ǅ\".localeCompare(\"Dž\")]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.newArray	6
+  4	goja.loadVal	{v:"\ufeffrésumé"}
+  5	goja.getPropCallee	"localeCompare"
+  6	goja.loadVal	{v:"resume"}
+  7	goja.call	1
+  8	goja._pushArrayItem	{}
+  9	goja.loadVal	{v:"a"}
+  10	goja.getPropCallee	"localeCompare"
+  11	goja.loadVal	{v:"\ufeffá"}
+  12	goja.call	1
+  13	goja._pushArrayItem	{}
+  14	goja.loadVal	{v:"\ufeffé"}
+  15	goja.getPropCallee	"localeCompare"
+  16	goja.loadVal	{v:"\ufeffé"}
+  17	goja.call	1
+  18	goja._pushArrayItem	{}
+  19	goja.loadVal	{v:"10"}
+  20	goja.getPropCallee	"localeCompare"
+  21	goja.loadVal	{v:"9"}
+  22	goja.call	1
+  23	goja._pushArrayItem	{}
+  24	goja.loadVal	{v:"a b"}
+  25	goja.getPropCallee	"localeCompare"
+  26	goja.loadVal	{v:"ab"}
+  27	goja.call	1
+  28	goja._pushArrayItem	{}
+  29	goja.loadVal	{v:"\ufeffǅ"}
+  30	goja.getPropCallee	"localeCompare"
+  31	goja.loadVal	{v:"\ufeffDž"}
+  32	goja.call	1
+  33	goja._pushArrayItem	{}
+  34	goja.setPropP	"r"
+  35	goja._loadUndef	{}
+  36	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  7	65
+  12	94
+  17	121
+  22	148
+  27	174
+  32	200
+  34	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

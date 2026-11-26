@@ -1,0 +1,7 @@
+POST /api/art/create HTTP/1.1
+Host: h
+Connection: close
+Content-Type: application/json
+Content-Length: 54
+
+{"fields":{"title":{"type":"string","required":true}}}

@@ -1,0 +1,52 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.same = ctx.entity.meta === ctx.entity.meta; ctx.entity.sameArr = ctx.entity.tags === ctx.entity.tags\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadStackLex	-1
+  4	goja.getProp	"entity"
+  5	goja.getProp	"meta"
+  6	goja.loadStackLex	-1
+  7	goja.getProp	"entity"
+  8	goja.getProp	"meta"
+  9	goja._op_strict_eq	{}
+  10	goja.setPropP	"same"
+  11	goja.loadStackLex	-1
+  12	goja.getProp	"entity"
+  13	goja.loadStackLex	-1
+  14	goja.getProp	"entity"
+  15	goja.getProp	"tags"
+  16	goja.loadStackLex	-1
+  17	goja.getProp	"entity"
+  18	goja.getProp	"tags"
+  19	goja._op_strict_eq	{}
+  20	goja.setPropP	"sameArr"
+  21	goja._loadUndef	{}
+  22	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	43
+  4	47
+  5	54
+  6	63
+  7	67
+  8	74
+  9	43
+  10	36
+  11	80
+  12	84
+  13	101
+  14	105
+  15	112
+  16	121
+  17	125
+  18	132
+  19	101
+  20	91
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

@@ -1,0 +1,5 @@
+GET /metrics HTTP/1.1
+Host: h
+Connection: close
+Authorization: Bearer metrics-token
+

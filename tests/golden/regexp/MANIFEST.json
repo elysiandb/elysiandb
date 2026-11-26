@@ -1,0 +1,44 @@
+{
+  "part": "regexp",
+  "baseline": "1a11e5e",
+  "go_version": "go1.24.7",
+  "goos": "darwin",
+  "goarch": "amd64",
+  "files": [
+    {
+      "path": "compile.jsonl",
+      "size": 4126158,
+      "sha256": "3f21ae3ca2618441052f2252fbcbd65e23ee2f3310f89dfdaf633a94f225d800"
+    },
+    {
+      "path": "exec.jsonl",
+      "size": 2837947,
+      "sha256": "7b3ccf4ca2998e36a58e670980753e086cea599384e3a7b295c08a0bd073fb28"
+    },
+    {
+      "path": "fowler.jsonl",
+      "size": 45777,
+      "sha256": "e7284b3fa51b846b09ba17f290e0e6378dd9ef313a47aedb1f0ce94c7449f293"
+    },
+    {
+      "path": "fuzz.jsonl",
+      "size": 686293,
+      "sha256": "685e72825b853b617f05794b00816bc5e840a48f79c3816117fe2181817392dc"
+    },
+    {
+      "path": "re2-exhaustive.jsonl",
+      "size": 7612866,
+      "sha256": "f313c08b5ed2288335e01b2b100de3e191ffc77bd04af4818cd2001634eb335d"
+    },
+    {
+      "path": "re2-search.jsonl",
+      "size": 265814,
+      "sha256": "fdce5fa62c5e7004b260dd5da2cf53dc67f175c45d4324669bbc969e27a24958"
+    },
+    {
+      "path": "syntax.jsonl",
+      "size": 1478549,
+      "sha256": "11208e6d23ddca58f4b1b736b3a7f05fe35fffc45cbb43b70c0ce9f007de5e41"
+    }
+  ]
+}

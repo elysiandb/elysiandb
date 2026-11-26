@@ -1,0 +1,29 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.rows = ctx.query(\"order\", {}).slice()\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadStackLex	-1
+  4	goja.getPropCallee	"query"
+  5	goja.loadVal	{v:"order"}
+  6	goja._newObject	{}
+  7	goja.call	2
+  8	goja.getPropCallee	"slice"
+  9	goja.call	0
+  10	goja.setPropP	"rows"
+  11	goja._loadUndef	{}
+  12	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	43
+  6	62
+  7	52
+  9	71
+  10	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

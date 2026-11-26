@@ -1,0 +1,7 @@
+POST /api/book HTTP/1.1
+Host: h
+Connection: close
+Content-Type: application/json
+Content-Length: 93
+
+{"id":"b1","title":"Dune","year":1965,"author":{"@entity":"person","id":"p1","name":"Frank"}}

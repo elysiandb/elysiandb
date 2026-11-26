@@ -1,0 +1,7 @@
+PUT /kv/t HTTP/1.1
+Host: h
+Connection: close
+Authorization: Bearer golden-token
+Content-Length: 1
+
+v

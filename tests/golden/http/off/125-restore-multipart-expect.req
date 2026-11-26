@@ -1,0 +1,7 @@
+POST /api/restore HTTP/1.1
+Host: h
+Connection: close
+Content-Type: multipart/form-data; boundary=GOLDENBOUNDARY
+Expect: 100-continue
+Content-Length: 8330
+

@@ -1,0 +1,34 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { ctx.entity.r = [typeof GoError, String(new GoError(\"x\"))] }" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.newArray	2
+  4	goja.loadDynamicRef	"GoError"
+  5	goja._typeof	{}
+  6	goja._pushArrayItem	{}
+  7	goja.loadDynamicCallee	"String"
+  8	goja.loadDynamic	"GoError"
+  9	goja.loadVal	{v:"x"}
+  10	goja._new	1
+  11	goja.call	1
+  12	goja._pushArrayItem	{}
+  13	goja.setPropP	"r"
+  14	goja._loadUndef	{}
+  15	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  4	48
+  7	57
+  8	68
+  10	64
+  11	63
+  13	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

@@ -1,0 +1,10 @@
+{"int_choice":0,"int_error":true,"remaining_hex":"","scan_error":false,"stdin_hex":"616c6963650a","token_hex":"616c696365"}
+{"int_choice":0,"int_error":true,"remaining_hex":"","scan_error":false,"stdin_hex":"2020626f6220200a","token_hex":"626f62"}
+{"int_choice":0,"int_error":true,"remaining_hex":"6176650a","scan_error":true,"stdin_hex":"6361726f6c20646176650a","token_hex":"6361726f6c"}
+{"int_choice":0,"int_error":true,"remaining_hex":"","scan_error":true,"stdin_hex":"0a","token_hex":""}
+{"int_choice":0,"int_error":true,"remaining_hex":"","scan_error":true,"stdin_hex":"","token_hex":""}
+{"int_choice":0,"int_error":true,"remaining_hex":"","scan_error":false,"stdin_hex":"657665","token_hex":"657665"}
+{"int_choice":0,"int_error":true,"remaining_hex":"","scan_error":false,"stdin_hex":"6672616e6b0d0a","token_hex":"6672616e6b"}
+{"int_choice":2,"int_error":false,"remaining_hex":"","scan_error":false,"stdin_hex":"320a","token_hex":"32"}
+{"int_choice":0,"int_error":true,"remaining_hex":"790a","scan_error":false,"stdin_hex":"780a790a","token_hex":"78"}
+{"int_choice":0,"int_error":true,"remaining_hex":"","scan_error":false,"stdin_hex":"fffe0a","token_hex":"efbfbdefbfbd"}

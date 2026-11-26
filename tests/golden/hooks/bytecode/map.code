@@ -1,0 +1,31 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.m = new Map([[\"a\", 1]])\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadDynamic	"Map"
+  4	goja.newArray	1
+  5	goja.newArray	2
+  6	goja.loadVal	{v:"a"}
+  7	goja._pushArrayItem	{}
+  8	goja.loadVal	{v:1}
+  9	goja._pushArrayItem	{}
+  10	goja._pushArrayItem	{}
+  11	goja._new	1
+  12	goja.setPropP	"m"
+  13	goja._loadUndef	{}
+  14	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	44
+  4	48
+  5	49
+  11	40
+  12	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

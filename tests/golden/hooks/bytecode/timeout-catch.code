@@ -1,0 +1,25 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\ntry { while (true) {} } catch (e) { ctx.entity.caught = 1 }\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.try	{catchOffset:3 finallyOffset:0}
+  2	goja.jump	0
+  3	goja.jump	7
+  4	*goja.enterBlock	&{names:map[] stashSize:0 stackSize:0}
+  5	goja.loadStackLex	-1
+  6	goja.getProp	"entity"
+  7	goja.loadVal	{v:1}
+  8	goja.setPropP	"caught"
+  9	*goja.leaveBlock	&{stackSize:1 popStash:false}
+  10	goja.leaveTry	{}
+  11	goja._loadUndef	{}
+  12	goja._ret	{}
+  positions:
+  0	0
+  5	61
+  6	65
+  8	72
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

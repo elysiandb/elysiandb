@@ -1,0 +1,152 @@
+[
+  {
+    "accepted": "{\"format\":2,\"lsn\":5,\"segment\":1,\"offset\":16,\"created_at\":\"x\"}",
+    "hex": "7b22666f726d6174223a322c226c736e223a352c227365676d656e74223a312c226f6666736574223a31362c22637265617465645f6174223a2278227d",
+    "name": "format-2"
+  },
+  {
+    "accepted": "{\"format\":1,\"checkpoint\":\"c.ckpt\",\"lsn\":5,\"segment\":0,\"offset\":0,\"created_at\":\"\"}",
+    "hex": "7b22666f726d6174223a312c22636865636b706f696e74223a22632e636b7074222c226c736e223a357d",
+    "name": "format-1"
+  },
+  {
+    "accepted": "{\"format\":2,\"lsn\":7,\"segment\":2,\"offset\":0,\"created_at\":\"y\"}",
+    "hex": "7b22464f524d4154223a322c224c534e223a372c225365676d656e74223a322c22435245415445445f4154223a2279227d",
+    "name": "upper-case-keys"
+  },
+  {
+    "accepted": "{\"format\":2,\"lsn\":9,\"segment\":0,\"offset\":0,\"created_at\":\"\"}",
+    "hex": "7b22666f726d6174223a322c226c736e223a312c226c736e223a397d",
+    "name": "duplicate-keys"
+  },
+  {
+    "hex": "6e756c6c",
+    "name": "null",
+    "rejected": {
+      "message": "MANIFEST has format 0, this version reads formats 1 and 2"
+    }
+  },
+  {
+    "accepted": "{\"format\":2,\"lsn\":0,\"segment\":0,\"offset\":0,\"created_at\":\"\"}",
+    "hex": "7b22666f726d6174223a322c227479706573223a6e756c6c2c22656e746974696573223a6e756c6c2c226c697665223a6e756c6c7d",
+    "name": "null-fields"
+  },
+  {
+    "hex": "7b22666f726d6174223a312e307d",
+    "name": "format-1.0",
+    "rejected": {
+      "field": "format",
+      "literal": "cannot read MANIFEST: ",
+      "offset": 13,
+      "wrapped": "json_type"
+    }
+  },
+  {
+    "hex": "7b22666f726d6174223a3165307d",
+    "name": "format-1e0",
+    "rejected": {
+      "field": "format",
+      "literal": "cannot read MANIFEST: ",
+      "offset": 13,
+      "wrapped": "json_type"
+    }
+  },
+  {
+    "hex": "7b22666f726d6174223a322c226c736e223a3165327d",
+    "name": "lsn-1e2",
+    "rejected": {
+      "field": "lsn",
+      "literal": "cannot read MANIFEST: ",
+      "offset": 21,
+      "wrapped": "json_type"
+    }
+  },
+  {
+    "hex": "7b22666f726d6174223a322c226c736e223a2d317d",
+    "name": "lsn-negative",
+    "rejected": {
+      "field": "lsn",
+      "literal": "cannot read MANIFEST: ",
+      "offset": 20,
+      "wrapped": "json_type"
+    }
+  },
+  {
+    "hex": "7b22666f726d6174223a327d2078",
+    "name": "trailing-data",
+    "rejected": {
+      "literal": "cannot read MANIFEST: ",
+      "offset": 14,
+      "wrapped": "json_syntax"
+    }
+  },
+  {
+    "hex": "7b22666f726d6174223a322c226c736e223a",
+    "name": "truncated",
+    "rejected": {
+      "literal": "cannot read MANIFEST: ",
+      "offset": 18,
+      "wrapped": "json_syntax"
+    }
+  },
+  {
+    "hex": "7b22666f726d6174223a307d",
+    "name": "format-0",
+    "rejected": {
+      "message": "MANIFEST has format 0, this version reads formats 1 and 2"
+    }
+  },
+  {
+    "hex": "7b22666f726d6174223a337d",
+    "name": "format-3",
+    "rejected": {
+      "message": "MANIFEST has format 3, this version reads formats 1 and 2"
+    }
+  },
+  {
+    "hex": "7b226c736e223a337d",
+    "name": "missing-format",
+    "rejected": {
+      "message": "MANIFEST has format 0, this version reads formats 1 and 2"
+    }
+  },
+  {
+    "hex": "7b22666f726d6174223a2232227d",
+    "name": "string-format",
+    "rejected": {
+      "field": "format",
+      "literal": "cannot read MANIFEST: ",
+      "offset": 13,
+      "wrapped": "json_type"
+    }
+  },
+  {
+    "hex": "7b22666f726d6174223a322c226c697665223a7b2231223a2278227d7d",
+    "name": "live-bad-value",
+    "rejected": {
+      "field": "live",
+      "literal": "cannot read MANIFEST: ",
+      "offset": 27,
+      "wrapped": "json_type"
+    }
+  },
+  {
+    "accepted": "{\"format\":2,\"lsn\":0,\"segment\":0,\"offset\":0,\"created_at\":\"\",\"live\":{\"9x\":1}}",
+    "hex": "7b22666f726d6174223a322c226c697665223a7b223978223a317d7d",
+    "name": "live-9x"
+  },
+  {
+    "accepted": "{\"format\":2,\"lsn\":0,\"segment\":0,\"offset\":0,\"created_at\":\"\"}",
+    "hex": "7b22666f726d6174223a322c226578747261223a5b312c325d7d",
+    "name": "unknown-field"
+  },
+  {
+    "hex": "",
+    "name": "empty",
+    "rejected": {
+      "literal": "cannot read MANIFEST: ",
+      "offset": 0,
+      "wrapped": "json_syntax"
+    }
+  }
+]

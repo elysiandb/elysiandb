@@ -1,0 +1,7 @@
+POST /api/security/login HTTP/1.1
+Host: h
+Connection: close
+Content-Type: application/json
+Content-Length: 39
+
+{"username":"admin","password":"wrong"}

@@ -1,0 +1,24 @@
+{
+  "part": "guards",
+  "baseline": "1a11e5e",
+  "go_version": "go1.24.7",
+  "goos": "darwin",
+  "goarch": "amd64",
+  "files": [
+    {
+      "path": "capabilities-go.tsv",
+      "size": 3902,
+      "sha256": "c3d7efc358c293289f8e32b0a2bdac5d94d13c32fa10500059b1363773a96050"
+    },
+    {
+      "path": "capabilities.tsv",
+      "size": 3817,
+      "sha256": "4350d996d5e76ff74fc19a09560d3c3530ebc50d6f8bfb420a7832ae8dd8bf60"
+    },
+    {
+      "path": "go-tests.tsv",
+      "size": 56303,
+      "sha256": "b906fc9728e4f5a1399a50354415640284c8e4aef34f0e53a92001fac15e9cd7"
+    }
+  ]
+}

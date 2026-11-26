@@ -1,0 +1,26 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.partial = 1; throw new Error(\"boom\")\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadVal	{v:1}
+  4	goja.setPropP	"partial"
+  5	goja.loadDynamic	"Error"
+  6	goja.loadVal	{v:"boom"}
+  7	goja._new	1
+  8	goja._throw	{}
+  9	goja._loadUndef	{}
+  10	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  4	36
+  5	59
+  7	55
+  8	49
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

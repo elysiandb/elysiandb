@@ -1,0 +1,187 @@
+use std::sync::Arc;
+use std::time::Duration;
+
+use elysiandb::api;
+use elysiandb::configuration::Config;
+use elysiandb::globals;
+use elysiandb::gocompat::json::{Map, Value};
+use elysiandb::hook::{self, Hook};
+use elysiandb::httpd::{Request, RequestCtx, STATUS_BAD_REQUEST, STATUS_OK};
+use elysiandb::security::{self, BasicUser, Role};
+use elysiandb::storage;
+use elysiandb::sync::MutexGuard;
+use elysiandb::transport::http::api::hook as http_hook;
+
+use crate::tempdir::TempDir;
+
+const HOUR: Duration = Duration::from_secs(3600);
+
+struct Store {
+    _dir: TempDir,
+    _serial: MutexGuard<'static, ()>,
+}
+
+impl Drop for Store {
+    fn drop(&mut self) {
+        let _ = storage::close();
+    }
+}
+
+fn object(pairs: Vec<(&str, Value)>) -> Map {
+    pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
+}
+
+fn s(v: &str) -> Value {
+    Value::String(v.to_string())
+}
+
+fn setup_hook_test() -> Store {
+    let serial = crate::serial();
+    let _ = storage::close();
+    let dir = TempDir::new();
+    let mut cfg = Config::default();
+    cfg.store.folder = dir.path().to_string_lossy().into_owned();
+    cfg.store.shards = 4;
+    cfg.security.authentication.enabled = true;
+    cfg.api.hooks.enabled = true;
+    globals::set_config(Some(Arc::new(cfg)));
+
+    storage::load_db();
+    storage::load_json_db();
+    api::delete_all();
+
+    hook::init_hooks();
+
+    api::write_entity(
+        b"_elysiandb_core_user",
+        &mut object(vec![
+            ("id", s("admin")),
+            ("username", s("admin")),
+            ("password", s("admin-password-hash")),
+            ("role", s("admin")),
+        ]),
+    );
+
+    Store {
+        _dir: dir,
+        _serial: serial,
+    }
+}
+
+fn ensure_user(username: &str, role: Role) {
+    if !security::basic_user_exists(username.as_bytes()) {
+        let _ = security::create_basic_user(&BasicUser {
+            username: username.as_bytes().to_vec(),
+            password: format!("{username}-password").into_bytes(),
+            role,
+        });
+    }
+}
+
+fn session_ctx(username: &str, role: Role, method: &str, body: Option<&[u8]>) -> RequestCtx {
+    ensure_user(username, role.clone());
+    let s = security::create_session(username.as_bytes(), role, HOUR).unwrap_or_default();
+
+    let mut req = Request::new();
+    req.header.set_method(method);
+    req.header.set_cookie(security::SESSION_COOKIE_NAME, &s.id);
+    if let Some(body) = body {
+        req.set_body(body);
+    }
+
+    let mut ctx = RequestCtx::new();
+    ctx.init(&req, None);
+    ctx
+}
+
+fn admin_ctx(method: &str, body: Option<&[u8]>) -> RequestCtx {
+    session_ctx("admin", Role::admin(), method, body)
+}
+
+#[test]
+fn create_hook_decodes_the_body_like_go() {
+    let _s = setup_hook_test();
+
+    let cases: [(&[u8], u16); 10] = [
+        (br#"{"priority": 1.0}"#, STATUS_BAD_REQUEST),
+        (br#"{"priority": 1e2}"#, STATUS_BAD_REQUEST),
+        (br#"{"priority": "3"}"#, STATUS_BAD_REQUEST),
+        (br#"{"priority": 99999999999999999999}"#, STATUS_BAD_REQUEST),
+        (br#"{"enabled": "true"}"#, STATUS_BAD_REQUEST),
+        (b"[]", STATUS_BAD_REQUEST),
+        (b"", STATUS_BAD_REQUEST),
+        (b"{} x", STATUS_BAD_REQUEST),
+        (b"null", STATUS_OK),
+        (
+            br#"{"NAME": "n", "Bypass_ACL": true, "event": "post_read", "unknown": 1, "priority": 2}"#,
+            STATUS_OK,
+        ),
+    ];
+    for (body, want) in cases {
+        let mut ctx = admin_ctx("POST", Some(body));
+        ctx.set_user_value("entity", "doc".to_string());
+        http_hook::create_hook_for_entity_controller(&mut ctx);
+        assert_eq!(
+            ctx.response.status_code(),
+            want,
+            "{}: {}",
+            String::from_utf8_lossy(body),
+            String::from_utf8_lossy(ctx.response.body())
+        );
+    }
+
+    let list = hook::get_hooks_for_entity("doc").expect("hooks");
+    let named = list
+        .iter()
+        .find(|h| h.name == "n")
+        .expect("case-insensitive keys");
+    assert!(named.bypass_acl && named.priority == 2 && named.entity == "doc");
+    assert_eq!(
+        named.script,
+        hook::get_default_hook_script_js_for_post_read()
+    );
+
+    let mut ctx = admin_ctx("GET", None);
+    ctx.set_user_value("entity", "DOC".to_string());
+    http_hook::get_hooks_for_entity_controller(&mut ctx);
+    let body = String::from_utf8_lossy(ctx.response.body()).into_owned();
+    assert!(
+        body.starts_with(r#"[{"id":""#)
+            && body.contains(r#""priority":0,"bypass_acl":false,"enabled":false}"#),
+        "{body}"
+    );
+}
+
+#[test]
+fn apply_post_read_hooks_keeps_the_order_of_the_documents() {
+    let _s = setup_hook_test();
+
+    let mut h = Hook {
+        entity: "doc".to_string(),
+        name: "mark".to_string(),
+        event: hook::HOOK_EVENT_POST_READ.to_string(),
+        language: "javascript".to_string(),
+        enabled: true,
+        script: "function postRead(ctx) { ctx.entity.seen = ctx.entity.id + '!' }".to_string(),
+        ..Hook::default()
+    };
+    hook::create_hook(&mut h).expect("create hook");
+
+    let docs: Vec<Map> = (0..50)
+        .map(|i| object(vec![("id", s(&format!("d{i:02}")))]))
+        .collect();
+    let req = hook::Request::new("");
+    let out =
+        elysiandb::transport::http::api::pre_read::apply_post_read_hooks(&req, "doc", &docs, |d| {
+            let v = talos::host::DocValue::Map(d.clone());
+            String::from_utf8(talos::host::json::marshal(&v).expect("encode")).expect("utf-8")
+        });
+
+    assert_eq!(out.len(), 50);
+    for (i, o) in out.iter().enumerate() {
+        assert_eq!(
+            o.as_deref(),
+            Some(format!(r#"{{"id":"d{i:02}","seen":"d{i:02}!"}}"#).as_str())
+        );
+    }
+}

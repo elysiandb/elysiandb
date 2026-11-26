@@ -183,24 +183,18 @@ const TABS = [
                 title: "monitoring.sections.runtime",
                 charts: [
                     { title: "monitoring.charts.memory", unit: "bytes", series: [
-                        { name: "heap_bytes", label: "monitoring.series.heap", color: "accent" },
+                        { name: "allocated_bytes", label: "monitoring.series.allocated", color: "accent" },
                         { name: "total_bytes", label: "monitoring.series.total", color: "cyan" },
                     ] },
-                    { title: "monitoring.charts.goroutines", unit: "count", series: [
-                        { name: "goroutines", label: "monitoring.series.goroutines", color: "green" },
-                    ] },
-                    { title: "monitoring.charts.gcPause", unit: "ms", series: [
-                        { name: "gc_pause_p99_ms", label: "monitoring.series.gcPause", color: "orange" },
-                    ] },
-                    { title: "monitoring.charts.gcCycles", unit: "perMinute", scale: 60, series: [
-                        { name: "gc_cycles_rps", label: "monitoring.series.gcCycles", color: "purple" },
+                    { title: "monitoring.charts.threads", unit: "count", series: [
+                        { name: "threads", label: "monitoring.series.threads", color: "green" },
                     ] },
                     { title: "monitoring.charts.cpu", unit: "percent", scale: 0.01, series: [
                         { name: "cpu_percent", label: "monitoring.series.cpu", color: "red" },
                     ] },
                     { title: "monitoring.charts.cpuCores", unit: "count", series: [
                         { name: "cpu_cores", label: "monitoring.series.cpuCores", color: "red" },
-                        { name: "gomaxprocs", label: "monitoring.series.gomaxprocs", color: "teal" },
+                        { name: "usable_cpus", label: "monitoring.series.usableCpus", color: "teal" },
                     ] },
                     { title: "monitoring.charts.openFds", unit: "count", series: [
                         { name: "open_fds", label: "monitoring.series.openFds", color: "teal" },
@@ -214,7 +208,7 @@ const TABS = [
                     { title: "monitoring.charts.memoryBudget", unit: "bytes", series: [
                         { name: "memory_budget_bytes", label: "monitoring.series.budget", color: "red" },
                         { name: "total_bytes", label: "monitoring.series.total", color: "cyan" },
-                        { name: "heap_live_bytes", label: "monitoring.series.heapLive", color: "accent" },
+                        { name: "memory_live_bytes", label: "monitoring.series.memoryLive", color: "accent" },
                     ] },
                     { title: "monitoring.charts.memoryShares", unit: "bytes", series: [
                         { name: "value_cache_bytes", label: "monitoring.series.valueCache", color: "accent" },

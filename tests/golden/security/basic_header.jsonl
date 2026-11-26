@@ -1,0 +1,12 @@
+{"accepted_shape":true,"decoded_hex":"61646d696e3a61646d696e","header_hex":"4261736963205957527461573436595752746157343d","password_hex":"61646d696e","username_hex":"61646d696e"}
+{"accepted_shape":true,"decoded_hex":"757365723a70613a7373","header_hex":"42617369632064584e6c636a70775954707a63773d3d","password_hex":"70613a7373","username_hex":"75736572"}
+{"accepted_shape":false,"decoded_hex":"6e6f636f6c6f6e","header_hex":"426173696320626d396a6232787662673d3d"}
+{"accepted_shape":true,"decoded_hex":"3a656d707479","header_hex":"4261736963204f6d567463485235","password_hex":"656d707479","username_hex":""}
+{"accepted_shape":true,"decoded_hex":"ff3afe","header_hex":"4261736963202f7a722b","password_hex":"fe","username_hex":"ff"}
+{"accepted_shape":false,"error":true,"header_hex":"426173696320212121"}
+{"accepted_shape":false,"error":true,"header_hex":"426173696320595752746157343659575274615734"}
+{"accepted_shape":false,"header_hex":"6261736963205957527461573436595752746157343d"}
+{"accepted_shape":false,"error":true,"header_hex":"426173696320205957527461573436595752746157343d"}
+{"accepted_shape":false,"header_hex":"4265617265722078"}
+{"accepted_shape":false,"header_hex":""}
+{"accepted_shape":false,"decoded_hex":"","header_hex":"426173696320"}

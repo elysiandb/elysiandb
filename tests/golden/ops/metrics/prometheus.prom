@@ -1,0 +1,254 @@
+# HELP elysiandb_http_requests_total HTTP requests by status class.
+# TYPE elysiandb_http_requests_total counter
+elysiandb_http_requests_total{status_class="2xx"} 384
+elysiandb_http_requests_total{status_class="3xx"} 0
+elysiandb_http_requests_total{status_class="4xx"} 26
+elysiandb_http_requests_total{status_class="5xx"} 0
+# HELP elysiandb_tcp_commands_total TCP commands by command.
+# TYPE elysiandb_tcp_commands_total counter
+elysiandb_tcp_commands_total{command="GET"} 26
+elysiandb_tcp_commands_total{command="SET"} 0
+elysiandb_tcp_commands_total{command="MGET"} 0
+elysiandb_tcp_commands_total{command="DEL"} 0
+elysiandb_tcp_commands_total{command="OTHER"} 0
+# HELP elysiandb_tcp_connections_total TCP connections accepted.
+# TYPE elysiandb_tcp_connections_total counter
+elysiandb_tcp_connections_total 0
+# HELP elysiandb_slow_requests_total HTTP requests and TCP commands slower than log.slowRequestMs.
+# TYPE elysiandb_slow_requests_total counter
+elysiandb_slow_requests_total 12
+# HELP elysiandb_unauthorized_requests_total HTTP requests answered 401.
+# TYPE elysiandb_unauthorized_requests_total counter
+elysiandb_unauthorized_requests_total 0
+# HELP elysiandb_forbidden_requests_total HTTP requests answered 403.
+# TYPE elysiandb_forbidden_requests_total counter
+elysiandb_forbidden_requests_total 0
+# HELP elysiandb_failed_logins_total Failed logins.
+# TYPE elysiandb_failed_logins_total counter
+elysiandb_failed_logins_total 12
+# HELP elysiandb_hook_executions_total Hook script executions.
+# TYPE elysiandb_hook_executions_total counter
+elysiandb_hook_executions_total 13
+# HELP elysiandb_hook_errors_total Hook script errors.
+# TYPE elysiandb_hook_errors_total counter
+elysiandb_hook_errors_total 1
+# HELP elysiandb_heavy_queries_total Requests served by the heavy lane.
+# TYPE elysiandb_heavy_queries_total counter
+elysiandb_heavy_queries_total 1
+# HELP elysiandb_heavy_queued_total Heavy requests that waited for a slot.
+# TYPE elysiandb_heavy_queued_total counter
+elysiandb_heavy_queued_total 1
+# HELP elysiandb_heavy_rejected_total Heavy requests rejected because the queue was full or too slow.
+# TYPE elysiandb_heavy_rejected_total counter
+elysiandb_heavy_rejected_total 1
+# HELP elysiandb_requests_abandoned_total Requests stopped because the client closed the connection.
+# TYPE elysiandb_requests_abandoned_total counter
+elysiandb_requests_abandoned_total 1
+# HELP elysiandb_kv_operations_total KV operations by kind.
+# TYPE elysiandb_kv_operations_total counter
+elysiandb_kv_operations_total{op="get"} 26
+elysiandb_kv_operations_total{op="set"} 0
+elysiandb_kv_operations_total{op="delete"} 0
+# HELP elysiandb_kv_lookups_total KV reads by result.
+# TYPE elysiandb_kv_lookups_total counter
+elysiandb_kv_lookups_total{result="hit"} 26
+elysiandb_kv_lookups_total{result="miss"} 26
+# HELP elysiandb_kv_expired_keys_total Keys removed by expiration.
+# TYPE elysiandb_kv_expired_keys_total counter
+elysiandb_kv_expired_keys_total 0
+# HELP elysiandb_document_operations_total REST API document operations by kind.
+# TYPE elysiandb_document_operations_total counter
+elysiandb_document_operations_total{op="read"} 0
+elysiandb_document_operations_total{op="write"} 0
+elysiandb_document_operations_total{op="query"} 0
+# HELP elysiandb_api_cache_lookups_total API cache lookups by result.
+# TYPE elysiandb_api_cache_lookups_total counter
+elysiandb_api_cache_lookups_total{result="hit"} 26
+elysiandb_api_cache_lookups_total{result="miss"} 0
+# HELP elysiandb_flushes_total Flushes to disk that wrote data.
+# TYPE elysiandb_flushes_total counter
+elysiandb_flushes_total 1
+# HELP elysiandb_flush_failures_total Failed flushes to disk.
+# TYPE elysiandb_flush_failures_total counter
+elysiandb_flush_failures_total 0
+# HELP elysiandb_forced_flushes_total Flushes forced by the recovery log size limit.
+# TYPE elysiandb_forced_flushes_total counter
+elysiandb_forced_flushes_total 0
+# HELP elysiandb_recovery_write_failures_total Failed recovery log writes.
+# TYPE elysiandb_recovery_write_failures_total counter
+elysiandb_recovery_write_failures_total 0
+# HELP elysiandb_log_lines_total Warning and error log lines.
+# TYPE elysiandb_log_lines_total counter
+elysiandb_log_lines_total{level="warn"} 15
+elysiandb_log_lines_total{level="error"} 6
+# HELP elysiandb_kv_keys Keys in the KV store.
+# TYPE elysiandb_kv_keys gauge
+elysiandb_kv_keys 10
+# HELP elysiandb_kv_keys_with_ttl Keys with a TTL.
+# TYPE elysiandb_kv_keys_with_ttl gauge
+elysiandb_kv_keys_with_ttl 2
+# HELP elysiandb_index_backlog Fields waiting for a lazy index rebuild.
+# TYPE elysiandb_index_backlog gauge
+elysiandb_index_backlog 3
+# HELP elysiandb_heavy_waiting Heavy requests waiting for a slot.
+# TYPE elysiandb_heavy_waiting gauge
+elysiandb_heavy_waiting 1
+# HELP elysiandb_api_cache_entries API cache entries.
+# TYPE elysiandb_api_cache_entries gauge
+elysiandb_api_cache_entries 12
+# HELP elysiandb_recovery_log_bytes_json Size of the JSON recovery log.
+# TYPE elysiandb_recovery_log_bytes_json gauge
+elysiandb_recovery_log_bytes_json 1.048576e+06
+# HELP elysiandb_recovery_log_bytes_store Size of the store recovery log.
+# TYPE elysiandb_recovery_log_bytes_store gauge
+elysiandb_recovery_log_bytes_store 4.194304e+06
+# HELP elysiandb_data_folder_bytes Size of the data folder.
+# TYPE elysiandb_data_folder_bytes gauge
+elysiandb_data_folder_bytes 0
+# HELP elysiandb_heap_bytes Go heap in use.
+# TYPE elysiandb_heap_bytes gauge
+elysiandb_heap_bytes <MASK>
+# HELP elysiandb_memory_bytes Memory mapped by the Go runtime.
+# TYPE elysiandb_memory_bytes gauge
+elysiandb_memory_bytes <MASK>
+# HELP elysiandb_goroutines Goroutines.
+# TYPE elysiandb_goroutines gauge
+elysiandb_goroutines <MASK>
+# HELP elysiandb_open_fds Open file descriptors.
+# TYPE elysiandb_open_fds gauge
+elysiandb_open_fds <MASK>
+# HELP elysiandb_http_connections Open HTTP connections.
+# TYPE elysiandb_http_connections gauge
+elysiandb_http_connections 5
+# HELP elysiandb_tcp_connections Open TCP connections.
+# TYPE elysiandb_tcp_connections gauge
+elysiandb_tcp_connections 0
+# HELP elysiandb_admin_sessions Active Admin UI sessions.
+# TYPE elysiandb_admin_sessions gauge
+elysiandb_admin_sessions 1
+# HELP elysiandb_open_transactions Open transactions.
+# TYPE elysiandb_open_transactions gauge
+elysiandb_open_transactions 2
+# HELP elysiandb_oldest_transaction_seconds Age of the oldest open transaction.
+# TYPE elysiandb_oldest_transaction_seconds gauge
+elysiandb_oldest_transaction_seconds 1.5
+# HELP elysiandb_disk_read_bytes_total Bytes read from the data folder.
+# TYPE elysiandb_disk_read_bytes_total counter
+elysiandb_disk_read_bytes_total 0
+# HELP elysiandb_disk_write_bytes_total Bytes written to the data folder.
+# TYPE elysiandb_disk_write_bytes_total counter
+elysiandb_disk_write_bytes_total 0
+# HELP elysiandb_disk_syncs_total Synchronizations of files and folders to the disk.
+# TYPE elysiandb_disk_syncs_total counter
+elysiandb_disk_syncs_total 0
+# HELP elysiandb_disk_sync_seconds_total Time spent in synchronizations.
+# TYPE elysiandb_disk_sync_seconds_total counter
+elysiandb_disk_sync_seconds_total 0
+# HELP elysiandb_refused_writes_total Writes refused because the disk is full or failing.
+# TYPE elysiandb_refused_writes_total counter
+elysiandb_refused_writes_total 0
+# HELP elysiandb_backups_total Backups by result.
+# TYPE elysiandb_backups_total counter
+elysiandb_backups_total{result="ok"} 0
+elysiandb_backups_total{result="failed"} 0
+# HELP elysiandb_backup_last_duration_seconds Duration of the last backup.
+# TYPE elysiandb_backup_last_duration_seconds gauge
+elysiandb_backup_last_duration_seconds 0
+# HELP elysiandb_startup_seconds Time from the start of the process until it could serve.
+# TYPE elysiandb_startup_seconds gauge
+elysiandb_startup_seconds 0
+# HELP elysiandb_entities Documents per entity type.
+# TYPE elysiandb_entities gauge
+elysiandb_entities{entity_type="author"} 8
+elysiandb_entities{entity_type="book"} 30
+# HELP elysiandb_uptime_seconds Seconds since the server started.
+# TYPE elysiandb_uptime_seconds gauge
+elysiandb_uptime_seconds <MASK>
+# HELP elysiandb_http_request_duration_seconds HTTP request duration.
+# TYPE elysiandb_http_request_duration_seconds histogram
+elysiandb_http_request_duration_seconds_bucket{le="5e-05"} 0
+elysiandb_http_request_duration_seconds_bucket{le="0.0001"} 0
+elysiandb_http_request_duration_seconds_bucket{le="0.00025"} 0
+elysiandb_http_request_duration_seconds_bucket{le="0.0005"} 0
+elysiandb_http_request_duration_seconds_bucket{le="0.001"} 111
+elysiandb_http_request_duration_seconds_bucket{le="0.0025"} 137
+elysiandb_http_request_duration_seconds_bucket{le="0.005"} 229
+elysiandb_http_request_duration_seconds_bucket{le="0.01"} 356
+elysiandb_http_request_duration_seconds_bucket{le="0.025"} 410
+elysiandb_http_request_duration_seconds_bucket{le="0.05"} 410
+elysiandb_http_request_duration_seconds_bucket{le="0.1"} 410
+elysiandb_http_request_duration_seconds_bucket{le="0.25"} 410
+elysiandb_http_request_duration_seconds_bucket{le="0.5"} 410
+elysiandb_http_request_duration_seconds_bucket{le="1"} 410
+elysiandb_http_request_duration_seconds_bucket{le="2.5"} 410
+elysiandb_http_request_duration_seconds_bucket{le="5"} 410
+elysiandb_http_request_duration_seconds_bucket{le="10"} 410
+elysiandb_http_request_duration_seconds_bucket{le="+Inf"} 410
+elysiandb_http_request_duration_seconds_sum 2.338
+elysiandb_http_request_duration_seconds_count 410
+# HELP elysiandb_tcp_command_duration_seconds TCP command duration.
+# TYPE elysiandb_tcp_command_duration_seconds histogram
+elysiandb_tcp_command_duration_seconds_bucket{le="5e-05"} 0
+elysiandb_tcp_command_duration_seconds_bucket{le="0.0001"} 0
+elysiandb_tcp_command_duration_seconds_bucket{le="0.00025"} 0
+elysiandb_tcp_command_duration_seconds_bucket{le="0.0005"} 26
+elysiandb_tcp_command_duration_seconds_bucket{le="0.001"} 26
+elysiandb_tcp_command_duration_seconds_bucket{le="0.0025"} 26
+elysiandb_tcp_command_duration_seconds_bucket{le="0.005"} 26
+elysiandb_tcp_command_duration_seconds_bucket{le="0.01"} 26
+elysiandb_tcp_command_duration_seconds_bucket{le="0.025"} 26
+elysiandb_tcp_command_duration_seconds_bucket{le="0.05"} 26
+elysiandb_tcp_command_duration_seconds_bucket{le="0.1"} 26
+elysiandb_tcp_command_duration_seconds_bucket{le="0.25"} 26
+elysiandb_tcp_command_duration_seconds_bucket{le="0.5"} 26
+elysiandb_tcp_command_duration_seconds_bucket{le="1"} 26
+elysiandb_tcp_command_duration_seconds_bucket{le="2.5"} 26
+elysiandb_tcp_command_duration_seconds_bucket{le="5"} 26
+elysiandb_tcp_command_duration_seconds_bucket{le="10"} 26
+elysiandb_tcp_command_duration_seconds_bucket{le="+Inf"} 26
+elysiandb_tcp_command_duration_seconds_sum 0.0078
+elysiandb_tcp_command_duration_seconds_count 26
+# HELP elysiandb_tcp_auth_duration_seconds TCP AUTH duration, which includes a bcrypt comparison.
+# TYPE elysiandb_tcp_auth_duration_seconds histogram
+elysiandb_tcp_auth_duration_seconds_bucket{le="5e-05"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="0.0001"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="0.00025"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="0.0005"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="0.001"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="0.0025"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="0.005"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="0.01"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="0.025"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="0.05"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="0.1"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="0.25"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="0.5"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="1"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="2.5"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="5"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="10"} 0
+elysiandb_tcp_auth_duration_seconds_bucket{le="+Inf"} 0
+elysiandb_tcp_auth_duration_seconds_sum 0
+elysiandb_tcp_auth_duration_seconds_count 0
+# HELP elysiandb_hook_duration_seconds Hook script duration.
+# TYPE elysiandb_hook_duration_seconds histogram
+elysiandb_hook_duration_seconds_bucket{le="5e-05"} 0
+elysiandb_hook_duration_seconds_bucket{le="0.0001"} 0
+elysiandb_hook_duration_seconds_bucket{le="0.00025"} 0
+elysiandb_hook_duration_seconds_bucket{le="0.0005"} 0
+elysiandb_hook_duration_seconds_bucket{le="0.001"} 1
+elysiandb_hook_duration_seconds_bucket{le="0.0025"} 1
+elysiandb_hook_duration_seconds_bucket{le="0.005"} 13
+elysiandb_hook_duration_seconds_bucket{le="0.01"} 13
+elysiandb_hook_duration_seconds_bucket{le="0.025"} 13
+elysiandb_hook_duration_seconds_bucket{le="0.05"} 13
+elysiandb_hook_duration_seconds_bucket{le="0.1"} 13
+elysiandb_hook_duration_seconds_bucket{le="0.25"} 13
+elysiandb_hook_duration_seconds_bucket{le="0.5"} 13
+elysiandb_hook_duration_seconds_bucket{le="1"} 13
+elysiandb_hook_duration_seconds_bucket{le="2.5"} 13
+elysiandb_hook_duration_seconds_bucket{le="5"} 13
+elysiandb_hook_duration_seconds_bucket{le="10"} 13
+elysiandb_hook_duration_seconds_bucket{le="+Inf"} 13
+elysiandb_hook_duration_seconds_sum 0.049
+elysiandb_hook_duration_seconds_count 13

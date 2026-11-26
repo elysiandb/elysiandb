@@ -7,51 +7,206 @@ on:
     branches: ["**"]
 
 jobs:
-  test:
-    name: Go tests
+  lint:
+    name: Format, lint and lockfile
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version: ["1.24.x"]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: ${{ matrix.go-version }}
-          cache: true
+      - name: Setup Rust
+        run: rustup toolchain install
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
 
       - name: Ensure adminui dist exists
         run: mkdir -p adminui/dist
 
-      - name: Verify go.mod
-        run: go mod tidy && git diff --exit-code
+      - name: Verify Cargo.lock
+        run: cargo metadata --locked --format-version 1 > /dev/null
 
-      - name: Run tests (race)
-        run: make test
+      - name: Format
+        run: cargo fmt --all --check
 
-      - name: Coverage (all packages)
+      - name: Check the test groups
+        run: python3 .github/ci/tests.py check
+
+      - name: Lint
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+  coverage:
+    name: Tests with coverage (${{ matrix.group }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [http-security, api-hooks, storage-ops, others]
+    env:
+      GROUP: ${{ matrix.group }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        run: rustup toolchain install && rustup component add llvm-tools-preview
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: coverage
+          save-if: ${{ matrix.group == 'others' }}
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Ensure adminui dist exists
+        run: mkdir -p adminui/dist
+
+      - name: Run the tests with coverage
         run: |
-          COVERPKG=$(go list ./... | tr '\n' ',' | sed 's/,$//')
-          TEST_PKGS=$(go list -f '{{if or (len .TestGoFiles) (len .XTestGoFiles)}}{{.ImportPath}}{{end}}' ./... | grep -v '^$')
-          if [ -z "$TEST_PKGS" ]; then echo "no test packages"; exit 0; fi
+          targets=$(python3 .github/ci/tests.py targets "$GROUP")
+          skips=$(python3 .github/ci/tests.py skip-args)
+          read -ra targets <<< "$targets"
+          read -ra skips <<< "$skips"
+          cargo llvm-cov --workspace --locked --release --no-fail-fast --lcov --output-path lcov.info "${targets[@]}" -- --test-threads=1 "${skips[@]}" 2>&1 | tee "$RUNNER_TEMP/run.log"
 
-          go test $TEST_PKGS -race -covermode=atomic -coverpkg="$COVERPKG" \
-            -coverprofile=coverage.out -count=1
-
-          go tool cover -func=coverage.out | tail
+      - name: Count the tests
+        run: |
+          mkdir -p "$RUNNER_TEMP/counts"
+          python3 .github/ci/tests.py summarize "$GROUP" "run=$RUNNER_TEMP/run.log" > "$RUNNER_TEMP/counts/$GROUP.json"
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v6
         with:
-          files: coverage.out
+          files: lcov.info
+          disable_search: true
           flags: unittests
+          name: ${{ matrix.group }}
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
+
+      - name: Upload the counts
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-counts-${{ matrix.group }}
+          path: ${{ runner.temp }}/counts/${{ matrix.group }}.json
+          if-no-files-found: error
+          overwrite: true
+
+  uninstrumented:
+    name: Tests without instrumentation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        run: rustup toolchain install
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Ensure adminui dist exists
+        run: mkdir -p adminui/dist
+
+      - name: Build
+        run: cargo test --workspace --locked --release --lib --bins --tests --no-run
+
+      - name: List the tests
+        run: |
+          cargo test --workspace --locked --release --lib --bins --tests -- --list 2>&1 | tee "$RUNNER_TEMP/list.log"
+          cargo test --workspace --locked --release --lib --bins --tests -- --list --ignored 2>&1 | tee "$RUNNER_TEMP/ignored.log"
+
+      - name: Run the tests left out of coverage
+        run: |
+          filters=$(python3 .github/ci/tests.py filter-args)
+          read -ra filters <<< "$filters"
+          cargo test --workspace --locked --release --lib --bins --tests --no-fail-fast -- --test-threads=1 "${filters[@]}" 2>&1 | tee "$RUNNER_TEMP/run.log"
+
+      - name: Run the doc tests
+        run: cargo test --workspace --locked --release --doc -- --test-threads=1 2>&1 | tee "$RUNNER_TEMP/doc.log"
+
+      - name: Count the tests
+        run: |
+          mkdir -p "$RUNNER_TEMP/counts"
+          python3 .github/ci/tests.py summarize uninstrumented "list=$RUNNER_TEMP/list.log" "ignored=$RUNNER_TEMP/ignored.log" "run=$RUNNER_TEMP/run.log" "doc=$RUNNER_TEMP/doc.log" > "$RUNNER_TEMP/counts/uninstrumented.json"
+
+      - name: Upload the counts
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-counts-uninstrumented
+          path: ${{ runner.temp }}/counts/uninstrumented.json
+          if-no-files-found: error
+          overwrite: true
+
+  inventory:
+    name: Test inventory
+    needs: [coverage, uninstrumented]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        run: rustup toolchain install
+
+      - name: Download the counts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: test-counts-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/counts
+
+      - name: Check that every test ran once
+        run: python3 .github/ci/tests.py verify "$RUNNER_TEMP/counts"
+
+  talos:
+    name: talos conformance (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      TEST262_COMMIT: cb4a6c8074671c00df8cbc17a620c0f9462b312a
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        run: rustup toolchain install
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Fetch test262
+        run: |
+          git init -q "$RUNNER_TEMP/test262"
+          git -C "$RUNNER_TEMP/test262" fetch -q --depth 1 https://github.com/tc39/test262.git "$TEST262_COMMIT"
+          git -C "$RUNNER_TEMP/test262" checkout -q FETCH_HEAD
+
+      - name: Run test262
+        env:
+          TALOS_TEST262_DIR: ${{ runner.temp }}/test262
+        run: cargo test --locked --release -p talos --test test262 -- --ignored tc39 --test-threads=1
 
   adminui:
     name: Admin UI tests
@@ -79,3 +234,49 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  docker:
+    name: Docker multi-arch build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          platforms: linux/amd64,linux/arm64
+          push: false
+          build-args: VERSION=ci
+
+      - name: Check the images
+        run: |
+          for arch in amd64 arm64; do
+            docker buildx build --platform "linux/$arch" --build-arg VERSION=ci --load -t "elysiandb:ci-$arch" .
+            id=$(docker create "elysiandb:ci-$arch")
+            docker cp "$id:/usr/local/bin/elysiandb" "elysiandb-$arch"
+            docker rm "$id"
+            info=$(file "elysiandb-$arch")
+            echo "$info"
+            case "$info" in *"statically linked"* | *"static-pie linked"*) ;; *) exit 1 ;; esac
+            docker run -d --name "elysiandb-$arch" "elysiandb:ci-$arch"
+            status=starting
+            for _ in $(seq 60); do
+              status=$(docker inspect -f '{{.State.Health.Status}}' "elysiandb-$arch")
+              [ "$status" = starting ] || break
+              sleep 2
+            done
+            docker logs "elysiandb-$arch"
+            [ "$status" = healthy ]
+            headers=$(docker exec "elysiandb-$arch" wget -qSO /dev/null http://127.0.0.1:8089/health 2>&1)
+            echo "$headers"
+            case "$headers" in *"X-Elysian-Version: ci"*) ;; *) exit 1 ;; esac
+            docker rm -f "elysiandb-$arch"
+          done

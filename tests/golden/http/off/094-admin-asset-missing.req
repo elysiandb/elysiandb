@@ -1,0 +1,4 @@
+GET /admin/assets/app.js HTTP/1.1
+Host: h
+Connection: close
+

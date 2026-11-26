@@ -1,0 +1,8 @@
+POST /api/book HTTP/1.1
+Host: h
+Connection: close
+Content-Type: application/json
+Authorization: Bearer golden-token
+Content-Length: 27
+
+{"id":"k1","title":"Token"}

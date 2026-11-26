@@ -1,0 +1,56 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { ctx.entity.a = 9007199254740993; ctx.entity.b = Math.pow(2, 63); ctx.entity.c = -Math.pow(2, 53); ctx.entity.d = 2 ** 53 - 1 }" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadVal	{v:9.007199254740992e+15}
+  4	goja.setPropP	"a"
+  5	goja.loadStackLex	-1
+  6	goja.getProp	"entity"
+  7	goja.loadDynamic	"Math"
+  8	goja.getPropCallee	"pow"
+  9	goja.loadVal	{v:2}
+  10	goja.loadVal	{v:63}
+  11	goja.call	2
+  12	goja.setPropP	"b"
+  13	goja.loadStackLex	-1
+  14	goja.getProp	"entity"
+  15	goja.loadDynamic	"Math"
+  16	goja.getPropCallee	"pow"
+  17	goja.loadVal	{v:2}
+  18	goja.loadVal	{v:53}
+  19	goja.call	2
+  20	goja._neg	{}
+  21	goja.setPropP	"c"
+  22	goja.loadStackLex	-1
+  23	goja.getProp	"entity"
+  24	goja.loadVal	{v:9007199254740992}
+  25	goja.loadVal	{v:1}
+  26	goja._sub	{}
+  27	goja.setPropP	"d"
+  28	goja._loadUndef	{}
+  29	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  4	36
+  5	58
+  6	62
+  7	73
+  11	81
+  12	69
+  13	90
+  14	94
+  15	106
+  19	114
+  21	101
+  22	123
+  23	127
+  26	138
+  27	134
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

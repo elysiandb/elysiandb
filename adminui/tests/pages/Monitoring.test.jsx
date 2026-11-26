@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { describe, expect, it } from "vitest";
+import uPlot from "uplot";
 import Monitoring from "../../src/pages/Monitoring.jsx";
 import { ToastProvider } from "../../src/components/notification/ToastProvider.jsx";
 import { useLanguageStore } from "../../src/i18n/store.js";
@@ -104,7 +105,7 @@ describe("Monitoring", () => {
     it.each([
         ["errors", ["Server errors (5xx) per second", "Authentication failures per minute", "Hook errors per minute", "Warnings and errors logged per minute"], []],
         ["persistence", ["Flush duration", "Failed and forced flushes per minute", "Log size", "Data folder size"], ["Last successful flush"]],
-        ["system", ["Memory", "Goroutines", "GC pause (p99)", "GC cycles per minute", "Process CPU (% of all threads)", "Open file descriptors", "Memory against the budget", "Memory by use", "Memory pressure (0 normal, 1 high, 2 critical)", "Requests refused for memory per minute", "Open connections", "Admin sessions", "Open transactions", "Oldest open transaction"], ["Runtime", "Memory budget", "Connections"]],
+        ["system", ["Memory", "Process threads", "Process CPU (% of all threads)", "Busy CPU threads", "Open file descriptors", "Memory against the budget", "Memory by use", "Memory pressure (0 normal, 1 high, 2 critical)", "Requests refused for memory per minute", "Open connections", "Admin sessions", "Open transactions", "Oldest open transaction"], ["Runtime", "Memory budget", "Connections"]],
         ["hooks", ["Hook executions per second", "Hook duration (p95)", "Reused hook queries and results"], ["Post-read"]],
     ])("opens the %s tab from the URL", async (tab, charts, texts) => {
         mockApi(routes());
@@ -119,6 +120,44 @@ describe("Monitoring", () => {
         }
         expect(screen.queryByRole("img", { name: "Requests per second" })).not.toBeInTheDocument();
         expectNoRawTranslationKeys();
+    });
+
+    it("draws the runtime charts from the threads, usable CPUs and allocator series", async () => {
+        const runtime = {
+            allocated_bytes: [100, 110, 120],
+            total_bytes: [400, 400, 410],
+            threads: [21, 22, 23],
+            cpu_cores: [1.5, 1.25, 1],
+            usable_cpus: [8, 8, 8],
+            memory_budget_bytes: [1000, 1000, 1000],
+            memory_live_bytes: [90, 95, 99],
+        };
+        mockApi({
+            ...routes(),
+            "GET /monitoring/series": (options, url) => {
+                const data = series(url.searchParams.get("range"));
+                return { ...data, series: { ...data.series, ...runtime } };
+            },
+        });
+        renderMonitoring("/admin/monitoring?tab=system");
+
+        const chartData = async (name) => {
+            const target = await screen.findByRole("img", { name });
+            let plot;
+            await waitFor(() => {
+                plot = uPlot.instances.findLast((instance) => instance.target === target);
+                expect(plot?.data?.[0]).toHaveLength(3);
+            });
+            return plot.data.slice(1);
+        };
+
+        expect(await chartData("Memory")).toEqual([runtime.allocated_bytes, runtime.total_bytes]);
+        expect(await chartData("Process threads")).toEqual([runtime.threads]);
+        expect(await chartData("Busy CPU threads")).toEqual([runtime.cpu_cores, runtime.usable_cpus]);
+        expect(await chartData("Memory against the budget")).toEqual([runtime.memory_budget_bytes, runtime.total_bytes, runtime.memory_live_bytes]);
+        expect(within(screen.getByRole("region", { name: "Runtime" })).getAllByRole("img").map((chart) => chart.getAttribute("aria-label"))).toEqual([
+            "Memory", "Process threads", "Process CPU (% of all threads)", "Busy CPU threads", "Open file descriptors",
+        ]);
     });
 
     it("fills every line of every tab", async () => {

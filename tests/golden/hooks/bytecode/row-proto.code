@@ -1,0 +1,49 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { var r = ctx.query(\"nothing\", {}); ctx.entity.r = [r.length, Array.isArray(r), typeof r.map] }" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:1 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getPropCallee	"query"
+  3	goja.loadVal	{v:"nothing"}
+  4	goja._newObject	{}
+  5	goja.call	2
+  6	goja.initStackP	1
+  7	goja.loadStackLex	-1
+  8	goja.getProp	"entity"
+  9	goja.newArray	3
+  10	goja.loadStack	1
+  11	goja.getProp	"length"
+  12	goja._pushArrayItem	{}
+  13	goja.loadDynamic	"Array"
+  14	goja.getPropCallee	"isArray"
+  15	goja.loadStack	1
+  16	goja.call	1
+  17	goja._pushArrayItem	{}
+  18	goja.loadStack	1
+  19	goja.getProp	"map"
+  20	goja._typeof	{}
+  21	goja._pushArrayItem	{}
+  22	goja.setPropP	"r"
+  23	goja._loadUndef	{}
+  24	goja._ret	{}
+  positions:
+  0	0
+  1	33
+  4	54
+  5	42
+  6	29
+  7	59
+  8	63
+  9	74
+  10	75
+  11	77
+  13	85
+  15	99
+  16	98
+  18	110
+  19	112
+  22	70
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

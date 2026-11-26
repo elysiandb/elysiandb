@@ -1,0 +1,33 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { ctx.entity.a = \"<>&\u2028\u2029\\u0000\\t\\\"\\\\\"; ctx.entity.b = \"\\uD800\"; ctx.entity.c = \"é😀\" }" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadVal	{v:"\ufeff<>&\u2028\u2029\x00\t\"\\"}
+  4	goja.setPropP	"a"
+  5	goja.loadStackLex	-1
+  6	goja.getProp	"entity"
+  7	goja.loadVal	{v:"\ufeff�"}
+  8	goja.setPropP	"b"
+  9	goja.loadStackLex	-1
+  10	goja.getProp	"entity"
+  11	goja.loadVal	{v:"\ufeffé��"}
+  12	goja.setPropP	"c"
+  13	goja._loadUndef	{}
+  14	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  4	36
+  5	65
+  6	69
+  8	76
+  9	90
+  10	94
+  12	101
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

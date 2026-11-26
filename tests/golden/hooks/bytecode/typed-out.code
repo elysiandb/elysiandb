@@ -1,0 +1,42 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { ctx.entity.t = new Uint8Array([1, 2]); ctx.entity.f = new Float64Array([1.5]) }" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadDynamic	"Uint8Array"
+  4	goja.newArray	2
+  5	goja.loadVal	{v:1}
+  6	goja._pushArrayItem	{}
+  7	goja.loadVal	{v:2}
+  8	goja._pushArrayItem	{}
+  9	goja._new	1
+  10	goja.setPropP	"t"
+  11	goja.loadStackLex	-1
+  12	goja.getProp	"entity"
+  13	goja.loadDynamic	"Float64Array"
+  14	goja.newArray	1
+  15	goja.loadVal	{v:1.5}
+  16	goja._pushArrayItem	{}
+  17	goja._new	1
+  18	goja.setPropP	"f"
+  19	goja._loadUndef	{}
+  20	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	44
+  4	55
+  9	40
+  10	36
+  11	64
+  12	68
+  13	83
+  14	96
+  17	79
+  18	75
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

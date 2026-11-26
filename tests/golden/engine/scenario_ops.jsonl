@@ -1,0 +1,189 @@
+{"op":"ensure_type","entity":"s"}
+{"op":"ensure_type","entity":"people"}
+{"op":"ensure_index","entity":"s","index":"f:title"}
+{"op":"ensure_index","entity":"s","index":"g:note"}
+{"op":"put","entity":"s","id":"d000","doc":{"note":"searchable text 000","num":0,"status":"open","tags":[],"title":"Title 00"}}
+{"op":"put","entity":"s","id":"d001","doc":{"author":{"@entity":"people","id":"p01"},"note":"searchable text 001","num":1,"status":"closed","tags":["red"],"title":"Title 01"}}
+{"op":"put","entity":"s","id":"d002","doc":{"note":"searchable text 002","num":2,"status":"draft","tags":["red","green"],"title":"Title 02"}}
+{"op":"put","entity":"s","id":"d003","doc":{"note":"searchable text 003","num":3,"status":"open","tags":["red","green","blue"],"title":"Title 03"}}
+{"op":"put","entity":"s","id":"d004","doc":{"note":"searchable text 004","num":4,"status":"closed","tags":[],"title":"Title 04"}}
+{"op":"put","entity":"s","id":"d005","doc":{"author":{"@entity":"people","id":"p05"},"note":"searchable text 005","num":5,"status":"draft","tags":["red"],"title":"Title 05"}}
+{"op":"put","entity":"s","id":"d006","doc":{"note":"searchable text 006","num":6,"status":"open","tags":["red","green"],"title":"Title 06"}}
+{"op":"put","entity":"s","id":"d007","doc":{"note":"searchable text 007","num":7,"status":"closed","tags":["red","green","blue"],"title":"Title 07"}}
+{"op":"put","entity":"s","id":"d008","doc":{"note":"searchable text 008","num":8,"status":"draft","tags":[],"title":"Title 08"}}
+{"op":"put","entity":"s","id":"d009","doc":{"author":{"@entity":"people","id":"p02"},"note":"searchable text 009","num":9,"status":"open","tags":["red"],"title":"Title 09"}}
+{"op":"put","entity":"s","id":"d010","doc":{"note":"searchable text 010","num":10,"status":"closed","tags":["red","green"],"title":"Title 10"}}
+{"op":"put","entity":"s","id":"d011","doc":{"note":"searchable text 011","num":11,"status":"draft","tags":["red","green","blue"],"title":"Title 11"}}
+{"op":"put","entity":"s","id":"d012","doc":{"note":"searchable text 012","num":12,"status":"open","tags":[],"title":"Title 12"}}
+{"op":"put","entity":"s","id":"d013","doc":{"author":{"@entity":"people","id":"p06"},"note":"searchable text 013","num":13,"status":"closed","tags":["red"],"title":"Title 00"}}
+{"op":"put","entity":"s","id":"d014","doc":{"note":"searchable text 014","num":14,"status":"draft","tags":["red","green"],"title":"Title 01"}}
+{"op":"put","entity":"s","id":"d015","doc":{"note":"searchable text 015","num":15,"status":"open","tags":["red","green","blue"],"title":"Title 02"}}
+{"op":"put","entity":"s","id":"d016","doc":{"note":"searchable text 016","num":16,"status":"closed","tags":[],"title":"Title 03"}}
+{"op":"put","entity":"s","id":"d017","doc":{"author":{"@entity":"people","id":"p03"},"note":"searchable text 017","num":0,"status":"draft","tags":["red"],"title":"Title 04"}}
+{"op":"put","entity":"s","id":"d018","doc":{"note":"searchable text 018","num":1,"status":"open","tags":["red","green"],"title":"Title 05"}}
+{"op":"put","entity":"s","id":"d019","doc":{"note":"searchable text 019","num":2,"status":"closed","tags":["red","green","blue"],"title":"Title 06"}}
+{"op":"put","entity":"s","id":"d020","doc":{"note":"searchable text 020","num":3,"status":"draft","tags":[],"title":"Title 07"}}
+{"op":"put","entity":"s","id":"d021","doc":{"author":{"@entity":"people","id":"p00"},"note":"searchable text 021","num":4,"status":"open","tags":["red"],"title":"Title 08"}}
+{"op":"put","entity":"s","id":"d022","doc":{"note":"searchable text 022","num":5,"status":"closed","tags":["red","green"],"title":"Title 09"}}
+{"op":"put","entity":"s","id":"d023","doc":{"note":"searchable text 023","num":6,"status":"draft","tags":["red","green","blue"],"title":"Title 10"}}
+{"op":"put","entity":"s","id":"d024","doc":{"note":"searchable text 024","num":7,"status":"open","tags":[],"title":"Title 11"}}
+{"op":"put","entity":"s","id":"d025","doc":{"author":{"@entity":"people","id":"p04"},"note":"searchable text 025","num":8,"status":"closed","tags":["red"],"title":"Title 12"}}
+{"op":"put","entity":"s","id":"d026","doc":{"note":"searchable text 026","num":9,"status":"draft","tags":["red","green"],"title":"Title 00"}}
+{"op":"put","entity":"s","id":"d027","doc":{"note":"searchable text 027","num":10,"status":"open","tags":["red","green","blue"],"title":"Title 01"}}
+{"op":"put","entity":"s","id":"d028","doc":{"note":"searchable text 028","num":11,"status":"closed","tags":[],"title":"Title 02"}}
+{"op":"put","entity":"s","id":"d029","doc":{"author":{"@entity":"people","id":"p01"},"note":"searchable text 029","num":12,"status":"draft","tags":["red"],"title":"Title 03"}}
+{"op":"put","entity":"s","id":"d030","doc":{"note":"searchable text 030","num":13,"status":"open","tags":["red","green"],"title":"Title 04"}}
+{"op":"put","entity":"s","id":"d031","doc":{"note":"searchable text 031","num":14,"status":"closed","tags":["red","green","blue"],"title":"Title 05"}}
+{"op":"put","entity":"s","id":"d032","doc":{"note":"searchable text 032","num":15,"status":"draft","tags":[],"title":"Title 06"}}
+{"op":"put","entity":"s","id":"d033","doc":{"author":{"@entity":"people","id":"p05"},"note":"searchable text 033","num":16,"status":"open","tags":["red"],"title":"Title 07"}}
+{"op":"put","entity":"s","id":"d034","doc":{"note":"searchable text 034","num":0,"status":"closed","tags":["red","green"],"title":"Title 08"}}
+{"op":"put","entity":"s","id":"d035","doc":{"note":"searchable text 035","num":1,"status":"draft","tags":["red","green","blue"],"title":"Title 09"}}
+{"op":"put","entity":"s","id":"d036","doc":{"note":"searchable text 036","num":2,"status":"open","tags":[],"title":"Title 10"}}
+{"op":"put","entity":"s","id":"d037","doc":{"author":{"@entity":"people","id":"p02"},"note":"searchable text 037","num":3,"status":"closed","tags":["red"],"title":"Title 11"}}
+{"op":"put","entity":"s","id":"d038","doc":{"note":"searchable text 038","num":4,"status":"draft","tags":["red","green"],"title":"Title 12"}}
+{"op":"put","entity":"s","id":"d039","doc":{"note":"searchable text 039","num":5,"status":"open","tags":["red","green","blue"],"title":"Title 00"}}
+{"op":"put","entity":"s","id":"d040","doc":{"note":"searchable text 040","num":6,"status":"closed","tags":[],"title":"Title 01"}}
+{"op":"put","entity":"s","id":"d041","doc":{"author":{"@entity":"people","id":"p06"},"note":"searchable text 041","num":7,"status":"draft","tags":["red"],"title":"Title 02"}}
+{"op":"put","entity":"s","id":"d042","doc":{"note":"searchable text 042","num":8,"status":"open","tags":["red","green"],"title":"Title 03"}}
+{"op":"put","entity":"s","id":"d043","doc":{"note":"searchable text 043","num":9,"status":"closed","tags":["red","green","blue"],"title":"Title 04"}}
+{"op":"put","entity":"s","id":"d044","doc":{"note":"searchable text 044","num":10,"status":"draft","tags":[],"title":"Title 05"}}
+{"op":"put","entity":"s","id":"d045","doc":{"author":{"@entity":"people","id":"p03"},"note":"searchable text 045","num":11,"status":"open","tags":["red"],"title":"Title 06"}}
+{"op":"put","entity":"s","id":"d046","doc":{"note":"searchable text 046","num":12,"status":"closed","tags":["red","green"],"title":"Title 07"}}
+{"op":"put","entity":"s","id":"d047","doc":{"note":"searchable text 047","num":13,"status":"draft","tags":["red","green","blue"],"title":"Title 08"}}
+{"op":"put","entity":"s","id":"d048","doc":{"note":"searchable text 048","num":14,"status":"open","tags":[],"title":"Title 09"}}
+{"op":"put","entity":"s","id":"d049","doc":{"author":{"@entity":"people","id":"p00"},"note":"searchable text 049","num":15,"status":"closed","tags":["red"],"title":"Title 10"}}
+{"op":"put","entity":"s","id":"d050","doc":{"note":"searchable text 050","num":16,"status":"draft","tags":["red","green"],"title":"Title 11"}}
+{"op":"put","entity":"s","id":"d051","doc":{"note":"searchable text 051","num":0,"status":"open","tags":["red","green","blue"],"title":"Title 12"}}
+{"op":"put","entity":"s","id":"d052","doc":{"note":"searchable text 052","num":1,"status":"closed","tags":[],"title":"Title 00"}}
+{"op":"put","entity":"s","id":"d053","doc":{"author":{"@entity":"people","id":"p04"},"note":"searchable text 053","num":2,"status":"draft","tags":["red"],"title":"Title 01"}}
+{"op":"put","entity":"s","id":"d054","doc":{"note":"searchable text 054","num":3,"status":"open","tags":["red","green"],"title":"Title 02"}}
+{"op":"put","entity":"s","id":"d055","doc":{"note":"searchable text 055","num":4,"status":"closed","tags":["red","green","blue"],"title":"Title 03"}}
+{"op":"put","entity":"s","id":"d056","doc":{"note":"searchable text 056","num":5,"status":"draft","tags":[],"title":"Title 04"}}
+{"op":"put","entity":"s","id":"d057","doc":{"author":{"@entity":"people","id":"p01"},"note":"searchable text 057","num":6,"status":"open","tags":["red"],"title":"Title 05"}}
+{"op":"put","entity":"s","id":"d058","doc":{"note":"searchable text 058","num":7,"status":"closed","tags":["red","green"],"title":"Title 06"}}
+{"op":"put","entity":"s","id":"d059","doc":{"note":"searchable text 059","num":8,"status":"draft","tags":["red","green","blue"],"title":"Title 07"}}
+{"op":"put","entity":"s","id":"d060","doc":{"note":"searchable text 060","num":9,"status":"open","tags":[],"title":"Title 08"}}
+{"op":"put","entity":"s","id":"d061","doc":{"author":{"@entity":"people","id":"p05"},"note":"searchable text 061","num":10,"status":"closed","tags":["red"],"title":"Title 09"}}
+{"op":"put","entity":"s","id":"d062","doc":{"note":"searchable text 062","num":11,"status":"draft","tags":["red","green"],"title":"Title 10"}}
+{"op":"put","entity":"s","id":"d063","doc":{"note":"searchable text 063","num":12,"status":"open","tags":["red","green","blue"],"title":"Title 11"}}
+{"op":"put","entity":"s","id":"d064","doc":{"note":"searchable text 064","num":13,"status":"closed","tags":[],"title":"Title 12"}}
+{"op":"put","entity":"s","id":"d065","doc":{"author":{"@entity":"people","id":"p02"},"note":"searchable text 065","num":14,"status":"draft","tags":["red"],"title":"Title 00"}}
+{"op":"put","entity":"s","id":"d066","doc":{"note":"searchable text 066","num":15,"status":"open","tags":["red","green"],"title":"Title 01"}}
+{"op":"put","entity":"s","id":"d067","doc":{"note":"searchable text 067","num":16,"status":"closed","tags":["red","green","blue"],"title":"Title 02"}}
+{"op":"put","entity":"s","id":"d068","doc":{"note":"searchable text 068","num":0,"status":"draft","tags":[],"title":"Title 03"}}
+{"op":"put","entity":"s","id":"d069","doc":{"author":{"@entity":"people","id":"p06"},"note":"searchable text 069","num":1,"status":"open","tags":["red"],"title":"Title 04"}}
+{"op":"put","entity":"s","id":"d070","doc":{"note":"searchable text 070","num":2,"status":"closed","tags":["red","green"],"title":"Title 05"}}
+{"op":"put","entity":"s","id":"d071","doc":{"note":"searchable text 071","num":3,"status":"draft","tags":["red","green","blue"],"title":"Title 06"}}
+{"op":"put","entity":"s","id":"d072","doc":{"note":"searchable text 072","num":4,"status":"open","tags":[],"title":"Title 07"}}
+{"op":"put","entity":"s","id":"d073","doc":{"author":{"@entity":"people","id":"p03"},"note":"searchable text 073","num":5,"status":"closed","tags":["red"],"title":"Title 08"}}
+{"op":"put","entity":"s","id":"d074","doc":{"note":"searchable text 074","num":6,"status":"draft","tags":["red","green"],"title":"Title 09"}}
+{"op":"put","entity":"s","id":"d075","doc":{"note":"searchable text 075","num":7,"status":"open","tags":["red","green","blue"],"title":"Title 10"}}
+{"op":"put","entity":"s","id":"d076","doc":{"note":"searchable text 076","num":8,"status":"closed","tags":[],"title":"Title 11"}}
+{"op":"put","entity":"s","id":"d077","doc":{"author":{"@entity":"people","id":"p00"},"note":"searchable text 077","num":9,"status":"draft","tags":["red"],"title":"Title 12"}}
+{"op":"put","entity":"s","id":"d078","doc":{"note":"searchable text 078","num":10,"status":"open","tags":["red","green"],"title":"Title 00"}}
+{"op":"put","entity":"s","id":"d079","doc":{"note":"searchable text 079","num":11,"status":"closed","tags":["red","green","blue"],"title":"Title 01"}}
+{"op":"put","entity":"s","id":"d080","doc":{"note":"searchable text 080","num":12,"status":"draft","tags":[],"title":"Title 02"}}
+{"op":"put","entity":"s","id":"d081","doc":{"author":{"@entity":"people","id":"p04"},"note":"searchable text 081","num":13,"status":"open","tags":["red"],"title":"Title 03"}}
+{"op":"put","entity":"s","id":"d082","doc":{"note":"searchable text 082","num":14,"status":"closed","tags":["red","green"],"title":"Title 04"}}
+{"op":"put","entity":"s","id":"d083","doc":{"note":"searchable text 083","num":15,"status":"draft","tags":["red","green","blue"],"title":"Title 05"}}
+{"op":"put","entity":"s","id":"d084","doc":{"note":"searchable text 084","num":16,"status":"open","tags":[],"title":"Title 06"}}
+{"op":"put","entity":"s","id":"d085","doc":{"author":{"@entity":"people","id":"p01"},"note":"searchable text 085","num":0,"status":"closed","tags":["red"],"title":"Title 07"}}
+{"op":"put","entity":"s","id":"d086","doc":{"note":"searchable text 086","num":1,"status":"draft","tags":["red","green"],"title":"Title 08"}}
+{"op":"put","entity":"s","id":"d087","doc":{"note":"searchable text 087","num":2,"status":"open","tags":["red","green","blue"],"title":"Title 09"}}
+{"op":"put","entity":"s","id":"d088","doc":{"note":"searchable text 088","num":3,"status":"closed","tags":[],"title":"Title 10"}}
+{"op":"put","entity":"s","id":"d089","doc":{"author":{"@entity":"people","id":"p05"},"note":"searchable text 089","num":4,"status":"draft","tags":["red"],"title":"Title 11"}}
+{"op":"put","entity":"s","id":"d090","doc":{"note":"searchable text 090","num":5,"status":"open","tags":["red","green"],"title":"Title 12"}}
+{"op":"put","entity":"s","id":"d091","doc":{"note":"searchable text 091","num":6,"status":"closed","tags":["red","green","blue"],"title":"Title 00"}}
+{"op":"put","entity":"s","id":"d092","doc":{"note":"searchable text 092","num":7,"status":"draft","tags":[],"title":"Title 01"}}
+{"op":"put","entity":"s","id":"d093","doc":{"author":{"@entity":"people","id":"p02"},"note":"searchable text 093","num":8,"status":"open","tags":["red"],"title":"Title 02"}}
+{"op":"put","entity":"s","id":"d094","doc":{"note":"searchable text 094","num":9,"status":"closed","tags":["red","green"],"title":"Title 03"}}
+{"op":"put","entity":"s","id":"d095","doc":{"note":"searchable text 095","num":10,"status":"draft","tags":["red","green","blue"],"title":"Title 04"}}
+{"op":"put","entity":"s","id":"d096","doc":{"note":"searchable text 096","num":11,"status":"open","tags":[],"title":"Title 05"}}
+{"op":"put","entity":"s","id":"d097","doc":{"author":{"@entity":"people","id":"p06"},"note":"searchable text 097","num":12,"status":"closed","tags":["red"],"title":"Title 06"}}
+{"op":"put","entity":"s","id":"d098","doc":{"note":"searchable text 098","num":13,"status":"draft","tags":["red","green"],"title":"Title 07"}}
+{"op":"put","entity":"s","id":"d099","doc":{"note":"searchable text 099","num":14,"status":"open","tags":["red","green","blue"],"title":"Title 08"}}
+{"op":"put","entity":"s","id":"d100","doc":{"note":"searchable text 100","num":15,"status":"closed","tags":[],"title":"Title 09"}}
+{"op":"put","entity":"s","id":"d101","doc":{"author":{"@entity":"people","id":"p03"},"note":"searchable text 101","num":16,"status":"draft","tags":["red"],"title":"Title 10"}}
+{"op":"put","entity":"s","id":"d102","doc":{"note":"searchable text 102","num":0,"status":"open","tags":["red","green"],"title":"Title 11"}}
+{"op":"put","entity":"s","id":"d103","doc":{"note":"searchable text 103","num":1,"status":"closed","tags":["red","green","blue"],"title":"Title 12"}}
+{"op":"put","entity":"s","id":"d104","doc":{"note":"searchable text 104","num":2,"status":"draft","tags":[],"title":"Title 00"}}
+{"op":"put","entity":"s","id":"d105","doc":{"author":{"@entity":"people","id":"p00"},"note":"searchable text 105","num":3,"status":"open","tags":["red"],"title":"Title 01"}}
+{"op":"put","entity":"s","id":"d106","doc":{"note":"searchable text 106","num":4,"status":"closed","tags":["red","green"],"title":"Title 02"}}
+{"op":"put","entity":"s","id":"d107","doc":{"note":"searchable text 107","num":5,"status":"draft","tags":["red","green","blue"],"title":"Title 03"}}
+{"op":"put","entity":"s","id":"d108","doc":{"note":"searchable text 108","num":6,"status":"open","tags":[],"title":"Title 04"}}
+{"op":"put","entity":"s","id":"d109","doc":{"author":{"@entity":"people","id":"p04"},"note":"searchable text 109","num":7,"status":"closed","tags":["red"],"title":"Title 05"}}
+{"op":"put","entity":"s","id":"d110","doc":{"note":"searchable text 110","num":8,"status":"draft","tags":["red","green"],"title":"Title 06"}}
+{"op":"put","entity":"s","id":"d111","doc":{"note":"searchable text 111","num":9,"status":"open","tags":["red","green","blue"],"title":"Title 07"}}
+{"op":"put","entity":"s","id":"d112","doc":{"note":"searchable text 112","num":10,"status":"closed","tags":[],"title":"Title 08"}}
+{"op":"put","entity":"s","id":"d113","doc":{"author":{"@entity":"people","id":"p01"},"note":"searchable text 113","num":11,"status":"draft","tags":["red"],"title":"Title 09"}}
+{"op":"put","entity":"s","id":"d114","doc":{"note":"searchable text 114","num":12,"status":"open","tags":["red","green"],"title":"Title 10"}}
+{"op":"put","entity":"s","id":"d115","doc":{"note":"searchable text 115","num":13,"status":"closed","tags":["red","green","blue"],"title":"Title 11"}}
+{"op":"put","entity":"s","id":"d116","doc":{"note":"searchable text 116","num":14,"status":"draft","tags":[],"title":"Title 12"}}
+{"op":"put","entity":"s","id":"d117","doc":{"author":{"@entity":"people","id":"p05"},"note":"searchable text 117","num":15,"status":"open","tags":["red"],"title":"Title 00"}}
+{"op":"put","entity":"s","id":"d118","doc":{"note":"searchable text 118","num":16,"status":"closed","tags":["red","green"],"title":"Title 01"}}
+{"op":"put","entity":"s","id":"d119","doc":{"note":"searchable text 119","num":0,"status":"draft","tags":["red","green","blue"],"title":"Title 02"}}
+{"op":"put","entity":"people","id":"p00","doc":{"name":"Person 0"}}
+{"op":"put","entity":"people","id":"p01","doc":{"name":"Person 1"}}
+{"op":"put","entity":"people","id":"p02","doc":{"name":"Person 2"}}
+{"op":"put","entity":"people","id":"p03","doc":{"name":"Person 3"}}
+{"op":"put","entity":"people","id":"p04","doc":{"name":"Person 4"}}
+{"op":"put","entity":"people","id":"p05","doc":{"name":"Person 5"}}
+{"op":"put","entity":"people","id":"p06","doc":{"name":"Person 6"}}
+{"op":"dump","step":"after-first-writes"}
+{"op":"ensure_index","entity":"s","index":"s:num"}
+{"op":"ensure_index","entity":"s","index":"r:author"}
+{"op":"ensure_index","entity":"s","index":"b:status"}
+{"op":"ensure_index","entity":"s","index":"c:status,num"}
+{"op":"ensure_index","entity":"s","index":"f:tags"}
+{"op":"watch_field","entity":"s","field":"status"}
+{"op":"dump","step":"after-indexes"}
+{"op":"put","entity":"s","id":"d000","doc":{"author":{"@entity":"people","id":"p01"},"note":"searchable text 001","num":1,"status":"closed","tags":["red"],"title":"Title 01"}}
+{"op":"put","entity":"s","id":"d005","doc":{"note":"searchable text 006","num":6,"status":"open","tags":["red","green"],"title":"Title 06"}}
+{"op":"put","entity":"s","id":"d010","doc":{"note":"searchable text 011","num":11,"status":"draft","tags":["red","green","blue"],"title":"Title 11"}}
+{"op":"put","entity":"s","id":"d015","doc":{"note":"searchable text 016","num":16,"status":"closed","tags":[],"title":"Title 03"}}
+{"op":"put","entity":"s","id":"d020","doc":{"author":{"@entity":"people","id":"p00"},"note":"searchable text 021","num":4,"status":"open","tags":["red"],"title":"Title 08"}}
+{"op":"put","entity":"s","id":"d025","doc":{"note":"searchable text 026","num":9,"status":"draft","tags":["red","green"],"title":"Title 00"}}
+{"op":"put","entity":"s","id":"d030","doc":{"note":"searchable text 031","num":14,"status":"closed","tags":["red","green","blue"],"title":"Title 05"}}
+{"op":"put","entity":"s","id":"d035","doc":{"note":"searchable text 036","num":2,"status":"open","tags":[],"title":"Title 10"}}
+{"op":"put","entity":"s","id":"d040","doc":{"author":{"@entity":"people","id":"p06"},"note":"searchable text 041","num":7,"status":"draft","tags":["red"],"title":"Title 02"}}
+{"op":"put","entity":"s","id":"d045","doc":{"note":"searchable text 046","num":12,"status":"closed","tags":["red","green"],"title":"Title 07"}}
+{"op":"put","entity":"s","id":"d050","doc":{"note":"searchable text 051","num":0,"status":"open","tags":["red","green","blue"],"title":"Title 12"}}
+{"op":"put","entity":"s","id":"d055","doc":{"note":"searchable text 056","num":5,"status":"draft","tags":[],"title":"Title 04"}}
+{"op":"put","entity":"s","id":"d060","doc":{"author":{"@entity":"people","id":"p05"},"note":"searchable text 061","num":10,"status":"closed","tags":["red"],"title":"Title 09"}}
+{"op":"put","entity":"s","id":"d065","doc":{"note":"searchable text 066","num":15,"status":"open","tags":["red","green"],"title":"Title 01"}}
+{"op":"put","entity":"s","id":"d070","doc":{"note":"searchable text 071","num":3,"status":"draft","tags":["red","green","blue"],"title":"Title 06"}}
+{"op":"put","entity":"s","id":"d075","doc":{"note":"searchable text 076","num":8,"status":"closed","tags":[],"title":"Title 11"}}
+{"op":"put","entity":"s","id":"d080","doc":{"author":{"@entity":"people","id":"p04"},"note":"searchable text 081","num":13,"status":"open","tags":["red"],"title":"Title 03"}}
+{"op":"put","entity":"s","id":"d085","doc":{"note":"searchable text 086","num":1,"status":"draft","tags":["red","green"],"title":"Title 08"}}
+{"op":"put","entity":"s","id":"d090","doc":{"note":"searchable text 091","num":6,"status":"closed","tags":["red","green","blue"],"title":"Title 00"}}
+{"op":"put","entity":"s","id":"d095","doc":{"note":"searchable text 096","num":11,"status":"open","tags":[],"title":"Title 05"}}
+{"op":"put","entity":"s","id":"d100","doc":{"author":{"@entity":"people","id":"p03"},"note":"searchable text 101","num":16,"status":"draft","tags":["red"],"title":"Title 10"}}
+{"op":"put","entity":"s","id":"d105","doc":{"note":"searchable text 106","num":4,"status":"closed","tags":["red","green"],"title":"Title 02"}}
+{"op":"put","entity":"s","id":"d110","doc":{"note":"searchable text 111","num":9,"status":"open","tags":["red","green","blue"],"title":"Title 07"}}
+{"op":"put","entity":"s","id":"d115","doc":{"note":"searchable text 116","num":14,"status":"draft","tags":[],"title":"Title 12"}}
+{"op":"delete","entity":"s","id":"d000"}
+{"op":"delete","entity":"s","id":"d009"}
+{"op":"delete","entity":"s","id":"d018"}
+{"op":"delete","entity":"s","id":"d027"}
+{"op":"delete","entity":"s","id":"d036"}
+{"op":"delete","entity":"s","id":"d045"}
+{"op":"delete","entity":"s","id":"d054"}
+{"op":"delete","entity":"s","id":"d063"}
+{"op":"delete","entity":"s","id":"d072"}
+{"op":"delete","entity":"s","id":"d081"}
+{"op":"delete","entity":"s","id":"d090"}
+{"op":"delete","entity":"s","id":"d099"}
+{"op":"delete","entity":"s","id":"d108"}
+{"op":"delete","entity":"s","id":"d117"}
+{"op":"put","entity":"s","id":"d009","doc":{"note":"searchable text 500","num":7,"status":"draft","tags":[],"title":"Title 06"}}
+{"op":"dump","step":"after-updates"}
+{"op":"reset_entity","entity":"people"}
+{"op":"put","entity":"people","id":"p00","doc":{"name":"Again"}}
+{"op":"ensure_type","entity":"gone"}
+{"op":"put","entity":"gone","id":"g","doc":{"x":1}}
+{"op":"drop_type","entity":"gone"}
+{"op":"dump","step":"after-reset-and-drop"}
+{"op":"clear_all"}
+{"op":"put","entity":"s","id":"after-clear","doc":{"author":{"@entity":"people","id":"p01"},"note":"searchable text 001","num":1,"status":"closed","tags":["red"],"title":"Title 01"}}
+{"op":"ensure_index","entity":"s","index":"f:title"}
+{"op":"dump","step":"after-clear"}

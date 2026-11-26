@@ -1,0 +1,15 @@
+{"decoded":"{\"sessions\":[{\"token_hash\":\"aa\",\"username\":\"u\",\"role\":\"admin\",\"credentials\":\"cc\",\"expires_at\":5}]}","file_hex":"7b2273657373696f6e73223a5b7b22746f6b656e5f68617368223a226161222c22757365726e616d65223a2275222c22726f6c65223a2261646d696e222c2263726564656e7469616c73223a226363222c22657870697265735f6174223a357d5d7d"}
+{"decoded":"{\"sessions\":[{\"token_hash\":\"aa\",\"username\":\"u\",\"role\":\"\",\"credentials\":\"\",\"expires_at\":0}]}","file_hex":"7b2253455353494f4e53223a5b7b22544f4b454e5f48415348223a226161222c22557365726e616d65223a2275227d5d7d"}
+{"decoded":"{\"sessions\":[{\"token_hash\":\"aa\",\"username\":\"\",\"role\":\"\",\"credentials\":\"\",\"expires_at\":0}]}","file_hex":"7b2273657373696f6e73223a5b7b22746f6b656e5f68617368223a226161222c226c6567616379223a312c226964223a2278227d5d2c226f74686572223a747275657d"}
+{"decoded":"{\"sessions\":[{\"token_hash\":\"\",\"username\":\"\",\"role\":\"\",\"credentials\":\"\",\"expires_at\":0}]}","file_hex":"7b2273657373696f6e73223a5b7b7d5d7d"}
+{"decoded":"{\"sessions\":null}","file_hex":"6e756c6c"}
+{"decoded":"{\"sessions\":null}","file_hex":"7b2273657373696f6e73223a6e756c6c7d"}
+{"decoded":"{\"sessions\":[]}","file_hex":"7b2273657373696f6e73223a5b5d7d20747261696c696e67"}
+{"decoded":"{\"sessions\":[]}","file_hex":"7b2273657373696f6e73223a5b5d7d7b2273657373696f6e73223a5b7b22757365726e616d65223a227365636f6e64227d5d7d"}
+{"error":true,"file_hex":"7b2273657373696f6e73223a"}
+{"error":true,"file_hex":"5b5d"}
+{"error":true,"file_hex":"7b2273657373696f6e73223a7b7d7d"}
+{"error":true,"file_hex":"7b2273657373696f6e73223a5b7b22657870697265735f6174223a2235227d5d7d"}
+{"error":true,"file_hex":"7b2273657373696f6e73223a5b7b22657870697265735f6174223a312e357d5d7d"}
+{"error":true,"file_hex":""}
+{"error":true,"file_hex":"202020"}

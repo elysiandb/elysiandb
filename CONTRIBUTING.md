@@ -8,7 +8,7 @@ Please open an issue first so we can discuss it together.
 
 * **Keep it light:** minimal dependencies, small surface area.
 * **Fast by default:** low‑latency hot paths; prefer clarity + perf over feature bloat.
-* **KV core:** strict **key → value (\[]byte)** model.
+* **KV core:** strict **key → value (bytes)** model.
 * **Data structures can evolve *only* if they stay simple** (e.g., small value helpers or minimal indexing) and do not complicate hot paths.
 * **Protocols are first‑class:** both **HTTP** and **TCP** must remain supported and easy to use.
 * **Operational simplicity:** easy config, sane defaults, Docker‑friendly, good docs.
@@ -25,7 +25,7 @@ Please open an issue first so we can discuss it together.
 * **Docs & Examples:** improve README, configuration docs, quick starts, troubleshooting.
 * **Configuration UX:** validate config (e.g., shard count power‑of‑two), clearer errors.
 * **Testing:** add e2e tests for HTTP/TCP (GET 404, DELETE, RESET, SAVE/persistence); race tests.
-* **Performance & Memory:** safe micro‑optimizations (batching TCP flushes, reduce allocs/GC); keep code readable.
+* **Performance & Memory:** safe micro‑optimizations (batching TCP flushes, reduce allocations); keep code readable.
 * **Developer Experience:** Makefile tasks, CI polish, linters.
 * **SDK:** Provide SDK's for various languages
 
@@ -33,20 +33,20 @@ Please open an issue first so we can discuss it together.
 
 ## Dev Setup
 
-1. **Go 1.23+** installed.
-2. Clone and install deps:
+1. **Rust** installed through [rustup](https://rustup.rs) (the version is pinned by `rust-toolchain.toml`), and Node.js 20.19+ for the Admin UI.
+2. Clone and build:
 
    ```bash
    git clone https://github.com/taymour/elysiandb
    cd elysiandb
-   go mod tidy
+   cargo build
    ```
 3. Run locally:
 
    ```bash
-   go run elysiandb.go
+   cargo run -- server
    ```
-4. Run tests (race detector):
+4. Run tests:
 
    ```bash
    make test
@@ -59,7 +59,7 @@ Please open an issue first so we can discuss it together.
 
 * Prefer **e2e tests** for the HTTP API first; TCP tests welcome too.
 * Keep tests **deterministic**; reset state via `POST /reset` where needed.
-* Run with `-race` and ensure no data races are introduced.
+* Run `make test`, `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings`.
 
 ---
 
@@ -105,8 +105,8 @@ By contributing, you agree that your contributions are licensed under the reposi
 
 ## Quick Checklist (before opening a PR)
 
-* [ ] Code is formatted and idiomatic.
-* [ ] Tests pass locally with `-race`.
+* [ ] Code is formatted (`cargo fmt`) and clippy-clean.
+* [ ] Tests pass locally (`make test`).
 * [ ] Added/updated tests for behavior changes.
 * [ ] Docs/config updated if needed.
 * [ ] Changes keep the project **simple, fast, and lightweight**.

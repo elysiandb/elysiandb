@@ -1,0 +1,87 @@
+{"file":"invalid/not-gzip.tar.gz","reason":"invalid backup archive: not a gzip file: ⟨go:gzip⟩"}
+{"file":"invalid/empty-file.tar.gz","reason":"invalid backup archive: not a gzip file: ⟨go:gzip⟩"}
+{"file":"invalid/gzip-header-truncated.tar.gz","reason":"invalid backup archive: not a gzip file: ⟨go:gzip⟩"}
+{"file":"invalid/gzip-stream-truncated.tar.gz","reason":"invalid backup archive: security/users.key cannot be read: ⟨go:gzip⟩"}
+{"file":"valid/gzip-trailer-missing.tar.gz","note":"accepted: the gzip trailer is never read once the tar end blocks are read","reason":null}
+{"file":"invalid/deflate-corrupt.tar.gz","go_values":{"flate_offset":649},"reason":"invalid backup archive: security/users.key cannot be read: ⟨go:gzip⟩"}
+{"file":"valid/gzip-bad-crc.tar.gz","note":"accepted: the gzip trailer is never read once the tar end blocks are read","reason":null}
+{"file":"valid/gzip-bad-size.tar.gz","note":"accepted: the gzip trailer is never read once the tar end blocks are read","reason":null}
+{"file":"invalid/tar-empty-stream.tar.gz","reason":"invalid backup archive: manifest.json is missing"}
+{"file":"invalid/tar-only-end-blocks.tar.gz","reason":"invalid backup archive: manifest.json is missing"}
+{"file":"invalid/tar-garbage-header.tar.gz","reason":"invalid backup archive: unreadable tar stream: ⟨go:tar⟩"}
+{"file":"invalid/tar-truncated-in-entry.tar.gz","reason":"invalid backup archive: entities/books.jsonl cannot be read: ⟨go:tar⟩"}
+{"file":"invalid/manifest-not-first.tar.gz","reason":"invalid backup archive: expected manifest.json, found security/users.key"}
+{"file":"invalid/manifest-not-regular.tar.gz","reason":"invalid backup archive: manifest.json is not a regular file"}
+{"file":"invalid/manifest-too-large.tar.gz","reason":"invalid backup archive: manifest.json is too large"}
+{"file":"invalid/manifest-truncated-json.tar.gz","reason":"invalid backup archive: manifest.json is not valid JSON: ⟨go:json⟩"}
+{"file":"invalid/manifest-trailing-data.tar.gz","reason":"invalid backup archive: manifest.json is not valid JSON: ⟨go:json⟩"}
+{"file":"invalid/manifest-float-version.tar.gz","reason":"invalid backup archive: manifest.json is not valid JSON: ⟨go:json⟩"}
+{"file":"invalid/manifest-string-version.tar.gz","reason":"invalid backup archive: manifest.json is not valid JSON: ⟨go:json⟩"}
+{"file":"invalid/manifest-array.tar.gz","reason":"invalid backup archive: manifest.json is not valid JSON: ⟨go:json⟩"}
+{"file":"invalid/manifest-huge-number.tar.gz","reason":"invalid backup archive: manifest.json is not valid JSON: ⟨go:json⟩"}
+{"file":"invalid/unknown-format.tar.gz","reason":"invalid backup archive: unknown format \"other-backup\""}
+{"file":"invalid/format-version-zero.tar.gz","reason":"invalid backup archive: invalid format version 0"}
+{"file":"invalid/format-version-negative.tar.gz","reason":"invalid backup archive: invalid format version -3"}
+{"file":"invalid/format-version-newer.tar.gz","reason":"invalid backup archive: format version 2 is newer than the version 1 supported by ElysianDB 0.3.0","version":"0.3.0"}
+{"file":"invalid/kv-count-negative.tar.gz","reason":"invalid backup archive: invalid KV key count -1"}
+{"file":"invalid/entity-entry-empty-name.tar.gz","go_reason":"invalid backup archive: invalid entity entry {Name: Documents:1}","reason":"invalid backup archive: invalid entity entry {\"name\":\"\",\"documents\":1}"}
+{"file":"invalid/entity-entry-negative.tar.gz","go_reason":"invalid backup archive: invalid entity entry {Name:books Documents:-1}","reason":"invalid backup archive: invalid entity entry {\"name\":\"books\",\"documents\":-1}"}
+{"file":"invalid/entity-listed-twice.tar.gz","reason":"invalid backup archive: entities/books.jsonl is listed twice"}
+{"file":"invalid/schema-listed-twice.tar.gz","reason":"invalid backup archive: schemas/books.json is listed twice"}
+{"file":"invalid/checksum-missing.tar.gz","reason":"invalid backup archive: no checksum for kv/keys.jsonl"}
+{"file":"invalid/checksum-unknown-file.tar.gz","reason":"invalid backup archive: checksum for an unknown file extra/file.json"}
+{"file":"invalid/checksum-unknown-files.tar.gz","order":"first unknown path in sorted order (D20)","reason":"invalid backup archive: checksum for an unknown file aa/one.json"}
+{"file":"invalid/key-missing.tar.gz","reason":"invalid backup archive: security/users.key is missing"}
+{"file":"invalid/key-not-regular.tar.gz","reason":"invalid backup archive: security/users.key is not a regular file"}
+{"file":"invalid/key-wrong-name.tar.gz","reason":"invalid backup archive: expected security/users.key, found security/other.key"}
+{"file":"invalid/key-too-large.tar.gz","reason":"invalid backup archive: security/users.key is too large"}
+{"file":"invalid/key-blank.tar.gz","reason":"invalid backup archive: security/users.key does not hold a valid key"}
+{"file":"invalid/key-with-space.tar.gz","reason":"invalid backup archive: security/users.key does not hold a valid key"}
+{"file":"invalid/key-checksum-mismatch.tar.gz","reason":"invalid backup archive: checksum mismatch for security/users.key"}
+{"file":"invalid/schema-not-object.tar.gz","reason":"invalid backup archive: schemas/books.json is not a JSON object"}
+{"file":"invalid/schema-null.tar.gz","reason":"invalid backup archive: schemas/books.json is not a JSON object"}
+{"file":"invalid/schema-garbage.tar.gz","reason":"invalid backup archive: schemas/books.json is not a JSON object"}
+{"file":"invalid/schema-other-id.tar.gz","reason":"invalid backup archive: schemas/books.json describes \"authors\" instead of \"books\""}
+{"file":"invalid/schema-number-id.tar.gz","go_reason":"invalid backup archive: schemas/books.json describes %!q(float64=1) instead of \"books\"","reason":"invalid backup archive: schemas/books.json describes 1 instead of \"books\""}
+{"file":"invalid/schema-missing-id.tar.gz","go_reason":"invalid backup archive: schemas/books.json describes %!q(\u003cnil\u003e) instead of \"books\"","reason":"invalid backup archive: schemas/books.json describes null instead of \"books\""}
+{"file":"invalid/schema-invalid-fields.tar.gz","reason":"invalid backup archive: schemas/books.json has invalid fields"}
+{"file":"invalid/schema-two-objects.tar.gz","reason":"invalid backup archive: schemas/books.json holds more than one schema"}
+{"file":"invalid/schema-missing-entry.tar.gz","reason":"invalid backup archive: schemas/books.json is missing"}
+{"file":"invalid/entries-out-of-order.tar.gz","reason":"invalid backup archive: expected schemas/books.json, found entities/books.jsonl"}
+{"file":"invalid/document-truncated-json.tar.gz","reason":"invalid backup archive: entities/books.jsonl, document 1: ⟨go:json⟩"}
+{"file":"invalid/document-garbage.tar.gz","reason":"invalid backup archive: entities/books.jsonl, document 1: ⟨go:json⟩"}
+{"file":"invalid/document-array.tar.gz","reason":"invalid backup archive: entities/books.jsonl, document 1: ⟨go:json⟩"}
+{"file":"invalid/document-no-id.tar.gz","reason":"invalid backup archive: entities/books.jsonl, document 1: a document must be an object with a string id"}
+{"file":"invalid/document-number-id.tar.gz","reason":"invalid backup archive: entities/books.jsonl, document 1: a document must be an object with a string id"}
+{"file":"invalid/document-empty-id.tar.gz","reason":"invalid backup archive: entities/books.jsonl, document 1: a document must be an object with a string id"}
+{"file":"invalid/document-duplicate-id.tar.gz","reason":"invalid backup archive: entities/books.jsonl, document 2: duplicate id \"b1\""}
+{"file":"invalid/document-duplicate-escaped-id.tar.gz","reason":"invalid backup archive: entities/books.jsonl, document 2: duplicate id \"b1\""}
+{"file":"invalid/document-trailing-garbage.tar.gz","reason":"invalid backup archive: entities/books.jsonl, document 2: ⟨go:json⟩"}
+{"file":"invalid/document-count-mismatch.tar.gz","reason":"invalid backup archive: entities/books.jsonl holds 2 entries, the manifest announces 3"}
+{"file":"invalid/document-checksum-mismatch.tar.gz","reason":"invalid backup archive: checksum mismatch for entities/books.jsonl"}
+{"file":"invalid/entity-missing-entry.tar.gz","reason":"invalid backup archive: entities/books.jsonl is missing"}
+{"file":"invalid/kv-unknown-field.tar.gz","reason":"invalid backup archive: kv/keys.jsonl, entry 1: ⟨go:json⟩"}
+{"file":"invalid/kv-key-number.tar.gz","reason":"invalid backup archive: kv/keys.jsonl, entry 1: ⟨go:json⟩"}
+{"file":"invalid/kv-expiry-out-of-range.tar.gz","reason":"invalid backup archive: kv/keys.jsonl, entry 1: ⟨go:json⟩"}
+{"file":"invalid/kv-expiry-float.tar.gz","reason":"invalid backup archive: kv/keys.jsonl, entry 1: ⟨go:json⟩"}
+{"file":"invalid/kv-garbage.tar.gz","reason":"invalid backup archive: kv/keys.jsonl, entry 1: ⟨go:json⟩"}
+{"file":"invalid/kv-array.tar.gz","reason":"invalid backup archive: kv/keys.jsonl, entry 1: ⟨go:json⟩"}
+{"file":"invalid/kv-empty-key.tar.gz","reason":"invalid backup archive: kv/keys.jsonl, entry 1: invalid key \"\""}
+{"file":"invalid/kv-api-key.tar.gz","reason":"invalid backup archive: kv/keys.jsonl, entry 1: invalid key \"api:entity:x\""}
+{"file":"invalid/kv-duplicate-key.tar.gz","reason":"invalid backup archive: kv/keys.jsonl, entry 2: duplicate key \"a\""}
+{"file":"invalid/kv-negative-expiry.tar.gz","reason":"invalid backup archive: kv/keys.jsonl, entry 1: invalid expiration -5"}
+{"file":"invalid/kv-bad-base64.tar.gz","reason":"invalid backup archive: kv/keys.jsonl, entry 1: invalid base64 value"}
+{"file":"invalid/kv-unknown-encoding.tar.gz","reason":"invalid backup archive: kv/keys.jsonl, entry 1: unknown encoding \"hex\""}
+{"file":"invalid/kv-count-mismatch.tar.gz","reason":"invalid backup archive: kv/keys.jsonl holds 2 entries, the manifest announces 5"}
+{"file":"invalid/kv-checksum-mismatch.tar.gz","reason":"invalid backup archive: checksum mismatch for kv/keys.jsonl"}
+{"file":"invalid/kv-missing-entry.tar.gz","reason":"invalid backup archive: kv/keys.jsonl is missing"}
+{"file":"invalid/unexpected-trailing-file.tar.gz","reason":"invalid backup archive: unexpected file extra.json"}
+{"file":"invalid/unexpected-trailing-folder.tar.gz","reason":"invalid backup archive: unexpected file extra/"}
+{"file":"valid/two-gzip-members.tar.gz","reason":null}
+{"file":"valid/typeflag-nul.tar.gz","reason":null}
+{"file":"valid/kv-case-insensitive.tar.gz","reason":null}
+{"file":"valid/kv-expired-and-live.tar.gz","reason":null}
+{"file":"valid/documents-without-separators.tar.gz","reason":null}
+{"file":"valid/manifest-extra-keys.tar.gz","reason":null}
+{"file":"valid/raw-documents.tar.gz","reason":null}
+{"file":"valid/empty-entities.tar.gz","reason":null}

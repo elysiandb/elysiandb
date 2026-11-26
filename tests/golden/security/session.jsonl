@@ -1,0 +1,11 @@
+{"fn":"hashSessionID","id":"","token_hash":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+{"fn":"hashSessionID","id":"abc","token_hash":"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"}
+{"fn":"hashSessionID","id":"0000000000000000000000000000000000000000000000000000000000000000","token_hash":"60e05bd1b195af2f94112fa7197a5c88289058840ce7c6df9693756bc6250f55"}
+{"fn":"hashSessionID","id":"session-id-1","token_hash":"14cfca0a6d955280ebdc3d1f762426a26b39b698cf005ff977319b22d95120b8"}
+{"bcrypt":"","credentials":"e3b0c44298fc1c149afbf4c8996fb924","fn":"credentialsFingerprint"}
+{"bcrypt":"$2a$10$7AsfOfdfjHszYXGJf457ReAXadHfICVbqMJwPvXbgco4h/RGSosr2","credentials":"31adf56726be7237f3582ee7a574c973","fn":"credentialsFingerprint"}
+{"bcrypt":"$2a$10$xyz","credentials":"7292cf6bd0c27b835e2a2a5e734d9ab8","fn":"credentialsFingerprint"}
+{"fn":"sessions_file","sessions_file_hex":"7b2273657373696f6e73223a5b7b22746f6b656e5f68617368223a223c69643e222c22757365726e616d65223a2261646d696e222c22726f6c65223a2261646d696e222c2263726564656e7469616c73223a226633646663316133663839343731313336316537356438653637636637323235222c22657870697265735f6174223a3c6e6f772b38363430303e7d5d7d0a","step":"create"}
+{"fn":"GetSession","found":true}
+{"fn":"sessions_file","sessions_file_hex":"7b2273657373696f6e73223a6e756c6c7d0a","step":"delete-last"}
+{"fn":"sessions_file","sessions_file_hex":"7b2273657373696f6e73223a5b5d7d0a","step":"delete-user-sessions"}

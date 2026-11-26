@@ -1,0 +1,39 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.r = [(1234567.891).toLocaleString(), new Date(0).toLocaleTimeString(), \"a\".toLocaleUpperCase()]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.newArray	3
+  4	goja.loadVal	{v:1.234567891e+06}
+  5	goja.getPropCallee	"toLocaleString"
+  6	goja.call	0
+  7	goja._pushArrayItem	{}
+  8	goja.loadDynamic	"Date"
+  9	goja.loadVal	{v:0}
+  10	goja._new	1
+  11	goja.getPropCallee	"toLocaleTimeString"
+  12	goja.call	0
+  13	goja._pushArrayItem	{}
+  14	goja.loadVal	{v:"a"}
+  15	goja.getPropCallee	"toLocaleUpperCase"
+  16	goja.call	0
+  17	goja._pushArrayItem	{}
+  18	goja.setPropP	"r"
+  19	goja._loadUndef	{}
+  20	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  6	69
+  8	77
+  10	73
+  12	103
+  16	128
+  18	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

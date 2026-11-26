@@ -1,59 +1,47 @@
 tcp_benchmark:
-	./elysian_bench -addr 127.0.0.1:8088   -vus 500 -duration 20s -keys 20000 -payload 16 -pair
+	cargo run --release --locked --bin elysian_bench -- -addr 127.0.0.1:8088   -vus 500 -duration 20s -keys 20000 -payload 16 -pair
 http_benchmark:
 	BASE_URL=http://localhost:8089 KEYS=5000 VUS=200 DURATION=30s k6 run elysian_k6.js
 api_benchmark:
 	BASE_URL=http://localhost:8089 KEYS=5000 VUS=200 DURATION=30s k6 run elysian_api_k6.js
 
-COVERPKG := $(shell go list ./... | tr '\n' ',' | sed 's/,$$//')
+VERSION ?= $(or $(if $(wildcard .git),$(shell git describe --tags --always --dirty 2>/dev/null)),dev)
+CARGO_TARGET_DIR ?= target
+COVERAGE_SKIPS = $(shell python3 .github/ci/tests.py skip-args)
+UNINSTRUMENTED_TESTS = $(shell python3 .github/ci/tests.py filter-args)
 
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//')
-LDFLAGS := -X github.com/taymour/elysiandb/internal/globals.VERSION=$(VERSION)
-
-.PHONY: test test-e2e-http test-unit test-cover build bench bench-compare
-
-BENCH_COUNT ?= 5
-BENCH_TIME ?= 2s
-BENCH_BASE ?= origin/main
-
-bench:
-	go test ./test/bench -run '^$$' -bench . -benchmem -benchtime $(BENCH_TIME) -count $(BENCH_COUNT) | tee bench.new.txt
-
-bench-compare: bench
-	@rm -rf .bench-base && git worktree add -q .bench-base $(BENCH_BASE)
-	@mkdir -p .bench-base/test/bench && cp test/bench/bench_test.go .bench-base/test/bench/
-	cd .bench-base && go test ./test/bench -run '^$$' -bench . -benchmem -benchtime $(BENCH_TIME) -count $(BENCH_COUNT) | tee ../bench.base.txt
-	@git worktree remove --force .bench-base
-	@if command -v benchstat >/dev/null; then benchstat bench.base.txt bench.new.txt; else echo "install benchstat (golang.org/x/perf/cmd/benchstat) to compare bench.base.txt and bench.new.txt"; fi
+.PHONY: test test-e2e-http test-unit test-cover test-cover-group test-uninstrumented build
 
 test:
-	@pkgs=$$(go list -f '{{if or (len .TestGoFiles) (len .XTestGoFiles)}}{{.ImportPath}}{{end}}' ./... | grep -v '^$$'); \
-	if [ -z "$$pkgs" ]; then echo "no test packages"; exit 0; fi; \
-	go test $$pkgs -v -race -count=1
+	cargo test --workspace --locked --release -- --test-threads=1
 
 test-e2e-http:
-	go test ./test/e2e/http -v -race -count=1
+	cargo test --locked --release --test e2e_http -- --test-threads=1
 
 test-unit:
-	@pkgs=$$(go list ./... | grep -v '^github.com/[^/]*/[^/]*/test/'); \
-	if [ -z "$$pkgs" ]; then echo "no unit test packages"; exit 0; fi; \
-	go test $$pkgs -v -race -count=1
+	cargo test --workspace --locked --release --lib --bins
 
 test-cover:
-	@pkgs=$$(go list -f '{{if or (len .TestGoFiles) (len .XTestGoFiles)}}{{.ImportPath}}{{end}}' ./... | grep -v '^$$'); \
-	if [ -z "$$pkgs" ]; then echo "no test packages"; exit 0; fi; \
-	go test $$pkgs -race -coverprofile=coverage.out -coverpkg=$(COVERPKG) -count=1 && \
-	go tool cover -func=coverage.out
+	@python3 .github/ci/tests.py skip-args > /dev/null
+	cargo llvm-cov --workspace --locked --release --no-fail-fast --lcov --output-path lcov.info -- --test-threads=1 $(COVERAGE_SKIPS) && cargo llvm-cov report --summary-only
+
+test-cover-group:
+	@python3 .github/ci/tests.py targets "$(GROUP)" > /dev/null
+	cargo llvm-cov --workspace --locked --release --no-fail-fast --lcov --output-path lcov.info $(shell python3 .github/ci/tests.py targets "$(GROUP)") -- --test-threads=1 $(COVERAGE_SKIPS) && cargo llvm-cov report --summary-only
+
+test-uninstrumented:
+	@python3 .github/ci/tests.py filter-args > /dev/null
+	cargo test --workspace --locked --release --lib --bins --tests --no-fail-fast -- --test-threads=1 $(UNINSTRUMENTED_TESTS)
 
 build:
-	go build -ldflags "$(LDFLAGS)" -o elysiandb .
+	ELYSIANDB_VERSION="$(VERSION)" cargo build --release --locked --bin elysiandb && cp "$(CARGO_TARGET_DIR)/release/elysiandb" ./elysiandb
 
 install:
 	rm -f /usr/local/bin/elysiandb
-	go build -ldflags "$(LDFLAGS)" -o /usr/local/bin/elysiandb .
+	ELYSIANDB_VERSION="$(VERSION)" cargo build --release --locked --bin elysiandb && cp "$(CARGO_TARGET_DIR)/release/elysiandb" /usr/local/bin/elysiandb
 
 server:
-	go run -ldflags "$(LDFLAGS)" . server
+	ELYSIANDB_VERSION="$(VERSION)" cargo run --release --locked --bin elysiandb -- server
 
 run: build-admin server
 

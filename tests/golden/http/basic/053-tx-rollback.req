@@ -1,0 +1,6 @@
+POST /api/tx/{{tx2}}/rollback HTTP/1.1
+Host: h
+Connection: close
+Authorization: Basic YWRtaW46YWRtaW4=
+Content-Length: 0
+

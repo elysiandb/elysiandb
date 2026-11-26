@@ -1,0 +1,247 @@
+[package]
+name = "elysiandb"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.91.1"
+license = "MIT"
+publish = false
+build = "build.rs"
+default-run = "elysiandb"
+
+[workspace]
+members = ["crates/gocompat", "crates/talos"]
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "elysiandb"
+path = "src/main.rs"
+
+[[bin]]
+name = "elysian_bench"
+path = "src/bin/elysian_bench.rs"
+
+[dependencies]
+arc-swap = "=1.7.1"
+gocompat = { path = "crates/gocompat" }
+talos = { path = "crates/talos" }
+libc = "=0.2.191"
+mimalloc = "=0.1.52"
+rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-native-certs = "=0.8.5"
+
+[[test]]
+name = "pagetree_test"
+path = "tests/internal/pagetree_test/main.rs"
+
+[[test]]
+name = "ptree_test"
+path = "tests/internal/ptree_test/main.rs"
+
+[[test]]
+name = "memory_test"
+path = "tests/internal/memory_test/main.rs"
+
+[[test]]
+name = "golden_engine"
+path = "tests/golden_engine/main.rs"
+
+[[test]]
+name = "golden_persistence"
+path = "tests/golden_persistence/main.rs"
+
+[[test]]
+name = "datastore_test"
+path = "tests/internal/datastore_test/main.rs"
+
+[[test]]
+name = "durable_test"
+path = "tests/internal/durable_test/main.rs"
+
+[[test]]
+name = "journal_test"
+path = "tests/internal/journal_test/main.rs"
+
+[[test]]
+name = "legacy_test"
+path = "tests/internal/legacy_test/main.rs"
+
+[[test]]
+name = "log_test"
+path = "tests/internal/log_test/main.rs"
+
+[[test]]
+name = "backup_test"
+path = "tests/internal/backup_test/main.rs"
+
+[[test]]
+name = "golden_ops"
+path = "tests/golden_ops/main.rs"
+
+[[test]]
+name = "configuration_test"
+path = "tests/internal/configuration_test/main.rs"
+
+[[test]]
+name = "globals_test"
+path = "tests/internal/globals_test/main.rs"
+
+[[test]]
+name = "storage_test"
+path = "tests/internal/storage_test/main.rs"
+
+[[test]]
+name = "schema_test"
+path = "tests/internal/schema_test/main.rs"
+
+[[test]]
+name = "cache_test"
+path = "tests/internal/cache_test/main.rs"
+
+[[test]]
+name = "api_test"
+path = "tests/internal/api_test/main.rs"
+
+[[test]]
+name = "golden_api"
+path = "tests/golden_api/main.rs"
+
+[[test]]
+name = "stat_test"
+path = "tests/internal/stat_test/main.rs"
+
+[[test]]
+name = "transaction_test"
+path = "tests/internal/transaction_test/main.rs"
+
+[[test]]
+name = "metrics_test"
+path = "tests/internal/metrics_test/main.rs"
+
+[[test]]
+name = "tcp_parsing_test"
+path = "tests/internal/transport_test/tcp_test/parsing_test/main.rs"
+
+[[test]]
+name = "tcp_handler_test"
+path = "tests/internal/transport_test/tcp_test/handler/main.rs"
+
+[[test]]
+name = "tcp_routing_test"
+path = "tests/internal/transport_test/tcp_test/tcp_routing_test/main.rs"
+
+[[test]]
+name = "security_test"
+path = "tests/internal/security_test/main.rs"
+
+[[test]]
+name = "acl_test"
+path = "tests/internal/acl_test/main.rs"
+
+[[test]]
+name = "http_security_test"
+path = "tests/internal/transport_test/http_test/api_test/security_test/main.rs"
+
+[[test]]
+name = "http_acl_test"
+path = "tests/internal/transport_test/http_test/acl_test/main.rs"
+
+[[test]]
+name = "http_adminui_test"
+path = "tests/internal/transport_test/http_test/adminui_test/main.rs"
+
+[[test]]
+name = "http_observe_test"
+path = "tests/internal/transport_test/http_test/observe_test/main.rs"
+
+[[test]]
+name = "http_monitoring_test"
+path = "tests/internal/transport_test/http_test/monitoring_test/main.rs"
+
+[[test]]
+name = "http_controller_test"
+path = "tests/internal/transport_test/http_test/controller_test/main.rs"
+
+[[test]]
+name = "byte_ids_test"
+path = "tests/byte_ids/main.rs"
+
+[[test]]
+name = "golden_security"
+path = "tests/golden_security/main.rs"
+
+[[test]]
+name = "bcrypt_test"
+path = "tests/crypto/bcrypt_test/main.rs"
+
+[[test]]
+name = "blowfish_test"
+path = "tests/crypto/blowfish_test/main.rs"
+
+[[test]]
+name = "flate_test"
+path = "tests/archive/flate_test/main.rs"
+
+[[test]]
+name = "gzip_test"
+path = "tests/archive/gzip_test/main.rs"
+
+[[test]]
+name = "tar_test"
+path = "tests/archive/tar_test/main.rs"
+
+[[test]]
+name = "httpd_test"
+path = "tests/internal/httpd_test/main.rs"
+
+[[test]]
+name = "httprouter_test"
+path = "tests/internal/httprouter_test/main.rs"
+
+[[test]]
+name = "golden_http"
+path = "tests/golden_http/main.rs"
+
+[profile.release]
+strip = true
+panic = "unwind"
+
+[profile.dev]
+panic = "unwind"
+
+[[test]]
+name = "hook_test"
+path = "tests/internal/hook_test/main.rs"
+
+[[test]]
+name = "http_hook_test"
+path = "tests/internal/transport_test/http_test/api_test/hook_test/main.rs"
+
+[[test]]
+name = "routing_test"
+path = "tests/internal/routing_test/main.rs"
+
+[[test]]
+name = "http_api_test"
+path = "tests/internal/transport_test/http_test/api_test/main.rs"
+
+[[test]]
+name = "http_transaction_test"
+path = "tests/internal/transport_test/http_test/api_test/transaction_test/main.rs"
+
+[[test]]
+name = "cmd_test"
+path = "tests/internal/cmd_test/main.rs"
+
+[[test]]
+name = "boot_test"
+path = "tests/internal/boot_test/main.rs"
+
+[[test]]
+name = "e2e_http"
+path = "tests/e2e_http/main.rs"
+
+[[test]]
+name = "additions"
+path = "tests/additions/main.rs"

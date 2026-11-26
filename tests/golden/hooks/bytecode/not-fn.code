@@ -1,0 +1,8 @@
+func: ""
+code:
+0	*goja.bindGlobal	&{vars:["postRead"] funcs:[] lets:[] consts:[] deletable:false}
+1	goja.resolveVar1	"postRead"
+2	goja.loadVal	{v:5}
+3	goja._initValueP	{}
+positions:
+3	4

@@ -1,0 +1,66 @@
+{
+  "data": {
+    "entities": [
+      {
+        "documents": [
+          {
+            "id_hex": "32",
+            "json": "{\"t\":2}"
+          },
+          {
+            "id_hex": "31",
+            "json": "{\"t\":1}"
+          },
+          {
+            "id_hex": "33",
+            "json": "{\"t\":3}"
+          }
+        ],
+        "entity_hex": "626f6f6b"
+      },
+      {
+        "documents": [],
+        "entity_hex": "617574686f72"
+      },
+      {
+        "documents": [
+          {
+            "id_hex": "61",
+            "json": "{\"t\":\"a\"}"
+          }
+        ],
+        "entity_hex": "616c706861"
+      },
+      {
+        "documents": [
+          {
+            "id_hex": "7a",
+            "json": "{\"t\":\"z\"}"
+          }
+        ],
+        "entity_hex": "7a657461"
+      }
+    ],
+    "expirations": [],
+    "kv": [
+      {
+        "key_hex": "6170693a656e746974793a626f6f6b3a696e7465726e616c3a696e6465783a6964",
+        "value_hex": "320a310a320a67686f73740a0a"
+      },
+      {
+        "key_hex": "6170693a656e746974793a74797065733a6c697374",
+        "value_hex": "626f6f6b0a0a617574686f720a626f6f6b0a"
+      }
+    ],
+    "replayed": 0,
+    "types_hex": [
+      "626f6f6b",
+      "617574686f72",
+      "616c706861",
+      "7a657461"
+    ]
+  },
+  "now": 1800000000,
+  "present": true,
+  "replay": true
+}

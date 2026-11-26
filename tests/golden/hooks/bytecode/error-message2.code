@@ -1,0 +1,77 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\ntry { undefined() } catch (e) { ctx.entity.r = e.message }; try { var o = {}; o.f() } catch (e) { ctx.entity.r2 = e.message }; try { x.y } catch (e) { ctx.entity.r3 = e.message }\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:1 args:1}
+  1	goja.try	{catchOffset:5 finallyOffset:0}
+  2	goja.loadDynamicCallee	"undefined"
+  3	goja.call	0
+  4	goja._pop	{}
+  5	goja.jump	8
+  6	*goja.enterBlock	&{names:map[] stashSize:0 stackSize:0}
+  7	goja.loadStackLex	-1
+  8	goja.getProp	"entity"
+  9	goja.loadStackLex	2
+  10	goja.getProp	"message"
+  11	goja.setPropP	"r"
+  12	*goja.leaveBlock	&{stackSize:1 popStash:false}
+  13	goja.leaveTry	{}
+  14	goja.try	{catchOffset:8 finallyOffset:0}
+  15	goja._newObject	{}
+  16	goja.initStackP	1
+  17	goja.loadStack	1
+  18	goja.getPropCallee	"f"
+  19	goja.call	0
+  20	goja._pop	{}
+  21	goja.jump	8
+  22	*goja.enterBlock	&{names:map[] stashSize:0 stackSize:0}
+  23	goja.loadStackLex	-1
+  24	goja.getProp	"entity"
+  25	goja.loadStackLex	2
+  26	goja.getProp	"message"
+  27	goja.setPropP	"r2"
+  28	*goja.leaveBlock	&{stackSize:1 popStash:false}
+  29	goja.leaveTry	{}
+  30	goja.try	{catchOffset:5 finallyOffset:0}
+  31	goja.loadDynamic	"x"
+  32	goja.getProp	"y"
+  33	goja._pop	{}
+  34	goja.jump	8
+  35	*goja.enterBlock	&{names:map[] stashSize:0 stackSize:0}
+  36	goja.loadStackLex	-1
+  37	goja.getProp	"entity"
+  38	goja.loadStackLex	2
+  39	goja.getProp	"message"
+  40	goja.setPropP	"r3"
+  41	*goja.leaveBlock	&{stackSize:1 popStash:false}
+  42	goja.leaveTry	{}
+  43	goja._loadUndef	{}
+  44	goja._ret	{}
+  positions:
+  0	0
+  2	31
+  3	40
+  7	57
+  8	61
+  9	72
+  10	74
+  11	68
+  15	99
+  16	95
+  17	103
+  19	106
+  23	123
+  24	127
+  25	139
+  26	141
+  27	134
+  31	158
+  32	160
+  36	176
+  37	180
+  38	192
+  39	194
+  40	187
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

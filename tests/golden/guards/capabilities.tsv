@@ -1,0 +1,150 @@
+key	adminui
+key	adminui.enabled
+key	api
+key	api.cache
+key	api.cache.cleanupIntervalSeconds
+key	api.cache.enabled
+key	api.cache.maxEntryKB
+key	api.cache.maxMB
+key	api.hooks
+key	api.hooks.enabled
+key	api.hooks.requestBudgetMs
+key	api.hooks.timeoutMs
+key	api.index
+key	api.index.workers
+key	api.query
+key	api.query.cancelOnDisconnect
+key	api.query.maxQueued
+key	api.query.queueTimeoutMs
+key	api.query.timeoutMs
+key	api.query.workers
+key	api.response
+key	api.response.spoolMB
+key	api.schema
+key	api.schema.enabled
+key	api.schema.strict
+key	engine
+key	engine.name
+key	log
+key	log.accessLog
+key	log.bufferLines
+key	log.flushIntervalSeconds
+key	log.format
+key	log.level
+key	log.slowRequestMs
+key	monitoring
+key	monitoring.prometheus
+key	monitoring.prometheus.enabled
+key	monitoring.prometheus.token
+key	security
+key	security.authentication
+key	security.authentication.enabled
+key	security.authentication.mode
+key	security.authentication.token
+key	server
+key	server.http
+key	server.http.cors
+key	server.http.cors.allowedOrigins
+key	server.http.enabled
+key	server.http.host
+key	server.http.port
+key	server.http.readTimeoutSeconds
+key	server.http.trustedProxies
+key	server.http.writeTimeoutSeconds
+key	server.tcp
+key	server.tcp.cors
+key	server.tcp.cors.allowedOrigins
+key	server.tcp.enabled
+key	server.tcp.host
+key	server.tcp.port
+key	server.tcp.readTimeoutSeconds
+key	server.tcp.trustedProxies
+key	server.tcp.writeTimeoutSeconds
+key	stats
+key	stats.enabled
+key	store
+key	store.backup
+key	store.backup.everyMinutes
+key	store.backup.folder
+key	store.backup.keep
+key	store.crashRecovery
+key	store.crashRecovery.enabled
+key	store.crashRecovery.maxLogMB
+key	store.durability
+key	store.flushIntervalSeconds
+key	store.folder
+key	store.memory
+key	store.memory.limitMB
+key	store.minFreeDiskMB
+key	store.shards
+route	DELETE /api/hook/{entity}/{id}
+route	DELETE /api/security/user/{user_name}
+route	DELETE /api/tx/{txId}/entity/{entity}/{id}
+route	DELETE /api/{entity}
+route	DELETE /api/{entity}/{id}
+route	DELETE /kv/{key}
+route	GET /admin/{filepath:*}
+route	GET /api/acl/{user_name}
+route	GET /api/acl/{user_name}/{entity}
+route	GET /api/backup
+route	GET /api/entity/types
+route	GET /api/entity/types/name
+route	GET /api/export
+route	GET /api/hook/id/{id}
+route	GET /api/hook/{entity}
+route	GET /api/security/me
+route	GET /api/security/user
+route	GET /api/security/user/{user_name}
+route	GET /api/{entity}
+route	GET /api/{entity}/count
+route	GET /api/{entity}/schema
+route	GET /api/{entity}/{id}
+route	GET /api/{entity}/{id}/exists
+route	GET /config
+route	GET /health
+route	GET /kv/mget
+route	GET /kv/{key}
+route	GET /metrics
+route	GET /monitoring/details
+route	GET /monitoring/logs
+route	GET /monitoring/logs/download
+route	GET /monitoring/logs/level
+route	GET /monitoring/overview
+route	GET /monitoring/series
+route	GET /stats
+route	POST /api/hook/{entity}
+route	POST /api/import
+route	POST /api/query
+route	POST /api/restore
+route	POST /api/security/login
+route	POST /api/security/logout
+route	POST /api/security/user
+route	POST /api/tx/begin
+route	POST /api/tx/{txId}/commit
+route	POST /api/tx/{txId}/entity/{entity}
+route	POST /api/tx/{txId}/rollback
+route	POST /api/{entity}
+route	POST /api/{entity}/create
+route	POST /api/{entity}/migrate
+route	POST /reset
+route	POST /save
+route	PUT /api/acl/{user_name}/{entity}
+route	PUT /api/acl/{user_name}/{entity}/default
+route	PUT /api/hook/id/{id}
+route	PUT /api/security/user/{user_name}/password
+route	PUT /api/security/user/{user_name}/role
+route	PUT /api/tx/{txId}/entity/{entity}/{id}
+route	PUT /api/{entity}
+route	PUT /api/{entity}/schema
+route	PUT /api/{entity}/{id}
+route	PUT /kv/{key}
+route	PUT /monitoring/logs/level
+command	backup
+command	change-password
+command	create-user
+command	delete-user
+command	export-legacy
+command	help
+command	reset
+command	restore
+command	server

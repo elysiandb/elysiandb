@@ -1,0 +1,28 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.m = new Set([1, 2])\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadDynamic	"Set"
+  4	goja.newArray	2
+  5	goja.loadVal	{v:1}
+  6	goja._pushArrayItem	{}
+  7	goja.loadVal	{v:2}
+  8	goja._pushArrayItem	{}
+  9	goja._new	1
+  10	goja.setPropP	"m"
+  11	goja._loadUndef	{}
+  12	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	44
+  4	48
+  9	40
+  10	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

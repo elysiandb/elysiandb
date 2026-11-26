@@ -1,0 +1,8 @@
+PUT /api/book/b1 HTTP/1.1
+Host: h
+Connection: close
+Content-Type: application/json
+Authorization: Basic YWRtaW46YWRtaW4=
+Content-Length: 13
+
+{"year":1966}

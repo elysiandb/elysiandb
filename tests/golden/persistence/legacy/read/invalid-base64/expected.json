@@ -1,0 +1,10 @@
+{
+  "error": {
+    "file": "elysiandb.json",
+    "offset": 0,
+    "wrapped": "base64"
+  },
+  "now": 1800000000,
+  "present": true,
+  "replay": true
+}

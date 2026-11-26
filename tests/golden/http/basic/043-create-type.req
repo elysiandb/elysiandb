@@ -1,0 +1,8 @@
+POST /api/movie/create HTTP/1.1
+Host: h
+Connection: close
+Content-Type: application/json
+Authorization: Basic YWRtaW46YWRtaW4=
+Content-Length: 54
+
+{"fields":{"title":{"type":"string","required":true}}}

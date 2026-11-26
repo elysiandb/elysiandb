@@ -1,0 +1,220 @@
+{"allowed":true,"fn":"OriginIsAllowed","origin":"http://allowed.test"}
+{"allowed":true,"fn":"OriginIsAllowed","origin":"HTTP://ALLOWED.TEST"}
+{"allowed":false,"fn":"OriginIsAllowed","origin":"http://allowed.test/"}
+{"allowed":true,"fn":"OriginIsAllowed","origin":"https://upper.test"}
+{"allowed":true,"fn":"OriginIsAllowed","origin":"http://kelvin.test"}
+{"allowed":true,"fn":"OriginIsAllowed","origin":"http://Kelvin.test"}
+{"allowed":false,"fn":"OriginIsAllowed","origin":"http://other.test"}
+{"allowed":false,"fn":"OriginIsAllowed","origin":""}
+{"allowed":false,"fn":"OriginIsAllowed","origin":"null"}
+{"allowed":false,"fn":"OriginIsAllowed","origin":"*"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://allowed.test","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://h","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://h","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://h","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://h","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://h","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://evil.test","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://evil.test","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://evil.test","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://evil.test","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://evil.test","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"not a url","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"not a url","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"not a url","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"not a url","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"not a url","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://H","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://H","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://H","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://H","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"GET","origin":"http://H","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://allowed.test","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://h","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://h","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://h","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://h","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://h","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://evil.test","rejected":true,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://evil.test","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://evil.test","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://evil.test","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://evil.test","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"not a url","rejected":true,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"not a url","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"not a url","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"not a url","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"not a url","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://H","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://H","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://H","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://H","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"POST","origin":"http://H","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://allowed.test","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://h","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://h","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://h","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://h","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://h","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://evil.test","rejected":true,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://evil.test","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://evil.test","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://evil.test","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://evil.test","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"not a url","rejected":true,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"not a url","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"not a url","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"not a url","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"not a url","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://H","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://H","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://H","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://H","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PUT","origin":"http://H","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://allowed.test","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://h","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://h","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://h","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://h","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://h","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://evil.test","rejected":true,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://evil.test","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://evil.test","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://evil.test","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://evil.test","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"not a url","rejected":true,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"not a url","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"not a url","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"not a url","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"not a url","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://H","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://H","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://H","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://H","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"DELETE","origin":"http://H","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://allowed.test","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://h","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://h","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://h","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://h","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://h","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://evil.test","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://evil.test","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://evil.test","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://evil.test","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://evil.test","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"not a url","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"not a url","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"not a url","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"not a url","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"not a url","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://H","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://H","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://H","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://H","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"OPTIONS","origin":"http://H","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://allowed.test","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://h","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://h","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://h","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://h","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://h","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://evil.test","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://evil.test","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://evil.test","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://evil.test","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://evil.test","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"not a url","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"not a url","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"not a url","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"not a url","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"not a url","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://H","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://H","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://H","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://H","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"HEAD","origin":"http://H","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://allowed.test","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://allowed.test","rejected":false,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://h","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://h","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://h","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://h","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://h","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://evil.test","rejected":true,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://evil.test","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://evil.test","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://evil.test","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://evil.test","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"not a url","rejected":true,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"not a url","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"not a url","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"not a url","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"not a url","rejected":true,"sec_fetch_site":"same-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://H","rejected":false,"sec_fetch_site":""}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://H","rejected":false,"sec_fetch_site":"same-origin"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://H","rejected":false,"sec_fetch_site":"none"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://H","rejected":true,"sec_fetch_site":"cross-site"}
+{"fn":"CrossOriginWriteIsRejected","host":"h","method":"PATCH","origin":"http://H","rejected":true,"sec_fetch_site":"same-site"}

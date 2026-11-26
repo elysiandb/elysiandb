@@ -1,0 +1,62 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.g = JSON.stringify(ctx.group(\"order\", {}, \"group\", \"amount\")); ctx.entity.c = ctx.count(\"order\", {}); ctx.entity.s9 = ctx.sum(\"order\", {}, \"amount\")\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadDynamic	"JSON"
+  4	goja.getPropCallee	"stringify"
+  5	goja.loadStackLex	-1
+  6	goja.getPropCallee	"group"
+  7	goja.loadVal	{v:"order"}
+  8	goja._newObject	{}
+  9	goja.loadVal	{v:"group"}
+  10	goja.loadVal	{v:"amount"}
+  11	goja.call	4
+  12	goja.call	1
+  13	goja.setPropP	"g"
+  14	goja.loadStackLex	-1
+  15	goja.getProp	"entity"
+  16	goja.loadStackLex	-1
+  17	goja.getPropCallee	"count"
+  18	goja.loadVal	{v:"order"}
+  19	goja._newObject	{}
+  20	goja.call	2
+  21	goja.setPropP	"c"
+  22	goja.loadStackLex	-1
+  23	goja.getProp	"entity"
+  24	goja.loadStackLex	-1
+  25	goja.getPropCallee	"sum"
+  26	goja.loadVal	{v:"order"}
+  27	goja._newObject	{}
+  28	goja.loadVal	{v:"amount"}
+  29	goja.call	3
+  30	goja.setPropP	"s9"
+  31	goja._loadUndef	{}
+  32	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  5	55
+  8	74
+  11	64
+  12	54
+  13	36
+  14	99
+  15	103
+  16	114
+  19	133
+  20	123
+  21	110
+  22	138
+  23	142
+  24	154
+  27	171
+  29	161
+  30	149
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

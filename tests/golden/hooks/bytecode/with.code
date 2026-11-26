@@ -1,0 +1,26 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { with (ctx.entity) { ctx.entity.w = price } }" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja._enterWith	{}
+  4	*goja.loadMixedStackLex	&{name:"ctx" idx:-1 level:1 callee:false}
+  5	goja.getProp	"entity"
+  6	goja.loadDynamic	"price"
+  7	goja.setPropP	"w"
+  8	goja._leaveWith	{}
+  9	goja._loadUndef	{}
+  10	goja._ret	{}
+  positions:
+  0	0
+  1	31
+  2	35
+  4	45
+  5	49
+  6	60
+  7	56
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

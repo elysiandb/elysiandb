@@ -1,0 +1,19 @@
+{
+  "part": "gomath",
+  "baseline": "1a11e5e",
+  "go_version": "go1.24.7",
+  "goos": "darwin",
+  "goarch": "arm64",
+  "files": [
+    {
+      "path": "amd64.cases",
+      "size": 2610984,
+      "sha256": "2ec130d7b31a1da4888088dbf822198920ec601e67f0f9b73ee95765c5387efa"
+    },
+    {
+      "path": "arm64.cases",
+      "size": 2610984,
+      "sha256": "6de46e0de36ad28d1a8b203c94dc55415423daa9b7166d9b290a040f270e4786"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.r = \"aaa\".replace(/a/y, \"b\")\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadVal	{v:"aaa"}
+  4	goja.getPropCallee	"replace"
+  5	*goja.newRegexp	&{pattern:&{src:"a" global:false ignoreCase:false multiline:false dotAll:false sticky:true unicode:false regexpWrapper:&{expr:"a" prog:<syntax.Prog> onepass:<regexp.onePassProg> numSubexp:0 maxBitStateLen:87381 subexpNames:[""] prefix:"a" prefixBytes:[97] prefixRune:97 prefixEnd:0 mpool:0 matchcap:2 prefixComplete:true cond:0 minInputLen:1 longest:false} regexp2Wrapper:<nil>} src:"a"}
+  6	goja.loadVal	{v:"b"}
+  7	goja.call	2
+  8	goja.setPropP	"r"
+  9	goja._loadUndef	{}
+  10	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  7	53
+  8	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

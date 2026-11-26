@@ -1,0 +1,86 @@
+{
+  "steps": [
+    {
+      "len": 2000,
+      "ops": {
+        "put": {
+          "from": 0,
+          "key": "key-%08d",
+          "to": 2000,
+          "value": "32 bytes, byte j = ((j+i)*31+7)\u00260xff"
+        }
+      },
+      "root": {
+        "id": "25769814886",
+        "size": 1490
+      },
+      "step": "put",
+      "tree": "a"
+    },
+    {
+      "len": 300,
+      "ops": {
+        "delete": "keys i and i+1 for i = 0, 5, 10 … 495",
+        "put": {
+          "from": 0,
+          "to": 500
+        }
+      },
+      "root": {
+        "id": "30064781486",
+        "size": 362
+      },
+      "step": "put-delete",
+      "tree": "b"
+    },
+    {
+      "len": 5000,
+      "ops": {
+        "keys": "sorted fmt(\"f\\x00title\\x00%08d\\x00%06d\", i*7%5000, i) for i \u003c 5000",
+        "values": null
+      },
+      "root": {
+        "id": "64424523765",
+        "size": 110
+      },
+      "step": "from-sorted",
+      "tree": "c-index"
+    },
+    {
+      "len": 3000,
+      "ops": {
+        "keys": "big-endian uint32 seq 1..3000",
+        "values": "encodeSlot{seq, id key-%08d(i), lsn i+10, segment 1+i/100, offset 16+i*40, length i%97}"
+      },
+      "root": {
+        "id": "85899358880",
+        "size": 36
+      },
+      "step": "from-sorted",
+      "tree": "c-slots"
+    },
+    {
+      "len": 0,
+      "ops": null,
+      "root": null,
+      "step": "empty",
+      "tree": "d"
+    },
+    {
+      "len": 2000,
+      "ops": {
+        "put": "key-%08d(i*17) for i \u003c 100, 48 bytes, byte j = ((j+i+1000)*31+7)\u00260xff"
+      },
+      "root": {
+        "id": "111669151210",
+        "size": 1490
+      },
+      "step": "update-after-flush",
+      "tree": "e"
+    }
+  ],
+  "store": {
+    "limit": "1073741824",
+    "segment_size": 16384
+  }
+}

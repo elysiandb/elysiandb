@@ -1,0 +1,57 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nvar a = ctx.query(\"order\", {}); var o = {k: 1}; a[0].obj = o; o.k = 2; ctx.entity.r = a[0].obj.k\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:2 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getPropCallee	"query"
+  3	goja.loadVal	{v:"order"}
+  4	goja._newObject	{}
+  5	goja.call	2
+  6	goja.initStackP	1
+  7	goja._newObject	{}
+  8	goja.loadVal	{v:1}
+  9	goja.putProp	"k"
+  10	goja.initStackP	2
+  11	goja.loadStack	1
+  12	goja.loadVal	{v:0}
+  13	goja._getElem	{}
+  14	goja.loadStack	2
+  15	goja.setPropP	"obj"
+  16	goja.loadStack	2
+  17	goja.loadVal	{v:2}
+  18	goja.setPropP	"k"
+  19	goja.loadStackLex	-1
+  20	goja.getProp	"entity"
+  21	goja.loadStack	1
+  22	goja.loadVal	{v:0}
+  23	goja._getElem	{}
+  24	goja.getProp	"obj"
+  25	goja.getProp	"k"
+  26	goja.setPropP	"r"
+  27	goja._loadUndef	{}
+  28	goja._ret	{}
+  positions:
+  0	0
+  1	33
+  4	52
+  5	42
+  6	29
+  7	65
+  10	61
+  11	73
+  13	74
+  14	84
+  15	78
+  16	87
+  18	89
+  19	96
+  20	100
+  21	111
+  23	112
+  24	116
+  25	120
+  26	107
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

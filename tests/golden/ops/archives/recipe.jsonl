@@ -1,0 +1,27 @@
+{"args":["restore","\u003cfile\u003e","--force"],"dataset":"api","file":"seed/seed.tar.gz","op":"restore","seq":0}
+{"body":"{\"id\":\"f1\",\"title\":\"plain\",\"n\":1}","dataset":"api","method":"POST","op":"http","path":"/api/books","seq":1,"status":200}
+{"body":"{\"id\":\"s1\",\"title\":\"\u003cb\u003e \u0026 \u003c/b\u003e\",\"n\":1e21,\"small\":1.5e-7,\"neg\":-0.0}","dataset":"api","method":"POST","op":"http","path":"/api/books","seq":2,"status":200}
+{"body":"{\"id\":\"s2\",\"line\":\"a\u2028b\",\"big\":12345678901234567890,\"accent\":\"\\u00e9t\\u00e9\"}","dataset":"api","method":"POST","op":"http","path":"/api/books","seq":3,"status":200}
+{"body":"{\"id\":\"n1\",\"nested\":{\"a\":[1,2.5,{\"b\":\"c\"}],\"empty\":{},\"nil\":null,\"t\":true}}","dataset":"api","method":"POST","op":"http","path":"/api/books","seq":4,"status":200}
+{"body":"{\"id\":\"q\\\"1\",\"title\":\"quote in id\"}","dataset":"api","method":"POST","op":"http","path":"/api/books","seq":5,"status":200}
+{"body":"{\"fields\":{\"name\":{\"type\":\"string\",\"required\":true},\"age\":{\"type\":\"number\"}}}","dataset":"api","method":"POST","op":"http","path":"/api/authors/create","seq":6,"status":200}
+{"body":"{\"id\":\"a1\",\"name\":\"Ann\",\"age\":40}","dataset":"api","method":"POST","op":"http","path":"/api/authors","seq":7,"status":200}
+{"body":"{\"id\":\"1\"}","dataset":"api","method":"POST","op":"http","path":"/api/x:y","seq":8,"status":200}
+{"body":"{\"id\":\"1\"}","dataset":"api","method":"POST","op":"http","path":"/api/my%20books","seq":9,"status":200}
+{"body":"{\"id\":\"1\"}","dataset":"api","method":"POST","op":"http","path":"/api/a+b@c!~","seq":10,"status":200}
+{"body":"{\"id\":\"1\"}","dataset":"api","method":"POST","op":"http","path":"/api/uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu","seq":11,"status":200}
+{"body":"{\"id\":\"1\"}","dataset":"api","method":"POST","op":"http","path":"/api/pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp","seq":12,"status":200}
+{"body":"{\"id\":\"1\"}","dataset":"api","method":"POST","op":"http","path":"/api/qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq","seq":13,"status":200}
+{"dataset":"api","op":"tcp","reply":"OK\n","send":"SET plain value\r\n","seq":14}
+{"dataset":"api","op":"tcp","reply":"OK\n","send":"SET spaced  two  spaces \r\n","seq":15}
+{"dataset":"api","op":"tcp","reply":"OK\n","send":"SET ctl a\u0001bc\td\u001fe\r\n","seq":16}
+{"dataset":"api","op":"tcp","reply":"OK\n","send_b64":"U0VUIGJpbiD//gB6DQo=","seq":17}
+{"dataset":"api","op":"tcp","reply":"OK\n","send_b64":"U0VUIGJhZP9rZXkgdg0K","seq":18}
+{"dataset":"api","op":"tcp","reply":"OK\n","send":"SET html \u003c\u0026\u003e\"\\\r\n","seq":19}
+{"dataset":"api","op":"tcp","reply":"OK\n","send":"SET emptyval \r\n","seq":20}
+{"dataset":"api","op":"tcp","reply":"OK\n","send":"SET TTL=1 gone v\r\n","seq":21}
+{"dataset":"api","ms":2100,"op":"sleep","seq":22}
+{"dataset":"api","op":"tcp","reply":"gone=not found\n","send":"GET gone\r\n","seq":23}
+{"args":["restore","\u003cfile\u003e","--force"],"dataset":"seed-only","file":"seed/seed.tar.gz","op":"restore","seq":0}
+{"args":["restore","\u003cfile\u003e","--force"],"dataset":"large","file":"seed/seed.tar.gz","op":"restore","seq":0}
+{"body_head":"{\"id\":\"","body_mid":"\",\"t\":\"\u003c\",\"items\":[","body_tail":"{\"a\":1}]}","count":20,"dataset":"large","id_prefix":"big-","id_width":2,"item":"{\"a\":1,\"b\":\"xyz\"},","items":3000,"method":"POST","op":"http_repeat","path":"/api/big","seq":1,"statuses":{"200":20}}

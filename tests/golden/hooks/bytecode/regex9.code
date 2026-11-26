@@ -1,0 +1,66 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.r = [\"aBc\".match(/b/i).index, \"a.b.c\".split(/\\./), \"abc\".search(/c/), [...\"a1b2\".matchAll(/\\d/g)].length, RegExp.prototype.flags !== undefined, /a/gimsuy.flags]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.newArray	6
+  4	goja.loadVal	{v:"aBc"}
+  5	goja.getPropCallee	"match"
+  6	*goja.newRegexp	&{pattern:&{src:"b" global:false ignoreCase:true multiline:false dotAll:false sticky:false unicode:false regexpWrapper:&{expr:"(?i:b)" prog:<syntax.Prog> onepass:<regexp.onePassProg> numSubexp:0 maxBitStateLen:87381 subexpNames:[""] prefix:"" prefixBytes:[] prefixRune:0 prefixEnd:0 mpool:0 matchcap:2 prefixComplete:false cond:0 minInputLen:1 longest:false} regexp2Wrapper:<nil>} src:"b"}
+  7	goja.call	1
+  8	goja.getProp	"index"
+  9	goja._pushArrayItem	{}
+  10	goja.loadVal	{v:"a.b.c"}
+  11	goja.getPropCallee	"split"
+  12	*goja.newRegexp	&{pattern:&{src:"\\." global:false ignoreCase:false multiline:false dotAll:false sticky:false unicode:false regexpWrapper:&{expr:"\\." prog:<syntax.Prog> onepass:<regexp.onePassProg> numSubexp:0 maxBitStateLen:87381 subexpNames:[""] prefix:"." prefixBytes:[46] prefixRune:46 prefixEnd:0 mpool:0 matchcap:2 prefixComplete:true cond:0 minInputLen:1 longest:false} regexp2Wrapper:<nil>} src:"\\."}
+  13	goja.call	1
+  14	goja._pushArrayItem	{}
+  15	goja.loadVal	{v:"abc"}
+  16	goja.getPropCallee	"search"
+  17	*goja.newRegexp	&{pattern:&{src:"c" global:false ignoreCase:false multiline:false dotAll:false sticky:false unicode:false regexpWrapper:&{expr:"c" prog:<syntax.Prog> onepass:<regexp.onePassProg> numSubexp:0 maxBitStateLen:87381 subexpNames:[""] prefix:"c" prefixBytes:[99] prefixRune:99 prefixEnd:0 mpool:0 matchcap:2 prefixComplete:true cond:0 minInputLen:1 longest:false} regexp2Wrapper:<nil>} src:"c"}
+  18	goja.call	1
+  19	goja._pushArrayItem	{}
+  20	goja.newArray	0
+  21	goja.loadVal	{v:"a1b2"}
+  22	goja.getPropCallee	"matchAll"
+  23	*goja.newRegexp	&{pattern:&{src:"\\d" global:true ignoreCase:false multiline:false dotAll:false sticky:false unicode:false regexpWrapper:&{expr:"\\d" prog:<syntax.Prog> onepass:<regexp.onePassProg> numSubexp:0 maxBitStateLen:87381 subexpNames:[""] prefix:"" prefixBytes:[] prefixRune:0 prefixEnd:0 mpool:0 matchcap:2 prefixComplete:false cond:0 minInputLen:1 longest:false} regexp2Wrapper:<nil>} src:"\\d"}
+  24	goja.call	1
+  25	goja._pushArraySpread	{}
+  26	goja.getProp	"length"
+  27	goja._pushArrayItem	{}
+  28	goja.loadDynamic	"RegExp"
+  29	goja.getProp	"prototype"
+  30	goja.getProp	"flags"
+  31	goja.loadDynamic	"undefined"
+  32	goja._op_strict_neq	{}
+  33	goja._pushArrayItem	{}
+  34	*goja.newRegexp	&{pattern:&{src:"a" global:true ignoreCase:true multiline:true dotAll:true sticky:true unicode:true regexpWrapper:&{expr:"(?msi:a)" prog:<syntax.Prog> onepass:<regexp.onePassProg> numSubexp:0 maxBitStateLen:87381 subexpNames:[""] prefix:"" prefixBytes:[] prefixRune:0 prefixEnd:0 mpool:0 matchcap:2 prefixComplete:false cond:0 minInputLen:1 longest:false} regexp2Wrapper:<nil>} src:"a"}
+  35	goja.getProp	"flags"
+  36	goja._pushArrayItem	{}
+  37	goja.setPropP	"r"
+  38	goja._loadUndef	{}
+  39	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  7	52
+  8	59
+  13	79
+  18	99
+  20	106
+  24	125
+  26	134
+  28	142
+  29	149
+  30	159
+  31	169
+  32	142
+  35	190
+  37	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

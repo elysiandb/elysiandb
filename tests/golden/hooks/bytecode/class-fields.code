@@ -1,0 +1,63 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nclass C { #x = 1; static y = 2; get x() { return this.#x } }; ctx.entity.r = [new C().x, C.y]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:1 args:1}
+  1	goja.jump	1
+  2	*goja.newStaticFieldInit	&{initFields:<prog> numPrivateFields:0 numPrivateMethods:0}
+    func: "<static_initializer>"
+    code:
+    0	goja.loadVal	{v:2}
+    1	goja.definePropKeyed	"y"
+    positions:
+  3	*goja.newClass	&{ctor:<nil> name:"C" source:"class C { #x = 1; static y = 2; get x() { return this.#x } }" initFields:<prog> privateFields:[] privateMethods:[] numPrivateFields:1 numPrivateMethods:0 length:0 hasPrivateEnv:true}
+    func: "<instance_members_initializer>"
+    code:
+    0	goja.loadVal	{v:1}
+    1	*goja.definePrivateProp	&{idx:0}
+    positions:
+  4	goja.dupN	1
+  5	*goja.newMethod	&{newFunc:{prg:<prog> name:"x" source:"get x() { return this.#x }" length:0 strict:true} homeObjOffset:1}
+    func: "x"
+    code:
+    0	*goja.enterFuncStashless	&{stackSize:0 args:0}
+    1	goja.loadStack	0
+    2	*goja.getPrivatePropRes	&{name:"x" idx:0 level:0 isStatic:false isMethod:false}
+    3	goja._ret	{}
+    positions:
+    0	57
+    1	74
+    2	79
+  6	*goja.defineGetterKeyed	&{key:"x" enumerable:false}
+  7	goja._pop	{}
+  8	*goja.initStaticElements	&{privateFields:[] privateMethods:[]}
+  9	goja.popPrivateEnv	{}
+  10	goja.initStackP	1
+  11	goja.loadStackLex	-1
+  12	goja.getProp	"entity"
+  13	goja.newArray	2
+  14	goja.loadStackLex	1
+  15	goja._new	0
+  16	goja.getProp	"x"
+  17	goja._pushArrayItem	{}
+  18	goja.loadStackLex	1
+  19	goja.getProp	"y"
+  20	goja._pushArrayItem	{}
+  21	goja.setPropP	"r"
+  22	goja._loadUndef	{}
+  23	goja._ret	{}
+  positions:
+  0	0
+  3	25
+  11	87
+  12	91
+  13	102
+  14	107
+  15	103
+  16	111
+  18	114
+  19	116
+  21	98
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

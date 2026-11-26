@@ -1,0 +1,103 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.r = [ctx.query(\"order\", {amount: {gt: 1}}).length, ctx.query(\"order\", {amount: {gte: \"1.5\"}}).length, ctx.query(\"order\", {group: {eq: \"G\"}}).length, ctx.query(\"order\", {group: {eq: null}}).length, ctx.query(\"order\", {id: {eq: [\"o1\"]}}).length]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.newArray	5
+  4	goja.loadStackLex	-1
+  5	goja.getPropCallee	"query"
+  6	goja.loadVal	{v:"order"}
+  7	goja._newObject	{}
+  8	goja._newObject	{}
+  9	goja.loadVal	{v:1}
+  10	goja.putProp	"gt"
+  11	goja.putProp	"amount"
+  12	goja.call	2
+  13	goja.getProp	"length"
+  14	goja._pushArrayItem	{}
+  15	goja.loadStackLex	-1
+  16	goja.getPropCallee	"query"
+  17	goja.loadVal	{v:"order"}
+  18	goja._newObject	{}
+  19	goja._newObject	{}
+  20	goja.loadVal	{v:"1.5"}
+  21	goja.putProp	"gte"
+  22	goja.putProp	"amount"
+  23	goja.call	2
+  24	goja.getProp	"length"
+  25	goja._pushArrayItem	{}
+  26	goja.loadStackLex	-1
+  27	goja.getPropCallee	"query"
+  28	goja.loadVal	{v:"order"}
+  29	goja._newObject	{}
+  30	goja._newObject	{}
+  31	goja.loadVal	{v:"G"}
+  32	goja.putProp	"eq"
+  33	goja.putProp	"group"
+  34	goja.call	2
+  35	goja.getProp	"length"
+  36	goja._pushArrayItem	{}
+  37	goja.loadStackLex	-1
+  38	goja.getPropCallee	"query"
+  39	goja.loadVal	{v:"order"}
+  40	goja._newObject	{}
+  41	goja._newObject	{}
+  42	goja.loadVal	{v:{}}
+  43	goja.putProp	"eq"
+  44	goja.putProp	"group"
+  45	goja.call	2
+  46	goja.getProp	"length"
+  47	goja._pushArrayItem	{}
+  48	goja.loadStackLex	-1
+  49	goja.getPropCallee	"query"
+  50	goja.loadVal	{v:"order"}
+  51	goja._newObject	{}
+  52	goja._newObject	{}
+  53	goja.newArray	1
+  54	goja.loadVal	{v:"o1"}
+  55	goja._pushArrayItem	{}
+  56	goja.putProp	"eq"
+  57	goja.putProp	"id"
+  58	goja.call	2
+  59	goja.getProp	"length"
+  60	goja._pushArrayItem	{}
+  61	goja.setPropP	"r"
+  62	goja._loadUndef	{}
+  63	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  4	41
+  7	60
+  8	69
+  12	50
+  13	79
+  15	87
+  18	106
+  19	115
+  23	96
+  24	130
+  26	138
+  29	157
+  30	165
+  34	147
+  35	177
+  37	185
+  40	204
+  41	212
+  45	194
+  46	225
+  48	233
+  51	252
+  52	257
+  53	262
+  58	242
+  59	272
+  61	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

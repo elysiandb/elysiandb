@@ -1,0 +1,158 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.a = \"abc\".padStart(5, \"-\"); ctx.entity.b = \"a-b-c\".replaceAll(\"-\", \"+\"); ctx.entity.c = \"é\".normalize(\"NFD\").length; ctx.entity.d = \"a\".localeCompare(\"b\"); ctx.entity.e = \"ä\".localeCompare(\"z\"); ctx.entity.f = \"abc\".at(-1); ctx.entity.g = \"ABC\".toLowerCase(); ctx.entity.h = \"İ\".toLowerCase().length; ctx.entity.i = \"ß\".toUpperCase(); ctx.entity.j = \"😀\".length; ctx.entity.k = [...\"😀\"].length; ctx.entity.l = \"a,b\".split(\",\"); ctx.entity.m = \"x\".codePointAt(0)\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadVal	{v:"abc"}
+  4	goja.getPropCallee	"padStart"
+  5	goja.loadVal	{v:5}
+  6	goja.loadVal	{v:"-"}
+  7	goja.call	2
+  8	goja.setPropP	"a"
+  9	goja.loadStackLex	-1
+  10	goja.getProp	"entity"
+  11	goja.loadVal	{v:"a-b-c"}
+  12	goja.getPropCallee	"replaceAll"
+  13	goja.loadVal	{v:"-"}
+  14	goja.loadVal	{v:"+"}
+  15	goja.call	2
+  16	goja.setPropP	"b"
+  17	goja.loadStackLex	-1
+  18	goja.getProp	"entity"
+  19	goja.loadVal	{v:"\ufeffé"}
+  20	goja.getPropCallee	"normalize"
+  21	goja.loadVal	{v:"NFD"}
+  22	goja.call	1
+  23	goja.getProp	"length"
+  24	goja.setPropP	"c"
+  25	goja.loadStackLex	-1
+  26	goja.getProp	"entity"
+  27	goja.loadVal	{v:"a"}
+  28	goja.getPropCallee	"localeCompare"
+  29	goja.loadVal	{v:"b"}
+  30	goja.call	1
+  31	goja.setPropP	"d"
+  32	goja.loadStackLex	-1
+  33	goja.getProp	"entity"
+  34	goja.loadVal	{v:"\ufeffä"}
+  35	goja.getPropCallee	"localeCompare"
+  36	goja.loadVal	{v:"z"}
+  37	goja.call	1
+  38	goja.setPropP	"e"
+  39	goja.loadStackLex	-1
+  40	goja.getProp	"entity"
+  41	goja.loadVal	{v:"abc"}
+  42	goja.getPropCallee	"at"
+  43	goja.loadVal	{v:1}
+  44	goja._neg	{}
+  45	goja.call	1
+  46	goja.setPropP	"f"
+  47	goja.loadStackLex	-1
+  48	goja.getProp	"entity"
+  49	goja.loadVal	{v:"ABC"}
+  50	goja.getPropCallee	"toLowerCase"
+  51	goja.call	0
+  52	goja.setPropP	"g"
+  53	goja.loadStackLex	-1
+  54	goja.getProp	"entity"
+  55	goja.loadVal	{v:"\ufeffİ"}
+  56	goja.getPropCallee	"toLowerCase"
+  57	goja.call	0
+  58	goja.getProp	"length"
+  59	goja.setPropP	"h"
+  60	goja.loadStackLex	-1
+  61	goja.getProp	"entity"
+  62	goja.loadVal	{v:"\ufeffß"}
+  63	goja.getPropCallee	"toUpperCase"
+  64	goja.call	0
+  65	goja.setPropP	"i"
+  66	goja.loadStackLex	-1
+  67	goja.getProp	"entity"
+  68	goja.loadVal	{v:"\ufeff��"}
+  69	goja.getProp	"length"
+  70	goja.setPropP	"j"
+  71	goja.loadStackLex	-1
+  72	goja.getProp	"entity"
+  73	goja.newArray	0
+  74	goja.loadVal	{v:"\ufeff��"}
+  75	goja._pushArraySpread	{}
+  76	goja.getProp	"length"
+  77	goja.setPropP	"k"
+  78	goja.loadStackLex	-1
+  79	goja.getProp	"entity"
+  80	goja.loadVal	{v:"a,b"}
+  81	goja.getPropCallee	"split"
+  82	goja.loadVal	{v:","}
+  83	goja.call	1
+  84	goja.setPropP	"l"
+  85	goja.loadStackLex	-1
+  86	goja.getProp	"entity"
+  87	goja.loadVal	{v:"x"}
+  88	goja.getPropCallee	"codePointAt"
+  89	goja.loadVal	{v:0}
+  90	goja.call	1
+  91	goja.setPropP	"m"
+  92	goja._loadUndef	{}
+  93	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  7	54
+  8	36
+  9	64
+  10	68
+  15	97
+  16	75
+  17	109
+  18	113
+  22	138
+  23	146
+  24	120
+  25	154
+  26	158
+  30	186
+  31	165
+  32	193
+  33	197
+  37	226
+  38	204
+  39	233
+  40	237
+  45	256
+  46	244
+  47	262
+  48	266
+  51	294
+  52	273
+  53	298
+  54	302
+  57	329
+  58	332
+  59	309
+  60	340
+  61	344
+  64	371
+  65	351
+  66	375
+  67	379
+  69	397
+  70	386
+  71	405
+  72	409
+  73	420
+  76	432
+  77	416
+  78	440
+  79	444
+  83	466
+  84	451
+  85	473
+  86	477
+  90	503
+  91	484
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

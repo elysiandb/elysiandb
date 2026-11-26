@@ -1,0 +1,11 @@
+{
+  "part": "guards",
+  "baseline": "1a11e5e",
+  "files": [
+    {
+      "path": "e2e-api-dead.tsv",
+      "size": 3267,
+      "sha256": "8fb95fc26e47aa9eb839eefb0b320042bb88d1618ffe9d229f340adae98835ea"
+    }
+  ]
+}

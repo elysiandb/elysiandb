@@ -1,0 +1,33 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.m2 = ctx.entity.meta; ctx.entity.m2.q = 1\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadStackLex	-1
+  4	goja.getProp	"entity"
+  5	goja.getProp	"meta"
+  6	goja.setPropP	"m2"
+  7	goja.loadStackLex	-1
+  8	goja.getProp	"entity"
+  9	goja.getProp	"m2"
+  10	goja.loadVal	{v:1}
+  11	goja.setPropP	"q"
+  12	goja._loadUndef	{}
+  13	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	41
+  4	45
+  5	52
+  6	36
+  7	58
+  8	62
+  9	69
+  11	72
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

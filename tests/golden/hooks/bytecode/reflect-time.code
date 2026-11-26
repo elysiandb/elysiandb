@@ -1,0 +1,126 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.d = new Date(0); var d = ctx.entity.d; delete ctx.entity.d; ctx.entity.r = [Object.getOwnPropertyNames(d).join(\",\"), typeof d.Year, typeof d.Year === \"function\" ? d.Year() : null, typeof d.UnixMilli === \"function\" ? d.UnixMilli() : null, Object.keys(d).length, String(Object.getPrototypeOf(d) === Object.prototype)]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:1 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadDynamic	"Date"
+  4	goja.loadVal	{v:0}
+  5	goja._new	1
+  6	goja.setPropP	"d"
+  7	goja.loadStackLex	-1
+  8	goja.getProp	"entity"
+  9	goja.getProp	"d"
+  10	goja.initStackP	1
+  11	goja.loadStackLex	-1
+  12	goja.getProp	"entity"
+  13	goja.deleteProp	"d"
+  14	goja._pop	{}
+  15	goja.loadStackLex	-1
+  16	goja.getProp	"entity"
+  17	goja.newArray	6
+  18	goja.loadDynamic	"Object"
+  19	goja.getPropCallee	"getOwnPropertyNames"
+  20	goja.loadStack	1
+  21	goja.call	1
+  22	goja.getPropCallee	"join"
+  23	goja.loadVal	{v:","}
+  24	goja.call	1
+  25	goja._pushArrayItem	{}
+  26	goja.loadStack	1
+  27	goja.getProp	"Year"
+  28	goja._typeof	{}
+  29	goja._pushArrayItem	{}
+  30	goja.loadStack	1
+  31	goja.getProp	"Year"
+  32	goja._typeof	{}
+  33	goja.loadVal	{v:"function"}
+  34	goja._op_strict_eq	{}
+  35	goja.jneP	5
+  36	goja.loadStack	1
+  37	goja.getPropCallee	"Year"
+  38	goja.call	0
+  39	goja.jump	2
+  40	goja.loadVal	{v:{}}
+  41	goja._pushArrayItem	{}
+  42	goja.loadStack	1
+  43	goja.getProp	"UnixMilli"
+  44	goja._typeof	{}
+  45	goja.loadVal	{v:"function"}
+  46	goja._op_strict_eq	{}
+  47	goja.jneP	5
+  48	goja.loadStack	1
+  49	goja.getPropCallee	"UnixMilli"
+  50	goja.call	0
+  51	goja.jump	2
+  52	goja.loadVal	{v:{}}
+  53	goja._pushArrayItem	{}
+  54	goja.loadDynamic	"Object"
+  55	goja.getPropCallee	"keys"
+  56	goja.loadStack	1
+  57	goja.call	1
+  58	goja.getProp	"length"
+  59	goja._pushArrayItem	{}
+  60	goja.loadDynamicCallee	"String"
+  61	goja.loadDynamic	"Object"
+  62	goja.getPropCallee	"getPrototypeOf"
+  63	goja.loadStack	1
+  64	goja.call	1
+  65	goja.loadDynamic	"Object"
+  66	goja.getProp	"prototype"
+  67	goja._op_strict_eq	{}
+  68	goja.call	1
+  69	goja._pushArrayItem	{}
+  70	goja.setPropP	"r"
+  71	goja._loadUndef	{}
+  72	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	44
+  5	40
+  6	36
+  7	61
+  8	65
+  9	72
+  10	57
+  11	82
+  12	86
+  13	93
+  15	96
+  16	100
+  17	111
+  18	112
+  20	139
+  21	138
+  24	146
+  26	160
+  27	162
+  30	175
+  31	177
+  34	168
+  36	199
+  38	205
+  42	223
+  43	225
+  46	216
+  48	252
+  50	263
+  54	274
+  56	286
+  57	285
+  58	289
+  60	297
+  61	304
+  63	326
+  64	325
+  65	333
+  66	340
+  67	304
+  68	303
+  70	107
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

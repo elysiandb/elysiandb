@@ -1,0 +1,119 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.i = 1; ctx.entity.f = 1.5; ctx.entity.p53 = Math.pow(2,53); ctx.entity.p53b = Math.pow(2,53)+2; ctx.entity.e21 = 1e21; ctx.entity.small = 1e-7; ctx.entity.negz = -0; ctx.entity.sum = 0.1+0.2; ctx.entity.div = 10/4*2; ctx.entity.pi = parseInt(\"12\"); ctx.entity.nf = Number(\"1.0\")\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadVal	{v:1}
+  4	goja.setPropP	"i"
+  5	goja.loadStackLex	-1
+  6	goja.getProp	"entity"
+  7	goja.loadVal	{v:1.5}
+  8	goja.setPropP	"f"
+  9	goja.loadStackLex	-1
+  10	goja.getProp	"entity"
+  11	goja.loadDynamic	"Math"
+  12	goja.getPropCallee	"pow"
+  13	goja.loadVal	{v:2}
+  14	goja.loadVal	{v:53}
+  15	goja.call	2
+  16	goja.setPropP	"p53"
+  17	goja.loadStackLex	-1
+  18	goja.getProp	"entity"
+  19	goja.loadDynamic	"Math"
+  20	goja.getPropCallee	"pow"
+  21	goja.loadVal	{v:2}
+  22	goja.loadVal	{v:53}
+  23	goja.call	2
+  24	goja.loadVal	{v:2}
+  25	goja._add	{}
+  26	goja.setPropP	"p53b"
+  27	goja.loadStackLex	-1
+  28	goja.getProp	"entity"
+  29	goja.loadVal	{v:1e+21}
+  30	goja.setPropP	"e21"
+  31	goja.loadStackLex	-1
+  32	goja.getProp	"entity"
+  33	goja.loadVal	{v:1e-07}
+  34	goja.setPropP	"small"
+  35	goja.loadStackLex	-1
+  36	goja.getProp	"entity"
+  37	goja.loadVal	{v:0}
+  38	goja._neg	{}
+  39	goja.setPropP	"negz"
+  40	goja.loadStackLex	-1
+  41	goja.getProp	"entity"
+  42	goja.loadVal	{v:0.1}
+  43	goja.loadVal	{v:0.2}
+  44	goja._add	{}
+  45	goja.setPropP	"sum"
+  46	goja.loadStackLex	-1
+  47	goja.getProp	"entity"
+  48	goja.loadVal	{v:2.5}
+  49	goja.loadVal	{v:2}
+  50	goja._mul	{}
+  51	goja.setPropP	"div"
+  52	goja.loadStackLex	-1
+  53	goja.getProp	"entity"
+  54	goja.loadDynamicCallee	"parseInt"
+  55	goja.loadVal	{v:"12"}
+  56	goja.call	1
+  57	goja.setPropP	"pi"
+  58	goja.loadStackLex	-1
+  59	goja.getProp	"entity"
+  60	goja.loadDynamicCallee	"Number"
+  61	goja.loadVal	{v:"1.0"}
+  62	goja.call	1
+  63	goja.setPropP	"nf"
+  64	goja._loadUndef	{}
+  65	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  4	36
+  5	43
+  6	47
+  8	54
+  9	63
+  10	67
+  11	80
+  15	88
+  16	74
+  17	96
+  18	100
+  19	114
+  23	122
+  25	114
+  26	107
+  27	132
+  28	136
+  30	143
+  31	155
+  32	159
+  34	166
+  35	180
+  36	184
+  39	191
+  40	202
+  41	206
+  44	219
+  45	213
+  46	228
+  47	232
+  50	245
+  51	239
+  52	253
+  53	257
+  54	269
+  56	277
+  57	264
+  58	285
+  59	289
+  60	301
+  62	307
+  63	296
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

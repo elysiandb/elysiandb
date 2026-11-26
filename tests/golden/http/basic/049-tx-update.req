@@ -1,0 +1,8 @@
+PUT /api/tx/{{tx}}/entity/book/b2 HTTP/1.1
+Host: h
+Connection: close
+Content-Type: application/json
+Authorization: Basic YWRtaW46YWRtaW4=
+Content-Length: 21
+
+{"title":"Emma (tx)"}

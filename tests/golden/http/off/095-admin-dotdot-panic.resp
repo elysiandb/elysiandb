@@ -1,0 +1,12 @@
+HTTP/1.1 500 Internal Server Error
+Server: ElysianDB
+Date: <DATE>
+Content-Length: 0
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Cache-Control: no-store
+X-Request-Id: <RID>
+Connection: close
+

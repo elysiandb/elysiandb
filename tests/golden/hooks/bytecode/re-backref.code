@@ -1,0 +1,50 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.r = [/(a)\\1/.test(\"aa\"), /\\1(a)/.test(\"a\"), /(?=a)a/.test(\"a\"), /(?!b)a/.test(\"a\"), /(?<!b)a/.test(\"ba\")]\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.newArray	5
+  4	*goja.newRegexp	&{pattern:&{src:"(a)\\1" global:false ignoreCase:false multiline:false dotAll:false sticky:false unicode:false regexpWrapper:<nil> regexp2Wrapper:&{rx:<regexp2.Regexp> cache:<nil>}} src:"(a)\\1"}
+  5	goja.getPropCallee	"test"
+  6	goja.loadVal	{v:"aa"}
+  7	goja.call	1
+  8	goja._pushArrayItem	{}
+  9	*goja.newRegexp	&{pattern:&{src:"\\1(a)" global:false ignoreCase:false multiline:false dotAll:false sticky:false unicode:false regexpWrapper:<nil> regexp2Wrapper:&{rx:<regexp2.Regexp> cache:<nil>}} src:"\\1(a)"}
+  10	goja.getPropCallee	"test"
+  11	goja.loadVal	{v:"a"}
+  12	goja.call	1
+  13	goja._pushArrayItem	{}
+  14	*goja.newRegexp	&{pattern:&{src:"(?=a)a" global:false ignoreCase:false multiline:false dotAll:false sticky:false unicode:false regexpWrapper:<nil> regexp2Wrapper:&{rx:<regexp2.Regexp> cache:<nil>}} src:"(?=a)a"}
+  15	goja.getPropCallee	"test"
+  16	goja.loadVal	{v:"a"}
+  17	goja.call	1
+  18	goja._pushArrayItem	{}
+  19	*goja.newRegexp	&{pattern:&{src:"(?!b)a" global:false ignoreCase:false multiline:false dotAll:false sticky:false unicode:false regexpWrapper:<nil> regexp2Wrapper:&{rx:<regexp2.Regexp> cache:<nil>}} src:"(?!b)a"}
+  20	goja.getPropCallee	"test"
+  21	goja.loadVal	{v:"a"}
+  22	goja.call	1
+  23	goja._pushArrayItem	{}
+  24	*goja.newRegexp	&{pattern:&{src:"(?<!b)a" global:false ignoreCase:false multiline:false dotAll:false sticky:false unicode:false regexpWrapper:<nil> regexp2Wrapper:&{rx:<regexp2.Regexp> cache:<nil>}} src:"(?<!b)a"}
+  25	goja.getPropCallee	"test"
+  26	goja.loadVal	{v:"ba"}
+  27	goja.call	1
+  28	goja._pushArrayItem	{}
+  29	goja.setPropP	"r"
+  30	goja._loadUndef	{}
+  31	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	40
+  7	53
+  12	73
+  17	93
+  22	113
+  27	134
+  29	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

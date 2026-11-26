@@ -1,0 +1,11 @@
+HTTP/1.1 200 OK
+Server: ElysianDB
+Date: <DATE>
+Content-Length: 0
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
+X-Request-Id: <RID>
+Connection: close
+

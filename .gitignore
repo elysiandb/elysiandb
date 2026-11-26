@@ -1,8 +1,8 @@
 .vscode
 .code
 .idea
-elysiandb
-coverage.out
+/elysiandb
+/target
+lcov.info
 *.sh
 *.txt
-.bench-base/

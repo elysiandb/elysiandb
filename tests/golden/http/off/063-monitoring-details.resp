@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+Server: ElysianDB
+Date: <DATE>
+Content-Type: application/json
+Content-Length: <LEN>
+X-Elysian-Version: <VER>
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Cache-Control: no-store
+X-Request-Id: <RID>
+Connection: close
+
+{"entity_types":[],"hooks":[{"avg_ms":"\u003cnumber\u003e","entity":"\u003cstring\u003e","errors":"\u003cnumber\u003e","executions":"\u003cnumber\u003e","hook_id":"\u003cstring\u003e","last_error":"\u003cstring\u003e","last_error_at":"\u003cnull\u003e","p95_ms":"\u003cnumber\u003e","phase":"\u003cstring\u003e","queries":"\u003cnumber\u003e","query_cache_hits":"\u003cnumber\u003e","rows_read":"\u003cnumber\u003e"}],"indexes":[{"entity":"\u003cstring\u003e","entries":"\u003cnumber\u003e","index":"\u003cstring\u003e","kind":"\u003cstring\u003e","last_used_at":"\u003cstring\u003e","origin":"\u003cstring\u003e","state":"\u003cstring\u003e","uses":"\u003cnumber\u003e"}],"routes":{"last_15m":[{"count":"\u003cnumber\u003e","error_rate":"\u003cnumber\u003e","errors":"\u003cnumber\u003e","method":"\u003cstring\u003e","p95_ms":"\u003cnumber\u003e","route":"\u003cstring\u003e"}],"since_startup":[{"count":"\u003cnumber\u003e","error_rate":"\u003cnumber\u003e","errors":"\u003cnumber\u003e","method":"\u003cstring\u003e","p95_ms":"\u003cnumber\u003e","route":"\u003cstring\u003e"}]}}

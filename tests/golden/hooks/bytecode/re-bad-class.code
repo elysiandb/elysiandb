@@ -1,0 +1,27 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) {\nctx.entity.r = new RegExp(\"[b-a]\").test(\"a\")\n}" length:1 strict:false}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.loadStackLex	-1
+  2	goja.getProp	"entity"
+  3	goja.loadDynamic	"RegExp"
+  4	goja.loadVal	{v:"[b-a]"}
+  5	goja._new	1
+  6	goja.getPropCallee	"test"
+  7	goja.loadVal	{v:"a"}
+  8	goja.call	1
+  9	goja.setPropP	"r"
+  10	goja._loadUndef	{}
+  11	goja._ret	{}
+  positions:
+  0	0
+  1	25
+  2	29
+  3	44
+  5	40
+  8	64
+  9	36
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+positions:

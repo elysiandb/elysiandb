@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+Server: ElysianDB
+Date: <DATE>
+Content-Type: application/json
+Content-Length: 204
+X-Elysian-Version: <VER>
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Cache-Control: no-store
+X-Request-Id: <RID>
+Connection: close
+
+[{"entity":"book","id":"ann::book","permissions":{"create":true,"delete":true,"owning_delete":true,"owning_read":true,"owning_update":true,"owning_write":true,"read":true,"update":true},"username":"ann"}]

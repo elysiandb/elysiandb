@@ -1,0 +1,8 @@
+POST /api/security/user HTTP/1.1
+Host: h
+Connection: close
+Content-Type: application/json
+Cookie: edb_session={{sid}}
+Content-Length: 54
+
+{"username":"ann","password":"secret-1","role":"user"}

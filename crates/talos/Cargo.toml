@@ -1,0 +1,13 @@
+[package]
+name = "talos"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.91.1"
+license = "MIT"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+gocompat = { path = "../gocompat" }

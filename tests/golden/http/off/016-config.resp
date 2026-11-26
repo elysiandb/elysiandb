@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+Server: ElysianDB
+Date: <DATE>
+Content-Type: application/json
+Content-Length: <LEN>
+X-Elysian-Version: <VER>
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Cache-Control: no-store
+X-Request-Id: <RID>
+Connection: close
+
+{"Store":{"Folder":"<DATA>","Shards":8,"FlushIntervalSeconds":0,"CrashRecovery":{"Enabled":true,"MaxLogMB":100},"Durability":"","Memory":{"LimitMB":0},"MinFreeDiskMB":0,"Backup":{"Folder":"","EveryMinutes":0,"Keep":0}},"Server":{"HTTP":{"Enabled":true,"Host":"127.0.0.1","Port":8089,"CORS":{"AllowedOrigins":null},"TrustedProxies":null,"ReadTimeoutSeconds":0,"WriteTimeoutSeconds":0},"TCP":{"Enabled":false,"Host":"127.0.0.1","Port":8088,"CORS":{"AllowedOrigins":null},"TrustedProxies":null,"ReadTimeoutSeconds":0,"WriteTimeoutSeconds":0}},"Log":{"Level":"info","Format":"text","AccessLog":true,"SlowRequestMs":500,"BufferLines":500,"FlushIntervalSeconds":0},"Security":{"Authentication":{"Enabled":false,"Mode":"","Token":""}},"Stats":{"Enabled":true},"Api":{"Index":{"Workers":1},"Cache":{"Enabled":true,"CleanupIntervalSeconds":10,"MaxMB":0,"MaxEntryKB":0},"Schema":{"Enabled":true,"Strict":false},"Hooks":{"Enabled":true,"TimeoutMs":0,"RequestBudgetMs":0},"Query":{"Workers":0,"TimeoutMs":0,"MaxQueued":0,"QueueTimeoutMs":0,"CancelOnDisconnect":null},"Response":{"SpoolMB":0}},"AdminUI":{"Enabled":true},"Engine":{"Name":""},"Monitoring":{"Prometheus":{"Enabled":true,"Token":""},"Pprof":{"Enabled":false}}}

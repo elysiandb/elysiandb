@@ -1,0 +1,18 @@
+func: ""
+code:
+0	*goja.newFunc	&{prg:<prog> name:"postRead" source:"function postRead(ctx) { undeclared = 1 }" length:1 strict:true}
+  func: "postRead"
+  code:
+  0	*goja.enterFuncStashless	&{stackSize:0 args:1}
+  1	goja.resolveVar1Strict	"undeclared"
+  2	goja.loadVal	{v:1}
+  3	goja._putValueP	{}
+  4	goja._loadUndef	{}
+  5	goja._ret	{}
+  positions:
+  0	14
+  1	39
+1	*goja.bindGlobal	&{vars:[] funcs:["postRead"] lets:[] consts:[] deletable:false}
+2	goja.loadVal	{v:"use strict"}
+3	goja._saveResult	{}
+positions:

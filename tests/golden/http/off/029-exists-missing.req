@@ -1,0 +1,4 @@
+GET /api/book/zz/exists HTTP/1.1
+Host: h
+Connection: close
+

@@ -1,0 +1,18 @@
+POST /api/book HTTP/1.1
+Host: h
+Connection: close
+Content-Type: application/json
+Transfer-Encoding: chunked
+
+7
+{"id":"
+7
+c1","ti
+7
+tle":"C
+7
+hunked"
+1
+}
+0
+
