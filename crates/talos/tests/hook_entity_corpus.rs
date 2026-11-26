@@ -124,35 +124,21 @@ pub fn outcomes(file: &str, arch_file: &str) -> Vec<(String, bool, String)> {
     out
 }
 
-const PENDING: [&str; 3] = ["surface", "typed-out", "reflect-bytes"];
-
-fn replay(file: &str, arch_file: &str, with_pending: bool) {
+fn replay(file: &str, arch_file: &str) {
     let results = outcomes(file, arch_file);
     assert_eq!(results.len(), 198, "{file}: eligible cases");
-    let mut failures = Vec::new();
-    let mut passed = 0;
-    for (label, ok, detail) in &results {
-        let pending = PENDING.contains(&label.as_str());
-        if *ok {
-            passed += 1;
-        } else if with_pending || !pending {
-            failures.push(format!("{label}:\n{detail}"));
-        }
-    }
+    let failures: Vec<String> = results
+        .iter()
+        .filter(|(_, ok, _)| !*ok)
+        .map(|(label, _, detail)| format!("{label}:\n{detail}"))
+        .collect();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
-    assert!(passed >= results.len() - PENDING.len());
 }
 
 #[test]
 fn entity_corpus_utc() {
     run_in_zone("entity_corpus_utc", Zone::Env("UTC"), || {
-        on_big_stack(|| {
-            replay(
-                "hooks/corpus-utc.jsonl",
-                "hooks/arch-amd64-utc.jsonl",
-                false,
-            )
-        })
+        on_big_stack(|| replay("hooks/corpus-utc.jsonl", "hooks/arch-amd64-utc.jsonl"))
     });
 }
 
@@ -166,33 +152,6 @@ fn entity_corpus_europe_paris() {
                 replay(
                     "hooks/corpus-europe-paris.jsonl",
                     "hooks/arch-amd64-europe-paris.jsonl",
-                    false,
-                )
-            })
-        },
-    );
-}
-
-#[test]
-#[ignore = "requires the typed array builtins"]
-fn entity_corpus_pending_utc() {
-    run_in_zone("entity_corpus_pending_utc", Zone::Env("UTC"), || {
-        on_big_stack(|| replay("hooks/corpus-utc.jsonl", "hooks/arch-amd64-utc.jsonl", true))
-    });
-}
-
-#[test]
-#[ignore = "requires the typed array builtins"]
-fn entity_corpus_pending_europe_paris() {
-    run_in_zone(
-        "entity_corpus_pending_europe_paris",
-        Zone::Env("Europe/Paris"),
-        || {
-            on_big_stack(|| {
-                replay(
-                    "hooks/corpus-europe-paris.jsonl",
-                    "hooks/arch-amd64-europe-paris.jsonl",
-                    true,
                 )
             })
         },

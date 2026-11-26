@@ -1,7 +1,7 @@
 use super::goarray_reflect::{GoPairArray, IndexIter, PairCell};
 use super::goreflect::describe_value;
 use super::goslice::{define_length, delete_length};
-use super::{DocValue, Pair, TypedSlice, check_host_object_property_descr};
+use super::{DocValue, Pair, SliceElem, SliceStore, TypedSlice, check_host_object_property_descr};
 use crate::heap::{ObjRef, Tracer};
 use crate::object::{
     BASE_CLASS, BaseObject, CLASS_ARRAY, IterNextFunc, ObjClass, ObjData, ObjExt,
@@ -14,9 +14,9 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub type Backing<E> = Rc<RefCell<Vec<E>>>;
+pub type Backing<E> = <E as SliceElem>::Store;
 
-pub trait GoElem: Clone + Default + 'static {
+pub trait GoElem: SliceElem {
     fn to_js(&self, rt: &mut Runtime) -> JsResult<Value>;
     fn from_js(rt: &mut Runtime, v: &Value) -> JsResult<Result<Self, String>>;
     fn wrap(s: TypedSlice<Self>) -> DocValue;
@@ -315,7 +315,7 @@ impl<E: GoElem> GoTypedSlice<E> {
             Self::cache_put(rt, o, idx, Some(w));
             return Ok(Value::Object(w));
         }
-        let e = b.borrow()[idx].clone();
+        let e = b.get_elem(idx);
         e.to_js(rt)
     }
 
@@ -325,9 +325,9 @@ impl<E: GoElem> GoTypedSlice<E> {
         if oldcap < size {
             let newcap = grow_cap(size, s.data.len, oldcap);
             let mut n: Vec<E> = Vec::with_capacity(newcap);
-            n.extend_from_slice(&s.data.backing.borrow()[..s.data.len]);
+            n.extend(s.data.backing.prefix(s.data.len));
             n.resize_with(newcap, E::default);
-            s.data.backing = Rc::new(RefCell::new(n));
+            s.data.backing = Backing::<E>::from_vec(n);
             s.data.len = size;
             let b = s.data.backing.clone();
             let l = s.cache.len().min(size);
@@ -341,8 +341,8 @@ impl<E: GoElem> GoTypedSlice<E> {
             }
         } else {
             let start = s.data.len;
-            for e in &mut s.data.backing.borrow_mut()[start..size] {
-                *e = E::default();
+            for i in start..size {
+                s.data.backing.set_elem(i, E::default());
             }
             s.data.len = size;
         }
@@ -362,8 +362,8 @@ impl<E: GoElem> GoTypedSlice<E> {
         }
         let s = Self::this_mut(rt, o);
         let end = s.data.len;
-        for e in &mut s.data.backing.borrow_mut()[size..end] {
-            *e = E::default();
+        for i in size..end {
+            s.data.backing.set_elem(i, E::default());
         }
         s.data.len = size;
     }
@@ -379,7 +379,7 @@ impl<E: GoElem> GoTypedSlice<E> {
         let b = Self::this(rt, o).data.backing.clone();
         match E::from_js(rt, v)? {
             Ok(e) => {
-                b.borrow_mut()[idx] = e;
+                b.set_elem(idx, e);
                 if cached.is_some() {
                     Self::cache_put(rt, o, idx, None);
                 }
@@ -634,7 +634,7 @@ impl<E: GoElem> GoTypedSlice<E> {
                 Self::cache_put(rt, o, idx as usize, None);
             }
             let b = Self::this(rt, o).data.backing.clone();
-            b.borrow_mut()[idx as usize] = E::default();
+            b.set_elem(idx as usize, E::default());
         }
     }
 
@@ -692,7 +692,7 @@ impl<E: GoElem> GoTypedSlice<E> {
     fn swap(rt: &mut Runtime, o: ObjRef, i: i64, j: i64) -> JsResult<()> {
         let (i, j) = (i as usize, j as usize);
         let b = Self::this(rt, o).data.backing.clone();
-        b.borrow_mut().swap(i, j);
+        b.swap_elems(i, j);
         let ci = Self::cached(rt, o, i);
         let cj = Self::cached(rt, o, j);
         match ci {

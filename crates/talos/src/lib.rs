@@ -51,6 +51,7 @@ pub mod string_imported;
 pub mod string_unicode;
 pub mod talosdump;
 pub mod token;
+pub mod typedarrays;
 pub mod unistring;
 pub mod value;
 pub mod vm;

@@ -19,6 +19,7 @@ use crate::runtime::{JsResult, RunError, Runtime, Throw};
 use crate::string::{JsString, STRING_EMPTY};
 use crate::string_ascii::AsciiString;
 use crate::string_imported::ImportedString;
+use crate::typedarrays::{ArrayBufferObject, TypedArrayObject};
 use crate::value::{
     ERR_ACCESS_BEFORE_INIT, ERR_ASSIGN_TO_CONST, Value, float_to_value, int_to_value,
 };
@@ -261,6 +262,8 @@ impl Exporter {
             Proxy,
             Primitive(Value),
             Func(bool),
+            Typed(DocValue),
+            ArrayBuffer,
             Base,
         }
         let kind = {
@@ -291,6 +294,10 @@ impl Exporter {
                         Kind::Date(d.export())
                     } else if a.downcast_ref::<Promise>().is_some() {
                         Kind::Promise
+                    } else if a.is::<TypedArrayObject>() {
+                        Kind::Typed(TypedArrayObject::export(rt, o))
+                    } else if a.is::<ArrayBufferObject>() {
+                        Kind::ArrayBuffer
                     } else if rt.is_proxy(o) {
                         Kind::Proxy
                     } else {
@@ -420,6 +427,8 @@ impl Exporter {
             },
             Kind::Promise => js_handle(rt, o, HandleKind::Promise),
             Kind::Proxy => js_handle(rt, o, HandleKind::Proxy),
+            Kind::Typed(dv) => dv,
+            Kind::ArrayBuffer => js_handle(rt, o, HandleKind::ArrayBuffer),
             Kind::Primitive(v) => export_primitive(rt, &v),
             Kind::Func(ctor) => export_func(rt, o, ctor),
             Kind::Base => {
@@ -741,6 +750,7 @@ pub enum ExportType {
     Proxy,
     Host,
     Dynamic,
+    ArrayBuffer,
 }
 
 impl Runtime {
@@ -798,6 +808,10 @@ impl Runtime {
                     ExportType::Time
                 } else if a.is::<Promise>() {
                     ExportType::Promise
+                } else if a.is::<TypedArrayObject>() {
+                    ExportType::TypedSlice
+                } else if a.is::<ArrayBufferObject>() {
+                    ExportType::ArrayBuffer
                 } else if self.is_proxy(o) {
                     ExportType::Proxy
                 } else {

@@ -80,6 +80,10 @@ pub fn marshal(v: &DocValue) -> Result<Vec<u8>, String> {
             path.push(p);
             stack.push(Enc::Leave(p));
         }
+        if typed_nil(&v) {
+            e.write_null();
+            continue;
+        }
         match &v {
             DocValue::Nil => e.write_null(),
             DocValue::Bool(b) => e.write_bool(*b),
@@ -189,6 +193,22 @@ pub fn marshal(v: &DocValue) -> Result<Vec<u8>, String> {
         }
     }
     Ok(e.into_bytes())
+}
+
+fn typed_nil(v: &DocValue) -> bool {
+    match v {
+        DocValue::Bytes(h) => h.is_nil(),
+        DocValue::Int8s(h) => h.is_nil(),
+        DocValue::Uint16s(h) => h.is_nil(),
+        DocValue::Int16s(h) => h.is_nil(),
+        DocValue::Uint32s(h) => h.is_nil(),
+        DocValue::Int32s(h) => h.is_nil(),
+        DocValue::Float32s(h) => h.is_nil(),
+        DocValue::Float64s(h) => h.is_nil(),
+        DocValue::Int64s(h) => h.is_nil(),
+        DocValue::Uint64s(h) => h.is_nil(),
+        _ => false,
+    }
 }
 
 fn write_ints(e: &mut EncodeState, it: impl Iterator<Item = i64>) {

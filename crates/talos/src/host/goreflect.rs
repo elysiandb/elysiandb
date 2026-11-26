@@ -537,6 +537,9 @@ pub fn arg_bytes(rt: &mut Runtime, call: &FunctionCall<'_>, i: usize) -> JsResul
             if let Some(b) = rt.ext_dyn::<GoTypedSlice<u8>>(*o) {
                 return Ok(b.data.to_vec());
             }
+            if let Some(b) = rt.export_to_bytes(&v)? {
+                return Ok(b);
+            }
             let o = *o;
             let len_v = o.get_str(rt, &"length".into(), None)?;
             let Some(len_v) = len_v.filter(|_| o.assert_callable(rt).is_none()) else {

@@ -509,7 +509,13 @@ fn throw_of(e: RunError) -> Throw {
     }
 }
 
-fn detach_array_buffer(_rt: &mut Runtime, _call: FunctionCall<'_>) -> JsResult<Value> {
+fn detach_array_buffer(rt: &mut Runtime, call: FunctionCall<'_>) -> JsResult<Value> {
+    if let Value::Object(o) = call.arg(0)
+        && let Some(data) = rt.array_buffer_data(*o)
+    {
+        data.borrow_mut().detach();
+        return Ok(Value::Undefined);
+    }
     Err(Throw::TypeError(
         "detachArrayBuffer() is called with incompatible argument".to_string(),
     ))

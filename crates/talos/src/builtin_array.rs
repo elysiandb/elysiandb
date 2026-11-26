@@ -293,7 +293,11 @@ impl Runtime {
         self.objectproto_to_string(FunctionCall::new(&Value::Object(array), &[]))
     }
 
-    fn write_item_locale_string(&mut self, item: &Value, buf: &mut StringBuilder) -> JsResult<()> {
+    pub(crate) fn write_item_locale_string(
+        &mut self,
+        item: &Value,
+        buf: &mut StringBuilder,
+    ) -> JsResult<()> {
         if !matches!(item, Value::Empty | Value::Undefined | Value::Null) {
             if let Some(Value::Object(f)) = self.get_v_str(item, &"toLocaleString".into())?
                 && let Some(c) = f.assert_callable(self)

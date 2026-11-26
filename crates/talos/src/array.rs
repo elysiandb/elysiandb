@@ -38,6 +38,9 @@ impl ArrayIterObject {
         let Some(obj) = rt.ext_dyn::<ArrayIterObject>(o).and_then(|ai| ai.obj) else {
             return Ok(rt.create_iter_result_object(Value::Undefined, true));
         };
+        if let Some(ta) = rt.typed_array(obj) {
+            crate::typedarrays::ensure_not_detached(rt, &ta.data, true)?;
+        }
         let lv = nil_safe(obj.get_str(rt, &crate::vm::STR_LENGTH, None)?);
         let l = to_length(rt, &lv)?;
         let (index, kind) = match rt.ext_dyn::<ArrayIterObject>(o) {
