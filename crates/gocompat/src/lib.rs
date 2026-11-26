@@ -1,6 +1,7 @@
 pub mod base64;
 pub mod binary;
 pub mod errors;
+pub mod filepath;
 pub mod flag;
 pub mod fmt;
 pub mod json;
