@@ -7,22 +7,55 @@ RUN npm ci
 COPY adminui/ ./
 RUN npm run build
 
-FROM golang:1.24-alpine AS builder
+FROM --platform=$BUILDPLATFORM rust:1.91.1-slim-bookworm AS builder
 WORKDIR /src
 
-COPY go.mod go.sum ./
-RUN go mod download
+ARG TARGETARCH
+ARG CARGO_ZIGBUILD_VERSION=0.24.1
+COPY rust-toolchain.toml ./
+RUN case "${TARGETARCH:-}" in \
+      amd64) arch=x86_64 ;; \
+      arm64) arch=aarch64 ;; \
+      "") arch="$(uname -m)" ;; \
+      *) echo "unsupported architecture ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+ && echo "${arch}-unknown-linux-musl" > /target \
+ && rustup toolchain install \
+ && rustup target add "$(cat /target)" \
+ && if [ "${arch}" = "$(uname -m)" ]; then \
+      apt-get update \
+      && apt-get install -y --no-install-recommends musl-tools \
+      && rm -rf /var/lib/apt/lists/* \
+      && echo build > /cargo-command; \
+    else \
+      case "$(uname -m)" in \
+        x86_64) zig_sha256=24aeeec8af16c381934a6cd7d95c807a8cb2cf7df9fa40d359aa884195c4716c ;; \
+        aarch64) zig_sha256=f7a654acc967864f7a050ddacfaa778c7504a0eca8d2b678839c21eea47c992b ;; \
+        *) echo "unsupported build architecture $(uname -m)" >&2; exit 1 ;; \
+      esac \
+      && apt-get update \
+      && apt-get install -y --no-install-recommends curl xz-utils \
+      && rm -rf /var/lib/apt/lists/* \
+      && curl -fsSL -o /tmp/zig.tar.xz "https://ziglang.org/download/0.14.1/zig-$(uname -m)-linux-0.14.1.tar.xz" \
+      && echo "${zig_sha256}  /tmp/zig.tar.xz" | sha256sum -c - \
+      && mkdir -p /opt/zig \
+      && tar -xJf /tmp/zig.tar.xz -C /opt/zig --strip-components=1 \
+      && rm /tmp/zig.tar.xz \
+      && ln -s /opt/zig/zig /usr/local/bin/zig \
+      && cargo install --locked cargo-zigbuild --version "${CARGO_ZIGBUILD_VERSION}" \
+      && echo zigbuild > /cargo-command; \
+    fi
 
 COPY . .
 COPY --from=adminui /src/adminui/dist ./adminui/dist
 
-ARG TARGETOS
-ARG TARGETARCH
 ARG VERSION=dev
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
-    go build -trimpath \
-    -ldflags="-s -w -X github.com/taymour/elysiandb/internal/globals.VERSION=${VERSION#v}" \
-    -o /out/elysiandb .
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/src/target \
+    if [ "$(cat /cargo-command)" = build ]; then export TARGET_CC=musl-gcc; fi \
+ && ELYSIANDB_VERSION="${VERSION}" cargo "$(cat /cargo-command)" --release --locked --bin elysiandb --target "$(cat /target)" \
+ && mkdir -p /out \
+ && cp "target/$(cat /target)/release/elysiandb" /out/elysiandb
 
 FROM alpine:3.20
 
