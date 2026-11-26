@@ -303,7 +303,7 @@ pub fn current_instance() -> Instance {
     .collect();
 
     Instance {
-        version: globals::VERSION.to_string(),
+        version: globals::version(),
         rust_version: RUST_VERSION.to_string(),
         engine: globals::engine(),
         started_at: started.wall.clone(),

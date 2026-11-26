@@ -24,7 +24,7 @@ impl Default for StatsContainer {
 
 pub fn new_stats_container() -> StatsContainer {
     let s = StatsContainer::empty();
-    *s.version.write() = globals::VERSION.to_string();
+    *s.version.write() = globals::version();
     s
 }
 

@@ -90,7 +90,7 @@ pub fn prepare(now: Time) -> Result<Source, BoxError> {
     let manifest = Manifest {
         format: FORMAT.to_string(),
         format_version: FORMAT_VERSION,
-        elysiandb_version: globals::VERSION.to_string(),
+        elysiandb_version: globals::version(),
         created_at: now.utc().format(RFC3339),
         engine: globals::engine(),
         entities: Vec::new(),

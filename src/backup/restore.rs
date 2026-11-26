@@ -136,7 +136,7 @@ impl Manifest {
                 "format version {} is newer than the version {} supported by ElysianDB {}",
                 self.format_version,
                 FORMAT_VERSION,
-                globals::VERSION
+                globals::version()
             )));
         }
 

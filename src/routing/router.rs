@@ -127,6 +127,6 @@ pub fn version(next: Handler) -> Handler {
         next(ctx);
         ctx.response
             .header
-            .add("X-Elysian-Version", globals::VERSION);
+            .add("X-Elysian-Version", globals::version());
     })
 }

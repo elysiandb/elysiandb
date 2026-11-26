@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::fmt;
 use std::io::{self, Write};
-use std::net::{SocketAddr, TcpListener};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::os::fd::AsRawFd;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
@@ -181,6 +181,10 @@ impl Server {
         self.inner.serve(listener)
     }
 
+    pub fn serve_connection(&self, stream: TcpStream, peer_addr: SocketAddr) -> io::Result<()> {
+        self.inner.serve_connection(stream, peer_addr)
+    }
+
     pub fn shutdown(&self) -> Result<(), ShutdownError> {
         self.inner.shutdown(None)
     }
@@ -232,6 +236,26 @@ impl ServerInner {
         self.accept_running.store(false, Ordering::SeqCst);
         poller.wake();
         res
+    }
+
+    fn serve_connection(
+        self: &Arc<Self>,
+        stream: TcpStream,
+        peer_addr: SocketAddr,
+    ) -> io::Result<()> {
+        if self.is_stopping() {
+            return Err(io::Error::from(io::ErrorKind::NotConnected));
+        }
+        let mut current = self.poller.lock();
+        if current.is_none() {
+            let poller = Arc::new(Poller::new()?);
+            *current = Some(poller.clone());
+            let server = self.clone();
+            crate::sync::spawn("http-poller", move || poller.run(&server));
+        }
+        drop(current);
+        self.accepted(stream, peer_addr);
+        Ok(())
     }
 
     fn accept_loop(self: &Arc<Self>, listener: &TcpListener, wake: &WakePipe) -> io::Result<()> {

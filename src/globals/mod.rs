@@ -19,3 +19,16 @@ pub use format::{BLUE, BOLD, FAINT, GOLD, GRAY, RED, RESET, VIOLET};
 pub use procs::{PROCS_ENV, parse_procs, procs};
 
 pub const VERSION: &str = env!("ELYSIANDB_BUILD_VERSION");
+
+static VERSION_OVERRIDE: crate::sync::RwLock<Option<String>> = crate::sync::RwLock::new(None);
+
+pub fn version() -> String {
+    match VERSION_OVERRIDE.read().as_ref() {
+        Some(v) => v.clone(),
+        None => VERSION.to_string(),
+    }
+}
+
+pub fn set_version(v: Option<String>) {
+    *VERSION_OVERRIDE.write() = v;
+}

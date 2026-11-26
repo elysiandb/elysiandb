@@ -1292,7 +1292,7 @@ impl Client {
 }
 
 fn user_agent() -> String {
-    format!("ElysianDB/{}", globals::VERSION)
+    format!("ElysianDB/{}", globals::version())
 }
 
 fn proxy_authorization(proxy: &Proxy) -> Option<Vec<u8>> {
