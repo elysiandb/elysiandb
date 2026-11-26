@@ -57,9 +57,6 @@ fn collect(dir: &Path, prefix: &str, top: bool, files: &mut Vec<(String, String)
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
-    if top && dir.join("go.mod").exists() {
-        panic!("the Admin UI folder {} holds a go.mod file", dir.display());
-    }
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
         let path = entry.path();
@@ -78,12 +75,6 @@ fn collect(dir: &Path, prefix: &str, top: bool, files: &mut Vec<(String, String)
             continue;
         };
         if file_type.is_dir() {
-            if path.join("go.mod").exists() {
-                if top {
-                    panic!("the Admin UI folder {rel} holds a go.mod file");
-                }
-                continue;
-            }
             let before = files.len();
             collect(&path, &rel, false, files);
             if top && files.len() == before {
