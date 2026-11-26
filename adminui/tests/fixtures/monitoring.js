@@ -4,7 +4,7 @@ export const OVERVIEW = {
     generated_at: "2026-11-01T12:00:00Z",
     instance: {
         version: "0.2.2",
-        go_version: "go1.25.3",
+        rust_version: "rustc 1.91.1",
         engine: "internal",
         started_at: "2026-11-01T08:00:00Z",
         uptime_seconds: 14400,
@@ -45,7 +45,7 @@ export const OVERVIEW = {
         flush_failures: 0,
         last_success_at: "2026-11-01T11:59:57Z",
     },
-    runtime: { heap_bytes: 432013312, total_bytes: 512000000, goroutines: 57, cpu_percent: 3.2 },
+    runtime: { allocated_bytes: 432013312, total_bytes: 512000000, threads: 57, cpu_percent: 3.2 },
     connections: { http: 4, tcp: 0, admin_sessions: 2, open_transactions: 0, oldest_transaction_seconds: 0 },
     logs: { level: "info", errors_1h: 3, warnings_1h: 18, errors_24h: 11, warnings_24h: 140 },
 };
