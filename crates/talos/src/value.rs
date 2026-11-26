@@ -621,6 +621,16 @@ impl Value {
         }
     }
 
+    pub fn fmt_string(&self, rt: &mut Runtime) -> JsResult<String> {
+        match self.go_string(rt) {
+            Ok(s) => Ok(s),
+            Err(t) => {
+                let text = rt.fmt_panic_value(t)?;
+                Ok(format!("%!s(PANIC=String method: {text})"))
+            }
+        }
+    }
+
     pub fn to_float(&self, rt: &mut Runtime) -> JsResult<f64> {
         match self {
             Value::Object(o) => o.to_primitive_number(rt)?.to_float(rt),

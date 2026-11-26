@@ -37,7 +37,7 @@ impl Runtime {
             }
             _ => {}
         }
-        let s = v.go_string(self)?;
+        let s = v.fmt_string(self)?;
         Err(Throw::Value(
             self.new_type_error(&format!("Value is not a number: {s}")),
         ))

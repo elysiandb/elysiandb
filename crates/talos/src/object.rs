@@ -1110,7 +1110,7 @@ impl BaseObject {
         }
         if !rt.obj(o).base.extensible {
             if throw {
-                let s = Value::Object(o).go_string(rt)?;
+                let s = Value::Object(o).fmt_string(rt)?;
                 return Err(Throw::Value(
                     rt.new_type_error(&format!("{s} is not extensible")),
                 ));

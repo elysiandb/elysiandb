@@ -303,7 +303,7 @@ impl Runtime {
                 buf.write_string(&s);
                 return Ok(());
             }
-            let s = item.go_string(self)?;
+            let s = item.fmt_string(self)?;
             self.type_error_result(
                 true,
                 &format!("Property 'toLocaleString' of object {s} is not a function"),
@@ -884,7 +884,7 @@ impl Runtime {
         let length = get_length(self, o)?;
         let callback_obj = call.arg(0).to_object(self)?;
         let Some(callback_fn) = callback_obj.assert_callable(self) else {
-            let s = call.arg(0).go_string(self)?;
+            let s = call.arg(0).fmt_string(self)?;
             return Err(Throw::Value(
                 self.new_type_error(&format!("{s} is not a function")),
             ));
@@ -934,7 +934,7 @@ impl Runtime {
         let length = get_length(self, o)?;
         let callback_obj = call.arg(0).to_object(self)?;
         let Some(callback_fn) = callback_obj.assert_callable(self) else {
-            let s = call.arg(0).go_string(self)?;
+            let s = call.arg(0).fmt_string(self)?;
             return Err(Throw::Value(
                 self.new_type_error(&format!("{s} is not a function")),
             ));
@@ -981,7 +981,7 @@ impl Runtime {
         let length = get_length(self, o)?;
         let callback_obj = call.arg(0).to_object(self)?;
         let Some(callback_fn) = callback_obj.assert_callable(self) else {
-            let s = call.arg(0).go_string(self)?;
+            let s = call.arg(0).fmt_string(self)?;
             return Err(Throw::Value(
                 self.new_type_error(&format!("{s} is not a function")),
             ));
@@ -1629,7 +1629,7 @@ impl Runtime {
                 map_fn = m.assert_callable(self);
             }
             if map_fn.is_none() {
-                let s = map_fn_arg.go_string(self)?;
+                let s = map_fn_arg.fmt_string(self)?;
                 return Err(Throw::Value(
                     self.new_type_error(&format!("{s} is not a function")),
                 ));

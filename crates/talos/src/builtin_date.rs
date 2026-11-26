@@ -216,7 +216,7 @@ impl Runtime {
         if STRING_NUMBER.strict_equals(&arg) {
             return o.ordinary_to_primitive_number(self);
         }
-        let s = arg.go_string(self)?;
+        let s = arg.fmt_string(self)?;
         Err(Throw::Value(
             self.new_type_error(&format!("Invalid hint: {s}")),
         ))

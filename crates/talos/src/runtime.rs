@@ -1704,6 +1704,28 @@ impl Runtime {
         self.run_program(&p)
     }
 
+    pub fn fmt_panic_value(&mut self, t: Throw) -> JsResult<String> {
+        match t {
+            Throw::Value(v) => v.go_string(self),
+            Throw::Exception(e) => {
+                let mut b = e.val.go_string(self)?;
+                e.write_short_stack(&mut b);
+                Ok(b)
+            }
+            Throw::TypeError(m)
+            | Throw::RangeError(m)
+            | Throw::ReferenceError(m)
+            | Throw::SyntaxError(m) => Ok(m),
+            Throw::ReferenceErrorName(n) => self.new_reference_error(&n).go_string(self),
+            Throw::Interrupted(e) => Ok(e.error()),
+            Throw::StackOverflow(e) => {
+                let mut b = String::new();
+                e.exception.write_short_stack(&mut b);
+                Ok(b)
+            }
+        }
+    }
+
     pub fn throw_to_run_error(&mut self, t: Throw) -> RunError {
         match t {
             Throw::Interrupted(e) => RunError::Interrupted(e),

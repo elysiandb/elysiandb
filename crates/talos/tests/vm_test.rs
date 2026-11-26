@@ -210,6 +210,64 @@ fn native_frame_stays_visible_in_stack() {
     });
 }
 
+#[test]
+fn error_messages_keep_the_failure_of_a_formatted_value() {
+    const SCRIPT: &str = r#"function Boom(m) { this.message = m; }
+Boom.prototype.toString = function () { return "Boom: " + this.message; };
+var key = { toString: function () { throw new Boom("key"); } };
+var twice = { toString: function () { throw { toString: function () { throw new Boom("twice"); } }; } };
+var plain = { toString: function () { throw 42; } };
+function message(f) {
+  try {
+    f();
+  } catch (e) {
+    return e.constructor.name + ": " + e.message;
+  }
+  return "no error";
+}
+[
+  message(function () { var b = null; b[key]; }),
+  message(function () { var b; b[key](); }),
+  message(function () { var b = null; b[twice]; }),
+  message(function () { var b = null; b[plain]; }),
+  message(function () { [1].filter(key); }),
+  message(function () { [1].reduce(key); }),
+  message(function () { [1].reduceRight(key); }),
+  message(function () { Array.from([1], key); }),
+  message(function () { [{ toLocaleString: 1, toString: key.toString }].toLocaleString(); }),
+  message(function () { Date.prototype[Symbol.toPrimitive].call({}, key); }),
+  message(function () { Number.prototype.valueOf.call(key); }),
+  message(function () { Object.setPrototypeOf(Object.preventExtensions({ toString: key.toString }), {}); }),
+  message(function () {
+    var t = {};
+    Object.defineProperty(t, "x", { value: key });
+    new Proxy(t, { get: function () { return 1; } }).x;
+  }),
+  message(function () { [1].every(key); }),
+].join("\n");
+"#;
+    const EXPECTED: &str = r#"TypeError: Cannot read property '%!s(PANIC=String method: Boom: key at toString (<eval>:3:37(4)))' of undefined
+TypeError: Cannot read property '%!s(PANIC=String method: Boom: key at toString (<eval>:3:37(4)))' of undefined
+Boom: twice
+TypeError: Cannot read property '%!s(PANIC=String method: 42 at toString (<eval>:5:39(2)))' of undefined
+TypeError: %!s(PANIC=String method: Boom: key at toString (<eval>:3:37(4))) is not a function
+TypeError: %!s(PANIC=String method: Boom: key at toString (<eval>:3:37(4))) is not a function
+TypeError: %!s(PANIC=String method: Boom: key at toString (<eval>:3:37(4))) is not a function
+TypeError: %!s(PANIC=String method: Boom: key at toString (<eval>:3:37(4))) is not a function
+TypeError: Property 'toLocaleString' of object %!s(PANIC=String method: Boom: key at toString (<eval>:3:37(4))) is not a function
+TypeError: Invalid hint: %!s(PANIC=String method: Boom: key at toString (<eval>:3:37(4)))
+TypeError: Value is not a number: %!s(PANIC=String method: Boom: key at toString (<eval>:3:37(4)))
+TypeError: %!s(PANIC=String method: Boom: key at toString (<eval>:3:37(4))) is not extensible
+TypeError: 'get' on proxy: property 'x' is a read-only and non-configurable data property on the proxy target but the proxy did not return its actual value (expected '%!s(PANIC=String method: Boom: key at toString (<eval>:3:37(4)))' but got '{}')
+Boom: key"#;
+    on_big_stack(|| {
+        let mut rt = new_runtime();
+        let v = rt.run_string(SCRIPT).expect("run");
+        let got = v.go_string(&mut rt).expect("string");
+        assert_eq!(got, EXPECTED);
+    });
+}
+
 fn oracle_type_name(v: &Value) -> &'static str {
     match v {
         Value::Undefined => "talos.valueUndefined",

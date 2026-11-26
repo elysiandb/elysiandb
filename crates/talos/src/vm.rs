@@ -4280,7 +4280,7 @@ impl Runtime {
 
     fn cannot_read_property_of_undefined(&mut self, idx: usize) -> Throw {
         let k = self.vm.stack[idx].clone();
-        match k.go_string(self) {
+        match k.fmt_string(self) {
             Ok(s) => Throw::Value(
                 self.new_type_error(&format!("Cannot read property '{s}' of undefined")),
             ),

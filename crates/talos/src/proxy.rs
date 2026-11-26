@@ -942,7 +942,7 @@ impl ProxyObject {
                     let n = name.string(rt);
                     let expected =
                         nil_safe(Some(target_desc.value.clone()).filter(|v| !v.is_empty()))
-                            .go_string(rt)?;
+                            .fmt_string(rt)?;
                     return type_error(
                         rt,
                         &format!(
