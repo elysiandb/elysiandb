@@ -2513,7 +2513,7 @@ GET foo
 PING
 ```
 
-The TCP benchmark accepts the same credentials: `./elysian_bench -addr 127.0.0.1:8088 -auth my-secret-token`.
+The TCP benchmark accepts the same credentials: `cargo run --release --locked --bin elysian_bench -- -addr 127.0.0.1:8088 -auth my-secret-token`.
 
 ---
 
