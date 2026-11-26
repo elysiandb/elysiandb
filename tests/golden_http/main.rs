@@ -468,3 +468,111 @@ fn test_streamed_restore_body_errors_use_the_d27_messages() {
         assert_eq!(String::from_utf8_lossy(&body_of(raw)), want, "{text}");
     }
 }
+
+fn request(method: &str, path: &[u8], body: &str) -> Vec<u8> {
+    let mut out = method.as_bytes().to_vec();
+    out.push(b' ');
+    out.extend_from_slice(path);
+    out.extend_from_slice(b" HTTP/1.1\r\nHost: h\r\nConnection: close\r\n");
+    if !body.is_empty() || method != "GET" {
+        out.extend_from_slice(
+            format!(
+                "Content-Type: application/json\r\nContent-Length: {}\r\n",
+                body.len()
+            )
+            .as_bytes(),
+        );
+    }
+    out.extend_from_slice(b"\r\n");
+    out.extend_from_slice(body.as_bytes());
+    out
+}
+
+fn status_line(raw: &[u8]) -> String {
+    let text = String::from_utf8_lossy(raw).into_owned();
+    text.split("\r\n").next().unwrap_or_default().to_string()
+}
+
+#[test]
+fn test_import_with_a_null_document_stops_like_go() {
+    let requests = [
+        request("POST", b"/api/b", r#"{"id":"b1"}"#),
+        request("POST", b"/api/import", r#"{"a":[{"id":"x"}],"b":[null]}"#),
+        request("GET", b"/api/a", ""),
+        request("GET", b"/api/b", ""),
+        request("POST", b"/api/c", r#"{"id":"c1"}"#),
+        request("GET", b"/api/c/c1", ""),
+    ];
+    let refs: Vec<&[u8]> = requests.iter().map(Vec::as_slice).collect();
+    let (replies, logs) = routed::send_raw_with_logs("off", &refs);
+
+    assert_eq!(status_line(&replies[0]), "HTTP/1.1 200 OK");
+
+    let import = String::from_utf8_lossy(&replies[1]).into_owned();
+    assert_eq!(
+        status_line(&replies[1]),
+        "HTTP/1.1 500 Internal Server Error"
+    );
+    assert!(
+        import.contains("\r\nContent-Type: application/json\r\n"),
+        "{import}"
+    );
+    assert!(import.contains("\r\nContent-Length: 0\r\n"), "{import}");
+    assert!(!import.contains("X-Elysian-Version"), "{import}");
+    assert!(body_of(&replies[1]).is_empty(), "{import}");
+    assert!(
+        logs.contains("msg=\"handler panic\"")
+            && logs.contains("panic=\"cannot write a null document\""),
+        "{logs}"
+    );
+
+    assert_eq!(
+        String::from_utf8_lossy(&body_of(&replies[2])),
+        r#"[{"id":"x"}]"#
+    );
+    assert_eq!(String::from_utf8_lossy(&body_of(&replies[3])), "[]");
+    assert_eq!(status_line(&replies[4]), "HTTP/1.1 200 OK");
+    assert_eq!(
+        String::from_utf8_lossy(&body_of(&replies[5])),
+        r#"{"id":"c1"}"#
+    );
+}
+
+#[test]
+fn test_raw_entity_names_reach_the_wire_like_go() {
+    let fields = r#"{"fields":{"t":{"type":"string"}}}"#;
+    let requests = [
+        request("POST", b"/api/\xfe/create", fields),
+        request("POST", b"/api/\xfe/create", fields),
+        request("PUT", b"/api/\xfe/schema", fields),
+        request("GET", b"/api/entity/types/name", ""),
+        request("POST", b"/api/\xfe/migrate", r#"[{"set":{"x":1}}]"#),
+        request("POST", b"/api/\xfd/migrate", r#"[{"set":{"x":1}}]"#),
+    ];
+    let refs: Vec<&[u8]> = requests.iter().map(Vec::as_slice).collect();
+    let replies = routed::send_raw("off", &refs);
+
+    let schema = r#"{"_manual":true,"fields":{"t":{"name":"t","required":false,"type":"string"}},"id":"\ufffd"}"#;
+    assert_eq!(status_line(&replies[0]), "HTTP/1.1 200 OK");
+    assert_eq!(String::from_utf8_lossy(&body_of(&replies[0])), schema);
+
+    assert_eq!(status_line(&replies[1]), "HTTP/1.1 400 Bad Request");
+    assert_eq!(body_of(&replies[1]), b"entity type '\xfe' already exists");
+
+    assert_eq!(status_line(&replies[2]), "HTTP/1.1 200 OK");
+    assert_eq!(String::from_utf8_lossy(&body_of(&replies[2])), schema);
+
+    assert_eq!(
+        String::from_utf8_lossy(&body_of(&replies[3])),
+        r#"{"entities":["\ufffd"]}"#
+    );
+
+    assert_eq!(
+        body_of(&replies[4]),
+        b"{\"message\" : \"Entity '\xfe' migrated successfully.\"}"
+    );
+    assert_eq!(
+        body_of(&replies[5]),
+        b"{\"error\" : \"Entity '\xfd' does not exist.\"}"
+    );
+}

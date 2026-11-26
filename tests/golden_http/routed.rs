@@ -366,6 +366,10 @@ pub struct Replay {
 }
 
 pub fn send_raw(scenario: &str, requests: &[&[u8]]) -> Vec<Vec<u8>> {
+    send_raw_with_logs(scenario, requests).0
+}
+
+pub fn send_raw_with_logs(scenario: &str, requests: &[&[u8]]) -> (Vec<Vec<u8>>, String) {
     let booted = boot(scenario);
     let mut out = Vec::new();
     for req in requests {
@@ -375,7 +379,9 @@ pub fn send_raw(scenario: &str, requests: &[&[u8]]) -> Vec<Vec<u8>> {
         let (raw, _) = read_response(&mut conn, true, 0, 10000);
         out.push(raw);
     }
-    out
+    std::thread::sleep(Duration::from_millis(20));
+    let logs = booted.logs.since(0);
+    (out, logs)
 }
 
 pub fn replay(scenario: &str) -> Replay {
