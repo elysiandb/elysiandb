@@ -221,21 +221,6 @@ impl Client {
         }
     }
 
-    pub fn cookie(&self, name: &str) -> Option<String> {
-        self.cookies
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .get(name)
-            .cloned()
-    }
-
-    pub fn set_cookie(&self, name: &str, value: &str) {
-        self.cookies
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .insert(name.to_string(), value.to_string());
-    }
-
     pub fn close_idle_connections(&self) {
         self.idle.lock().unwrap_or_else(|e| e.into_inner()).clear();
     }

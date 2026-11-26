@@ -68,7 +68,6 @@ pub struct Server {
     process: Mutex<Process>,
     pid: libc::pid_t,
     pub client: Client,
-    pub port: u16,
     pub folder: PathBuf,
     pub log: ServerLog,
 }
@@ -141,7 +140,6 @@ pub fn spawn(
             SocketAddr::from(([127, 0, 0, 1], port)),
             Duration::from_secs(30),
         ),
-        port,
         folder: folder.to_path_buf(),
         log: output,
     });

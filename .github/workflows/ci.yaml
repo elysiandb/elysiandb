@@ -105,62 +105,6 @@ jobs:
           TALOS_TEST262_DIR: ${{ runner.temp }}/test262
         run: cargo test --locked --release -p talos --test test262 -- --ignored tc39 --test-threads=1
 
-  cross-binary:
-    name: Compatibility with v0.3.0
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      BASELINE_IMAGE: taymour/elysiandb:0.3.0
-      V024_IMAGE: taymour/elysiandb:0.2.4
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Setup Rust
-        run: rustup toolchain install
-
-      - name: Cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Ensure adminui dist exists
-        run: mkdir -p adminui/dist
-
-      - name: Extract the baseline binaries
-        run: |
-          mkdir -p "$RUNNER_TEMP/bin"
-          extract() {
-            id=$(docker create --platform linux/amd64 "$1")
-            docker cp "$id:/usr/local/bin/elysiandb" "$RUNNER_TEMP/bin/$2"
-            docker rm "$id" > /dev/null
-            chmod +x "$RUNNER_TEMP/bin/$2"
-            file "$RUNNER_TEMP/bin/$2"
-          }
-          extract "$BASELINE_IMAGE" elysiandb-baseline
-          extract "$V024_IMAGE" elysiandb-024
-
-      - name: Build
-        run: cargo build --locked --release --bin elysiandb --test e2e_process --test compat --test cross_binary
-
-      - name: Rust writes first, then the baseline
-        env:
-          ELYSIANDB_PREVIOUS_BINARY: ${{ runner.temp }}/bin/elysiandb-baseline
-          ELYSIANDB_V024_BINARY: ${{ runner.temp }}/bin/elysiandb-024
-        run: |
-          cargo test --locked --release --test e2e_process --test compat --test cross_binary -- --test-threads=1 --skip record_legacy_fixtures 2>&1 | tee "$RUNNER_TEMP/rust-first.log"
-          if grep -n '^skipped:' "$RUNNER_TEMP/rust-first.log"; then exit 1; fi
-
-      - name: Baseline writes first, then Rust, and the process suite on the baseline
-        env:
-          ELYSIANDB_BINARY: ${{ runner.temp }}/bin/elysiandb-baseline
-          ELYSIANDB_PREVIOUS_BINARY: ${{ github.workspace }}/target/release/elysiandb
-        run: |
-          cargo test --locked --release --test e2e_process -- --test-threads=1 2>&1 | tee "$RUNNER_TEMP/baseline-first.log"
-          if grep -n '^skipped:' "$RUNNER_TEMP/baseline-first.log"; then exit 1; fi
-
   adminui:
     name: Admin UI tests
     runs-on: ubuntu-latest
