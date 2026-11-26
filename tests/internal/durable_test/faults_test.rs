@@ -836,7 +836,7 @@ fn plain_options(dir: &Path, fs: Option<Arc<dyn Fs>>) -> Options {
 #[test]
 fn test_a_migration_interrupted_at_any_step_completes_at_the_next_start() {
     let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("test/compat/testdata/v0.2.4/full");
+        .join("tests/compat/testdata/v0.2.4/full");
 
     let tmp = TempDir::new();
     let reference = filepath::join(tmp.path(), "reference");

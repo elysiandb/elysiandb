@@ -8,7 +8,7 @@ use super::support::{array, field, string};
 
 pub fn fixture(rel: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("test/compat/testdata")
+        .join("tests/compat/testdata")
         .join(rel)
 }
 
