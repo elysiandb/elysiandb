@@ -517,32 +517,8 @@ impl Host<Connection> for Listening {
     }
 
     fn ready(self: &Arc<Self>, conn: Connection) {
-        let turn = Turn {
-            conn: Some(conn),
-            listening: self.clone(),
-        };
-        workers().submit(Box::new(move || turn.run()));
-    }
-}
-
-struct Turn {
-    conn: Option<Connection>,
-    listening: Arc<Listening>,
-}
-
-impl Turn {
-    fn run(mut self) {
-        if let Some(conn) = self.conn.take() {
-            self.listening.serve(conn);
-        }
-    }
-}
-
-impl Drop for Turn {
-    fn drop(&mut self) {
-        if let Some(conn) = self.conn.take() {
-            conn.finish();
-        }
+        let listening = self.clone();
+        workers().submit(Box::new(move || listening.serve(conn)));
     }
 }
 

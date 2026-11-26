@@ -10,6 +10,8 @@ pub(crate) type Job = Box<dyn FnOnce() + Send>;
 
 const WORKER_STACK_SIZE: usize = 8 << 20;
 const MAX_IDLE: Duration = Duration::from_secs(10);
+const SPAWN_RETRY_MIN: Duration = Duration::from_millis(5);
+const SPAWN_RETRY_MAX: Duration = Duration::from_secs(1);
 
 struct State {
     queue: VecDeque<Job>,
@@ -29,6 +31,20 @@ static POOL: OnceLock<Pool> = OnceLock::new();
 
 pub(crate) fn pool() -> &'static Pool {
     POOL.get_or_init(|| Pool::new("http-worker", WORKER_STACK_SIZE))
+}
+
+struct Handoff {
+    pool: &'static Pool,
+    job: Option<Job>,
+}
+
+impl Drop for Handoff {
+    fn drop(&mut self) {
+        if let Some(job) = self.job.take() {
+            self.pool.state.lock().queue.push_back(job);
+            self.pool.cv.notify_one();
+        }
+    }
 }
 
 struct WorkerExit(&'static Pool);
@@ -68,22 +84,46 @@ impl Pool {
         if st.total < self.max_workers {
             st.total += 1;
             drop(st);
-            let spawned = std::thread::Builder::new()
-                .name(self.name.to_string())
-                .stack_size(self.stack_size)
-                .spawn(move || crate::sync::run_fatal(|| self.run(job)));
-            if spawned.is_err() {
+            let mut first = Some(job);
+            let mut delay = SPAWN_RETRY_MIN;
+            loop {
+                if self.spawn(first.take()) {
+                    return;
+                }
                 let mut st = self.state.lock();
-                st.total -= 1;
+                if st.total > 1 {
+                    st.total -= 1;
+                    return;
+                }
+                drop(st);
+                std::thread::sleep(delay);
+                delay = (delay * 2).min(SPAWN_RETRY_MAX);
             }
-            return;
         }
         st.queue.push_back(job);
     }
 
-    fn run(&'static self, first: Job) {
+    fn spawn(&'static self, first: Option<Job>) -> bool {
+        let mut handoff = Handoff {
+            pool: self,
+            job: first,
+        };
+        std::thread::Builder::new()
+            .name(self.name.to_string())
+            .stack_size(self.stack_size)
+            .spawn(move || {
+                let first = handoff.job.take();
+                drop(handoff);
+                crate::sync::run_fatal(|| self.run(first));
+            })
+            .is_ok()
+    }
+
+    fn run(&'static self, first: Option<Job>) {
         let guard = WorkerExit(self);
-        first();
+        if let Some(job) = first {
+            job();
+        }
         loop {
             let mut st = self.state.lock();
             let job = loop {
