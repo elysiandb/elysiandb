@@ -8,9 +8,7 @@ coverage:
         informational: true
 
 ignore:
-  - "benchmark/**"
   - "src/bin/elysian_bench.rs"
-  - "benches/**"
   - "tests/**"
   - "crates/*/tests/**"
   - "docs/**"

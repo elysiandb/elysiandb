@@ -2,9 +2,7 @@
 .code
 .idea
 /elysiandb
-coverage.out
 /target
 lcov.info
 *.sh
 *.txt
-.bench-base/
