@@ -233,6 +233,10 @@ fn live_backup_holds_one_instant_under_writes() {
         n += 1000;
     }
 
+    if let Err(err) = e.kv_put(b"counter", b"30000", 0) {
+        panic!("{err}");
+    }
+
     let acked = AtomicI64::new(30000);
     let stop = AtomicBool::new(false);
     let errors: Mutex<Vec<String>> = Mutex::new(Vec::new());
