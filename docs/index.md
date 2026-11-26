@@ -2242,7 +2242,7 @@ Hooks behave exactly as described above; ElysianDB only avoids repeating work:
 * **Indexes prepared in advance.** The fields that the `ctx.query` calls of a script filter on are indexed in the background when the hook is created or changed, and these indexes are kept while the hook exists (see Storage engine internals).
 * **Lane.** A hook whose script runs take more than a few milliseconds on average, waits for shared results aside, waits for a slot of the hook lane (see Overload and timeouts).
 
-Each script is compiled once. Every run gets a fresh JavaScript runtime, as before: creating one costs about a microsecond, and nothing a script leaves in its globals can reach another run. The monitoring gives, per hook, its executions, duration, `ctx.query` calls, rows read and reused results.
+Each script is compiled once. Every run gets a fresh JavaScript runtime, as before: creating one costs less than a microsecond, and nothing a script leaves in its globals can reach another run. The monitoring gives, per hook, its executions, duration, `ctx.query` calls, rows read and reused results.
 
 ---
 
@@ -2776,4 +2776,6 @@ docker run -d --name elysiandb \
 * The image contains the Admin UI: set `adminui.enabled: true` and `security.authentication.mode: user` to serve it at `/admin`.
 * Inside a container, clients connect through the Docker network, not the loopback address, so the default `admin` password is refused (see Default admin password). Set `ELYSIANDB_ADMIN_PASSWORD` the first time the container starts on an empty volume: `docker run -e ELYSIANDB_ADMIN_PASSWORD='a-long-password' ...`. For an existing volume, run `docker exec -it elysiandb elysiandb change-password`.
 * The `HEALTHCHECK` calls `/health`, which works in every authentication mode.
-* Images report the version computed by `git describe` at build time. To build one yourself: `docker build --build-arg VERSION=$(git describe --tags --always) -t elysiandb .`
+* Images report the version computed by `git describe` at build time. To build one yourself: `docker build --build-arg VERSION=$(git describe --tags --always) -t elysiandb .`. Without `VERSION`, from a source archive for example, the image reports `dev`.
+* The build compiles a static binary for the platform of the machine that runs it: on an amd64 machine, `docker build --platform linux/amd64 --build-arg VERSION=$(git describe --tags --always) -t elysiandb .` needs neither cross-compilation nor emulation. For another platform, `--platform linux/arm64` on an amd64 machine or the reverse, the binary is cross-compiled with `cargo-zigbuild` and only the few commands of the final Alpine stage run under emulation. The build needs BuildKit, the default builder of Docker since version 23.
+* On a machine with 4 cores, a first build takes about 5 minutes, depending on the network: one to two minutes compile ElysianDB, the rest downloads the base images and the crates, builds the Admin UI and installs the musl tools. Later builds reuse the downloaded crates and the compiled dependencies.
