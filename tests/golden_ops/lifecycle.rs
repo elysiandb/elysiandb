@@ -25,6 +25,7 @@ struct Server {
     out: std::sync::Arc<std::sync::Mutex<Vec<u8>>>,
     reader: Option<std::thread::JoinHandle<()>>,
     http: u16,
+    tcp: u16,
 }
 
 impl Server {
@@ -74,6 +75,7 @@ impl Server {
             out,
             reader: Some(reader),
             http,
+            tcp: port,
         };
         server.wait_for("msg=\"tcp listening\"");
         server.wait_for("msg=\"admin ui available\"");
@@ -151,6 +153,56 @@ fn sigterm_stops_the_server_cleanly() {
 #[test]
 fn sigint_stops_the_server_cleanly() {
     stops_cleanly(libc::SIGINT, "interrupt");
+}
+
+fn drain_ms(out: &str) -> f64 {
+    let line = out
+        .lines()
+        .find(|l| l.contains("msg=\"requests drained\""))
+        .unwrap_or_else(|| panic!("no requests drained in {out}"));
+    let at = line.find("duration_ms=").expect("duration_ms") + "duration_ms=".len();
+    let digits: String = line[at..]
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .collect();
+    digits.parse().expect("drain duration")
+}
+
+#[test]
+fn sigterm_closes_the_idle_tcp_connections_without_waiting_for_the_timeout() {
+    let dir = TempDir::new();
+    let server = Server::start(dir.path());
+    let tcp = SocketAddr::from(([127, 0, 0, 1], server.tcp));
+
+    let silent = TcpStream::connect(tcp).expect("connect");
+    let mut answered = TcpStream::connect(tcp).expect("connect");
+    answered.write_all(b"PING\n").expect("ping");
+    let mut pong = [0u8; 5];
+    answered.read_exact(&mut pong).expect("pong");
+    assert_eq!(&pong, b"PONG\n");
+    let mut partial = TcpStream::connect(tcp).expect("connect");
+    partial.write_all(b"PING").expect("partial line");
+    std::thread::sleep(Duration::from_millis(200));
+
+    server.signal(libc::SIGTERM);
+    let (status, out, err) = server.wait();
+
+    assert_eq!(status.code(), Some(0), "{status:?}\n{out}\n{err}");
+    assert_eq!(err, "");
+    assert!(!out.contains("msg=\"connection error\""), "{out}");
+    assert!(drain_ms(&out) < 4000.0, "{out}");
+    for (name, mut conn) in [
+        ("silent", silent),
+        ("answered", answered),
+        ("partial", partial),
+    ] {
+        let _ = conn.set_read_timeout(Some(Duration::from_secs(5)));
+        let mut rest = Vec::new();
+        match conn.read_to_end(&mut rest) {
+            Ok(_) => assert!(rest.is_empty(), "{name}: {rest:?}"),
+            Err(e) => panic!("{name}: {e}"),
+        }
+    }
 }
 
 #[test]
