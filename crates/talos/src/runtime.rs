@@ -61,6 +61,16 @@ impl Throw {
             _ => {}
         }
     }
+
+    pub fn held_value(&self) -> Option<&Value> {
+        match self {
+            Throw::Value(v) => Some(v),
+            Throw::Exception(e) => Some(&e.val),
+            Throw::Interrupted(e) => Some(&e.exception.val),
+            Throw::StackOverflow(e) => Some(&e.exception.val),
+            _ => None,
+        }
+    }
 }
 
 pub fn type_error<T>(msg: impl Into<String>) -> JsResult<T> {
@@ -1876,7 +1886,12 @@ impl IteratorRecord {
             }
             let value = iterator_value(r, res)?;
             if let Err(e) = step(r, value) {
+                let mark = r.extra_roots.len();
+                if let Some(v) = e.held_value() {
+                    r.extra_roots.push(v.clone());
+                }
                 let _ = self.return_iter(r);
+                r.extra_roots.truncate(mark);
                 return Err(e);
             }
         }

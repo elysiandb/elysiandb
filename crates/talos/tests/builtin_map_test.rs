@@ -1,7 +1,7 @@
 mod jsrun;
 
 use jsrun::*;
-use talos::Value;
+use talos::{Runtime, Value};
 
 #[test]
 fn test_map_evil_iterator() {
@@ -97,4 +97,34 @@ fn test_map_get_adder_get_iterator_order() {
 	thrown && getterCalled === 1 && getIteratorCalled === 0;
 	"#;
     test_script(SCRIPT, Value::Bool(true));
+}
+
+#[test]
+fn pending_error_survives_the_iterator_close() {
+    const SCRIPT: &str = r#"
+var iterable = {};
+iterable[Symbol.iterator] = function () {
+  return {
+    next: function () { return { value: [], done: false }; },
+    return: function () { throw new TypeError("ignored"); },
+  };
+};
+Map.prototype.set = function () { throw new RangeError("kept"); };
+var seen;
+try {
+  new Map(iterable);
+} catch (e) {
+  seen = typeof e + ":" + e.name + ":" + e.message;
+}
+seen;
+"#;
+    on_big_stack(|| {
+        let mut rt = Runtime::new();
+        rt.set_gc_stress(true);
+        let v = rt.run_string(SCRIPT).expect("run");
+        assert_eq!(
+            v.go_string(&mut rt).expect("string"),
+            "object:RangeError:kept"
+        );
+    });
 }
