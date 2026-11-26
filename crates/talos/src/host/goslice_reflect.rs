@@ -269,14 +269,14 @@ impl<E: GoElem> GoTypedSlice<E> {
     fn this(rt: &Runtime, o: ObjRef) -> &GoTypedSlice<E> {
         match rt.ext_dyn::<GoTypedSlice<E>>(o) {
             Some(s) => s,
-            None => unreachable!("not a Go typed slice"),
+            None => unreachable!("not a host typed slice"),
         }
     }
 
     fn this_mut(rt: &mut Runtime, o: ObjRef) -> &mut GoTypedSlice<E> {
         match rt.ext_dyn_mut::<GoTypedSlice<E>>(o) {
             Some(s) => s,
-            None => unreachable!("not a Go typed slice"),
+            None => unreachable!("not a host typed slice"),
         }
     }
 

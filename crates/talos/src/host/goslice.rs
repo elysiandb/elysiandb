@@ -137,14 +137,14 @@ impl GoSlice {
     fn this(rt: &Runtime, o: ObjRef) -> &GoSlice {
         match rt.ext_dyn::<GoSlice>(o) {
             Some(s) => s,
-            None => unreachable!("not a Go slice"),
+            None => unreachable!("not a host slice"),
         }
     }
 
     fn this_mut(rt: &mut Runtime, o: ObjRef) -> &mut GoSlice {
         match rt.ext_dyn_mut::<GoSlice>(o) {
             Some(s) => s,
-            None => unreachable!("not a Go slice"),
+            None => unreachable!("not a host slice"),
         }
     }
 

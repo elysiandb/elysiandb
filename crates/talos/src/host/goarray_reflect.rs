@@ -83,7 +83,7 @@ impl GoPairArray {
     fn cell(rt: &Runtime, o: ObjRef) -> PairCell {
         match rt.ext_dyn::<GoPairArray>(o) {
             Some(p) => p.cell.clone(),
-            None => unreachable!("not a Go array"),
+            None => unreachable!("not a host array"),
         }
     }
 

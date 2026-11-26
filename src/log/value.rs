@@ -1,4 +1,4 @@
-use crate::gocompat::errors::Error as GoError;
+use crate::gocompat::errors::Error as MessageError;
 use crate::gocompat::json::{Encode, EncodeState, Error as JsonError, MapKey, Value as JsonValue};
 use crate::gocompat::time::{Duration, Time};
 use std::borrow::Cow;
@@ -250,7 +250,7 @@ impl ToValue for std::io::Error {
     }
 }
 
-impl ToValue for GoError {
+impl ToValue for MessageError {
     fn to_value(&self) -> Value<'_> {
         Value::Display(self)
     }

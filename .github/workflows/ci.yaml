@@ -129,7 +129,7 @@ jobs:
       - name: Ensure adminui dist exists
         run: mkdir -p adminui/dist
 
-      - name: Extract the Go binaries
+      - name: Extract the baseline binaries
         run: |
           mkdir -p "$RUNNER_TEMP/bin"
           extract() {

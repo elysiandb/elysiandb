@@ -56,7 +56,7 @@ impl GoMapSimple {
     pub fn data(rt: &Runtime, o: ObjRef) -> MapRef {
         match rt.ext_dyn::<GoMapSimple>(o) {
             Some(m) => m.data.clone(),
-            None => unreachable!("not a Go map"),
+            None => unreachable!("not a host map"),
         }
     }
 
@@ -71,7 +71,7 @@ impl GoMapSimple {
                     v.clone()
                 }
             },
-            None => unreachable!("not a Go map"),
+            None => unreachable!("not a host map"),
         };
         rt.to_value(&dv).map(Some)
     }

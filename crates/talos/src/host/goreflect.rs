@@ -182,7 +182,7 @@ impl GoReflect {
     fn this(rt: &Runtime, o: ObjRef) -> HostRef {
         match rt.ext_dyn::<GoReflect>(o) {
             Some(r) => r.value.clone(),
-            None => unreachable!("not a Go reflect object"),
+            None => unreachable!("not a host object"),
         }
     }
 
