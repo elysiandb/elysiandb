@@ -1074,7 +1074,7 @@ pub(super) fn path_text(path: &Path) -> String {
     String::from_utf8_lossy(path.as_os_str().as_bytes()).into_owned()
 }
 
-pub(super) fn close_file(file: File, path: &Path) -> Result<(), FsError> {
+pub(crate) fn close_file(file: File, path: &Path) -> Result<(), FsError> {
     let fd = file.into_raw_fd();
     if unsafe { libc::close(fd) } != 0 {
         return Err(FsError::new("close", path, io::Error::last_os_error()));
@@ -1114,7 +1114,7 @@ fn temp_folder(dir: &Path) -> PathBuf {
     dir.to_path_buf()
 }
 
-pub(super) fn create_temp(dir: &Path, prefix: &str) -> Result<(File, PathBuf), FsError> {
+pub(crate) fn create_temp(dir: &Path, prefix: &str) -> Result<(File, PathBuf), FsError> {
     let base = join_path(&temp_folder(dir), prefix);
 
     let mut tries = 0;

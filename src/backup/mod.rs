@@ -10,6 +10,7 @@ pub use archive::{
     Manifest, entity_path, file_name, schema_path,
 };
 pub use create::{Options, Source, create, prepare, write_file};
+pub(crate) use create::{close_file, create_temp};
 pub use periodic::{run_periodic, start_periodic};
 pub use restore::{
     Report, apply, new_upload, remove_abandoned_uploads, restore, restore_was_interrupted, verify,

@@ -4,6 +4,7 @@ pub mod api;
 pub mod archive;
 pub mod backup;
 pub mod cache;
+pub mod cmd;
 pub mod configuration;
 pub mod crypto;
 pub mod datastore;

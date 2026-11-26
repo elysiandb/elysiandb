@@ -23,6 +23,8 @@ gocompat = { path = "crates/gocompat" }
 talos = { path = "crates/talos" }
 libc = "=0.2.191"
 mimalloc = "=0.1.52"
+rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-native-certs = "=0.8.5"
 
 [[test]]
 name = "pagetree_test"
@@ -222,3 +224,7 @@ path = "tests/internal/transport_test/http_test/api_test/main.rs"
 [[test]]
 name = "http_transaction_test"
 path = "tests/internal/transport_test/http_test/api_test/transaction_test/main.rs"
+
+[[test]]
+name = "cmd_test"
+path = "tests/internal/cmd_test/main.rs"
