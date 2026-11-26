@@ -50,8 +50,8 @@ COPY . .
 COPY --from=adminui /src/adminui/dist ./adminui/dist
 
 ARG VERSION=dev
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/src/target \
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/src/target,sharing=locked \
     if [ "$(cat /cargo-command)" = build ]; then export TARGET_CC=musl-gcc; fi \
  && ELYSIANDB_VERSION="${VERSION}" cargo "$(cat /cargo-command)" --release --locked --bin elysiandb --target "$(cat /target)" \
  && mkdir -p /out \
