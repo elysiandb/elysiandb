@@ -233,7 +233,7 @@ fn hash_password(password: &[u8], key: &[u8]) -> Result<String, SecurityError> {
 impl BasicUser {
     pub fn to_hased_user(&self) -> Result<BasicHashedUser, SecurityError> {
         let key = create_key_file_or_get_key()?;
-        let password = hash_password(&self.password, key.as_bytes())?;
+        let password = hash_password(&self.password, &key)?;
 
         let role = if self.role.0.is_empty() {
             Role::user()
@@ -451,7 +451,7 @@ fn change_password(
 
     let key = create_key_file_or_get_key()?;
 
-    user.password = hash_password(new_password, key.as_bytes())?;
+    user.password = hash_password(new_password, &key)?;
 
     user.save()?;
 
@@ -546,7 +546,7 @@ fn key_path() -> String {
     format!("{}/{}", config().store.folder, KEY_FILENAME)
 }
 
-pub fn create_key_file_or_get_key() -> Result<String, SecurityError> {
+pub fn create_key_file_or_get_key() -> Result<Vec<u8>, SecurityError> {
     let cfg = config();
     let path = key_path();
     let fs_error = |op: &'static str, e: io::Error| SecurityError::Fs(FsError::new(op, &path, e));
@@ -574,7 +574,7 @@ pub fn create_key_file_or_get_key() -> Result<String, SecurityError> {
 
         let _ = durable::OS.sync_dir(Path::new(&cfg.store.folder));
 
-        return Ok(key);
+        return Ok(key.into_bytes());
     }
 
     file.seek(SeekFrom::Start(0))
@@ -582,7 +582,7 @@ pub fn create_key_file_or_get_key() -> Result<String, SecurityError> {
 
     let (key, result) = fscanf_word(&mut file);
     match result {
-        Ok(()) => Ok(String::from_utf8_lossy(&key).into_owned()),
+        Ok(()) => Ok(key),
         Err(ScanError::Io(e)) => Err(fs_error("read", e)),
         Err(_) => Err(SecurityError::NoKeyFound(path.clone())),
     }
@@ -624,7 +624,7 @@ pub fn authenticate_user(username: &[u8], password: &[u8]) -> Option<BasicHashed
 
     let key = create_key_file_or_get_key().ok()?;
 
-    let sum = digest(password, key.as_bytes());
+    let sum = digest(password, &key);
 
     if bcrypt::compare_hash_and_password(user.password.as_bytes(), &sum).is_ok() {
         return Some(user);

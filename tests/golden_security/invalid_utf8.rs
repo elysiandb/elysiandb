@@ -81,7 +81,7 @@ fn put_go_document(entity: &[u8], id: &[u8], bytes: &[u8]) {
 fn seed_go_user(id: &[u8], password: &str, role: &str) {
     let key = security::create_key_file_or_get_key().expect("key");
     let mut input = password.as_bytes().to_vec();
-    input.extend_from_slice(key.as_bytes());
+    input.extend_from_slice(&key);
     let hash = bcrypt::generate_from_password(&sha256::sum256(&input), bcrypt::DEFAULT_COST)
         .expect("hash");
     let hash = String::from_utf8(hash).expect("ascii hash");

@@ -37,12 +37,16 @@ fn keyfile_rows_match_go() {
             let key = result.expect("generated key");
             assert_eq!(key.len() as i64, int_of(row, "length"), "{row:?}");
             assert!(
-                key.bytes().all(|b| b"0123456789abcdef".contains(&b)),
+                key.iter().all(|b| b"0123456789abcdef".contains(b)),
                 "{row:?}"
             );
-            assert_eq!(std::fs::read(&path).expect("key file"), key.as_bytes());
+            assert_eq!(std::fs::read(&path).expect("key file"), key);
         } else {
-            assert_eq!(result.expect("key"), str_field(row, "key"), "{row:?}");
+            assert_eq!(
+                result.expect("key"),
+                str_field(row, "key").as_bytes(),
+                "{row:?}"
+            );
         }
         checked += 1;
     }

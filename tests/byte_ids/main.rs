@@ -5,9 +5,11 @@ use std::sync::{Arc, Once};
 
 use elysiandb::api::{self, BatchOperation, ByteFields, WriteSimulation};
 use elysiandb::configuration::Config;
+use elysiandb::crypto::{bcrypt, sha256};
 use elysiandb::globals;
 use elysiandb::gocompat::json::{self, Map, Value};
 use elysiandb::schema;
+use elysiandb::security::{self, BasicUser, Role};
 use elysiandb::storage;
 
 use tempdir::TempDir;
@@ -244,4 +246,50 @@ fn document_ids_with_invalid_utf8_are_stored_as_in_go() {
         api::read_entity_by_id(b"doc", b"t").and_then(|m| m.get("v").and_then(Value::as_i64)),
         Some(9)
     ));
+}
+
+fn salted(password: &[u8], key: &[u8]) -> [u8; 32] {
+    let mut input = password.to_vec();
+    input.extend_from_slice(key);
+    sha256::sum256(&input)
+}
+
+fn key_file() -> std::path::PathBuf {
+    let folder = globals::config().expect("config").store.folder.clone();
+    std::path::Path::new(&folder).join(security::KEY_FILENAME)
+}
+
+#[test]
+fn the_users_key_is_read_rune_by_rune_and_written_as_given() {
+    let _store = open_store();
+    let raw: &[u8] = b"k\xff\xfe1";
+    let read = "k\u{fffd}\u{fffd}1".as_bytes();
+    std::fs::write(key_file(), raw).expect("key file");
+    assert_eq!(security::create_key_file_or_get_key().expect("key"), read);
+    assert_eq!(std::fs::read(key_file()).expect("key file"), raw);
+
+    security::create_basic_user(&BasicUser {
+        username: b"bob".to_vec(),
+        password: b"bob-password".to_vec(),
+        role: Role::user(),
+    })
+    .expect("user");
+    let user =
+        api::read_entity_by_id(security::USER_ENTITY.as_bytes(), b"bob").expect("stored user");
+    let hash = user.get("password").and_then(Value::as_str).expect("hash");
+    assert!(
+        bcrypt::compare_hash_and_password(hash.as_bytes(), &salted(b"bob-password", read)).is_ok()
+    );
+    assert!(
+        bcrypt::compare_hash_and_password(hash.as_bytes(), &salted(b"bob-password", raw)).is_err()
+    );
+    assert!(security::authenticate_user(b"bob", b"bob-password").is_some());
+
+    let restored: &[u8] = b"r\x80\xc3(";
+    security::write_key(restored).expect("write key");
+    assert_eq!(std::fs::read(key_file()).expect("key file"), restored);
+    assert_eq!(
+        security::create_key_file_or_get_key().expect("key"),
+        "r\u{fffd}\u{fffd}(".as_bytes()
+    );
 }

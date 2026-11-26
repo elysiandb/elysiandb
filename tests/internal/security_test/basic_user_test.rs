@@ -50,7 +50,7 @@ fn create_key_file_or_get_key_read_same_key() {
 
     let k1 = security::create_key_file_or_get_key().expect("k1");
     let k2 = security::create_key_file_or_get_key().expect("k2");
-    assert_eq!(k1, k2, "expected same key, got {k1} and {k2}");
+    assert_eq!(k1, k2, "expected same key, got {k1:?} and {k2:?}");
 }
 
 #[test]
