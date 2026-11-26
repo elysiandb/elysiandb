@@ -92,3 +92,17 @@ assert.sameValue(0 <= 1n, true, "le");
 "#;
     test_script_with_test_lib(SCRIPT, Value::Undefined);
 }
+
+#[test]
+fn big_int_wrapper_has_the_object_class() {
+    const SCRIPT: &str = r#"
+const tag = Object.prototype.toString;
+assert.sameValue(tag.call(1n), "[object BigInt]", "primitive with the tag");
+assert.sameValue(tag.call(Object(1n)), "[object BigInt]", "wrapper with the tag");
+Object.defineProperty(BigInt.prototype, Symbol.toStringTag, { value: undefined });
+assert.sameValue(tag.call(1n), "[object Object]", "primitive without the tag");
+assert.sameValue(tag.call(Object(1n)), "[object Object]", "wrapper without the tag");
+assert.sameValue(tag.call(BigInt.prototype), "[object Object]", "prototype without the tag");
+"#;
+    test_script_with_test_lib(SCRIPT, Value::Undefined);
+}

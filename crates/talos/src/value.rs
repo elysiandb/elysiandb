@@ -670,7 +670,7 @@ impl Value {
             Value::String(s) => Ok(rt.new_string_object(s.clone())),
             Value::BigInt(_) => {
                 let proto = rt.get_big_int_prototype();
-                Ok(rt.new_primitive_object(self.clone(), Some(proto), "BigInt"))
+                Ok(rt.new_primitive_object(self.clone(), Some(proto), "Object"))
             }
             Value::Symbol(_) => {
                 let proto = rt.get_symbol_prototype();
