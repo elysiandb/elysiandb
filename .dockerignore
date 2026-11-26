@@ -3,6 +3,7 @@
 Dockerfile
 docker-compose.yml
 target
+/elysiandb
 elysian_k6.js
 benchmark.sh
 *.db
