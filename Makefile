@@ -5,10 +5,10 @@ http_benchmark:
 api_benchmark:
 	BASE_URL=http://localhost:8089 KEYS=5000 VUS=200 DURATION=30s k6 run elysian_api_k6.js
 
-COVERPKG := $(shell go list ./... | tr '\n' ',' | sed 's/,$$//')
+COVERPKG = $(shell go list ./... | tr '\n' ',' | sed 's/,$$//')
 
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//')
-LDFLAGS := -X github.com/taymour/elysiandb/internal/globals.VERSION=$(VERSION)
+VERSION ?= $(or $(if $(wildcard .git),$(shell git describe --tags --always --dirty 2>/dev/null)),dev)
+CARGO_TARGET_DIR ?= target
 
 .PHONY: test test-e2e-http test-unit test-cover build bench bench-compare
 
@@ -46,14 +46,14 @@ test-cover:
 	go tool cover -func=coverage.out
 
 build:
-	go build -ldflags "$(LDFLAGS)" -o elysiandb .
+	ELYSIANDB_VERSION="$(VERSION)" cargo build --release --locked --bin elysiandb && cp "$(CARGO_TARGET_DIR)/release/elysiandb" ./elysiandb
 
 install:
 	rm -f /usr/local/bin/elysiandb
-	go build -ldflags "$(LDFLAGS)" -o /usr/local/bin/elysiandb .
+	ELYSIANDB_VERSION="$(VERSION)" cargo build --release --locked --bin elysiandb && cp "$(CARGO_TARGET_DIR)/release/elysiandb" /usr/local/bin/elysiandb
 
 server:
-	go run -ldflags "$(LDFLAGS)" . server
+	ELYSIANDB_VERSION="$(VERSION)" cargo run --release --locked --bin elysiandb -- server
 
 run: build-admin server
 

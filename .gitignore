@@ -1,7 +1,7 @@
 .vscode
 .code
 .idea
-elysiandb
+/elysiandb
 coverage.out
 /target
 lcov.info

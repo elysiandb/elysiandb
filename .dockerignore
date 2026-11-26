@@ -2,8 +2,7 @@
 .gitignore
 Dockerfile
 docker-compose.yml
-**/*_test.go
-bench*/ 
+target
 elysian_k6.js
 benchmark.sh
 *.db
@@ -11,7 +10,6 @@ elysiandb.json
 elysiandb.expiration.json
 /build
 /bin
-/vendor
 .claude
 adminui/node_modules
 adminui/dist
