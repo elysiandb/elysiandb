@@ -640,6 +640,35 @@ fn password_prompt_reads_the_terminal_without_echo() {
 }
 
 #[test]
+fn a_closed_stdout_ends_the_cli_with_sigpipe() {
+    use std::os::fd::FromRawFd;
+    use std::os::unix::process::ExitStatusExt;
+
+    let dir = TempDir::new();
+    write(&dir.path().join("c.yaml"), cli_config("", 1).as_bytes());
+    let mut fds = [0 as libc::c_int; 2];
+    assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0, "pipe");
+    unsafe {
+        libc::close(fds[0]);
+    }
+    let stdout = unsafe { std::fs::File::from_raw_fd(fds[1]) };
+
+    let status = Command::new(BIN)
+        .args(["-config", "c.yaml", "help"])
+        .current_dir(dir.path())
+        .env_clear()
+        .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+        .env("TZ", "UTC")
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(stdout))
+        .stderr(Stdio::null())
+        .status()
+        .expect("run the CLI");
+
+    assert_eq!(status.signal(), Some(libc::SIGPIPE), "{status:?}");
+}
+
+#[test]
 fn password_prompt_at_the_end_of_input_fails() {
     let (seen, exit) = create_user_on_terminal(b"\x04", None);
     assert_eq!(exit, 0);

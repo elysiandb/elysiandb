@@ -361,3 +361,93 @@ fn backup_url_verifies_the_archive_unless_told_not_to() {
     assert_eq!(names.len(), 1, "{names:?}");
     assert!(names[0].starts_with("elysiandb-backup-") && names[0].ends_with(".tar.gz"));
 }
+
+fn backup_to(url: &str, env: &[(String, String)]) -> (String, i64) {
+    let dir = TempDir::new();
+    std::fs::create_dir(dir.path().join("out")).expect("out");
+    std::fs::write(dir.path().join("s.yaml"), cli_config("", 1)).expect("config");
+    let args: Vec<String> = [
+        "-config", "s.yaml", "backup", "--url", url, "--output", "out",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    let run = run_cli(dir.path(), &args, "", env);
+    (run.stdout, run.exit)
+}
+
+#[test]
+fn backup_url_goes_through_the_proxy_of_the_environment() {
+    let data = archive("seed/seed.tar.gz");
+    let body = data.clone();
+    let proxy = Fake::start(Box::new(move |_, _| response("200 OK", &[], &body)));
+    let proxy_url = format!("http://u:p@127.0.0.1:{}", proxy.port);
+
+    let (out, exit) = backup_to(
+        "http://backup.test",
+        &env(&[("HTTP_PROXY", proxy_url.as_str())]),
+    );
+    assert_eq!(exit, 0, "{out}");
+    let reqs = proxy.requests();
+    assert_eq!(reqs.len(), 1);
+    assert_eq!(reqs[0].target, "http://backup.test/api/backup");
+    assert_eq!(reqs[0].header("Host"), Some("backup.test"));
+    assert_eq!(reqs[0].header("Proxy-Authorization"), Some("Basic dTpw"));
+
+    let (out, exit) = backup_to(
+        "http://backup.test",
+        &env(&[
+            ("HTTP_PROXY", proxy_url.as_str()),
+            ("NO_PROXY", "backup.test"),
+        ]),
+    );
+    assert_eq!(exit, 1, "{out}");
+    failure_prefix(&out, "request to http://backup.test/api/backup failed: ");
+    assert_eq!(proxy.requests().len(), 1);
+
+    let refusing = Fake::start(Box::new(|_, _| response("403 Forbidden", &[], b"")));
+    let refusing_url = format!("http://127.0.0.1:{}", refusing.port);
+    let (out, exit) = backup_to(
+        "https://backup.test",
+        &env(&[("HTTPS_PROXY", refusing_url.as_str())]),
+    );
+    assert_eq!(exit, 1, "{out}");
+    failure(
+        &out,
+        "request to https://backup.test/api/backup failed: unexpected status 403",
+    );
+    let reqs = refusing.requests();
+    assert_eq!(reqs.len(), 1);
+    assert_eq!(
+        (reqs[0].method.as_str(), reqs[0].target.as_str()),
+        ("CONNECT", "backup.test:443")
+    );
+}
+
+fn failure_prefix(out: &str, prefix: &str) {
+    let line = format!("{RED}Backup failed: {prefix}");
+    assert!(out.contains(&line), "{out}");
+}
+
+#[test]
+fn backup_url_reports_tls_errors() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("plain server");
+    let port = listener.local_addr().expect("address").port();
+    let server = std::thread::spawn(move || {
+        if let Ok((mut stream, _)) = listener.accept() {
+            let _ = stream.set_read_timeout(Some(std::time::Duration::from_millis(300)));
+            let mut buf = [0u8; 4096];
+            while matches!(stream.read(&mut buf), Ok(n) if n > 0) {}
+            let _ = stream.write_all(b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n");
+            std::thread::sleep(std::time::Duration::from_millis(300));
+        }
+    });
+
+    let (out, exit) = backup_to(&format!("https://127.0.0.1:{port}"), &[]);
+    let _ = server.join();
+    assert_eq!(exit, 1, "{out}");
+    failure_prefix(
+        &out,
+        "request to https://127.0.0.1:<PORT>/api/backup failed: TLS error: ",
+    );
+}
