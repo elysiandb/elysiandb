@@ -44,6 +44,7 @@ pub use multipart::{
     FileHeader, Form, MultipartError, Part, Reader as MultipartReader, read_multipart_form,
     write_multipart_form,
 };
+pub(crate) use poller::{Host, Parked, Poller};
 pub use request::{
     DEFAULT_MAX_REQUEST_BODY_SIZE, MSG_BAD_REQUEST, MSG_BODY_TOO_LARGE, MSG_HEADER_TOO_LARGE,
     MSG_REQUEST_TIMEOUT, MultipartFormError, REASON_BODY_TOO_LARGE,
@@ -60,3 +61,4 @@ pub use status::*;
 pub(crate) use sys::{TCP_KEEPIDLE_OPTION, somaxconn};
 pub use textproto::{MimeHeader, canonical_mime_header_key, header_get as mime_header_get};
 pub use uri::{URI, UriError, normalize_path};
+pub(crate) use workers::Pool;

@@ -1,37 +1,49 @@
 use std::collections::{BTreeSet, HashMap};
 use std::io;
+use std::os::fd::RawFd;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use super::listener::WakePipe;
-use super::server::{ConnState, ServerInner};
 use super::sys::Selector;
 use crate::sync::Mutex;
 
 const WAKE_TOKEN: u64 = u64::MAX;
 const STOP_TICK: Duration = Duration::from_millis(100);
 
-struct Entry {
-    st: ConnState,
+pub(crate) trait Parked: Send {
+    fn fd(&self) -> RawFd;
+}
+
+pub(crate) trait Host<T>: Send + Sync {
+    fn stopping(&self) -> bool;
+    fn accept_finished(&self) -> bool;
+    fn expired(&self, conn: T);
+    fn drained(&self, conn: T);
+    fn ready(self: &Arc<Self>, conn: T);
+}
+
+struct Entry<T> {
+    conn: T,
     deadline: Option<Instant>,
     closable_at: Instant,
 }
 
-struct Registry {
-    entries: HashMap<u64, Entry>,
+struct Registry<T> {
+    entries: HashMap<u64, Entry<T>>,
     deadlines: BTreeSet<(Instant, u64)>,
     next_token: u64,
     exited: bool,
 }
 
-pub(crate) struct Poller {
+pub(crate) struct Poller<T> {
     selector: Selector,
     wake: WakePipe,
-    registry: Mutex<Registry>,
+    registry: Mutex<Registry<T>>,
 }
 
-impl Poller {
-    pub(crate) fn new() -> io::Result<Poller> {
+impl<T: Parked> Poller<T> {
+    pub(crate) fn new() -> io::Result<Poller<T>> {
         let selector = Selector::new()?;
         let wake = WakePipe::new()?;
         selector.add(wake.read_fd(), WAKE_TOKEN, false)?;
@@ -53,24 +65,24 @@ impl Poller {
 
     pub(crate) fn register(
         &self,
-        st: ConnState,
+        conn: T,
         deadline: Option<Instant>,
         closable_at: Instant,
-    ) -> Result<(), ConnState> {
+    ) -> Result<(), T> {
         let mut reg = self.registry.lock();
         if reg.exited {
-            return Err(st);
+            return Err(conn);
         }
         let token = reg.next_token;
         reg.next_token += 1;
-        let fd = st.inner.fd();
+        let fd = conn.fd();
         if let Some(d) = deadline {
             reg.deadlines.insert((d, token));
         }
         reg.entries.insert(
             token,
             Entry {
-                st,
+                conn,
                 deadline,
                 closable_at,
             },
@@ -81,7 +93,7 @@ impl Poller {
                 reg.deadlines.remove(&(d, token));
             }
             return match entry {
-                Some(e) => Err(e.st),
+                Some(e) => Err(e.conn),
                 None => Ok(()),
             };
         }
@@ -92,22 +104,22 @@ impl Poller {
         Ok(())
     }
 
-    fn take(&self, reg: &mut Registry, token: u64) -> Option<ConnState> {
+    fn take(&self, reg: &mut Registry<T>, token: u64) -> Option<T> {
         let entry = reg.entries.remove(&token)?;
         if let Some(d) = entry.deadline {
             reg.deadlines.remove(&(d, token));
         }
-        let _ = self.selector.delete(entry.st.inner.fd());
-        Some(entry.st)
+        let _ = self.selector.delete(entry.conn.fd());
+        Some(entry.conn)
     }
 
-    pub(crate) fn run(self: &Arc<Self>, server: &Arc<ServerInner>) {
+    pub(crate) fn run<H: Host<T>>(self: &Arc<Self>, host: &Arc<H>) {
         let mut ready = Vec::new();
         loop {
-            let stopping = server.is_stopping();
+            let stopping = host.stopping();
             let timeout = {
                 let mut reg = self.registry.lock();
-                if stopping && reg.entries.is_empty() && server.accept_done() {
+                if stopping && reg.entries.is_empty() && host.accept_finished() {
                     reg.exited = true;
                     return;
                 }
@@ -124,7 +136,8 @@ impl Poller {
                 continue;
             }
             let mut dispatch = Vec::new();
-            let mut close = Vec::new();
+            let mut expired = Vec::new();
+            let mut drained = Vec::new();
             {
                 let mut reg = self.registry.lock();
                 for &token in &ready {
@@ -132,23 +145,23 @@ impl Poller {
                         self.wake.drain();
                         continue;
                     }
-                    if let Some(st) = self.take(&mut reg, token) {
-                        dispatch.push(st);
+                    if let Some(conn) = self.take(&mut reg, token) {
+                        dispatch.push(conn);
                     }
                 }
                 let now = Instant::now();
-                let expired: Vec<u64> = reg
+                let due: Vec<u64> = reg
                     .deadlines
                     .iter()
                     .take_while(|(d, _)| *d <= now)
                     .map(|(_, t)| *t)
                     .collect();
-                for token in expired {
-                    if let Some(st) = self.take(&mut reg, token) {
-                        close.push(st);
+                for token in due {
+                    if let Some(conn) = self.take(&mut reg, token) {
+                        expired.push(conn);
                     }
                 }
-                if server.is_stopping() {
+                if host.stopping() {
                     let closable: Vec<u64> = reg
                         .entries
                         .iter()
@@ -156,17 +169,20 @@ impl Poller {
                         .map(|(t, _)| *t)
                         .collect();
                     for token in closable {
-                        if let Some(st) = self.take(&mut reg, token) {
-                            close.push(st);
+                        if let Some(conn) = self.take(&mut reg, token) {
+                            drained.push(conn);
                         }
                     }
                 }
             }
-            for st in close {
-                server.close_conn(st);
+            for conn in expired {
+                host.expired(conn);
             }
-            for st in dispatch {
-                server.dispatch(st);
+            for conn in drained {
+                host.drained(conn);
+            }
+            for conn in dispatch {
+                host.ready(conn);
             }
         }
     }

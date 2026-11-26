@@ -2,7 +2,7 @@ use std::cell::Cell;
 use std::fmt;
 use std::io::{self, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::os::fd::AsRawFd;
+use std::os::fd::{AsRawFd, RawFd};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::time::{Duration, Instant};
@@ -13,7 +13,7 @@ use super::ctx::{RequestCtx, next_conn_id};
 use super::date::server_date;
 use super::header::RequestHeader;
 use super::listener::{Wait, WakePipe, configure_accepted, wait_readable};
-use super::poller::Poller;
+use super::poller::{Host, Parked, Poller};
 use super::request::{DEFAULT_MAX_REQUEST_BODY_SIZE, HeadError, RequestError, quiet_io};
 use super::workers::pool;
 use crate::kv;
@@ -112,13 +112,19 @@ pub(crate) struct ConnState {
     previous_write_timeout: Duration,
 }
 
+impl Parked for ConnState {
+    fn fd(&self) -> RawFd {
+        self.inner.fd()
+    }
+}
+
 pub(crate) struct ServerInner {
     cfg: ServerConfig,
     open: AtomicI32,
     stopping: AtomicBool,
     accept_running: AtomicBool,
     wake: Mutex<Option<Arc<WakePipe>>>,
-    poller: Mutex<Option<Arc<Poller>>>,
+    poller: Mutex<Option<Arc<Poller<ConnState>>>>,
     last_overflow_log: Mutex<Option<Instant>>,
 }
 
@@ -191,6 +197,28 @@ impl Server {
 
     pub fn shutdown_with_timeout(&self, timeout: Duration) -> Result<(), ShutdownError> {
         self.inner.shutdown(Some(timeout))
+    }
+}
+
+impl Host<ConnState> for ServerInner {
+    fn stopping(&self) -> bool {
+        self.is_stopping()
+    }
+
+    fn accept_finished(&self) -> bool {
+        self.accept_done()
+    }
+
+    fn expired(&self, st: ConnState) {
+        self.close_conn(st);
+    }
+
+    fn drained(&self, st: ConnState) {
+        self.close_conn(st);
+    }
+
+    fn ready(self: &Arc<Self>, st: ConnState) {
+        self.dispatch(st);
     }
 }
 

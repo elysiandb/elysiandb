@@ -1,25 +1,27 @@
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::fmt;
-use std::io::{self, ErrorKind, Read, Write};
+use std::io::{self, ErrorKind, Write};
 use std::net::{
     IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr, TcpListener, TcpStream, ToSocketAddrs,
 };
 use std::os::fd::{AsRawFd, FromRawFd, RawFd};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration as StdDuration, Instant};
 
 use crate::globals;
 use crate::gocompat::json::quote_text;
 use crate::gocompat::time::Duration;
-use crate::httpd::{TCP_KEEPIDLE_OPTION, Wait, WakePipe, somaxconn, wait_readable};
+use crate::httpd::{
+    Host, Parked, Poller, Pool, TCP_KEEPIDLE_OPTION, Wait, WakePipe, somaxconn, wait_readable,
+};
 use crate::kv;
 use crate::log::{self, Level, Logger, Throttle};
 use crate::metrics;
 use crate::security;
-use crate::sync::{Mutex, WaitGroup, spawn_with_stack};
-use crate::transport::tcp::tcp_routing::{self, Conn};
+use crate::sync::{Mutex, WaitGroup, spawn};
+use crate::transport::tcp::tcp_routing::{self, Conn, Session};
 
 use super::init::config;
 use super::server::STOPPING;
@@ -32,7 +34,7 @@ const SOCKET_BUFFER: libc::c_int = 256 << 10;
 const KEEP_ALIVE_IDLE: libc::c_int = 120;
 const KEEP_ALIVE_INTERVAL: libc::c_int = 15;
 const KEEP_ALIVE_COUNT: libc::c_int = 9;
-const CONNECTION_STACK: usize = 512 << 10;
+const WORKER_STACK: usize = 512 << 10;
 
 pub const LINE_TOO_LONG: &str = "line longer than 131072 bytes";
 pub const CLOSED_BY_CLIENT: &str = "connection closed by the client";
@@ -44,15 +46,22 @@ static ACCEPT_THROTTLE: Throttle = Throttle::new(StdDuration::from_secs(60));
 static SLOW_THROTTLE: Throttle = Throttle::new(StdDuration::from_secs(60));
 
 struct Listening {
-    wake: Arc<WakePipe>,
+    wake: WakePipe,
     closed: AtomicBool,
+    accepting: AtomicBool,
     local: SocketAddr,
+    poller: Arc<Poller<Connection>>,
 }
 
 static LISTENER: Mutex<Option<Arc<Listening>>> = Mutex::new(None);
 static CONNS: WaitGroup = WaitGroup::new();
-static OPEN: Mutex<Option<HashMap<u64, TcpStream>>> = Mutex::new(None);
+static OPEN: Mutex<Option<HashMap<u64, Arc<TcpStream>>>> = Mutex::new(None);
 static NEXT_CONN: AtomicU64 = AtomicU64::new(0);
+static WORKERS: OnceLock<Pool> = OnceLock::new();
+
+fn workers() -> &'static Pool {
+    WORKERS.get_or_init(|| Pool::new("tcp-worker", WORKER_STACK))
+}
 
 #[derive(Debug)]
 pub enum AddrError {
@@ -296,7 +305,14 @@ pub fn init_tcp() {
     };
 
     let wake = match WakePipe::new() {
-        Ok(w) => Arc::new(w),
+        Ok(w) => w,
+        Err(err) => log::fatal(
+            "cannot start the TCP server",
+            kv!["component" => "tcp", "addr" => addr, "err" => log::display(&err)],
+        ),
+    };
+    let poller = match Poller::new() {
+        Ok(p) => Arc::new(p),
         Err(err) => log::fatal(
             "cannot start the TCP server",
             kv!["component" => "tcp", "addr" => addr, "err" => log::display(&err)],
@@ -306,15 +322,25 @@ pub fn init_tcp() {
         .local_addr()
         .unwrap_or_else(|_| SocketAddr::from((Ipv4Addr::UNSPECIFIED, port)));
     let listening = Arc::new(Listening {
-        wake: wake.clone(),
+        wake,
         closed: AtomicBool::new(false),
+        accepting: AtomicBool::new(true),
         local,
+        poller: poller.clone(),
     });
     *LISTENER.lock() = Some(listening.clone());
+
+    {
+        let host = listening.clone();
+        drop(spawn("tcp-poller", move || poller.run(&host)));
+    }
 
     TCP_LOG.info("tcp listening", kv!["addr" => addr]);
 
     accept_loop(&listener, &listening);
+    drop(listener);
+    listening.accepting.store(false, Ordering::SeqCst);
+    listening.poller.wake();
 }
 
 pub fn tcp_listener_addr() -> Option<SocketAddr> {
@@ -365,23 +391,7 @@ fn accept_loop(listener: &TcpListener, listening: &Listening) {
 
         delay = Duration(0);
         configure_accepted(&stream);
-
-        CONNS.add(1);
-        let spawned = spawn_with_stack("tcp-conn", CONNECTION_STACK, move || {
-            let _done = ConnDone;
-            handle_connection(stream, Some(peer));
-        });
-        if spawned.is_err() {
-            CONNS.done();
-        }
-    }
-}
-
-struct ConnDone;
-
-impl Drop for ConnDone {
-    fn drop(&mut self) {
-        CONNS.done();
+        listening.open(stream, peer);
     }
 }
 
@@ -416,12 +426,16 @@ fn next_accept_delay(delay: Duration) -> Duration {
 }
 
 pub fn stop_tcp(timeout: StdDuration) {
-    if let Some(l) = LISTENER.lock().as_ref() {
+    let listening = LISTENER.lock().clone();
+    if let Some(l) = &listening {
         l.closed.store(true, Ordering::SeqCst);
         l.wake.wake();
     }
 
     STOPPING.store(true, Ordering::SeqCst);
+    if let Some(l) = &listening {
+        l.poller.wake();
+    }
     for_each_open(|s| {
         let _ = s.shutdown(Shutdown::Read);
     });
@@ -442,25 +456,98 @@ fn for_each_open(f: impl Fn(&TcpStream)) {
     }
 }
 
-fn register(stream: &TcpStream) -> Option<u64> {
-    let clone = stream.try_clone().ok()?;
+fn register(stream: &Arc<TcpStream>) -> u64 {
     let id = NEXT_CONN.fetch_add(1, Ordering::SeqCst);
     OPEN.lock()
         .get_or_insert_with(HashMap::new)
-        .insert(id, clone);
-    Some(id)
+        .insert(id, stream.clone());
+    id
 }
 
-fn unregister(id: Option<u64>) {
-    if let Some(id) = id
-        && let Some(open) = OPEN.lock().as_mut()
-    {
+fn unregister(id: u64) {
+    if let Some(open) = OPEN.lock().as_mut() {
         open.remove(&id);
     }
 }
 
+impl Listening {
+    fn open(&self, stream: TcpStream, peer: SocketAddr) {
+        CONNS.add(1);
+        let mut conn = Connection::open(stream, Some(peer));
+        if conn.begin_line() {
+            self.park(conn);
+        } else {
+            conn.finish();
+        }
+    }
+
+    fn park(&self, conn: Connection) {
+        let deadline = conn.deadline;
+        if let Err(conn) = self.poller.register(conn, deadline, Instant::now()) {
+            conn.finish();
+        }
+    }
+
+    fn serve(&self, mut conn: Connection) {
+        match conn.advance() {
+            Next::Wait => self.park(conn),
+            Next::Close => conn.finish(),
+        }
+    }
+}
+
+impl Host<Connection> for Listening {
+    fn stopping(&self) -> bool {
+        self.closed.load(Ordering::SeqCst) && STOPPING.load(Ordering::SeqCst)
+    }
+
+    fn accept_finished(&self) -> bool {
+        !self.accepting.load(Ordering::SeqCst)
+    }
+
+    fn expired(&self, conn: Connection) {
+        if !STOPPING.load(Ordering::SeqCst) {
+            read_error(&conn.addr, ReadError::Timeout);
+        }
+        conn.finish();
+    }
+
+    fn drained(&self, conn: Connection) {
+        conn.finish();
+    }
+
+    fn ready(self: &Arc<Self>, conn: Connection) {
+        let turn = Turn {
+            conn: Some(conn),
+            listening: self.clone(),
+        };
+        workers().submit(Box::new(move || turn.run()));
+    }
+}
+
+struct Turn {
+    conn: Option<Connection>,
+    listening: Arc<Listening>,
+}
+
+impl Turn {
+    fn run(mut self) {
+        if let Some(conn) = self.conn.take() {
+            self.listening.serve(conn);
+        }
+    }
+}
+
+impl Drop for Turn {
+    fn drop(&mut self) {
+        if let Some(conn) = self.conn.take() {
+            conn.finish();
+        }
+    }
+}
+
 struct TcpConn {
-    stream: TcpStream,
+    stream: Arc<TcpStream>,
     remote: Option<SocketAddr>,
     closed: Cell<bool>,
 }
@@ -476,6 +563,159 @@ impl Conn for TcpConn {
     }
 }
 
+enum Next {
+    Wait,
+    Close,
+}
+
+struct Connection {
+    conn: TcpConn,
+    id: u64,
+    addr: String,
+    start: Instant,
+    debug: bool,
+    commands: i64,
+    session: Session,
+    reader: LineReader,
+    writer: LineWriter,
+    reading: bool,
+    deadline: Option<Instant>,
+}
+
+impl Parked for Connection {
+    fn fd(&self) -> RawFd {
+        self.conn.stream.as_raw_fd()
+    }
+}
+
+impl Connection {
+    fn open(stream: TcpStream, remote: Option<SocketAddr>) -> Connection {
+        let start = Instant::now();
+        let addr = connection_addr(remote);
+        let debug = log::enabled(Level::DEBUG);
+
+        metrics::tcp_connection_opened();
+        if debug {
+            TCP_LOG.debug("connection opened", kv!["remote_addr" => addr]);
+        }
+
+        let stream = Arc::new(stream);
+        let id = register(&stream);
+        Connection {
+            conn: TcpConn {
+                stream,
+                remote,
+                closed: Cell::new(false),
+            },
+            id,
+            addr,
+            start,
+            debug,
+            commands: 0,
+            session: tcp_routing::new_session(),
+            reader: LineReader::new(),
+            writer: LineWriter::new(),
+            reading: false,
+            deadline: None,
+        }
+    }
+
+    fn begin_line(&mut self) -> bool {
+        if STOPPING.load(Ordering::SeqCst) {
+            return false;
+        }
+
+        self.deadline = if self.session.is_authenticated() {
+            None
+        } else {
+            Some(Instant::now() + UNAUTHENTICATED_READ_TIMEOUT)
+        };
+        self.reading = true;
+        true
+    }
+
+    fn advance(&mut self) -> Next {
+        loop {
+            if !self.reading && !self.begin_line() {
+                return Next::Close;
+            }
+
+            match self.reader.read_slice(&self.conn.stream, self.deadline) {
+                Ok(Some((lo, hi))) => {
+                    self.reading = false;
+                    if !self.answer(lo, hi) {
+                        return Next::Close;
+                    }
+                }
+                Ok(None) => return Next::Wait,
+                Err(err) => {
+                    if !STOPPING.load(Ordering::SeqCst) {
+                        read_error(&self.addr, err);
+                    }
+                    return Next::Close;
+                }
+            }
+        }
+    }
+
+    fn answer(&mut self, lo: usize, hi: usize) -> bool {
+        let line = &self.reader.buf[lo..hi];
+
+        let command_start = Instant::now();
+        let resp = tcp_routing::route_line(line, &self.conn, &mut self.session);
+        observe_command(
+            tcp_routing::command_name(line),
+            command_start.elapsed(),
+            command_start,
+        );
+        self.commands += 1;
+
+        let stream = &*self.conn.stream;
+        if !resp.is_empty()
+            && let Err(e) = self.writer.write(stream, &resp)
+        {
+            write_error("write", &self.addr, &self.conn, &e);
+            return false;
+        }
+        if let Err(e) = self.writer.write(stream, b"\n") {
+            write_error("write", &self.addr, &self.conn, &e);
+            return false;
+        }
+        if let Err(e) = self.writer.flush(stream) {
+            write_error("flush", &self.addr, &self.conn, &e);
+            return false;
+        }
+        true
+    }
+
+    fn finish(self) {
+        let Connection {
+            conn,
+            id,
+            addr,
+            start,
+            debug,
+            commands,
+            ..
+        } = self;
+
+        unregister(id);
+        drop(conn);
+        metrics::tcp_connection_closed();
+        if debug {
+            TCP_LOG.debug(
+                "connection closed",
+                kv![
+                    "remote_addr" => addr,
+                    "duration_ms" => log::since(start),
+                    "commands" => commands,
+                ],
+            );
+        }
+        CONNS.done();
+    }
+}
+
 enum ReadError {
     Eof,
     Timeout,
@@ -484,34 +724,25 @@ enum ReadError {
 }
 
 struct LineReader {
-    stream: TcpStream,
-    buf: Box<[u8]>,
+    buf: Vec<u8>,
     start: usize,
     end: usize,
-    timeout: Option<StdDuration>,
 }
 
 impl LineReader {
-    fn new(stream: TcpStream) -> LineReader {
+    fn new() -> LineReader {
         LineReader {
-            stream,
-            buf: vec![0u8; BUFFER_SIZE].into_boxed_slice(),
+            buf: Vec::new(),
             start: 0,
             end: 0,
-            timeout: None,
         }
     }
 
-    fn set_timeout(&mut self, timeout: Option<StdDuration>) -> io::Result<()> {
-        if self.timeout == timeout {
-            return Ok(());
-        }
-        self.stream.set_read_timeout(timeout)?;
-        self.timeout = timeout;
-        Ok(())
-    }
-
-    fn read_slice(&mut self, deadline: Option<Instant>) -> Result<(usize, usize), ReadError> {
+    fn read_slice(
+        &mut self,
+        stream: &TcpStream,
+        deadline: Option<Instant>,
+    ) -> Result<Option<(usize, usize)>, ReadError> {
         loop {
             if let Some(i) = self.buf[self.start..self.end]
                 .iter()
@@ -519,10 +750,10 @@ impl LineReader {
             {
                 let line = (self.start, self.start + i + 1);
                 self.start += i + 1;
-                return Ok(line);
+                return Ok(Some(line));
             }
 
-            if self.end - self.start == self.buf.len() {
+            if self.end - self.start == BUFFER_SIZE {
                 self.start = self.end;
                 return Err(ReadError::BufferFull);
             }
@@ -533,27 +764,23 @@ impl LineReader {
                 self.start = 0;
             }
 
-            let timeout = match deadline {
-                None => None,
-                Some(d) => {
-                    let now = Instant::now();
-                    if now >= d {
-                        return Err(ReadError::Timeout);
-                    }
-                    Some((d - now).max(StdDuration::from_micros(1)))
-                }
-            };
-            self.set_timeout(timeout).map_err(ReadError::Io)?;
+            if let Some(d) = deadline
+                && Instant::now() >= d
+            {
+                return Err(ReadError::Timeout);
+            }
 
-            match self.stream.read(&mut self.buf[self.end..]) {
+            if self.buf.is_empty() {
+                self.buf = vec![0u8; BUFFER_SIZE];
+            }
+
+            match receive(stream, &mut self.buf[self.end..]) {
                 Ok(0) => return Err(ReadError::Eof),
                 Ok(n) => self.end += n,
                 Err(e) if e.kind() == ErrorKind::Interrupted => {}
-                Err(e) if matches!(e.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {
-                    if deadline.is_some() {
-                        return Err(ReadError::Timeout);
-                    }
-                    return Err(ReadError::Io(e));
+                Err(e) if e.kind() == ErrorKind::WouldBlock => return Ok(None),
+                Err(e) if e.kind() == ErrorKind::TimedOut && deadline.is_some() => {
+                    return Err(ReadError::Timeout);
                 }
                 Err(e) => return Err(ReadError::Io(e)),
             }
@@ -561,39 +788,50 @@ impl LineReader {
     }
 }
 
+fn receive(stream: &TcpStream, buf: &mut [u8]) -> io::Result<usize> {
+    let n = unsafe {
+        libc::recv(
+            stream.as_raw_fd(),
+            buf.as_mut_ptr().cast::<libc::c_void>(),
+            buf.len(),
+            libc::MSG_DONTWAIT,
+        )
+    };
+    if n < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(n as usize)
+}
+
 struct LineWriter {
-    stream: TcpStream,
     buf: Vec<u8>,
 }
 
 impl LineWriter {
-    fn new(stream: TcpStream) -> LineWriter {
-        LineWriter {
-            stream,
-            buf: Vec::with_capacity(BUFFER_SIZE),
-        }
+    fn new() -> LineWriter {
+        LineWriter { buf: Vec::new() }
     }
 
-    fn write(&mut self, mut p: &[u8]) -> io::Result<()> {
+    fn write(&mut self, mut stream: &TcpStream, mut p: &[u8]) -> io::Result<()> {
         while p.len() > BUFFER_SIZE - self.buf.len() {
             if self.buf.is_empty() {
-                let n = self.stream.write(p)?;
+                let n = stream.write(p)?;
                 p = &p[n..];
             } else {
                 let n = (BUFFER_SIZE - self.buf.len()).min(p.len());
                 self.buf.extend_from_slice(&p[..n]);
                 p = &p[n..];
-                self.flush()?;
+                self.flush(stream)?;
             }
         }
         self.buf.extend_from_slice(p);
         Ok(())
     }
 
-    fn flush(&mut self) -> io::Result<()> {
+    fn flush(&mut self, mut stream: &TcpStream) -> io::Result<()> {
         let mut written = 0;
         while written < self.buf.len() {
-            match self.stream.write(&self.buf[written..]) {
+            match stream.write(&self.buf[written..]) {
                 Ok(0) => {
                     self.buf.drain(..written);
                     return Err(io::Error::from(ErrorKind::WriteZero));
@@ -613,98 +851,6 @@ impl LineWriter {
 
 fn connection_addr(remote: Option<SocketAddr>) -> String {
     tcp_routing::source_name(tcp_routing::login_source(remote))
-}
-
-fn handle_connection(stream: TcpStream, remote: Option<SocketAddr>) {
-    let start = Instant::now();
-    let addr = connection_addr(remote);
-    let mut commands: i64 = 0;
-    let debug = log::enabled(Level::DEBUG);
-
-    metrics::tcp_connection_opened();
-    if debug {
-        TCP_LOG.debug("connection opened", kv!["remote_addr" => addr]);
-    }
-
-    let id = register(&stream);
-    let reader_stream = stream.try_clone();
-    let writer_stream = stream.try_clone();
-    let conn = TcpConn {
-        stream,
-        remote,
-        closed: Cell::new(false),
-    };
-
-    if let (Ok(reader_stream), Ok(writer_stream)) = (reader_stream, writer_stream) {
-        serve(&conn, reader_stream, writer_stream, &addr, &mut commands);
-    }
-
-    unregister(id);
-    drop(conn);
-    metrics::tcp_connection_closed();
-    if debug {
-        TCP_LOG.debug(
-            "connection closed",
-            kv![
-                "remote_addr" => addr,
-                "duration_ms" => log::since(start),
-                "commands" => commands,
-            ],
-        );
-    }
-}
-
-fn serve(conn: &TcpConn, reader: TcpStream, writer: TcpStream, addr: &str, commands: &mut i64) {
-    let mut r = LineReader::new(reader);
-    let mut w = LineWriter::new(writer);
-    let mut session = tcp_routing::new_session();
-
-    loop {
-        if STOPPING.load(Ordering::SeqCst) {
-            return;
-        }
-
-        let deadline = if session.is_authenticated() {
-            None
-        } else {
-            Some(Instant::now() + UNAUTHENTICATED_READ_TIMEOUT)
-        };
-
-        let (lo, hi) = match r.read_slice(deadline) {
-            Ok(range) => range,
-            Err(err) => {
-                if !STOPPING.load(Ordering::SeqCst) {
-                    read_error(addr, err);
-                }
-                return;
-            }
-        };
-        let line = &r.buf[lo..hi];
-
-        let command_start = Instant::now();
-        let resp = tcp_routing::route_line(line, conn, &mut session);
-        observe_command(
-            tcp_routing::command_name(line),
-            command_start.elapsed(),
-            command_start,
-        );
-        *commands += 1;
-
-        if !resp.is_empty()
-            && let Err(e) = w.write(&resp)
-        {
-            write_error("write", addr, conn, &e);
-            return;
-        }
-        if let Err(e) = w.write(b"\n") {
-            write_error("write", addr, conn, &e);
-            return;
-        }
-        if let Err(e) = w.flush() {
-            write_error("flush", addr, conn, &e);
-            return;
-        }
-    }
 }
 
 fn observe_command(command: &str, d: StdDuration, start: Instant) {

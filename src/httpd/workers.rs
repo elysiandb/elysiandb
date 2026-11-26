@@ -18,6 +18,8 @@ struct State {
 }
 
 pub(crate) struct Pool {
+    name: &'static str,
+    stack_size: usize,
     state: Mutex<State>,
     cv: Condvar,
     max_workers: usize,
@@ -26,30 +28,35 @@ pub(crate) struct Pool {
 static POOL: OnceLock<Pool> = OnceLock::new();
 
 pub(crate) fn pool() -> &'static Pool {
-    POOL.get_or_init(|| Pool {
-        state: Mutex::new(State {
-            queue: VecDeque::new(),
-            idle: 0,
-            total: 0,
-        }),
-        cv: Condvar::new(),
-        max_workers: MAX_WORKERS,
-    })
+    POOL.get_or_init(|| Pool::new("http-worker", WORKER_STACK_SIZE))
 }
 
-struct WorkerExit;
+struct WorkerExit(&'static Pool);
 
 impl Drop for WorkerExit {
     fn drop(&mut self) {
         if std::thread::panicking() {
-            let p = pool();
-            let mut st = p.state.lock();
+            let mut st = self.0.state.lock();
             st.total = st.total.saturating_sub(1);
         }
     }
 }
 
 impl Pool {
+    pub(crate) fn new(name: &'static str, stack_size: usize) -> Pool {
+        Pool {
+            name,
+            stack_size,
+            state: Mutex::new(State {
+                queue: VecDeque::new(),
+                idle: 0,
+                total: 0,
+            }),
+            cv: Condvar::new(),
+            max_workers: MAX_WORKERS,
+        }
+    }
+
     pub(crate) fn submit(&'static self, job: Job) {
         let mut st = self.state.lock();
         if st.idle > st.queue.len() {
@@ -62,8 +69,8 @@ impl Pool {
             st.total += 1;
             drop(st);
             let spawned = std::thread::Builder::new()
-                .name("http-worker".to_string())
-                .stack_size(WORKER_STACK_SIZE)
+                .name(self.name.to_string())
+                .stack_size(self.stack_size)
                 .spawn(move || crate::sync::run_fatal(|| self.run(job)));
             if spawned.is_err() {
                 let mut st = self.state.lock();
@@ -75,7 +82,7 @@ impl Pool {
     }
 
     fn run(&'static self, first: Job) {
-        let guard = WorkerExit;
+        let guard = WorkerExit(self);
         first();
         loop {
             let mut st = self.state.lock();
