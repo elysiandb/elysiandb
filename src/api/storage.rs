@@ -428,6 +428,24 @@ pub fn write_entity_bytes(
     Vec::new()
 }
 
+fn validate_write(
+    tx: &mut Tx<'_>,
+    entity: &[u8],
+    data: &Map,
+    check_inferred_schema: bool,
+) -> Vec<ValidationError> {
+    if schema_enabled() && entity != schema_entity() {
+        let current = tx.read_shared(schema_entity(), entity);
+        if let Some(current) = &current
+            && (check_inferred_schema || schema::is_manual_schema(entity, Some(current)))
+        {
+            return schema::validate_entity(entity, data, Some(current));
+        }
+    }
+
+    Vec::new()
+}
+
 fn write_entity_tx(
     tx: &mut Tx<'_>,
     entity: &[u8],
@@ -435,16 +453,9 @@ fn write_entity_tx(
     check_inferred_schema: bool,
     fields: &ByteFields,
 ) -> Vec<ValidationError> {
-    if schema_enabled() && entity != schema_entity() {
-        let current = tx.read_shared(schema_entity(), entity);
-        if let Some(current) = &current
-            && (check_inferred_schema || schema::is_manual_schema(entity, Some(current)))
-        {
-            let errors = schema::validate_entity(entity, data, Some(current));
-            if !errors.is_empty() {
-                return errors;
-            }
-        }
+    let errors = validate_write(tx, entity, data, check_inferred_schema);
+    if !errors.is_empty() {
+        return errors;
     }
 
     let has_id = matches!(data.get("id"), Some(Value::String(s)) if !s.is_empty());
@@ -496,11 +507,18 @@ pub fn update_entity_schema(entity: &[u8], fields_raw: &Map) -> Map {
     storable
 }
 
+fn entity_type_message(entity: &[u8], suffix: &[u8]) -> Vec<u8> {
+    let mut msg = b"entity type '".to_vec();
+    msg.extend_from_slice(entity);
+    msg.extend_from_slice(suffix);
+    msg
+}
+
 pub fn create_entity_type(entity: &[u8]) -> Result<(), BoxError> {
     if entity_type_exists(entity) {
-        return Err(errors::new(format!(
-            "entity type '{}' already exists",
-            text_of(entity)
+        return Err(errors::new_bytes(entity_type_message(
+            entity,
+            b"' already exists",
         )));
     }
 
@@ -511,9 +529,9 @@ pub fn create_entity_type(entity: &[u8]) -> Result<(), BoxError> {
 
 pub fn delete_entity_type(entity: &[u8]) -> Result<(), BoxError> {
     if !entity_type_exists(entity) {
-        return Err(errors::new(format!(
-            "entity type '{}' does not exist",
-            text_of(entity)
+        return Err(errors::new_bytes(entity_type_message(
+            entity,
+            b"' does not exist",
         )));
     }
 
@@ -585,8 +603,20 @@ fn update_schema_if_needed(tx: &mut Tx<'_>, entity: &[u8], data: &Map) {
 }
 
 pub fn write_list_of_entities(entity: &[u8], list: &mut [Map]) -> Vec<Vec<ValidationError>> {
+    write_list_of_entities_bytes(entity, list, &ByteFields::new())
+}
+
+pub fn write_list_of_entities_bytes(
+    entity: &[u8],
+    list: &mut [Map],
+    fields: &ByteFields,
+) -> Vec<Vec<ValidationError>> {
     let mut errors: Vec<Vec<ValidationError>> = Vec::new();
     let mut results: Vec<Option<Map>> = Vec::new();
+
+    for data in list.iter_mut() {
+        fields.apply(data);
+    }
 
     let source: &[Map] = list;
     let err = update(|tx| {
@@ -594,7 +624,7 @@ pub fn write_list_of_entities(entity: &[u8], list: &mut [Map]) -> Vec<Vec<Valida
         results = vec![None; source.len()];
         for (i, data) in source.iter().enumerate() {
             let mut attempt = deep_copy_document(data);
-            let errs = write_entity_tx(tx, entity, &mut attempt, true, &ByteFields::new());
+            let errs = write_entity_tx(tx, entity, &mut attempt, true, fields);
             let valid = errs.is_empty();
             errors.push(errs);
             if valid {
@@ -742,8 +772,35 @@ json_struct! {
 
 pub type ImportData = BTreeMap<Vec<u8>, Vec<Map>>;
 
-pub fn validate_import(
-    data: &ImportData,
+pub const NULL_DOCUMENT_PANIC: &str = "cannot write a null document";
+
+pub trait ImportItem {
+    fn document(&self) -> Option<&Map>;
+    fn document_mut(&mut self) -> Option<&mut Map>;
+}
+
+impl ImportItem for Map {
+    fn document(&self) -> Option<&Map> {
+        Some(self)
+    }
+
+    fn document_mut(&mut self) -> Option<&mut Map> {
+        Some(self)
+    }
+}
+
+impl ImportItem for Option<Map> {
+    fn document(&self) -> Option<&Map> {
+        self.as_ref()
+    }
+
+    fn document_mut(&mut self) -> Option<&mut Map> {
+        self.as_mut()
+    }
+}
+
+pub fn validate_import<T: ImportItem>(
+    data: &BTreeMap<Vec<u8>, Vec<T>>,
     schema_for: &dyn Fn(&[u8]) -> Option<Map>,
 ) -> Vec<ImportRejection> {
     let mut rejections = Vec::new();
@@ -751,6 +808,7 @@ pub fn validate_import(
         return rejections;
     }
 
+    let empty = Map::new();
     for (entity, items) in data {
         if entity.as_slice() == schema_entity() {
             continue;
@@ -762,6 +820,7 @@ pub fn validate_import(
         }
 
         for (index, item) in items.iter().enumerate() {
+            let item = item.document().unwrap_or(&empty);
             let errs = schema::validate_entity(entity, item, schema_data.as_ref());
             if !errs.is_empty() {
                 rejections.push(new_import_rejection(entity, index, item, errs));
@@ -788,7 +847,7 @@ pub fn new_import_rejection(
 
 const IMPORT_BATCH: usize = 1000;
 
-pub fn import_all(data: &mut ImportData) -> Vec<ImportRejection> {
+pub fn import_all<T: ImportItem>(data: &mut BTreeMap<Vec<u8>, Vec<T>>) -> Vec<ImportRejection> {
     let mut rejections = Vec::new();
     for (entity, items) in data.iter_mut() {
         delete_entity_documents(entity);
@@ -800,6 +859,15 @@ pub fn import_all(data: &mut ImportData) -> Vec<ImportRejection> {
             let err = update(|tx| {
                 batch = Vec::new();
                 for (index, item) in items.iter_mut().enumerate().take(end).skip(start) {
+                    let Some(item) = item.document_mut() else {
+                        let empty = Map::new();
+                        let errs = validate_write(tx, entity, &empty, false);
+                        if !errs.is_empty() {
+                            batch.push(new_import_rejection(entity, index, &empty, errs));
+                            continue;
+                        }
+                        std::panic::panic_any(NULL_DOCUMENT_PANIC.to_string());
+                    };
                     let mut attempt = deep_copy_document(item);
                     let errs = write_entity_tx(tx, entity, &mut attempt, false, &ByteFields::new());
                     if !errs.is_empty() {

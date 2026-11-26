@@ -8,6 +8,7 @@ mod include;
 mod matcher;
 mod planner;
 mod query_errors;
+mod rest;
 mod scalars;
 mod schema_corpus;
 mod sort;

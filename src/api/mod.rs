@@ -52,13 +52,14 @@ pub use simulation::{
 pub use sort::sort_entities;
 pub use storage::{
     BatchError, BatchOperation, ByteFields, CORE_ENTITY_TYPE_PREFIX, ERR_BATCH_UPDATE,
-    ERR_BATCH_VALIDATION, ImportData, ImportRejection, add_entity_type, apply_filters_to_list,
-    commit_batch, count_all_entities, count_entities, count_entities_per_type, create_entity_type,
-    delete_all, delete_all_entities, delete_entity_by_id, delete_entity_documents,
-    delete_entity_type, dump_all, encode_document, entity_exists, entity_type_exists,
-    get_entity_schema, get_list_of_ids, import_all, is_core_entity_type, list_entities,
-    list_entities_guarded, list_entity_types, list_public_entity_types, new_import_rejection,
-    paginate, read_entity_by_id, read_entity_bytes_by_id, update_entity_by_id,
-    update_entity_schema, update_list_of_entities, validate_import, write_entity,
-    write_entity_bytes, write_list_of_entities,
+    ERR_BATCH_VALIDATION, ImportData, ImportItem, ImportRejection, NULL_DOCUMENT_PANIC,
+    add_entity_type, apply_filters_to_list, commit_batch, count_all_entities, count_entities,
+    count_entities_per_type, create_entity_type, delete_all, delete_all_entities,
+    delete_entity_by_id, delete_entity_documents, delete_entity_type, dump_all, encode_document,
+    entity_exists, entity_type_exists, get_entity_schema, get_list_of_ids, import_all,
+    is_core_entity_type, list_entities, list_entities_guarded, list_entity_types,
+    list_public_entity_types, new_import_rejection, paginate, read_entity_by_id,
+    read_entity_bytes_by_id, update_entity_by_id, update_entity_schema, update_list_of_entities,
+    validate_import, write_entity, write_entity_bytes, write_list_of_entities,
+    write_list_of_entities_bytes,
 };

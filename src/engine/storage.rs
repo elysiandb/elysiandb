@@ -1,4 +1,6 @@
-use crate::api::{self, ImportData, ImportRejection};
+use std::collections::BTreeMap;
+
+use crate::api::{self, ImportItem, ImportRejection};
 use crate::gocompat::errors::BoxError;
 use crate::storage;
 
@@ -9,10 +11,10 @@ pub use crate::api::{
     get_entity_schema, get_list_of_ids, import_all, is_core_entity_type, iterate_entities,
     list_entities, list_entity_types, list_public_entity_types, read_entity_by_id,
     restore_entities, update_entity_by_id, update_entity_schema, update_list_of_entities,
-    write_entity, write_entity_bytes, write_list_of_entities,
+    write_entity, write_entity_bytes, write_list_of_entities, write_list_of_entities_bytes,
 };
 
-pub fn validate_import(data: &ImportData) -> Vec<ImportRejection> {
+pub fn validate_import<T: ImportItem>(data: &BTreeMap<Vec<u8>, Vec<T>>) -> Vec<ImportRejection> {
     api::validate_import(data, &get_entity_schema)
 }
 

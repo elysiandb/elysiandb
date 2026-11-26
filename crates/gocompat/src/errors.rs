@@ -30,6 +30,40 @@ pub fn new(msg: impl Into<String>) -> BoxError {
     Box::new(Error::new(msg))
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Bytes {
+    msg: Vec<u8>,
+}
+
+impl Bytes {
+    pub fn new(msg: impl Into<Vec<u8>>) -> Bytes {
+        Bytes { msg: msg.into() }
+    }
+
+    pub fn message(&self) -> &[u8] {
+        &self.msg
+    }
+}
+
+impl fmt::Display for Bytes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&crate::utf8::decode_string(&self.msg))
+    }
+}
+
+impl StdError for Bytes {}
+
+pub fn new_bytes(msg: impl Into<Vec<u8>>) -> BoxError {
+    Box::new(Bytes::new(msg))
+}
+
+pub fn message_bytes(err: &(dyn StdError + 'static)) -> Vec<u8> {
+    match err.downcast_ref::<Bytes>() {
+        Some(b) => b.message().to_vec(),
+        None => err.to_string().into_bytes(),
+    }
+}
+
 #[derive(Debug)]
 pub struct Wrapped {
     msg: String,
