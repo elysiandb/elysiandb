@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [e2e-http, golden-http, golden-ops, rest]
+        group: [http-security, api-hooks, storage-ops, others]
     env:
       GROUP: ${{ matrix.group }}
     defaults:
@@ -60,7 +60,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: coverage
-          save-if: ${{ matrix.group == 'rest' }}
+          save-if: ${{ matrix.group == 'others' }}
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2

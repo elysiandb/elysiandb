@@ -1,4 +1,4 @@
-[e2e-http]
+[http-security]
 e2e_http
 golden_security
 compat
@@ -6,14 +6,14 @@ security_test
 httpd_test
 http_security_test
 
-[golden-http]
+[api-hooks]
 golden_http
 e2e_process
 api_test
 hook_test
 golden_gocompat_unicode
 
-[golden-ops]
+[storage-ops]
 golden_ops
 durable_test
 datastore_test
@@ -27,5 +27,5 @@ journal_test
 golden_persistence
 golden_engine
 
-[rest]
+[others]
 *
