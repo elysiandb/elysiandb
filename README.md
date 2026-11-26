@@ -94,16 +94,6 @@ You can combine filters, logical operators, sorting, pagination, projections, an
 
 Queries are deterministic, type-aware, and executed predictably, making them easy to debug and safe to cache.
 
-## Performance
-
-ElysianDB is designed for low latency and high throughput.
-
-Paged, filtered, sorted, counted and searched requests use indexes and cost about the same on 1,000 or 60,000 documents, and writes are grouped into a few disk writes.
-
-On a MacBook Pro M4, mixed workloads with CRUD, filtering, sorting, nested writes, and includes reach tens of thousands of requests per second with sub-millisecond latencies under moderate load.
-
-These are real API scenarios, not synthetic microbenchmarks.
-
 ## Running in Production
 
 * **Hot backup:** `GET /api/backup`, or `elysiandb backup --url <address> --user <name> --output <folder>` with the password in `ELYSIANDB_PASSWORD`. One consistent instant, in a stream, without stopping the server or holding writes. Archives keep format v1 and travel both ways between versions.
