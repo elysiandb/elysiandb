@@ -210,6 +210,10 @@ fn periodic_backups_log_their_failures_and_keep_the_newest_archives() {
         .count();
     assert_eq!(kept, 7);
 
+    if unsafe { libc::geteuid() } == 0 {
+        return;
+    }
+
     std::thread::sleep(std::time::Duration::from_millis(1100));
     std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o500)).expect("chmod");
     backup::run_periodic(&folder_text, 3);
@@ -347,8 +351,13 @@ fn entry_names(data: &[u8]) -> Vec<String> {
     names
 }
 
+fn crosses_threads<T: Send>() {}
+
 #[test]
 fn a_backup_without_an_open_store_spools_its_entries_in_a_private_folder() {
+    crosses_threads::<backup::Source>();
+    crosses_threads::<Options<'static>>();
+
     let _ = storage::close();
     let dir = TempDir::new();
     let spool = dir.path().join("tmp");
@@ -395,4 +404,80 @@ fn a_backup_without_an_open_store_spools_its_entries_in_a_private_folder() {
         entry_names(&buf),
         [backup::MANIFEST_PATH, backup::KEY_PATH, backup::KV_PATH]
     );
+}
+
+const DEPTH: usize = 9990;
+const SMALL_STACK: usize = 256 << 10;
+
+fn deep_document() -> Vec<u8> {
+    let mut doc = br#"{"id":"deep","t":""#.to_vec();
+    doc.push(0x5c);
+    doc.extend_from_slice(br#"u0041","x":"#);
+    doc.extend(std::iter::repeat_n(b'[', DEPTH));
+    doc.extend(std::iter::repeat_n(b']', DEPTH));
+    doc.push(b'}');
+    doc
+}
+
+fn on_a_small_stack<T: Send>(f: impl FnOnce() -> T + Send) -> T {
+    std::thread::scope(|s| {
+        std::thread::Builder::new()
+            .stack_size(SMALL_STACK)
+            .spawn_scoped(s, f)
+            .expect("thread")
+            .join()
+            .expect("small stack")
+    })
+}
+
+#[test]
+fn deeply_nested_documents_are_backed_up_and_restored_without_recursion() {
+    let _ = storage::close();
+    let dir = TempDir::new();
+    let mut cfg = Config::default();
+    cfg.store.folder = dir.path().join("data").to_string_lossy().into_owned();
+    cfg.store.shards = 4;
+    globals::set_config(Some(Arc::new(cfg)));
+    storage::load_db();
+
+    let bytes = deep_document();
+    let mut doc = Map::new();
+    json::unmarshal(&bytes, &mut doc).expect("deep document");
+    storage::engine()
+        .expect("engine")
+        .update(|tx| {
+            tx.put_bytes(b"deep", b"deep", bytes.clone(), Some(doc.clone()))?;
+            tx.ensure_type(b"deep");
+            Ok(())
+        })
+        .expect("put");
+    drop(doc);
+
+    let archive = on_a_small_stack(|| {
+        let mut buf = Vec::new();
+        backup::create(&mut buf, Time::now()).expect("backup");
+        buf
+    });
+
+    let manifest = on_a_small_stack(|| backup::verify(archive.as_slice()).expect("verify"));
+    let deep: Vec<_> = manifest
+        .entities
+        .iter()
+        .filter(|e| e.name.as_bytes() == b"deep")
+        .collect();
+    assert_eq!(deep.len(), 1);
+    assert_eq!(deep[0].documents, 1);
+
+    let report =
+        on_a_small_stack(|| backup::restore(Cursor::new(archive.clone())).expect("restore"));
+    assert_eq!(report.entities.get(b"deep".as_slice()), Some(&1));
+
+    let stored = api::read_entity_bytes_by_id(b"deep", b"deep").expect("restored");
+    assert!(stored.starts_with(br#"{"id":"deep","t":"A","x":[[["#));
+    assert_eq!(
+        String::from_utf8_lossy(&stored[stored.len() - 40..]),
+        String::from_utf8_lossy(&bytes[bytes.len() - 40..])
+    );
+    assert_eq!(stored.len(), bytes.len() - 5);
+    let _ = storage::close();
 }

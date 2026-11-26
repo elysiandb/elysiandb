@@ -2,6 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::Cursor;
 use std::sync::Arc;
 
+use std::io::Read;
+
+use elysiandb::archive::{gzip, tar};
 use elysiandb::backup::{self, ArchiveError, Options, Report};
 use elysiandb::configuration::Config;
 use elysiandb::globals;
@@ -316,6 +319,7 @@ fn rebackup() -> Vec<u8> {
 fn go_archives_restore_like_go_and_back_up_again_like_go() {
     let mut rows = 0;
     let mut rebackups = 0;
+    let mut differing: Vec<(String, Vec<String>)> = Vec::new();
     for row in &read_jsonl("ops/archives/restore.jsonl") {
         let file = str_field(row, "file");
         assert_eq!(row.get("exit").and_then(Value::as_i64), Some(0), "{file}");
@@ -331,7 +335,8 @@ fn go_archives_restore_like_go_and_back_up_again_like_go() {
         );
         assert!(!backup::restore_was_interrupted(), "{file}");
 
-        let again = normalized(&rebackup());
+        let again_tar = rebackup();
+        let again = normalized(&again_tar);
         let equal = gunzip(&data)
             .map(|original| normalized(&original) == again)
             .unwrap_or(false);
@@ -344,12 +349,103 @@ fn go_archives_restore_like_go_and_back_up_again_like_go() {
         if let Some(rel) = row.get("rebackup").and_then(Value::as_str) {
             assert!(normalized(&archive(rel)) == again, "{file}: {rel}");
             rebackups += 1;
+        } else if !equal {
+            let original = gunzip_partial(&data);
+            differing.push((file.to_string(), differences(&original, &again_tar)));
+            let go_keys = tar_entries(&original)
+                .remove(backup::KV_PATH)
+                .expect("go keys");
+            if let Some(want) = expected_keys(file, &go_keys) {
+                let ours = tar_entries(&again_tar)
+                    .remove(backup::KV_PATH)
+                    .expect("keys");
+                assert!(ours == want, "{file}: {}", String::from_utf8_lossy(&ours));
+            }
+            if let Some((_, same_as)) = SAME_AS_GO.iter().find(|(f, _)| *f == file) {
+                assert!(normalized(&archive(same_as)) == again, "{file}: {same_as}");
+            }
         }
         rows += 1;
     }
 
     assert_eq!(rows, RESTORE_ROWS);
     assert_eq!(rebackups, REBACKUP_ROWS);
+    let want: Vec<(String, Vec<String>)> = REBACKUP_DIFFERENCES
+        .iter()
+        .map(|(f, d)| (f.to_string(), d.iter().map(|s| s.to_string()).collect()))
+        .collect();
+    assert_eq!(differing, want);
+}
+
+const SAME_AS_GO: [(&str, &str); 1] = [("seed/seed.tar.gz", "seed-only/backup.tar")];
+
+const KV_AND_MANIFEST: &[&str] = &["kv/keys.jsonl", "manifest.json"];
+const NEW_ADMIN: &[&str] = &[
+    "entities/_elysiandb_core_user.jsonl",
+    "manifest.json",
+    "schemas/_elysiandb_core_user.json",
+];
+
+const REBACKUP_DIFFERENCES: [(&str, &[&str]); 7] = [
+    ("seed/seed.tar.gz", KV_AND_MANIFEST),
+    ("api/periodic.tar.gz", KV_AND_MANIFEST),
+    ("api/hot.tar.gz", KV_AND_MANIFEST),
+    ("api/backup.tar.gz", KV_AND_MANIFEST),
+    ("valid/gzip-trailer-missing.tar.gz", NEW_ADMIN),
+    ("valid/gzip-bad-crc.tar.gz", NEW_ADMIN),
+    ("valid/gzip-bad-size.tar.gz", NEW_ADMIN),
+];
+
+fn expected_keys(file: &str, go: &[u8]) -> Option<Vec<u8>> {
+    let text = String::from_utf8(go.to_vec()).expect("utf8 keys");
+    if file == "seed/seed.tar.gz" {
+        let kept: String = text
+            .lines()
+            .filter(|l| !l.starts_with(r#"{"key":"old","#))
+            .map(|l| format!("{l}\n"))
+            .collect();
+        return Some(kept.into_bytes());
+    }
+    if file.starts_with("api/") {
+        let escape = format!("{}ufffd", '\\');
+        assert!(text.contains(&escape), "{file}");
+        return Some(text.replace(&escape, "\u{fffd}").into_bytes());
+    }
+    None
+}
+
+fn gunzip_partial(data: &[u8]) -> Vec<u8> {
+    let mut out = Vec::new();
+    if let Ok(mut r) = gzip::new_reader(data) {
+        let _ = r.read_to_end(&mut out);
+    }
+    out
+}
+
+fn tar_entries(data: &[u8]) -> BTreeMap<String, Vec<u8>> {
+    let mut out = BTreeMap::new();
+    let mut tr = tar::Reader::new(data);
+    while let Ok(Some(header)) = tr.next() {
+        let mut content = Vec::new();
+        let _ = tr.read_to_end(&mut content);
+        let name = String::from_utf8_lossy(&header.name).into_owned();
+        if name == backup::MANIFEST_PATH {
+            content = mask_value(&mask_value(&content, "created_at"), "elysiandb_version");
+        }
+        out.insert(name, content);
+    }
+    out
+}
+
+fn differences(go: &[u8], ours: &[u8]) -> Vec<String> {
+    let go = tar_entries(go);
+    let ours = tar_entries(ours);
+    let names: BTreeSet<&String> = go.keys().chain(ours.keys()).collect();
+    names
+        .into_iter()
+        .filter(|name| go.get(*name) != ours.get(*name))
+        .cloned()
+        .collect()
 }
 
 fn go_tars_of(dataset: &str) -> Vec<(String, Vec<u8>)> {
