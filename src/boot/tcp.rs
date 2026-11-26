@@ -58,6 +58,7 @@ static NEXT_CONN: AtomicU64 = AtomicU64::new(0);
 pub enum AddrError {
     Invalid(String),
     Unresolvable(String),
+    NotIpv4(String),
     Listen(String, io::Error),
 }
 
@@ -70,6 +71,7 @@ impl fmt::Display for AddrError {
             AddrError::Unresolvable(host) => {
                 write!(f, "cannot resolve {}", quote_text(host.as_bytes()))
             }
+            AddrError::NotIpv4(addr) => write!(f, "cannot listen on {addr}: not an IPv4 address"),
             AddrError::Listen(addr, err) if err.kind() == ErrorKind::AddrInUse => {
                 write!(f, "cannot listen on {addr}: address already in use")
             }
@@ -147,7 +149,7 @@ pub fn resolve_tcp_addr(addr: &str) -> Result<(Option<IpAddr>, u16), AddrError> 
     Ok((Some(pick.ip()), port))
 }
 
-fn go_addr(ip: Option<IpAddr>, port: u16) -> String {
+pub(crate) fn go_addr(ip: Option<IpAddr>, port: u16) -> String {
     match ip {
         None => format!(":{port}"),
         Some(IpAddr::V4(v4)) => format!("{v4}:{port}"),

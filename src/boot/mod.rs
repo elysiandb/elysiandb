@@ -20,7 +20,8 @@ pub use monitoring::{
     boot_monitoring, monitoring_sources, warn_if_authentication_is_off_on_public_address,
 };
 pub use server::{
-    changes_data, http_connections, new_http_handler, refuse_writes_without_disk, stop_http,
+    changes_data, http_connections, listen_tcp4, new_http_handler, new_http_server, new_router,
+    refuse_writes_without_disk, start_http, stop_http,
 };
 pub use stat::boot_stats;
 pub use tcp::{

@@ -12,9 +12,9 @@ fn free_port() -> u16 {
     ln.local_addr().expect("local address").port()
 }
 
-fn tcp_only_config(port: u16) -> String {
+fn server_config(http: u16, tcp: u16) -> String {
     format!(
-        "store:\n  folder: data\n  shards: 4\nserver:\n  http: {{ enabled: false, host: 127.0.0.1, port: 1 }}\n  tcp: {{ enabled: true, host: 127.0.0.1, port: {port} }}\nlog:\n  level: info\n  format: text\nsecurity:\n  authentication:\n    enabled: false\n"
+        "store:\n  folder: data\n  shards: 4\nserver:\n  http: {{ enabled: true, host: 127.0.0.1, port: {http} }}\n  tcp: {{ enabled: true, host: 127.0.0.1, port: {tcp} }}\nlog:\n  level: info\n  format: text\nsecurity:\n  authentication:\n    enabled: false\nadminui:\n  enabled: true\n"
     )
 }
 
@@ -28,7 +28,13 @@ struct Server {
 impl Server {
     fn start(dir: &Path) -> Server {
         let port = free_port();
-        std::fs::write(dir.join("s.yaml"), tcp_only_config(port)).expect("config");
+        let http = loop {
+            let p = free_port();
+            if p != port {
+                break p;
+            }
+        };
+        std::fs::write(dir.join("s.yaml"), server_config(http, port)).expect("config");
         let mut child = Command::new(BIN)
             .args(["-config", "s.yaml"])
             .current_dir(dir)
@@ -63,6 +69,8 @@ impl Server {
             port,
         };
         server.wait_for("msg=\"tcp listening\"");
+        server.wait_for("msg=\"admin ui available\"");
+        std::thread::sleep(Duration::from_millis(200));
         server
     }
 
@@ -107,7 +115,6 @@ fn positions(text: &str, needles: &[&str]) -> Vec<usize> {
 fn stops_cleanly(sig: libc::c_int, name: &str) {
     let dir = TempDir::new();
     let server = Server::start(dir.path());
-    server.wait_for("msg=\"ready to serve\"");
     server.signal(sig);
     let (status, out, err) = server.wait();
 
@@ -145,7 +152,6 @@ fn a_second_signal_during_the_shutdown_ends_the_process() {
 
     let dir = TempDir::new();
     let server = Server::start(dir.path());
-    server.wait_for("msg=\"ready to serve\"");
 
     let mut conn =
         TcpStream::connect(SocketAddr::from(([127, 0, 0, 1], server.port))).expect("connect");

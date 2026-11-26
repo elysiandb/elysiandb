@@ -1,21 +1,21 @@
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::net::{Shutdown, SocketAddr, TcpStream};
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Once};
 use std::time::Duration;
 
 use elysiandb::acl;
 use elysiandb::api as api_storage;
+use elysiandb::boot;
 use elysiandb::cache;
 use elysiandb::configuration;
 use elysiandb::globals;
 use elysiandb::gocompat::json::{self, Map, Value};
 use elysiandb::gocompat::time::Duration as GoDuration;
 use elysiandb::hook;
-use elysiandb::httprouter::Router;
 use elysiandb::log;
 use elysiandb::metrics;
-use elysiandb::routing;
 use elysiandb::security;
 use elysiandb::stat;
 use elysiandb::storage;
@@ -43,24 +43,32 @@ pub const SERVER_LEVEL: [(&str, &str); 11] = [
     ("limit", "002-concurrency-503"),
 ];
 
-pub const EXCLUDED: [(&str, &str, &str); 12] = [
-    ("off", "061-monitoring-overview", MONITORING),
-    ("off", "062-monitoring-series", MONITORING),
-    ("off", "063-monitoring-details", MONITORING),
-    ("off", "064-monitoring-logs", MONITORING),
-    ("basic", "065-monitoring-overview", MONITORING),
-    ("basic", "066-monitoring-series", MONITORING),
-    ("basic", "067-monitoring-details", MONITORING),
-    ("basic", "068-monitoring-logs", MONITORING),
-    ("disk-full", "001-write-refused", REFUSED_WRITES),
-    ("disk-full", "002-kv-refused", REFUSED_WRITES),
-    ("disk-full", "003-delete-allowed", REFUSED_WRITES),
-    ("disk-full", "004-read-allowed", REFUSED_WRITES),
+pub const EXCLUDED: [(&str, &str, &str); 0] = [];
+
+pub const MONITORING: [(&str, &str); 8] = [
+    ("off", "061-monitoring-overview"),
+    ("off", "062-monitoring-series"),
+    ("off", "063-monitoring-details"),
+    ("off", "064-monitoring-logs"),
+    ("basic", "065-monitoring-overview"),
+    ("basic", "066-monitoring-series"),
+    ("basic", "067-monitoring-details"),
+    ("basic", "068-monitoring-logs"),
 ];
 
-const MONITORING: &str = "monitoring sources and sampler of boot";
+const MONITORING_SCENARIOS: [&str; 2] = ["off", "basic"];
 
-const REFUSED_WRITES: &str = "refuse_writes_without_disk of boot";
+const MONITORING_TICKS: [(&str, &str, u64); 3] = [
+    ("off", "051-hook-create", 1),
+    ("off", "061-monitoring-overview", 2),
+    ("basic", "065-monitoring-overview", 10),
+];
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Sampler {
+    Thread,
+    Manual,
+}
 
 const ADMIN_UI_CASES: [&str; 6] = [
     "090-admin-redirect",
@@ -85,7 +93,12 @@ const D17_PPROF: &str = ",\"Pprof\":{\"Enabled\":false}";
 
 static INDEX: Once = Once::new();
 
+static FREE_SPACE: AtomicI64 = AtomicI64::new(1 << 40);
+
+const DISK_FULL: &str = "disk-full";
+
 struct Booted {
+    sampler: Sampler,
     data: TempDir,
     _conf: TempDir,
     logs: LogBuffer,
@@ -99,21 +112,22 @@ impl Drop for Booted {
             .server
             .shutdown_with_timeout(Duration::from_secs(5));
         let _ = storage::close();
+        let mut hooks = storage::hooks();
+        hooks.free_space_probe = None;
+        storage::set_hooks(hooks);
         log::set_output(None, false);
         let _ = log::configure(&log::Options::default());
-        metrics::reset();
+        if self.sampler == Sampler::Thread {
+            metrics::reset();
+        }
     }
 }
 
-fn new_router() -> Router {
-    let mut r = Router::new();
-    r.save_matched_route_path = true;
-    r.panic_handler = Some(observe::panic_handler());
-    routing::register_routes(&mut r);
-    r
+fn boot(scenario: &str) -> Booted {
+    boot_with(scenario, Sampler::Thread)
 }
 
-fn boot(scenario: &str) -> Booted {
+fn boot_with(scenario: &str, sampler: Sampler) -> Booted {
     INDEX.call_once(api_storage::index::register);
     let data = TempDir::new();
     let conf = TempDir::new();
@@ -141,11 +155,19 @@ fn boot(scenario: &str) -> Booted {
         panic!("{scenario}: {e}");
     }
     log::set_output(Some(Box::new(logs.clone())), false);
-    metrics::reset();
+    if sampler == Sampler::Thread {
+        metrics::reset();
+    }
     observe::reset_throttles();
     observe::install_panic_hook();
     globals::set_starting(false);
     security::reset_login_attempts();
+    if scenario == DISK_FULL {
+        FREE_SPACE.store(1 << 40, Ordering::SeqCst);
+        let mut hooks = storage::hooks();
+        hooks.free_space_probe = Some(Arc::new(|| Ok(FREE_SPACE.load(Ordering::SeqCst))));
+        storage::set_hooks(hooks);
+    }
 
     if cfg.api.cache.enabled {
         cache::init_cache(GoDuration(
@@ -162,16 +184,19 @@ fn boot(scenario: &str) -> Booted {
     if cfg.stats.enabled {
         stat::init();
     }
+    match sampler {
+        Sampler::Thread => boot::boot_monitoring(),
+        Sampler::Manual => metrics::set_sources(boot::monitoring_sources()),
+    }
 
-    let chain = api::close_after_unread_body(observe::middleware(security::protect(
-        new_router().into_handler(),
-    )));
+    let chain = api::close_after_unread_body(boot::new_http_handler(boot::new_router()));
     let mut server_cfg = new_http_server_config(100_000);
     server_cfg.handler = chain;
     server_cfg.header_received = Some(api::streaming_routes);
     let running = Running::start(server_cfg);
 
     Booted {
+        sampler,
         data,
         _conf: conf,
         logs,
@@ -355,6 +380,10 @@ pub fn excluded(scenario: &str, id: &str) -> bool {
     EXCLUDED.iter().any(|(s, i, _)| *s == scenario && *i == id)
 }
 
+pub fn monitoring(scenario: &str, id: &str) -> bool {
+    MONITORING.iter().any(|(s, i)| *s == scenario && *i == id)
+}
+
 pub fn server_level(scenario: &str, id: &str) -> bool {
     SERVER_LEVEL.iter().any(|(s, i)| *s == scenario && *i == id)
 }
@@ -385,10 +414,52 @@ pub fn send_raw_with_logs(scenario: &str, requests: &[&[u8]]) -> (Vec<Vec<u8>>, 
 }
 
 pub fn replay(scenario: &str) -> Replay {
+    replay_with(scenario, Sampler::Thread, &mut Clock::default())
+}
+
+#[derive(Default)]
+struct Clock {
+    start: Option<metrics::Moment>,
+    ticks: u64,
+}
+
+impl Clock {
+    fn tick_until(&mut self, last: u64) {
+        let start = self.start.get_or_insert_with(metrics::Moment::now).clone();
+        while self.ticks <= last {
+            metrics::tick(start.add(GoDuration(self.ticks as i64 * GoDuration::SECOND.0)));
+            self.ticks += 1;
+        }
+    }
+}
+
+pub fn replay_monitoring() -> usize {
+    let mut clock = Clock::default();
+    let mut replayed = 0;
+    for scenario in MONITORING_SCENARIOS {
+        let r = replay_with(scenario, Sampler::Manual, &mut clock);
+        assert_eq!(r.replayed + r.skipped, r.total, "{scenario}");
+        replayed += r.replayed;
+    }
+    replayed
+}
+
+fn replay_with(scenario: &str, sampler: Sampler, clock: &mut Clock) -> Replay {
     let ids = case_ids(scenario);
-    let booted = boot(scenario);
+    let booted = boot_with(scenario, sampler);
+    if sampler == Sampler::Manual && clock.ticks == 0 {
+        clock.tick_until(0);
+    }
     if SEEDED.contains(&scenario) {
         seed_big(booted.running.addr);
+    }
+    if scenario == DISK_FULL {
+        post_json(
+            booted.running.addr,
+            "/api/book",
+            r#"{"id":"d1","title":"Before"}"#,
+        );
+        FREE_SPACE.store(0, Ordering::SeqCst);
     }
     let folder = booted.data.path().to_string_lossy().into_owned();
     let mut norm = Normalizer::new(&folder, &std::env::temp_dir().to_string_lossy());
@@ -398,7 +469,16 @@ pub fn replay(scenario: &str) -> Replay {
     let mut skipped = 0;
 
     for id in &ids {
+        let watched = monitoring(scenario, id);
+        if sampler == Sampler::Manual
+            && let Some((_, _, last)) = MONITORING_TICKS
+                .iter()
+                .find(|(s, before, _)| *s == scenario && before == id)
+        {
+            clock.tick_until(*last);
+        }
         if excluded(scenario, id)
+            || (watched && sampler == Sampler::Thread)
             || server_level(scenario, id)
             || (built && ADMIN_UI_CASES.contains(&id.as_str()))
         {

@@ -13,6 +13,7 @@ mod lifecycle;
 mod logs;
 mod metrics;
 mod pty;
+mod remote_client;
 mod tar_archives;
 mod tcp;
 mod tcp_listener;

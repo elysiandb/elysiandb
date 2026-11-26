@@ -81,6 +81,10 @@ pub fn start_server() {
     globals::set_starting(true);
     drop(spawn("announce-ready", announce_ready));
 
+    if cfg.server.http.enabled {
+        drop(spawn("http-listener", boot::start_http));
+    }
+
     if cfg.server.tcp.enabled {
         drop(spawn("tcp-listener", boot::init_tcp));
     }

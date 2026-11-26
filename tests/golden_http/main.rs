@@ -383,12 +383,16 @@ fn run_routed(scenario: &str) {
 fn test_every_case_is_replayed_or_listed() {
     let mut total = 0;
     let mut listed = 0;
+    let mut monitored = 0;
     for scenario in SCENARIOS {
         let ids = routed::case_ids(scenario);
         total += ids.len();
         for id in &ids {
             if routed::excluded(scenario, id) || routed::server_level(scenario, id) {
                 listed += 1;
+            }
+            if routed::monitoring(scenario, id) {
+                monitored += 1;
             }
         }
     }
@@ -400,6 +404,41 @@ fn test_every_case_is_replayed_or_listed() {
     }
     assert_eq!(total, 268);
     assert_eq!(listed, routed::EXCLUDED.len() + routed::SERVER_LEVEL.len());
+    assert_eq!(monitored, routed::MONITORING.len());
+}
+
+const MONITORING_TEST: &str = "test_monitoring_cases_replay_the_go_corpus_in_a_fresh_process";
+
+#[test]
+fn test_monitoring_cases_replay_the_go_corpus_in_a_fresh_process() {
+    if std::env::var_os("RUN_MONITORING_REPLAY").is_some_and(|v| v == "1") {
+        let replayed = routed::replay_monitoring();
+        assert!(replayed > routed::MONITORING.len());
+        println!("monitoring replay done");
+        return;
+    }
+
+    let out = std::process::Command::new(std::env::current_exe().expect("test binary"))
+        .args([
+            MONITORING_TEST,
+            "--exact",
+            "--test-threads=1",
+            "--nocapture",
+        ])
+        .env("RUN_MONITORING_REPLAY", "1")
+        .output()
+        .expect("child test run");
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        out.status.success() && text.contains("monitoring replay done"),
+        "{text}\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
+fn test_routed_disk_full_cases_replay_the_go_corpus() {
+    run_routed("disk-full");
 }
 
 #[test]

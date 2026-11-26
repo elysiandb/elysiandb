@@ -11,6 +11,7 @@ use elysiandb::configuration::{AuthenticationConfig, Config, CrashRecoveryConfig
 use elysiandb::globals;
 use elysiandb::gocompat::json::{self, Map};
 use elysiandb::gocompat::time::Duration as GoDuration;
+use elysiandb::httpd::{Request, RequestCtx};
 use elysiandb::legacy;
 use elysiandb::log::{self, AttrValue, Entry, Level, Options, Query};
 use elysiandb::metrics;
@@ -274,6 +275,96 @@ fn test_boot_monitoring_starts_the_sampler() {
             panic!("the sampler did not record a point");
         }
         std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+fn free_port() -> i64 {
+    let ln = match std::net::TcpListener::bind("127.0.0.1:0") {
+        Ok(ln) => ln,
+        Err(err) => panic!("{err}"),
+    };
+    match ln.local_addr() {
+        Ok(addr) => i64::from(addr.port()),
+        Err(err) => panic!("{err}"),
+    }
+}
+
+#[test]
+fn test_http_handler_adds_request_ids_and_recovers_panics() {
+    let _log = setup_log();
+    let dir = TempDir::new();
+    config(dir.path(), |cfg| {
+        cfg.security.authentication.enabled = false;
+    });
+    storage::load_db();
+    storage::load_json_db();
+
+    let h = boot::new_http_handler(boot::new_router());
+
+    let mut req = Request::new();
+    req.set_request_uri("/health");
+    let mut ctx = RequestCtx::new();
+    ctx.init(&req, None);
+    h(&mut ctx);
+
+    if ctx.response.status_code() != 200 || ctx.response.header.peek("X-Request-Id").is_empty() {
+        panic!(
+            "expected 200 with a request id, got {}",
+            ctx.response.status_code()
+        );
+    }
+}
+
+fn get_status(port: i64, path: &str) -> std::io::Result<u16> {
+    use std::io::{Read, Write};
+    let mut conn = std::net::TcpStream::connect(("127.0.0.1", port as u16))?;
+    conn.set_read_timeout(Some(Duration::from_secs(5)))?;
+    conn.write_all(
+        format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n").as_bytes(),
+    )?;
+    let mut out = Vec::new();
+    conn.read_to_end(&mut out)?;
+    let head = String::from_utf8_lossy(&out);
+    head.split(' ')
+        .nth(1)
+        .and_then(|code| code.parse::<u16>().ok())
+        .ok_or_else(|| std::io::Error::other(format!("no status in {head:?}")))
+}
+
+#[test]
+fn test_start_http() {
+    let _log = setup_log();
+    let port = free_port();
+    let dir = TempDir::new();
+    config(dir.path(), |cfg| {
+        cfg.security.authentication.enabled = false;
+        cfg.server.http = server(true, "127.0.0.1", port);
+    });
+    storage::load_db();
+    storage::load_json_db();
+
+    std::thread::spawn(boot::start_http);
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let got = get_status(port, "/health");
+        if matches!(got, Ok(200)) {
+            break;
+        }
+        if Instant::now() > deadline {
+            panic!("the HTTP server did not answer: {got:?}");
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+
+    let listening = entries(text_query("http listening"));
+    if listening.len() != 1 || attr(&listening[0], "addr") != string(&format!("127.0.0.1:{port}")) {
+        panic!("expected an http listening line, got {listening:?}");
+    }
+
+    let n = boot::http_connections();
+    if n < 0 {
+        panic!("unexpected connection count {n}");
     }
 }
 

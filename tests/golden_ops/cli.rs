@@ -27,6 +27,7 @@ const GO_FLAG: &str = "\u{27e8}go:flag\u{27e9}";
 const GO_OS: &str = "\u{27e8}go:os\u{27e9}";
 const GO_YAML_SYNTAX: &str = "\u{27e8}go:yaml-syntax\u{27e9}";
 const GO_GZIP: &str = "\u{27e8}go:gzip\u{27e9}";
+const GO_HTTP_CLIENT: &str = "\u{27e8}go:http-client\u{27e9}";
 
 const RED: &str = "\x1b[38;5;196m";
 const RESET: &str = "\x1b[0m";
@@ -39,7 +40,12 @@ const REMOTE_ROWS: usize = 7;
 const NO_SUCH_FILE: &str = "No such file or directory (os error 2)";
 const NOT_A_TERMINAL: &str = "Inappropriate ioctl for device (os error 25)";
 
-const MARKERS: [(&str, &str, &str); 14] = [
+const MARKERS: [(&str, &str, &str); 15] = [
+    (
+        "remote refused",
+        GO_HTTP_CLIENT,
+        "request to http://127.0.0.1:<PORT>/api/backup failed: connection refused",
+    ),
     ("help -h", GO_USAGE, USAGE),
     ("help -help", GO_USAGE, USAGE),
     ("help --help", GO_USAGE, USAGE),
@@ -400,7 +406,7 @@ fn cli_golden_matches_go() {
         let stdin = str_field(row, "stdin");
 
         if name.starts_with("remote ") {
-            remote.push(name.to_string());
+            remote.push(row);
             continue;
         }
 
@@ -432,8 +438,112 @@ fn cli_golden_matches_go() {
 
     assert_eq!(local, LOCAL_ROWS);
     assert_eq!(invalid, INVALID_ROWS);
-    assert_eq!(remote.len(), REMOTE_ROWS, "{remote:?}");
+    assert_eq!(replay_remote(&remote), REMOTE_ROWS);
     assert_eq!(local + invalid + remote.len(), ROWS);
+}
+
+fn free_port() -> u16 {
+    loop {
+        let ln = std::net::TcpListener::bind("127.0.0.1:0").expect("free port");
+        let port = ln.local_addr().expect("local address").port();
+        if port != 8088 && port != 8089 {
+            return port;
+        }
+    }
+}
+
+fn remote_mode(name: &str) -> &'static str {
+    match name {
+        "remote off" | "remote refused" => "off",
+        "remote token" | "remote token wrong" => "token",
+        "remote user env password" | "remote user wrong password" => "user",
+        "remote basic" => "basic",
+        other => panic!("unknown remote case {other}"),
+    }
+}
+
+fn run_remote(dir: &Path, row: &Value, port: u16) {
+    let name = str_field(row, "name");
+    let url = format!("http://127.0.0.1:{port}");
+    let args: Vec<String> = strings(row, "args")
+        .into_iter()
+        .map(|a| a.replace("http://127.0.0.1:<PORT>", &url))
+        .collect();
+    let got = run_cli(dir, &args, str_field(row, "stdin"), &env_of(row));
+    let stdout = resolve(name, "stdout", str_field(row, "stdout"));
+    let stderr = resolve(name, "stderr", str_field(row, "stderr"));
+    check(name, row, &got, &stdout, &stderr);
+}
+
+fn stop_server(server: &mut std::process::Child, mode: &str) {
+    unsafe {
+        libc::kill(server.id() as libc::pid_t, libc::SIGINT);
+    }
+    let status = server.wait().expect("wait for the server");
+    assert_eq!(status.code(), Some(0), "{mode} server: {status:?}");
+}
+
+fn replay_remote(rows: &[&Value]) -> usize {
+    let mut played = 0;
+    for mode in ["off", "token", "user", "basic"] {
+        let cases: Vec<&Value> = rows
+            .iter()
+            .copied()
+            .filter(|r| {
+                let name = str_field(r, "name");
+                name != "remote refused" && remote_mode(name) == mode
+            })
+            .collect();
+        let dir = TempDir::new();
+        std::fs::create_dir(dir.path().join("out")).expect("out folder");
+        let port = free_port();
+        write(
+            &dir.path().join("s.yaml"),
+            cli_config(mode, port).as_bytes(),
+        );
+        let mut server = Command::new(BIN)
+            .args(["-config", "s.yaml"])
+            .current_dir(dir.path())
+            .env_clear()
+            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+            .env("HOME", dir.path())
+            .env("TZ", "UTC")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("start the server");
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        while std::net::TcpStream::connect(("127.0.0.1", port)).is_err() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the {mode} server did not start"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(300));
+
+        for row in &cases {
+            run_remote(dir.path(), row, port);
+            played += 1;
+        }
+
+        stop_server(&mut server, mode);
+    }
+
+    for row in rows
+        .iter()
+        .filter(|r| str_field(r, "name") == "remote refused")
+    {
+        let dir = TempDir::new();
+        std::fs::create_dir(dir.path().join("out")).expect("out folder");
+        write(&dir.path().join("s.yaml"), cli_config("off", 1).as_bytes());
+        run_remote(dir.path(), row, free_port());
+        played += 1;
+    }
+
+    played
 }
 
 const RESTORE_ROWS: usize = 19;
